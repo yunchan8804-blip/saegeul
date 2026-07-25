@@ -336,8 +336,7 @@ class InputView(
                 broadcaster.onClientPreeditUpdate(it.data)
             }
             is FcitxEvent.InputPanelEvent -> {
-                preeditEmptyState.updatePreeditEmptyState(preedit = it.data.preedit)
-                broadcaster.onInputPanelUpdate(it.data)
+                handleInputPanelUpdate(it.data)
             }
             is FcitxEvent.IMChangeEvent -> {
                 broadcaster.onImeUpdate(it.data)
@@ -348,6 +347,16 @@ class InputView(
             }
             else -> {}
         }
+    }
+
+    private fun handleInputPanelUpdate(data: FcitxEvent.InputPanelEvent.Data) {
+        val decorated = service.decorateBufferedHangulPreedit(data)
+        preeditEmptyState.updatePreeditEmptyState(preedit = decorated.preedit)
+        broadcaster.onInputPanelUpdate(decorated)
+    }
+
+    fun refreshBufferedHangulPreedit() {
+        handleInputPanelUpdate(fcitx.runImmediately { inputPanelCached })
     }
 
     fun updateSelection(start: Int, end: Int) {

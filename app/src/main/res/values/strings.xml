@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name_release">Fcitx5</string>
     <string name="app_name_debug">Fcitx5 (Debug)</string>
     <string name="save">Save</string>
@@ -151,6 +151,12 @@
     <string name="none">None</string>
     <string name="theme_migrated">Theme has been migrated to the current version</string>
     <string name="keep_keyboard_letters_uppercase">Keep keyboard letters uppercase</string>
+    <string name="buffered_hangul_input" tools:ignore="MissingTranslation">Buffered Hangul compatibility mode</string>
+    <string name="buffered_hangul_input_summary" tools:ignore="MissingTranslation">Keep Hangul composition inside Fcitx and send each completed segment as one unit. Experimental; verify behavior in the target app.</string>
+    <string name="buffered_input_transport" tools:ignore="MissingTranslation">Buffered input delivery</string>
+    <string name="buffered_input_transport_system_paste" tools:ignore="MissingTranslation">System paste (standard editors)</string>
+    <string name="buffered_input_transport_ctrl_v" tools:ignore="MissingTranslation">Ctrl+V (remote and raw-key apps)</string>
+    <string name="buffered_input_transport_direct_commit" tools:ignore="MissingTranslation">Direct commit (no clipboard)</string>
     <string name="choose_input_method">Choose input method</string>
     <string name="edit_clipboard">Edit clipboard</string>
     <string name="clipboard_edit_text_hint">Clipboard content</string>

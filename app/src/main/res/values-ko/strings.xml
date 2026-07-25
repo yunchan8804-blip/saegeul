@@ -91,4 +91,10 @@
     <string name="quickphrase_phrase">구문</string>
     <string name="reload_config">구성 새로고침</string>
     <string name="input_method_options">입력기 옵션</string>
+    <string name="buffered_hangul_input">한글 버퍼 호환 모드</string>
+    <string name="buffered_hangul_input_summary">한글 조합은 Fcitx 내부에서 처리하고 완성된 구간을 한 번에 전달합니다. 실험 기능이므로 대상 앱에서 직접 확인해야 합니다.</string>
+    <string name="buffered_input_transport">버퍼 입력 전달 방식</string>
+    <string name="buffered_input_transport_system_paste">시스템 붙여넣기 (표준 입력창)</string>
+    <string name="buffered_input_transport_ctrl_v">Ctrl+V (원격·Raw 키 앱)</string>
+    <string name="buffered_input_transport_direct_commit">직접 확정 (클립보드 미사용)</string>
     </resources>

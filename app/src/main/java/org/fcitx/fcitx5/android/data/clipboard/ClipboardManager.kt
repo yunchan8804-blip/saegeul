@@ -152,6 +152,9 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     override fun onPrimaryClipChanged() {
         val clip = clipboardManager.primaryClip ?: return
+        // Buffered compatibility mode uses a short-lived clipboard entry only as a transport.
+        // Never persist that implementation detail in Fcitx's user-visible clipboard history.
+        if (clip.isTransientBufferedPaste()) return
         /**
          * skip duplicate ClipData
          * https://developer.android.com/reference/android/content/ClipboardManager.OnPrimaryClipChangedListener#onPrimaryClipChanged()

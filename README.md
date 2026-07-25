@@ -83,10 +83,13 @@ Discuss on Telegram: [@fcitx5_android_group](https://t.me/fcitx5_android_group) 
 
 ### Dependencies
 
-- Android SDK Platform & Build-Tools 35.
-- Android NDK (Side by side) 25 & CMake 3.22.1, they can be installed using SDK Manager in Android Studio or `sdkmanager` command line.
+- JDK 17 (the Android bytecode target remains Java 11).
+- Android SDK Platform 36 & Build-Tools 36.1.0.
+- Android NDK (Side by side) 28.0.13004108 & CMake 3.31.6. They can be installed using SDK Manager in Android Studio or the `sdkmanager` command line.
 - [KDE/extra-cmake-modules](https://github.com/KDE/extra-cmake-modules)
 - GNU Gettext >= 0.20 (for `msgfmt` binary; or install `appstream` if you really have to use gettext <= 0.19.)
+
+The exact Android toolchain versions are defined in [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt).
 
 ### How to set up development environment
 
@@ -146,6 +149,10 @@ The current recommended versions are recorded in [Versions.kt](build-logic/conve
 ![Install CMake](https://user-images.githubusercontent.com/13914967/202184655-3c1ab47c-432f-4bd7-a508-92096482de50.png)
 
 </details>
+
+### Hangul compatibility development
+
+See [Hangul legends and buffered compatibility mode](docs/hangul-buffered-input.md) for the module boundaries, Windows build commands, delivery transports, manual test matrix, and known risks of the experimental buffered input path.
 
 ### Trouble-shooting
 

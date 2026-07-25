@@ -12,6 +12,7 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode
+import org.fcitx.fcitx5.android.input.BufferedInputTransport
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
@@ -39,6 +40,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
         val ignoreSystemCursor = switch(R.string.ignore_sys_cursor, "ignore_system_cursor", false)
+        val bufferedHangulInput = switch(
+            R.string.buffered_hangul_input,
+            "buffered_hangul_input",
+            false,
+            R.string.buffered_hangul_input_summary
+        )
+        val bufferedHangulTransport = enumList(
+            R.string.buffered_input_transport,
+            "buffered_hangul_transport",
+            BufferedInputTransport.SystemPaste
+        ) { bufferedHangulInput.getValue() }
         val hideKeyConfig = switch(R.string.hide_key_config, "hide_key_config", true)
         val disableAnimation = switch(R.string.disable_animation, "disable_animation", false)
         val vivoKeypressWorkaround = switch(

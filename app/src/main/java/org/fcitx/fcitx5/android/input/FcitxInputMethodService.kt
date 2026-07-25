@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.input
 
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.pm.ActivityInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
@@ -14,6 +16,7 @@ import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.os.SystemClock
 import android.text.InputType
 import android.util.LruCache
@@ -46,18 +49,23 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.SubtypeManager
+import org.fcitx.fcitx5.android.core.TextFormatFlag
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.clipboard.TRANSIENT_BUFFERED_PASTE_LABEL
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -67,6 +75,7 @@ import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.alpha
+import org.fcitx.fcitx5.android.utils.clipboardManager
 import org.fcitx.fcitx5.android.utils.forceShowSelf
 import org.fcitx.fcitx5.android.utils.inputMethodManager
 import org.fcitx.fcitx5.android.utils.isTypeNull
@@ -139,6 +148,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val prefs = AppPrefs.getInstance()
     private val inlineSuggestions by prefs.keyboard.inlineSuggestions
     private val ignoreSystemCursor by prefs.advanced.ignoreSystemCursor
+    private val bufferedHangulInputPref = prefs.advanced.bufferedHangulInput
+    private val bufferedHangulTransport by prefs.advanced.bufferedHangulTransport
+
+    private val bufferedHangul = BufferedInputController()
+    private var bufferedHangulSessionActive = false
+    @Volatile
+    private var bufferedHangulEngineResetPending = false
+    private val bufferedPhysicalKeysDown = mutableSetOf<Int>()
+
+    val bufferedHangulPrefix: String
+        get() = if (bufferedHangulSessionActive) bufferedHangul.prefix else ""
+
+    val isBufferedHangulSessionActive: Boolean
+        get() = bufferedHangulSessionActive
 
     private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
         prefs.keyboard.expandKeypressArea,
@@ -186,6 +209,35 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replaceInputViews(it)
     }
 
+    private fun bufferedHangulModeActive(ime: InputMethodEntry): Boolean =
+        BufferedHangulMode.isActive(bufferedHangulInputPref.getValue(), ime)
+
+    private fun effectiveCapabilityFlags(
+        flags: CapabilityFlags,
+        ime: InputMethodEntry
+    ): CapabilityFlags = BufferedHangulMode.effectiveCapabilities(
+        flags,
+        bufferedHangulInputPref.getValue(),
+        ime
+    )
+
+    @Keep
+    private val bufferedHangulInputListener = ManagedPreference.OnChangeListener<Boolean> { _, enabled ->
+        // Finish any editor-owned composing span before changing where preedit is rendered.
+        currentInputConnection?.finishComposingText()
+        resetComposingState()
+        if (!enabled && bufferedHangulSessionActive) {
+            submitBufferedHangul()
+        }
+        bufferedHangulSessionActive = bufferedHangulModeActive(
+            fcitx.runImmediately { inputMethodEntryCached }
+        )
+        if (!bufferedHangulSessionActive) clearBufferedHangul()
+        postFcitxJob {
+            setCapFlags(effectiveCapabilityFlags(capabilityFlags, inputMethodEntryCached))
+        }
+    }
+
     /**
      * Post a fcitx operation to [jobs] to be executed
      *
@@ -197,7 +249,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val job = fcitx.lifecycleScope.launch(start = CoroutineStart.LAZY) {
             fcitx.runOnReady(block)
         }
-        jobs.trySend(job)
+        if (jobs.trySend(job).isFailure) job.cancel()
         return job
     }
 
@@ -216,6 +268,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             it.registerOnChangeListener(recreateInputViewListener)
         }
         prefs.candidates.registerOnChangeListener(recreateCandidatesViewListener)
+        bufferedHangulInputPref.registerOnChangeListener(bufferedHangulInputListener)
         ThemeManager.addOnChangedListener(onThemeChangeListener)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             postFcitxJob {
@@ -231,9 +284,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
-                commitText(event.data.text, event.data.cursor)
+                if (bufferedHangulSessionActive) {
+                    bufferedHangul.capture(event.data.text)
+                } else {
+                    commitText(event.data.text, event.data.cursor)
+                }
             }
             is FcitxEvent.KeyEvent -> event.data.let event@{
+                if (handleBufferedHangulForwardedKey(it)) return@event
                 if (it.states.virtual) {
                     // KeyEvent from virtual keyboard
                     when (it.sym.sym) {
@@ -310,15 +368,26 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 handleDeleteSurrounding(before, after)
             }
             is FcitxEvent.IMChangeEvent -> {
+                val wasBufferedHangul = bufferedHangulSessionActive
+                val isBufferedHangul = bufferedHangulModeActive(event.data)
+                if (wasBufferedHangul && !isBufferedHangul) {
+                    submitBufferedHangul()
+                }
+                bufferedHangulSessionActive = isBufferedHangul
+                if (!wasBufferedHangul || !isBufferedHangul) clearBufferedHangul()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     val im = event.data.uniqueName
-                    val subtype = SubtypeManager.subtypeOf(im) ?: return
-                    skipNextSubtypeChange = im
-                    // [^1]: notify system that input method subtype has changed
-                    switchInputMethod(InputMethodUtil.componentName, subtype)
+                    SubtypeManager.subtypeOf(im)?.let { subtype ->
+                        skipNextSubtypeChange = im
+                        // [^1]: notify system that input method subtype has changed
+                        switchInputMethod(InputMethodUtil.componentName, subtype)
+                    }
                 }
                 if (inputDeviceMgr.evaluateOnInputMethodActivate()) {
                     showStatusIcon(StatusIconMapping.fromEntry(event.data))
+                }
+                postFcitxJob {
+                    setCapFlags(effectiveCapabilityFlags(capabilityFlags, event.data))
                 }
             }
             is FcitxEvent.SwitchInputMethodEvent -> {
@@ -420,20 +489,28 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun commitText(text: String, cursor: Int = -1) {
-        val ic = currentInputConnection ?: return
+        // Clipboard entries, emoji, and toolbar actions bypass Fcitx's CommitString event. Flush
+        // the internal Hangul segment first so those direct inserts cannot overtake it.
+        if (bufferedHangulSessionActive && !submitBufferedHangul()) return
+        commitTextToEditor(text, cursor)
+    }
+
+    private fun commitTextToEditor(text: String, cursor: Int = -1): Boolean {
+        val ic = currentInputConnection ?: return false
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
             val c = if (cursor == -1) text.length else cursor
             val target = composing.start + c
             resetComposingState()
+            var dispatched = true
             ic.withBatchEdit {
                 if (selection.current.start != target) {
                     selection.predict(target)
-                    ic.setSelection(target, target)
+                    dispatched = ic.setSelection(target, target) && dispatched
                 }
-                ic.finishComposingText()
+                dispatched = ic.finishComposingText() && dispatched
             }
-            return
+            return dispatched
         }
         // committed text should replace composing (if any), replace selected range (if any),
         // or simply prepend before cursor
@@ -441,19 +518,220 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         if (cursor == -1) {
             selection.predict(start + text.length)
-            ic.commitText(text, 1)
+            return ic.commitText(text, 1)
         } else {
             val target = start + cursor
             selection.predict(target)
+            var dispatched = true
             ic.withBatchEdit {
-                commitText(text, 1)
-                setSelection(target, target)
+                dispatched = commitText(text, 1) && dispatched
+                dispatched = setSelection(target, target) && dispatched
+            }
+            return dispatched
+        }
+    }
+
+    private fun handleBufferedHangulForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
+        if (!data.states.virtual && data.up && bufferedPhysicalKeysDown.remove(data.sym.sym)) {
+            cachedKeyEvents.remove(data.timestamp)
+            return true
+        }
+        if (!bufferedHangulSessionActive) return false
+        val hasShortcutModifier = data.states.ctrl || data.states.alt || data.states.meta ||
+            data.states.has(KeyState.Super) || data.states.has(KeyState.Super2) ||
+            data.states.has(KeyState.Hyper)
+        if (hasShortcutModifier) {
+            // Flush without touching the clipboard before forwarding shortcuts such as Ctrl+V.
+            // Otherwise their Unicode value could become literal text or a paste shortcut could
+            // overtake the pending Hangul segment.
+            if (!data.up) submitBufferedHangul(BufferedInputTransport.DirectCommit)
+            if (!data.states.virtual) return false
+            val keyCode = data.sym.keyCode
+            if (keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                Timber.w("Unable to forward buffered shortcut KeyEvent: $data")
+                return true
+            }
+            val eventTime = SystemClock.uptimeMillis()
+            if (data.up) sendUpKeyEvent(eventTime, keyCode, data.states.metaState)
+            else sendDownKeyEvent(eventTime, keyCode, data.states.metaState)
+            return true
+        }
+        val bufferedKey = when (data.sym.sym) {
+            FcitxKeyMapping.FcitxKey_BackSpace,
+            FcitxKeyMapping.FcitxKey_Return,
+            FcitxKeyMapping.FcitxKey_Left,
+            FcitxKeyMapping.FcitxKey_Right -> true
+            else -> data.unicode > 0
+        }
+        if (!bufferedKey) return false
+        if (data.up) return data.states.virtual
+        val handled = when (data.sym.sym) {
+            FcitxKeyMapping.FcitxKey_BackSpace -> {
+                val preeditEmpty = fcitx.runImmediately { inputPanelCached.preedit.isEmpty() }
+                if (preeditEmpty) {
+                    if (bufferedHangul.deleteLastCodePoint()) {
+                        inputView?.refreshBufferedHangulPreedit()
+                    } else {
+                        handleBackspaceKey()
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            FcitxKeyMapping.FcitxKey_Return -> {
+                if (submitBufferedHangul()) handleReturnKey()
+                true
+            }
+            FcitxKeyMapping.FcitxKey_Left -> {
+                if (submitBufferedHangul()) sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT)
+                true
+            }
+            FcitxKeyMapping.FcitxKey_Right -> {
+                if (submitBufferedHangul()) sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT)
+                true
+            }
+            else -> if (data.unicode > 0) {
+                bufferedHangul.capture(Character.toString(data.unicode))
+                submitBufferedHangul()
+                true
+            } else {
+                false
+            }
+        }
+        if (handled && !data.states.virtual) {
+            cachedKeyEvents.remove(data.timestamp)
+            bufferedPhysicalKeysDown.add(data.sym.sym)
+        }
+        return handled
+    }
+
+    /**
+     * Returns a copy for Fcitx's own preedit UI. The target InputConnection never sees it.
+     */
+    fun decorateBufferedHangulPreedit(data: FcitxEvent.InputPanelEvent.Data):
+        FcitxEvent.InputPanelEvent.Data {
+        val prefix = bufferedHangulPrefix
+        if (prefix.isEmpty() && !bufferedHangulEngineResetPending) return data
+        val source = if (bufferedHangulEngineResetPending) FormattedText.Empty else data.preedit
+        if (prefix.isEmpty()) return data.copy(preedit = source)
+        val cursor = source.cursor.let { if (it < 0) prefix.length else prefix.length + it }
+        val combined = FormattedText(
+            arrayOf(prefix, *source.strings),
+            intArrayOf(TextFormatFlag.NoFlag.flag, *source.flags),
+            cursor
+        )
+        return data.copy(preedit = combined)
+    }
+
+    private fun clearBufferedHangul() {
+        bufferedHangul.clear()
+        inputView?.refreshBufferedHangulPreedit()
+    }
+
+    /**
+     * Submit one complete buffered segment. Transport choice is explicit: paste acknowledgements
+     * do not report whether the target editor actually handled the action, so automatic fallback
+     * would risk duplicate input.
+     */
+    private fun queueBufferedHangulEngineReset() {
+        if (bufferedHangulEngineResetPending) return
+        bufferedHangulEngineResetPending = true
+        postFcitxJob { reset() }.invokeOnCompletion {
+            bufferedHangulEngineResetPending = false
+        }
+    }
+
+    private fun submitBufferedHangul(forcedTransport: BufferedInputTransport? = null): Boolean {
+        val currentPreedit = if (bufferedHangulEngineResetPending) {
+            ""
+        } else {
+            fcitx.runImmediately { inputPanelCached.preedit.toString() }
+        }
+        val text = bufferedHangul.snapshot(currentPreedit)
+        if (text.isEmpty()) return true
+        val dispatched = dispatchBufferedText(text, forcedTransport)
+        if (dispatched) {
+            bufferedHangul.clear()
+        } else if (currentPreedit.isNotEmpty()) {
+            // Preserve the tail before resetting the engine so a retry cannot duplicate it.
+            bufferedHangul.capture(currentPreedit)
+        }
+        if (currentPreedit.isNotEmpty()) queueBufferedHangulEngineReset()
+        inputView?.refreshBufferedHangulPreedit()
+        return dispatched
+    }
+
+    private fun dispatchBufferedText(
+        text: String,
+        forcedTransport: BufferedInputTransport? = null
+    ): Boolean {
+        if (currentInputConnection == null) return false
+        val transport = if (BufferedHangulMode.mustAvoidClipboard(capabilityFlags)) {
+            BufferedInputTransport.DirectCommit
+        } else {
+            forcedTransport ?: bufferedHangulTransport
+        }
+        return when (transport) {
+            BufferedInputTransport.DirectCommit -> {
+                commitTextToEditor(text)
+            }
+            BufferedInputTransport.SystemPaste -> {
+                if (!setBufferedClipboard(text)) return false
+                try {
+                    // The Boolean only acknowledges dispatch across RemoteInputConnection; it is
+                    // not the target editor's paste result and must not drive an auto fallback.
+                    val dispatched =
+                        currentInputConnection?.performContextMenuAction(android.R.id.paste) == true
+                    if (dispatched) predictBufferedInsertion(text)
+                    dispatched
+                } catch (exception: RuntimeException) {
+                    Timber.w(exception, "Unable to dispatch buffered system paste")
+                    false
+                }
+            }
+            BufferedInputTransport.CtrlV -> {
+                if (!setBufferedClipboard(text)) return false
+                val dispatched = sendCombinationKeyEvents(KeyEvent.KEYCODE_V, ctrl = true)
+                if (dispatched) predictBufferedInsertion(text)
+                dispatched
             }
         }
     }
 
-    private fun sendDownKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) {
-        currentInputConnection?.sendKeyEvent(
+    private fun predictBufferedInsertion(text: String) {
+        selection.predict(selection.latest.start + text.length)
+    }
+
+    private fun setBufferedClipboard(text: String): Boolean {
+        val clip = ClipData.newPlainText(TRANSIENT_BUFFERED_PASTE_LABEL, text).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                description.extras = PersistableBundle().apply {
+                    val key = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        ClipDescription.EXTRA_IS_SENSITIVE
+                    } else {
+                        "android.content.extra.IS_SENSITIVE"
+                    }
+                    putBoolean(key, true)
+                }
+            }
+        }
+        return try {
+            // Leave the submitted text in the clipboard. Remote InputConnection dispatch is
+            // asynchronous; restoring the previous clip here can paste the wrong content.
+            clipboardManager.setPrimaryClip(clip)
+            true
+        } catch (exception: RuntimeException) {
+            Timber.w(exception, "Unable to prepare buffered clipboard transport")
+            false
+        }
+    }
+
+    private fun sendDownKeyEvent(
+        eventTime: Long,
+        keyEventCode: Int,
+        metaState: Int = 0
+    ): Boolean = currentInputConnection?.sendKeyEvent(
             KeyEvent(
                 eventTime,
                 eventTime,
@@ -465,11 +743,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 ScancodeMapping.keyCodeToScancode(keyEventCode),
                 KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
             )
-        )
-    }
+        ) == true
 
-    private fun sendUpKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) {
-        currentInputConnection?.sendKeyEvent(
+    private fun sendUpKeyEvent(
+        eventTime: Long,
+        keyEventCode: Int,
+        metaState: Int = 0
+    ): Boolean = currentInputConnection?.sendKeyEvent(
             KeyEvent(
                 eventTime,
                 SystemClock.uptimeMillis(),
@@ -481,8 +761,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 ScancodeMapping.keyCodeToScancode(keyEventCode),
                 KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
             )
-        )
-    }
+        ) == true
 
     fun deleteSelection() {
         val lastSelection = selection.latest
@@ -496,7 +775,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         alt: Boolean = false,
         ctrl: Boolean = false,
         shift: Boolean = false
-    ) {
+    ): Boolean {
         var metaState = 0
         if (alt) metaState = KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
         if (ctrl) metaState = metaState or KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
@@ -505,11 +784,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (alt) sendDownKeyEvent(eventTime, KeyEvent.KEYCODE_ALT_LEFT)
         if (ctrl) sendDownKeyEvent(eventTime, KeyEvent.KEYCODE_CTRL_LEFT)
         if (shift) sendDownKeyEvent(eventTime, KeyEvent.KEYCODE_SHIFT_LEFT)
-        sendDownKeyEvent(eventTime, keyEventCode, metaState)
+        val mainKeyDispatched = sendDownKeyEvent(eventTime, keyEventCode, metaState)
         sendUpKeyEvent(eventTime, keyEventCode, metaState)
         if (shift) sendUpKeyEvent(eventTime, KeyEvent.KEYCODE_SHIFT_LEFT)
         if (ctrl) sendUpKeyEvent(eventTime, KeyEvent.KEYCODE_CTRL_LEFT)
         if (alt) sendUpKeyEvent(eventTime, KeyEvent.KEYCODE_ALT_LEFT)
+        // The modified key-down carries the full meta state and triggers the shortcut. Release
+        // failures are ambiguous and must not cause an automatic duplicate submission.
+        return mainKeyDispatched
     }
 
     fun applySelectionOffset(offsetStart: Int, offsetEnd: Int = 0) {
@@ -727,13 +1009,32 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        val flags = CapabilityFlags.fromEditorInfo(attribute)
+        val restartTransport = if (
+            BufferedHangulMode.mustAvoidClipboard(capabilityFlags) ||
+            BufferedHangulMode.mustAvoidClipboard(flags)
+        ) {
+            BufferedInputTransport.DirectCommit
+        } else {
+            null
+        }
+        val preserveFailedRestart = bufferedHangulSessionActive && restarting &&
+            !submitBufferedHangul(restartTransport)
+        bufferedPhysicalKeysDown.clear()
+        val nextBufferedHangulSessionActive = bufferedHangulModeActive(
+            fcitx.runImmediately { inputMethodEntryCached }
+        )
+        if (!preserveFailedRestart || !nextBufferedHangulSessionActive) {
+            bufferedHangul.clear()
+        }
+        bufferedHangulSessionActive = nextBufferedHangulSessionActive
+        inputView?.refreshBufferedHangulPreedit()
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
         // right cursor position, try to workaround this would simply introduce more bugs.
         selection.resetTo(attribute.initialSelStart, attribute.initialSelEnd)
         resetComposingState()
-        val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
@@ -749,7 +1050,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             // EditorInfo can be different in onStartInput and onStartInputView,
             // especially in browsers
-            setCapFlags(flags)
+            setCapFlags(effectiveCapabilityFlags(flags, inputMethodEntryCached))
             // for hardware keyboard, focus to allow switching input methods before onStartInputView
             if (!isNullType) {
                 focus(true)
@@ -862,6 +1163,23 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         newComposingEnd: Int,
         updateIndex: Int
     ) {
+        if (bufferedHangulSessionActive) {
+            if (!selection.consume(newSelStart, newSelEnd)) {
+                val engineHasPreedit = !bufferedHangulEngineResetPending &&
+                    fcitx.runImmediately { inputPanelCached.preedit.isNotEmpty() }
+                if (!bufferedHangul.isEmpty || engineHasPreedit) {
+                    // The target has already moved its cursor, so the original insertion anchor
+                    // cannot be restored reliably without using composing spans. Discard instead
+                    // of surprising the user by pasting the segment at a different position.
+                    Timber.i("Discarding buffered Hangul after an external selection change")
+                    bufferedHangul.clear()
+                    if (engineHasPreedit) queueBufferedHangulEngineReset()
+                    inputView?.refreshBufferedHangulPreedit()
+                }
+                selection.resetTo(newSelStart, newSelEnd)
+            }
+            return
+        }
         if (selection.consume(newSelStart, newSelEnd)) {
             // try restore composing range in case it was dropped by InputFilter
             // but only when prediction matches, since InputFilter can also change editor content
@@ -922,6 +1240,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // because of https://android.googlesource.com/platform/frameworks/base.git/+/refs/tags/android-11.0.0_r45/core/java/android/view/inputmethod/BaseInputConnection.java#851
     // it's not possible to set cursor inside composing text
     private fun updateComposingText(text: FormattedText) {
+        // A stale empty ClientPreeditEvent can race the capability change. In buffered mode the
+        // engine renders preedit in Fcitx's own input panel, never in the target InputConnection.
+        if (bufferedHangulSessionActive) return
         val ic = currentInputConnection ?: return
         val lastSelection = selection.latest
         ic.beginBatchEdit()
@@ -978,6 +1299,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Also updates internal composing state of [FcitxInputMethodService].
      */
     fun finishComposing() {
+        if (bufferedHangulSessionActive) {
+            submitBufferedHangul()
+            return
+        }
         val ic = currentInputConnection ?: return
         if (composing.isEmpty()) return
         composing.clear()
@@ -1053,12 +1378,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
+        val wasBufferedHangul = bufferedHangulSessionActive
+        if (wasBufferedHangul) {
+            submitBufferedHangul()
+        }
+        if (finishingInput) {
+            bufferedHangulSessionActive = false
+            bufferedHangul.clear()
+            bufferedPhysicalKeysDown.clear()
+        }
         currentInputConnection?.apply {
             finishComposingText()
             monitorCursorAnchor(false)
         }
         resetComposingState()
         postFcitxJob {
+            if (wasBufferedHangul) reset()
             focusOutIn()
         }
         hideStatusIcon()
@@ -1067,13 +1402,23 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         Timber.d("onFinishInput")
+        val wasBufferedHangul = bufferedHangulSessionActive
+        if (wasBufferedHangul) {
+            submitBufferedHangul()
+        }
+        bufferedHangulSessionActive = false
+        bufferedHangul.clear()
         postFcitxJob {
+            if (wasBufferedHangul) reset()
             focus(false)
         }
         capabilityFlags = CapabilityFlags.DefaultFlags
     }
 
     override fun onUnbindInput() {
+        bufferedHangulSessionActive = false
+        bufferedHangul.clear()
+        bufferedPhysicalKeysDown.clear()
         cachedKeyEvents.evictAll()
         cachedKeyEventIndex = 0
         cursorUpdateIndex = 0
@@ -1090,6 +1435,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             it.unregisterOnChangeListener(recreateInputViewListener)
         }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
+        bufferedHangulInputPref.unregisterOnChangeListener(bufferedHangulInputListener)
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
         super.onDestroy()
         // Fcitx might be used in super.onDestroy()

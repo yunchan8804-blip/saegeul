@@ -10,7 +10,9 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.transition.Slide
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -76,6 +78,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val currentKeyboard: BaseKeyboard? get() = keyboards[currentKeyboardName]
 
+    private var inputMethodConfigRequest = 0
+
     private val keyActionListener = KeyActionListener { it, source ->
         if (it is KeyAction.LayoutSwitchAction) {
             switchLayout(it.act)
@@ -112,7 +116,29 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
             it.onAttach()
             it.onReturnDrawableUpdate(returnKeyDrawable.resourceId)
-            it.onInputMethodUpdate(fcitx.runImmediately { inputMethodEntryCached })
+            updateInputMethod(fcitx.runImmediately { inputMethodEntryCached })
+        }
+    }
+
+    private fun updateInputMethod(ime: InputMethodEntry) {
+        currentKeyboard?.onInputMethodUpdate(ime)
+        val request = ++inputMethodConfigRequest
+        val textKeyboard = keyboards[TextKeyboard.Name] as TextKeyboard
+        if (!HangulKeyLegends.isHangulInputMethod(ime.addon, ime.languageCode)) {
+            textKeyboard.onHangulKeyboardLayoutUpdate(null)
+            return
+        }
+        service.lifecycleScope.launch {
+            val layout = runCatching {
+                fcitx.runOnReady {
+                    getImConfig(ime.uniqueName)
+                        .findByName("cfg")
+                        ?.findByName("Keyboard")
+                        ?.value
+                }
+            }.getOrNull()
+            if (request != inputMethodConfigRequest) return@launch
+            textKeyboard.onHangulKeyboardLayoutUpdate(layout)
         }
     }
 
@@ -145,10 +171,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             else -> TextKeyboard.Name
         }
         switchLayout(targetLayout, remember = false)
+        updateInputMethod(fcitx.runImmediately { inputMethodEntryCached })
     }
 
     override fun onImeUpdate(ime: InputMethodEntry) {
-        currentKeyboard?.onInputMethodUpdate(ime)
+        updateInputMethod(ime)
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {

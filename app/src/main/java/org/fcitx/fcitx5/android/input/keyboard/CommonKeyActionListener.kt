@@ -96,7 +96,11 @@ class CommonKeyActionListener :
                 is SymAction -> service.postFcitxJob {
                     sendKey(action.sym, action.states)
                 }
-                is CommitAction -> service.postFcitxJob {
+                is CommitAction -> if (service.isBufferedHangulSessionActive) {
+                    // The buffered path snapshots and resets the engine itself. Running
+                    // commitAndReset first can race its CommitString event with this insert.
+                    service.commitText(action.text)
+                } else service.postFcitxJob {
                     commitAndReset()
                     service.lifecycleScope.launch { service.commitText(action.text) }
                 }

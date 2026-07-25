@@ -92,6 +92,9 @@ class TextKeyboard(
 
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
 
+    private var hangulInputMethodActive = false
+    private var hangulKeyboardLayout: String? = null
+
     init {
         updateLangSwitchKey(showLangSwitchKey.getValue())
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
@@ -109,6 +112,14 @@ class TextKeyboard(
             else -> c.uppercase()
         }
     }
+
+    private fun transformAlphabetLegend(c: String): String =
+        if (hangulInputMethodActive) {
+            HangulKeyLegends.legend(c, capsState == CapsState.Once, hangulKeyboardLayout)
+                ?: transformAlphabet(c)
+        } else {
+            transformAlphabet(c)
+        }
 
     private var punctuationMapping: Map<String, String> = mapOf()
     private fun transformPunctuation(p: String) = punctuationMapping.getOrDefault(p, p)
@@ -165,18 +176,28 @@ class TextKeyboard(
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
+        hangulInputMethodActive =
+            HangulKeyLegends.isHangulInputMethod(ime.addon, ime.languageCode)
+        hangulKeyboardLayout = null
         space.mainText.text = buildString {
             append(ime.displayName)
             ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
         }
         if (capsState != CapsState.None) {
             switchCapsState()
+        } else {
+            updateAlphabetKeys()
         }
+    }
+
+    fun onHangulKeyboardLayoutUpdate(layout: String?) {
+        hangulKeyboardLayout = layout
+        updateAlphabetKeys()
     }
 
     private fun transformPopupPreview(c: String): String {
         if (c.length != 1) return c
-        if (c[0].isLetter()) return transformAlphabet(c)
+        if (c[0].isLetter()) return transformAlphabetLegend(c)
         return transformPunctuation(c)
     }
 
@@ -190,7 +211,7 @@ class TextKeyboard(
                         val label = action.keyboard.label
                         if (label.length == 1 && label[0].isLetter())
                             action.copy(
-                                keyboard = action.keyboard.copy(label = transformAlphabet(label))
+                                keyboard = action.keyboard.copy(label = transformAlphabetLegend(label))
                             )
                         else action
                     }
@@ -238,7 +259,9 @@ class TextKeyboard(
             if (it.def !is KeyDef.Appearance.AltText) return
             it.mainText.text = it.def.displayText.let { str ->
                 if (str.length != 1 || !str[0].isLetter()) return@forEach
-                if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
+                if (hangulInputMethodActive) transformAlphabetLegend(str)
+                else if (keepLettersUppercase) str.uppercase()
+                else transformAlphabet(str)
             }
         }
     }
