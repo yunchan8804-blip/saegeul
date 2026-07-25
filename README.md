@@ -154,6 +154,11 @@ The current recommended versions are recorded in [Versions.kt](build-logic/conve
 
 See [Hangul legends and buffered compatibility mode](docs/hangul-buffered-input.md) for the module boundaries, Windows build commands, delivery transports, manual test matrix, and known risks of the experimental buffered input path.
 
+Continuation material for this branch is kept in two separate documents:
+
+- [Detailed implementation handoff](docs/hangul-buffered-input-handoff.md): exact branch state, architecture, design decisions, verification evidence, debugging recipes, and a resume checklist.
+- [Prioritized implementation backlog](docs/hangul-buffered-input-backlog.md): remaining work grouped by priority with acceptance criteria and validation requirements.
+
 ### Trouble-shooting
 
 - Android Studio indexing takes forever to complete and cosumes a lot of memory.

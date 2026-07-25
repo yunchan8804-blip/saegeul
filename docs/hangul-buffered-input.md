@@ -26,7 +26,7 @@ TextKeyboard / physical key
   -> target InputConnection
 ```
 
-The Hangul plugin is a separate APK. A debug main APK must be used with the debug Hangul plugin APK so their package variant and signing identity match.
+The Hangul plugin is a separate APK. Use a debug main APK with the debug Hangul plugin APK, and a release main APK with the release plugin APK, because discovery uses variant-specific package names and intent actions. The non-service Hangul plugin does not require the main APK to have the same signer; signing identity matters when updating an already installed package and for plugins that use signature-protected services.
 
 ## Korean key legends
 
@@ -88,6 +88,8 @@ git config --global core.symlinks true
 git clone --recurse-submodules https://github.com/fcitx5-android/fcitx5-android.git D:\workspace\fcitx5-android
 ```
 
+That command recovers the upstream baseline only. The `feat/hangul-buffered-input` branch is local and has not been pushed to the official remote, so preserve the existing `D:\workspace\fcitx5-android` checkout. Reproducing this branch elsewhere requires an approved fork/remote push, a verified Git bundle, or an exported patch containing the local commits.
+
 Install MSYS2 plus the native configuration tools:
 
 ```powershell
@@ -104,7 +106,12 @@ C:\msys64\usr\bin\pacman.exe -S --needed --noconfirm `
 Install the versions pinned by `build-logic/convention/src/main/kotlin/Versions.kt`:
 
 ```powershell
-$SdkManager = "$env:ANDROID_HOME\cmdline-tools\latest\bin\sdkmanager.bat"
+$env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+$env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
+$SdkManager = Join-Path $env:ANDROID_HOME 'cmdline-tools\latest\bin\sdkmanager.bat'
+if (-not (Test-Path -LiteralPath $SdkManager)) {
+  throw 'Android SDK Command-line Tools are missing. Install them from Android Studio SDK Manager first.'
+}
 & $SdkManager --install `
   "platforms;android-36" `
   "build-tools;36.1.0" `
@@ -125,11 +132,12 @@ For a normal modern phone, limit development builds to arm64:
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest -PbuildABI=arm64-v8a
-.\gradlew.bat :app:lintDebug :plugin:hangul:lintDebug -PbuildABI=arm64-v8a
+.\gradlew.bat :plugin:hangul:lintDebug -PbuildABI=arm64-v8a
+.\gradlew.bat :app:lintDebug -PbuildABI=arm64-v8a
 .\gradlew.bat :app:assembleDebug :plugin:hangul:assembleDebug -PbuildABI=arm64-v8a
 ```
 
-Keep lint and APK assembly in separate Gradle invocations. With the current upstream task graph, selecting `:plugin:hangul:generateDataDescriptor` through assembly and `:plugin:hangul:generateDebugLintReportModel` in the same invocation triggers Gradle's implicit-dependency validation.
+The verified restriction is to keep Hangul plugin lint and Hangul plugin APK assembly out of the same Gradle invocation. With the current upstream task graph, selecting `:plugin:hangul:generateDataDescriptor` through assembly and `:plugin:hangul:generateDebugLintReportModel` through lint together triggers Gradle's implicit-dependency validation. Running app and plugin lint separately also makes the known app-lint debt easier to distinguish from plugin results.
 
 With a device connected through USB or wireless debugging:
 
@@ -181,3 +189,8 @@ Also verify Backspace at every Hangul composition stage, one-shot Shift and Caps
 - Lifecycle, shortcut ordering, numeric-password privacy, and physical key down/up behavior currently have code review coverage but still need Android instrumentation tests with a recording `InputConnection`.
 - Modern Dubeolsik is the only localized key layout. Yetgeul and three-set layouts need accurate dedicated definitions.
 - Add instrumentation tests with a recording `InputConnection`, plus an explicit user-visible submit/retry control if real-app testing shows that delimiter-based submission is insufficient.
+
+## Project continuation
+
+- [Detailed implementation handoff](hangul-buffered-input-handoff.md) records the exact branch state, implementation map, verified build and device results, operational risks, debugging procedures, and resume checklist.
+- [Prioritized implementation backlog](hangul-buffered-input-backlog.md) turns the remaining compatibility, transport, layout, test, privacy, and upstreaming work into acceptance-driven follow-up items.
