@@ -107,6 +107,10 @@ open class KeyDef(
             val action: KeyAction
         ) : Behavior()
 
+        class Gesture(
+            val handler: (CustomGestureView.Event) -> KeyAction?
+        ) : Behavior()
+
         class DoubleTap(
             val action: KeyAction
         ) : Behavior()

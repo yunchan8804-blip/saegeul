@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,9 +38,26 @@ class HangulKeyLegendsTest {
     }
 
     @Test
-    fun unsupportedHangulLayoutsKeepLatinLegends() {
-        assertNull(HangulKeyLegends.legend("Q", shifted = false, layout = "Sebeolsik 390"))
-        assertNull(HangulKeyLegends.legend("Q", shifted = true, layout = "Dubeolsik Yetgeul"))
+    fun allBuiltInNonRomajaLayoutsExposeTheirOwnLegends() {
+        HangulKeyLegends.supportedLayouts.forEach {
+            assertNotNull("Missing Q legend for $it", HangulKeyLegends.legend("Q", false, it))
+        }
+        assertEquals("ㅅ", HangulKeyLegends.legend("Q", false, "Sebeolsik 390"))
+        assertEquals("ㅅ", HangulKeyLegends.legend("Q", false, "Sebeolsik Final"))
+        assertNull(HangulKeyLegends.legend("Q", false, "Romaja"))
+        assertNull(HangulKeyLegends.legend("Q", false, "Unknown"))
+    }
+
+    @Test
+    fun threeSetLayoutsExposeNumberAndPunctuationPositions() {
+        assertEquals("ㅎ", HangulKeyLegends.legend("1", false, "Sebeolsik 390"))
+        assertEquals("ㅂ", HangulKeyLegends.legend(";", false, "Sebeolsik 390"))
+        assertEquals("ㅗ", HangulKeyLegends.legend("/", false, "Sebeolsik Final"))
+        assertEquals("ㅈ", HangulKeyLegends.legend("1", true, "Sebeolsik 390"))
+    }
+
+    @Test
+    fun inputMethodDetectionStaysFailClosed() {
         assertTrue(HangulKeyLegends.isHangulInputMethod("hangul", "ko-KR"))
         assertTrue(HangulKeyLegends.isHangulInputMethod("hangul", "ko_KR"))
         assertFalse(HangulKeyLegends.isHangulInputMethod("androidkeyboard", "ko"))

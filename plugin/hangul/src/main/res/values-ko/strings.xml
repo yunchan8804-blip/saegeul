@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name_debug">Fcitx5 (한글 플러그인 | 디버그)</string>
+    <string name="app_name_release">Fcitx5 (한글 플러그인)</string>
+    <string name="description">Fcitx5용 한글 입력기 엔진 지원</string>
+</resources>

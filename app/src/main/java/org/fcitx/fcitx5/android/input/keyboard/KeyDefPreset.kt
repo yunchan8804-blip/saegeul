@@ -192,9 +192,10 @@ class CommaKey(
     )
 )
 
-class LanguageKey : KeyDef(
+class LanguageKey(percentWidth: Float = 0.1f) : KeyDef(
     Appearance.Image(
         src = R.drawable.ic_baseline_language_24,
+        percentWidth = percentWidth,
         variant = Variant.AltForeground,
         viewId = R.id.button_lang
     ),
@@ -204,17 +205,20 @@ class LanguageKey : KeyDef(
     )
 )
 
-class SpaceKey : KeyDef(
+class SpaceKey(
+    percentWidth: Float = 0f,
+    pressAction: KeyAction = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_space))
+) : KeyDef(
     Appearance.Text(
         displayText = " ",
         textSize = 13f,
-        percentWidth = 0f,
+        percentWidth = percentWidth,
         border = Border.Special,
         viewId = R.id.button_space,
         soundEffect = InputFeedbacks.SoundEffect.SpaceBar
     ),
     setOf(
-        Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_space))),
+        Behavior.Press(pressAction),
         Behavior.LongPress(KeyAction.SpaceLongPressAction)
     )
 )

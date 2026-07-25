@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name_debug">Fcitx5 (Jyutping 플러그인 | 디버그)</string>
+    <string name="app_name_release">Fcitx5 (Jyutping 플러그인)</string>
+    <string name="description">Fcitx5용 Jyutping(광둥어 입력기) 엔진 지원</string>
+</resources>

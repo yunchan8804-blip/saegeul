@@ -244,6 +244,19 @@ abstract class BaseKeyboard(
                             } || oldOnGestureListener.onGesture(view, event)
                         }
                     }
+                    is KeyDef.Behavior.Gesture -> {
+                        swipeEnabled = true
+                        swipeThresholdX = selectionSwipeThreshold
+                        swipeThresholdY = selectionSwipeThreshold
+                        val oldOnGestureListener = onGestureListener ?: OnGestureListener.Empty
+                        onGestureListener = OnGestureListener { view, event ->
+                            val action = it.handler(event)
+                            if (action != null) {
+                                onAction(action)
+                                true
+                            } else oldOnGestureListener.onGesture(view, event)
+                        }
+                    }
                     is KeyDef.Behavior.DoubleTap -> {
                         doubleTapEnabled = true
                         onDoubleTapListener = { _ ->

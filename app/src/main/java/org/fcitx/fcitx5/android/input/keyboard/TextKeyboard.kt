@@ -84,6 +84,7 @@ class TextKeyboard(
     val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
+    private var inputMethodLabel = ""
 
     @Keep
     private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
@@ -179,10 +180,11 @@ class TextKeyboard(
         hangulInputMethodActive =
             HangulKeyLegends.isHangulInputMethod(ime.addon, ime.languageCode)
         hangulKeyboardLayout = null
-        space.mainText.text = buildString {
+        inputMethodLabel = buildString {
             append(ime.displayName)
             ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
         }
+        updateSpaceLabel()
         if (capsState != CapsState.None) {
             switchCapsState()
         } else {
@@ -192,7 +194,23 @@ class TextKeyboard(
 
     fun onHangulKeyboardLayoutUpdate(layout: String?) {
         hangulKeyboardLayout = layout
+        updateSpaceLabel()
         updateAlphabetKeys()
+    }
+
+    private fun updateSpaceLabel() {
+        val pickerAvailable = hangulInputMethodActive &&
+            MobileHangulSurfaceSwitcher.isAvailable(hangulKeyboardLayout)
+        space.mainText.text = if (pickerAvailable) {
+            context.getString(R.string.mobile_hangul_switch_label, inputMethodLabel)
+        } else {
+            inputMethodLabel
+        }
+        space.contentDescription = if (pickerAvailable) {
+            context.getString(R.string.mobile_hangul_switch_hint, inputMethodLabel)
+        } else {
+            inputMethodLabel
+        }
     }
 
     private fun transformPopupPreview(c: String): String {

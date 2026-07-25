@@ -6,6 +6,60 @@ package org.fcitx.fcitx5.android.data.theme
 
 object ThemePreset {
 
+    /** Warm paper and ink palette tuned for dense Hangul key legends. */
+    val HanjiLight = Theme.Builtin(
+        name = "HanjiLight",
+        isDark = false,
+        backgroundColor = 0xffe9e1d2,
+        barColor = 0xfff3eddf,
+        keyboardColor = 0xffe9e1d2,
+        keyBackgroundColor = 0xfffaf6ec,
+        keyTextColor = 0xff24201b,
+        candidateTextColor = 0xff24201b,
+        candidateLabelColor = 0xff51493f,
+        candidateCommentColor = 0xff766c60,
+        altKeyBackgroundColor = 0xffd8cdbb,
+        altKeyTextColor = 0xff51493f,
+        accentKeyBackgroundColor = 0xffb83a32,
+        accentKeyTextColor = 0xffffffff,
+        keyPressHighlightColor = 0x24000000,
+        keyShadowColor = 0xffc8bca9,
+        popupBackgroundColor = 0xfff3eddf,
+        popupTextColor = 0xff24201b,
+        spaceBarColor = 0xffd8cdbb,
+        dividerColor = 0x24000000,
+        clipboardEntryColor = 0xfffaf6ec,
+        genericActiveBackgroundColor = 0xff315b55,
+        genericActiveForegroundColor = 0xffffffff
+    )
+
+    /** Deep ink palette with dancheong accents for low-light use. */
+    val DancheongDark = Theme.Builtin(
+        name = "DancheongDark",
+        isDark = true,
+        backgroundColor = 0xff101918,
+        barColor = 0xff0b1211,
+        keyboardColor = 0xff101918,
+        keyBackgroundColor = 0xff253330,
+        keyTextColor = 0xfff4ead8,
+        candidateTextColor = 0xfff4ead8,
+        candidateLabelColor = 0xffc9bda9,
+        candidateCommentColor = 0xffa69b89,
+        altKeyBackgroundColor = 0xff192623,
+        altKeyTextColor = 0xffc9bda9,
+        accentKeyBackgroundColor = 0xffc84a3f,
+        accentKeyTextColor = 0xffffffff,
+        keyPressHighlightColor = 0x33ffffff,
+        keyShadowColor = 0xff080d0c,
+        popupBackgroundColor = 0xff253330,
+        popupTextColor = 0xfff4ead8,
+        spaceBarColor = 0xff33443f,
+        dividerColor = 0x26ffffff,
+        clipboardEntryColor = 0xff253330,
+        genericActiveBackgroundColor = 0xff24776d,
+        genericActiveForegroundColor = 0xffffffff
+    )
+
     val MaterialLight = Theme.Builtin(
         name = "MaterialLight",
         isDark = false,

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name_debug">Fcitx5 (태국어 플러그인 | 디버그)</string>
+    <string name="app_name_release">Fcitx5 (태국어 플러그인)</string>
+    <string name="description">Fcitx5용 태국어 입력기 지원</string>
+</resources>

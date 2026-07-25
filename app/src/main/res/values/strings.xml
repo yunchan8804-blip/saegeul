@@ -153,6 +153,19 @@
     <string name="keep_keyboard_letters_uppercase">Keep keyboard letters uppercase</string>
     <string name="buffered_hangul_input" tools:ignore="MissingTranslation">Buffered Hangul compatibility mode</string>
     <string name="buffered_hangul_input_summary" tools:ignore="MissingTranslation">Keep Hangul composition inside Fcitx and send each completed segment as one unit. Experimental; verify behavior in the target app.</string>
+    <string name="mobile_hangul_layout" tools:ignore="MissingTranslation">Korean keyboard surface</string>
+    <string name="mobile_hangul_physical" tools:ignore="MissingTranslation">Physical layout</string>
+    <string name="mobile_hangul_chunjiin" tools:ignore="MissingTranslation">Chunjiin</string>
+    <string name="mobile_hangul_chunjiin_plus" tools:ignore="MissingTranslation">Chunjiin Plus</string>
+    <string name="mobile_hangul_danmoum" tools:ignore="MissingTranslation">Danmoum</string>
+    <string name="mobile_hangul_moakey_one_hand" tools:ignore="MissingTranslation">Moakey (one hand)</string>
+    <string name="mobile_hangul_moakey_two_hand" tools:ignore="MissingTranslation">Moakey (two hand)</string>
+    <string name="mobile_hangul_vega" tools:ignore="MissingTranslation">Vega</string>
+    <string name="mobile_hangul_vega_center" tools:ignore="MissingTranslation">Vega (center)</string>
+    <string name="mobile_hangul_naratgul" tools:ignore="MissingTranslation">Naratgul</string>
+    <string name="mobile_hangul_naratgul_center" tools:ignore="MissingTranslation">Naratgul (center)</string>
+    <string name="mobile_hangul_switch_label" tools:ignore="MissingTranslation">%1$s ▾</string>
+    <string name="mobile_hangul_switch_hint" tools:ignore="MissingTranslation">%1$s. Long press to change Korean keyboard surface</string>
     <string name="buffered_input_transport" tools:ignore="MissingTranslation">Buffered input delivery</string>
     <string name="buffered_input_transport_system_paste" tools:ignore="MissingTranslation">System paste (standard editors)</string>
     <string name="buffered_input_transport_ctrl_v" tools:ignore="MissingTranslation">Ctrl+V (remote and raw-key apps)</string>

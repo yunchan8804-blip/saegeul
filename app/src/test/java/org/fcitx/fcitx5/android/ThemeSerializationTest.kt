@@ -65,7 +65,7 @@ class ThemeSerializationTest {
     }
 
     @Test
-    fun version2() {
+    fun version2MigratesToCurrentVersion() {
         // Version 2.0
         val raw = """
             {
@@ -98,7 +98,7 @@ class ThemeSerializationTest {
             }
         """.trimIndent()
         val (decoded, migrated) = raw.toCustomTheme()
-        Assert.assertEquals("Migration shouldn't happen", false, migrated)
+        Assert.assertEquals("Migration should happen", true, migrated)
         Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
     }
 }

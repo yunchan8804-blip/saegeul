@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.app.AlertDialog
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -68,24 +69,52 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private lateinit var keyboardView: FrameLayout
 
     private val keyboards: HashMap<String, BaseKeyboard> by lazy {
-        hashMapOf(
+        hashMapOf<String, BaseKeyboard>(
             TextKeyboard.Name to TextKeyboard(context, theme),
+            HangulKeyboard.Name to HangulKeyboard(context, theme),
             NumberKeyboard.Name to NumberKeyboard(context, theme)
-        )
+        ).apply {
+            MobileHangulLayout.entries
+                .filterNot { it == MobileHangulLayout.Physical }
+                .forEach { layout ->
+                    put(MobileHangulKeyboard.name(layout), MobileHangulKeyboard(context, theme, layout))
+                }
+        }
     }
     private var currentKeyboardName = ""
+    private var activeHangulLayout: String? = null
+    private var mobileHangulLayout by AppPrefs.getInstance().keyboard.mobileHangulLayout
     private var lastSymbolType: String by AppPrefs.getInstance().internal.lastSymbolLayout
 
     private val currentKeyboard: BaseKeyboard? get() = keyboards[currentKeyboardName]
 
     private var inputMethodConfigRequest = 0
 
-    private val keyActionListener = KeyActionListener { it, source ->
-        if (it is KeyAction.LayoutSwitchAction) {
-            switchLayout(it.act)
-        } else {
-            commonKeyActionListener.listener.onKeyAction(it, source)
+    private val keyActionListener = KeyActionListener { action, source ->
+        when {
+            action is KeyAction.LayoutSwitchAction -> switchLayout(action.act)
+            action is KeyAction.SpaceLongPressAction &&
+                MobileHangulSurfaceSwitcher.isAvailable(activeHangulLayout) ->
+                showMobileHangulLayoutPicker()
+            else -> commonKeyActionListener.listener.onKeyAction(action, source)
         }
+    }
+
+    private fun showMobileHangulLayoutPicker() {
+        val entries = MobileHangulLayout.entries
+        val labels = entries.map { context.getString(it.stringRes) }.toTypedArray()
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(context)
+            .setTitle(R.string.mobile_hangul_layout)
+            .setSingleChoiceItems(labels, entries.indexOf(mobileHangulLayout)) { _, which ->
+                val selected = entries.getOrNull(which) ?: return@setSingleChoiceItems
+                dialog.dismiss()
+                mobileHangulLayout = selected
+                switchLayout(MobileHangulSurfaceSwitcher.target(selected), remember = false)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        service.showDialog(dialog)
     }
 
     private val popupActionListener: PopupActionListener by lazy {
@@ -109,7 +138,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     private fun attachLayout(target: String) {
-        currentKeyboardName = target
+        currentKeyboardName = resolveTextLayout(target)
         currentKeyboard?.let {
             it.keyActionListener = keyActionListener
             it.popupActionListener = popupActionListener
@@ -125,7 +154,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         val request = ++inputMethodConfigRequest
         val textKeyboard = keyboards[TextKeyboard.Name] as TextKeyboard
         if (!HangulKeyLegends.isHangulInputMethod(ime.addon, ime.languageCode)) {
+            activeHangulLayout = null
             textKeyboard.onHangulKeyboardLayoutUpdate(null)
+            if (currentKeyboardName == HangulKeyboard.Name || currentKeyboardName.startsWith("MobileHangul:")) {
+                switchLayout(TextKeyboard.Name, false)
+            }
             return
         }
         service.lifecycleScope.launch {
@@ -138,12 +171,37 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 }
             }.getOrNull()
             if (request != inputMethodConfigRequest) return@launch
+            activeHangulLayout = layout
             textKeyboard.onHangulKeyboardLayoutUpdate(layout)
+            (keyboards[HangulKeyboard.Name] as HangulKeyboard)
+                .onHangulKeyboardLayoutUpdate(layout)
+            val target = resolveHangulLayout(layout)
+            if (currentKeyboardName == TextKeyboard.Name ||
+                currentKeyboardName == HangulKeyboard.Name ||
+                currentKeyboardName.startsWith("MobileHangul:")
+            ) {
+                switchLayout(target, remember = false)
+            }
         }
     }
 
+    private fun resolveHangulLayout(layout: String?): String = when {
+        layout in HangulKeyLegends.fullSurfaceLayouts -> HangulKeyboard.Name
+        mobileHangulLayout != MobileHangulLayout.Physical &&
+            (layout == "Dubeolsik" || layout == "0") ->
+            MobileHangulKeyboard.name(mobileHangulLayout)
+        else -> TextKeyboard.Name
+    }
+
+    private fun resolveTextLayout(target: String): String =
+        if (target == TextKeyboard.Name) {
+            resolveHangulLayout(activeHangulLayout)
+        } else {
+            target
+        }
+
     fun switchLayout(to: String, remember: Boolean = true) {
-        val target = to.ifEmpty { lastSymbolType }
+        val target = resolveTextLayout(to.ifEmpty { lastSymbolType })
         ContextCompat.getMainExecutor(service).execute {
             if (keyboards.containsKey(target)) {
                 if (remember && target != TextKeyboard.Name) {
@@ -168,7 +226,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         val targetLayout = when (info.inputType and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_NUMBER -> NumberKeyboard.Name
             InputType.TYPE_CLASS_PHONE -> NumberKeyboard.Name
-            else -> TextKeyboard.Name
+            else -> resolveTextLayout(TextKeyboard.Name)
         }
         switchLayout(targetLayout, remember = false)
         updateInputMethod(fcitx.runImmediately { inputMethodEntryCached })

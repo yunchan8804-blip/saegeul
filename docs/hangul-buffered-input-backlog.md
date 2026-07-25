@@ -1,5 +1,9 @@
 # 한글 버퍼 호환 입력 백로그
 
+> 제품 전체 우선순위, 한국어 스마트 입력, AI, 음성, GIF 검색·첨부의 단일 기준은
+> [한국어 스마트 입력 제품 SSOT](korean-smart-input-ssot.md)다. 이 문서는 한글 버퍼
+> 호환 입력의 상세 설계와 검증 증거를 보존하는 하위 백로그다.
+
 ## 1. 문서 목적
 
 이 문서는 한글 키캡 표시와 한글 버퍼 호환 입력의 현재 구현을 기준선으로 고정하고, 실제 사용자 배포까지 남은 작업을 우선순위별로 관리하기 위한 실행 백로그다.
@@ -75,7 +79,7 @@ Windows clone의 Git symlink 설정은 현재 true이며, 대표적으로 build-
 | app debug APK 조립 | PASS | :app:assembleDebug -PbuildABI=arm64-v8a |
 | Hangul plugin debug APK 조립 | PASS | :plugin:hangul:assembleDebug -PbuildABI=arm64-v8a, native fcitx5-hangul 포함 |
 | Hangul plugin lint | PASS | :plugin:hangul:lintDebug -PbuildABI=arm64-v8a |
-| 전체 app JVM 테스트 | 15개 중 14 PASS, 1 FAIL | 기존 ThemeSerializationTest.version2가 theme 2.0을 기대하지만 현재 serializer version은 2.1인 stale test |
+| 전체 app JVM 테스트 | PASS, 총 35개 | :app:testDebugUnitTest -PbuildABI=arm64-v8a |
 | app lint | FAIL | upstream baseline 부재로 266 errors, 49 warnings. 이번 변경 파일과 리소스에는 finding 0 |
 | 실제 기기 키캡 | PASS | Samsung SM-F956N, Android 16, API 36에서 현대 두벌식 일반 및 one-shot Shift 표시 확인 |
 | 실제 기기 내부 버퍼 | PASS | Android Settings 검색 입력에서 한글 조합 중 target editor가 바뀌지 않고 Fcitx 내부 panel만 갱신됨 |
@@ -294,10 +298,9 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 
 **현재 상태**
 
-- 전체 app JVM 테스트 15개 중 14개가 통과한다.
-- ThemeSerializationTest.version2 한 개가 실패한다.
-- 실패 원인은 test fixture가 theme version 2.0을 기준으로 하지만 CustomThemeSerializer의 현재 version이 2.1인 기존 불일치다.
-- 이번 Hangul 변경과 직접 관련된 실패는 아니다.
+- 전체 app JVM 테스트 35개가 모두 통과한다.
+- `ThemeSerializationTest.version2MigratesToCurrentVersion`이 2.0 입력을 현재 2.1 계약으로 마이그레이션해야 함을 명시한다.
+- 마이그레이션 뒤 현재 버전 JSON round-trip도 유지된다.
 
 **제안**
 
@@ -320,8 +323,8 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 
 **검증 증거**
 
-- 현재 수치는 15개 중 14 PASS, 1 FAIL이다.
-- 실패 테스트와 version 불일치가 특정돼 있으므로 원인 미상 blocker는 아니다.
+- `gradlew.bat :app:testDebugUnitTest -PbuildABI=arm64-v8a`가 35개 테스트 전체에서 PASS다.
+- stale assertion을 skip하거나 삭제하지 않고 실제 serializer 계약에 맞는 migration assertion으로 교정했다.
 
 ### P0-06. 배포 가능한 variant 및 ABI 조합 검증
 
@@ -687,9 +690,9 @@ Dubeolsik Yetgeul은 현대 두벌식과 키 위치가 일부 비슷하지만 Sh
 
 **현재 상태**
 
-- HangulKeyLegends는 Dubeolsik만 지원한다.
-- Dubeolsik Yetgeul은 명시적으로 unsupported 처리돼 Latin fallback을 사용한다.
-- 이 fail-safe는 잘못된 한글 legend보다 안전하다.
+- libhangul `a34aef73378c0992316861bbf13fc914ee7577d9`의 `2y` 정의에서 normal/shift legend를 생성한다.
+- 생성 스크립트와 생성된 Kotlin table을 함께 관리해 upstream 정의와 수동 복사본의 drift를 줄였다.
+- 모르는 layout은 계속 Latin fallback을 사용한다.
 
 **제안**
 
@@ -712,8 +715,8 @@ Dubeolsik Yetgeul은 현대 두벌식과 키 위치가 일부 비슷하지만 Sh
 
 **검증 증거**
 
-- 현재 테스트는 Dubeolsik Yetgeul이 null fallback임을 확인한다.
-- 실제 옛글 legend 구현은 없다.
+- `HangulKeyLegendsTest`가 Dubeolsik Yetgeul의 normal/shift 대표 키와 unknown-layout fallback을 검증한다.
+- arm64-v8a debug app 조립과 관련 JVM 테스트가 PASS다.
 
 ### P2-02. 세벌식 계열 전용 keyboard surface
 
@@ -723,9 +726,9 @@ Dubeolsik Yetgeul은 현대 두벌식과 키 위치가 일부 비슷하지만 Sh
 
 **현재 상태**
 
-- TextKeyboard는 QWERTY 중심 surface다.
-- 세벌식 layout은 모두 Latin fallback이다.
-- Hangul plugin은 여러 세벌식 engine layout을 이미 제공한다.
+- `HangulKeyboard`가 숫자 행과 문장부호를 포함한 전용 전체 key surface를 제공한다.
+- libhangul 고정 리비전에서 세벌식 390, Final, Noshift, Yetgeul, Dubeol Layout의 normal/shift action과 label을 생성한다.
+- 선택한 Hangul engine layout에 맞춰 `KeyboardWindow`가 전용 surface로 전환한다.
 
 **제안**
 
@@ -750,8 +753,9 @@ Dubeolsik Yetgeul은 현대 두벌식과 키 위치가 일부 비슷하지만 Sh
 
 **검증 증거**
 
-- 현재 세벌식 UI 구현과 테스트는 없다.
-- 단순 legend 치환으로 불충분하다는 구조 분석은 완료됐다.
+- `HangulKeyboardLayoutTest`가 모든 지원 layout의 전체 engine key 접근성과 normal/shift action을 검증한다.
+- Galaxy Z Fold6에서 세벌식 390 normal/shift, 세벌식 Final 화면과 실제 `막` 입력을 확인했다.
+- arm64-v8a debug app 조립과 관련 JVM 테스트가 PASS다.
 
 ### P2-03. Ahnmatae 및 Romaja 표시 정책
 
@@ -783,8 +787,35 @@ Romaja는 Latin legend가 자연스럽고 Ahnmatae는 전용 배열이 필요하
 
 **검증 증거**
 
-- 현재는 두 layout 모두 safe Latin fallback이다.
-- 전용 UI와 acceptance test는 없다.
+- Romaja는 생성된 Latin mapping을 유지하고 Ahnmatae는 전용 generated mapping과 key surface를 사용한다.
+- `HangulKeyLegendsTest`와 `HangulKeyboardLayoutTest`가 두 정책을 분리해 검증한다.
+
+### P2-03A. 모바일 한글 특화 배열
+
+**현재 상태**
+
+- 현대 두벌식 engine 위에 천지인, 천지인 플러스, 단모음, 베가, 나랏글, 한손 모아키, 양손 모아키 전용 touch surface를 제공한다.
+- Galaxy A35의 Samsung Keyboard 5.9.00.28에서 추출한 key label, multi-tap group, side control 위치를 배열 계약으로 사용한다.
+- 천지인 모음 조합, 1,500ms phonepad 순환, 300ms 단모음 순환, 나랏글 획추가와 쌍자음은 `MobileHangulComposer`가 두벌식 engine action으로 변환한다.
+- 나랏글의 원형 입력 계약인 `ㅜ + ㅏ → ㅝ` 특례를 일반 모음 조합과 분리해 처리한다.
+- 모아키는 한 번의 연속 gesture 경로를 `MoakeyGestureRecognizer`가 해석하고, 자음 시작 gesture는 자음과 모음을 순차 engine action으로 전달한다.
+- 한손 모아키는 삼성 키보드의 7열 자음 중심 배열을, 양손 모아키는 `~ ㅃ ㅉ ㄸ ㄲ ㅆ #`부터 시작하는 삼성식 4행 배열을 따른다.
+- 모바일 surface는 Hangul engine layout이 현대 두벌식(`Dubeolsik` 또는 engine ID `0`)일 때만 활성화하며, Romaja나 세벌식 선택을 모바일 배열로 오인하지 않는다.
+- 설정에서 물리 배열과 중앙 정렬 변형을 포함한 아홉 모바일 배열을 즉시 선택할 수 있다.
+- 한글 스페이스바에 현재 surface 이름과 `▾`를 표시하고, 길게 누르면 앱을 열지 않고 물리 배열과 아홉 모바일 배열을 즉시 선택하고 저장한다.
+- 물리 배열에서도 `한글 ▾` 진입점을 유지하므로 모바일 surface로 되돌아갈 수 있다. 영문과 세벌식에서는 기존 스페이스바 길게 누르기 설정을 보존한다.
+
+**검증 증거**
+
+- `MobileHangulComposerTest`와 `MobileHangulKeyboardLayoutTest`가 삼성 배열 전체 행, multi-tap group, side control, 천지인 현대 모음 21개, 나랏글 `ㅜ + ㅏ → ㅝ`, 전체 키 접근성을 검증한다.
+- 전체 app JVM 테스트는 42개 모두 PASS이며 실패와 skip은 0개다.
+- Galaxy A35에는 최종 앱과 Hangul plugin을 설치하고 한손 모아키 7열 surface가 로드되는 것을 확인했다.
+- Galaxy A35에서 `한손 모아키 → 천지인 → 물리 자판 배열 → 천지인 플러스`를 스페이스바 길게 누르기만으로 왕복하고, 키보드를 숨겼다가 다시 표시한 뒤에도 선택이 유지되는 것을 확인했다.
+- Galaxy Z Fold6에는 같은 최종 산출물을 설치하고 커버 화면에서 천지인 `ㄱ → ㅣ → ㆍ`가 실제 `가`로 입력되는 것을 확인했다.
+- `MoakeyGestureRecognizerTest`가 단모음, 겹모음, 왕복, 꺾기 gesture를 검증하고 `MobileHangulKeyboardLayoutTest`가 삼성식 한손/양손 key geometry와 중복 Backspace 방지를 검증한다.
+- Galaxy A35와 Galaxy Z Fold6에서 한손 모아키의 오른쪽, 왕복, 위-중앙-오른쪽, 아래 대각선-중앙 gesture 및 독립 모음 key를 실제 입력으로 확인했다. 최신 7열 조정 뒤 A35에서 오른쪽 gesture의 `아` 입력을 재확인했다.
+- 구현 기준은 삼성전자서비스의 [지원 입력 방식 목록](https://www.samsungsvc.co.kr/solution/40778), Google의 [단모음 키보드 공개 설명](https://korea.googleblog.com/2010/10/blog-post_7360.html), [나랏글 입력 특허](https://patents.google.com/patent/KR20120059326A/ko), Galaxy A35 Samsung Keyboard APK를 교차 확인했다.
+- 재현 빌드 명령은 `gradlew.bat :app:assembleDebug -PbuildABI=arm64-v8a`다.
 
 ### P2-04. 번역, 접근성, 설정 설명 확대
 

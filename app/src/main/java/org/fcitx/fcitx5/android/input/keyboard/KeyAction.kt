@@ -21,6 +21,10 @@ sealed class KeyAction {
 
     data class CommitAction(val text: String) : KeyAction()
 
+    data class MobileHangulAction(val token: MobileHangulComposer.Token) : KeyAction()
+
+    data class MobileHangulSequenceAction(val tokens: List<MobileHangulComposer.Token>) : KeyAction()
+
     data class CapsAction(val lock: Boolean) : KeyAction()
 
     data object QuickPhraseAction : KeyAction()
