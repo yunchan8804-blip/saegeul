@@ -104,6 +104,8 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     fun allEntries() = clbDao.allEntries()
 
+    suspend fun searchableEntries(limit: Int = 200) = clbDao.searchableEntries(limit)
+
     suspend fun pin(id: Int) = clbDao.updatePinStatus(id, true)
 
     suspend fun unpin(id: Int) = clbDao.updatePinStatus(id, false)

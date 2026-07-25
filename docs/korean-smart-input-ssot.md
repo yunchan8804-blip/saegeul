@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 마일스톤: `GIF-01 Commons GIF 검색·링크·첨부 MVP`
+현재 활성 마일스톤: `KO-03 동적 빠른 문구`
 
 ## 2. 상태 표기
 
@@ -71,6 +71,8 @@
 | `KO-BASE-05` | 스페이스바 길게 눌러 한글 표면 전환 | `DONE` | 두 기기 왕복·설정 유지 |
 | `KO-BASE-06` | 한지 Light·단청 Dark 등 한국 테마 | `DONE` | serialization 테스트와 실기기 렌더 |
 | `KO-BASE-07` | 앱 및 plugin 한국어 번역 확대 | `DONE` | build와 두 기기 설치 |
+| `KO-01` | 한/영 오타 즉시 복구 | `DONE` | 5 JVM 테스트와 A35 Discord 교체·실행 취소 |
+| `KO-02` | 초성 통합 검색 | `DONE` | 6 JVM 테스트와 A35 `ㄱㅅ` 검색·1회 삽입 |
 
 현재 변경은 dirty tree에 있으므로 새로운 기능을 대규모로 겹치기 전에 검증 가능한 checkpoint를
 남겨야 한다. 기존 사용자의 변경을 삭제하거나 되돌리지 않는다.
@@ -96,7 +98,7 @@
 
 | ID | 기능 | 상태 | 가치 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `GIF-01` | Commons GIF 검색·링크·첨부 MVP | `IN_PROGRESS` | 키보드 이탈 없이 반응 GIF 사용 | L |
+| `GIF-01` | Commons GIF 검색·링크·첨부 MVP | `DONE` | 키보드 이탈 없이 반응 GIF 사용 | L |
 
 `GIF-01`의 상세 계약은 7절에 있다.
 
@@ -104,14 +106,56 @@
 
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `KO-01` | 한/영 오타 즉시 복구 | `NEXT` | `dkssud→안녕`, `ㅗ디ㅣㅐ→hello`, preview 후 교체 | S |
-| `KO-02` | 초성 통합 검색 | `NEXT` | 빠른 문구·clipboard·emoji를 `ㄱㅅ` 등으로 검색 | M |
+| `KO-01` | 한/영 오타 즉시 복구 | `DONE` | `dkssud→안녕`, `ㅗ디ㅣㅐ→hello`, preview 후 교체 | S |
+| `KO-02` | 초성 통합 검색 | `DONE` | 빠른 문구·clipboard·emoji를 `ㄱㅅ` 등으로 검색 | M |
 | `KO-03` | 동적 빠른 문구 | `NEXT` | 날짜·시간·이름·전화·주소·clipboard 변수, preview | M |
 | `KO-04` | 앱별 키보드 profile | `NEXT` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자·국어사전 후보 | `BACKLOG` | 한글 단어의 한자, 음훈, 동음이의어를 로컬 후보로 표시 | M |
 | `KO-06` | 개인 단어장 | `BACKLOG` | 이름·회사명·전문용어를 opt-in으로 로컬 우선 후보에 반영 | L |
 | `KO-07` | 한국어 조사·문맥 후보 | `BACKLOG` | 조사와 다음 어절 추천, 자동 확정은 기본 off | L |
 | `KO-08` | 한국식 감정표현 추천 | `BACKLOG` | emoji·kaomoji·ㅋㅋ/ㅎㅎ 후보, provider와 분리 | M |
+
+#### KO-02 상세 계약
+
+1. 키보드 툴바에서 통합 검색을 열고 화면 안의 19개 초성 패드로 query를 즉시 조합한다.
+   일반 문자열은 같은 화면의 입력 대화상자에서 붙여넣기 또는 물리 키보드로 입력한다.
+2. `ㄱㅅ`은 `감사합니다`, `감사`, `고생`처럼 음절 초성이 연속 일치하는 결과를 찾는다.
+3. 결과는 빠른 문구, 민감하지 않은 clipboard, 한국어 keyword가 붙은 emoji를 같은 목록에서
+   source label로 구분해 표시한다. 원본 저장소를 복제하거나 서로 덮어쓰지 않는다.
+4. 초성 prefix, 일반 prefix, 초성 contains, 일반 contains 순으로 점수를 부여하고 같은 점수에서는
+   빠른 문구, clipboard, emoji 순과 원본 순서를 유지한다.
+5. 결과를 탭하면 조합을 먼저 안전하게 확정하고 `commitText`를 정확히 한 번 호출한 뒤 일반 키보드로
+   돌아간다. editor identity가 바뀌었으면 삽입하지 않고 오류를 표시한다.
+6. sensitive clipboard 항목은 검색 repository 단계에서 제외한다. password, sensitive,
+   no-personalized-learning editor에서는 통합 검색 전체를 열어도 데이터 조회와 삽입을 차단한다.
+7. 검색은 전부 기기 안에서 수행하며 query나 결과 원문을 로그·분석·네트워크로 보내지 않는다.
+8. 빈 query는 전체 clipboard를 노출하지 않고 검색 안내만 표시한다. 결과 수에는 상한을 둔다.
+
+완료 게이트는 초성 matcher·정렬·dedupe·민감 항목 제외 테스트, 전체 JVM test와 arm64 build,
+A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문자열 clipboard 검색 검증이다.
+
+#### KO-02 구현·검증 증거 (2026-07-26)
+
+| 범위 | 결과 | 증거 |
+| --- | --- | --- |
+| 검색 엔진 JVM test | `PASS` | 6개, failure/error 0. 초성 추출·연속 일치, 일반 문자열, exact/prefix/contains 정렬, source 우선순위, dedupe, limit 포함 |
+| 원본 데이터 통합 | `PASS` | enabled 빠른 문구를 직접 읽고, Room clipboard는 `deleted=0 AND sensitive=0`, emoji는 분리된 한국어 keyword로 모델링 |
+| 민감 입력 | `PASS` | sensitive 모델을 엔진에서 다시 제외하고 password/sensitive/no-personalized editor에서 toolbar와 repository 조회·삽입 차단 |
+| A35 초성 UX | `PASS` | 19개 화면 내 초성 pad에서 `ㄱ`→`ㅅ`을 탭하자 `ㄱㅅ` query와 source label이 표시됨 |
+| A35 정확한 삽입 | `PASS` | Discord에서 🙏 결과를 탭한 뒤 compose text가 Unicode U+1F64F 하나임을 hierarchy로 확인; 메시지는 전송하지 않고 draft 삭제 |
+| 전체 JVM/build | `PASS` | app 64개, failure/error/skipped 0; arm64 app과 Hangul plugin build 성공 |
+| 최종 A35 설치 | `PASS` | app/plugin 재설치 및 Fcitx IME 재선택, app `2026-07-26 08:21:07`, plugin `08:21:09` |
+
+#### KO-01 구현·검증 증거 (2026-07-26)
+
+| 범위 | 결과 | 증거 |
+| --- | --- | --- |
+| 변환기 JVM test | `PASS` | 5개, failure/error 0. 영문 QWERTY→한글, 한글→영문, 겹자모·겹받침, 문장부호, cursor-local chunk 포함 |
+| 안전한 교체 | `PASS` | 미리보기 뒤 editor identity와 직전 원문을 다시 확인하고 정확히 한 번 교체; 별도 실행 취소 제공 |
+| 민감 입력 | `PASS` | password, sensitive, no-personalized-learning editor에서 툴바 action 비활성 |
+| A35 Discord | `PASS` | `dkssudgktpdy` 전체를 `안녕하세요`로 교체한 뒤 원문으로 실행 취소됨; 메시지는 전송하지 않고 검증 draft 삭제 |
+| 최종 app JVM test | `PASS` | GIF·KO-01을 포함한 58개, failure/error/skipped 0 |
+| 최종 arm64 설치 | `PASS` | A35 app/plugin 재설치 및 Fcitx IME 재선택, app `2026-07-26 08:03:10`, plugin `08:03:13` |
 
 ### 6.3 AI 텍스트 기능
 
@@ -227,7 +271,9 @@ canonical page URL과 downloadable media URL을 혼동하지 않는다.
 - MediaWiki API의 file namespace 검색과 `imageinfo/extmetadata`를 사용한다.
 - query는 UTF-8 한국어를 그대로 지원하며 safe search는 항상 켠 상태로 취급한다.
 - MIME이 정확히 `image/gif`인 파일만 허용한다.
-- CC0, Public Domain, CC BY, CC BY-SA, GFDL 등 명시적으로 허용한 open/free license만 노출한다.
+- MVP는 CC0, Public Domain, CC BY, CC BY-SA처럼 앱이 attribution 의무를 명확히
+  표시할 수 있는 allowlist만 노출한다. GFDL처럼 배포 시 라이선스 사본 등 추가 의무가 생기는
+  형식은 해당 의무 UI를 구현하기 전까지 제외한다.
 - license, author 또는 canonical source를 확인할 수 없는 결과는 제외한다.
 - `do not use`, copyright violation, fair use, non-free, all rights reserved, permission missing,
   deletion candidate 신호가 있는 결과는 제외한다.
@@ -283,6 +329,24 @@ Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 �
 12. 일반 text editor에서 attachment가 disabled되고 link만 정확히 한 번 입력됨.
 13. password/private editor에서 검색 request가 0회임.
 14. attach 실패에서 link 자동 삽입이 0회임.
+
+### 7.12 구현·검증 증거 (2026-07-26)
+
+| 범위 | 결과 | 증거 |
+| --- | --- | --- |
+| GIF unit/state test | `PASS` | GIF 11개, failure/error 0. provider parsing, license, animated signature/frame, MIME, overlay state, private request 0 포함 |
+| app 전체 JVM test | `PASS` | 64개, failure/error/skipped 0 |
+| arm64 app/plugin build | `PASS` | `:app:assembleDebug`, `:plugin:hangul:assembleDebug` |
+| A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, app과 Hangul plugin 최종 APK 재설치, app update `2026-07-26 08:21:07` |
+| 일반 text editor | `PASS` | Settings 검색창은 `contentMimeTypes=null`; 첨부 disabled 설명 표시, Commons canonical URL 1회만 입력됨 |
+| GIF 지원 editor | `PASS` | Discord `contentMimeTypes=[image/*]`; 14,925-byte animated GIF를 `commitContent`로 전달해 전송 전 compose preview가 실제 표시됨 |
+| attach 실패 fallback | `PASS` | attach 경로에는 URL commit이 없고 실패는 상태 표시만 수행 |
+| private editor network | `PASS` | `GifSearchGateTest.privateEditorMakesZeroProviderRequests`가 provider 호출 0을 검증 |
+| Z Fold6 설치 | `PASS` | `SM-F956N / 192.168.0.94:36675`, app과 Hangul plugin 재설치, Fcitx 입력기 서비스 등록 및 최신 패키지 기본 입력기 전환 확인 |
+
+`GIF-01`의 코드, 자동 테스트, A35 기능 검증, A35·Z Fold6 설치 게이트가 모두 통과했다.
+Discord 검증 중에는 compose preview까지만 확인했고 메시지는 전송하지 않았으며, 검증 뒤 draft
+attachment를 제거했다.
 
 ## 8. AI·음성 아키텍처 계약
 
@@ -344,9 +408,9 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 
 ### 단계 2 — 로컬 한국어 quick wins
 
-1. `KO-01` 한/영 오타 복구.
-2. `KO-02` 초성 통합 검색.
-3. `KO-03` 동적 빠른 문구.
+1. `KO-01` 한/영 오타 복구. (`DONE`)
+2. `KO-02` 초성 통합 검색. (`DONE`)
+3. `KO-03` 동적 빠른 문구. (`NEXT`)
 4. `KO-04` 앱별 profile과 network policy.
 
 ### 단계 3 — AI 기반과 text 기능

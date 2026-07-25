@@ -337,4 +337,62 @@
     <string name="key_border_stroke">Enable stroke for key border</string>
     <string name="preferred_voice_input">Preferred voice input</string>
     <string name="edit_text_playground">EditText Playground</string>
+    <!-- GIF MVP is localized for the product's Korean target and falls back to English elsewhere. -->
+    <string name="gif_search" tools:ignore="MissingTranslation">GIF search</string>
+    <string name="gif_recommended" tools:ignore="MissingTranslation">Recommended GIFs</string>
+    <string name="gif_link_insert" tools:ignore="MissingTranslation">Insert link</string>
+    <string name="gif_attach" tools:ignore="MissingTranslation">Attach GIF</string>
+    <string name="gif_attachment_unsupported" tools:ignore="MissingTranslation">This app does not support GIF attachments</string>
+    <string name="gif_source_license" tools:ignore="MissingTranslation">%1$s · %2$s</string>
+    <string name="gif_powered_by_commons" tools:ignore="MissingTranslation">Open-license results from Wikimedia Commons</string>
+    <string name="gif_loading" tools:ignore="MissingTranslation">Searching GIFs…</string>
+    <string name="gif_downloading" tools:ignore="MissingTranslation">Downloading and verifying GIF…</string>
+    <string name="gif_no_results" tools:ignore="MissingTranslation">No open-license animated GIFs found</string>
+    <string name="gif_search_failed" tools:ignore="MissingTranslation">GIF search failed</string>
+    <string name="gif_retry" tools:ignore="MissingTranslation">Retry</string>
+    <string name="gif_attach_failed" tools:ignore="MissingTranslation">Could not attach the GIF. The link was not inserted.</string>
+    <string name="gif_attached" tools:ignore="MissingTranslation">GIF attached</string>
+    <string name="gif_link_failed" tools:ignore="MissingTranslation">Could not insert the link</string>
+    <string name="gif_private_disabled" tools:ignore="MissingTranslation">GIF search is disabled in password and private fields</string>
+    <string name="gif_editor_changed" tools:ignore="MissingTranslation">The input field changed. Select the GIF again.</string>
+    <string name="gif_query_title" tools:ignore="MissingTranslation">GIF search term</string>
+    <string name="gif_query_paste_hint" tools:ignore="MissingTranslation">Type with a hardware keyboard or paste text</string>
+    <string name="gif_search_action" tools:ignore="MissingTranslation">Search</string>
+    <string name="gif_keyword_celebrate" tools:ignore="MissingTranslation">Celebrate</string>
+    <string name="gif_keyword_laugh" tools:ignore="MissingTranslation">Laugh</string>
+    <string name="gif_keyword_love" tools:ignore="MissingTranslation">Love</string>
+    <string name="gif_keyword_applause" tools:ignore="MissingTranslation">Applause</string>
+    <string name="gif_keyword_thanks" tools:ignore="MissingTranslation">Thanks</string>
+    <string name="gif_keyword_surprise" tools:ignore="MissingTranslation">Surprise</string>
+    <string name="gif_keyword_angry" tools:ignore="MissingTranslation">Angry</string>
+    <string name="gif_keyword_sad" tools:ignore="MissingTranslation">Sad</string>
+    <string name="typo_recovery" tools:ignore="MissingTranslation">Korean/English typo recovery</string>
+    <string name="typo_recovery_source" tools:ignore="MissingTranslation">Current input</string>
+    <string name="typo_recovery_local_notice" tools:ignore="MissingTranslation">Converted entirely on this device. Preview before replacing.</string>
+    <string name="typo_recovery_en_to_ko" tools:ignore="MissingTranslation">English keys → Korean</string>
+    <string name="typo_recovery_ko_to_en" tools:ignore="MissingTranslation">Korean keys → English</string>
+    <string name="typo_recovery_no_text" tools:ignore="MissingTranslation">No convertible Korean or English text immediately before the cursor</string>
+    <string name="typo_recovery_private_disabled" tools:ignore="MissingTranslation">Typo recovery is disabled in password and private fields</string>
+    <string name="typo_recovery_editor_changed" tools:ignore="MissingTranslation">The text or cursor changed. Open typo recovery again.</string>
+    <string name="typo_recovery_applied" tools:ignore="MissingTranslation">Replaced %1$s with %2$s</string>
+    <string name="typo_recovery_undo" tools:ignore="MissingTranslation">Undo replacement</string>
+    <string name="typo_recovery_undone" tools:ignore="MissingTranslation">The original input was restored</string>
+    <string name="typo_recovery_back" tools:ignore="MissingTranslation">Back to keyboard</string>
+    <string name="korean_search" tools:ignore="MissingTranslation">Korean integrated search</string>
+    <string name="korean_search_action" tools:ignore="MissingTranslation">Search</string>
+    <string name="korean_search_query_title" tools:ignore="MissingTranslation">Search quick phrases, clipboard, and emoji</string>
+    <string name="korean_search_query_hint" tools:ignore="MissingTranslation">Initials or text, e.g. ㄱㅅ</string>
+    <string name="korean_search_local_notice" tools:ignore="MissingTranslation">On-device search · sensitive clipboard items excluded</string>
+    <string name="korean_search_prompt" tools:ignore="MissingTranslation">Search quick phrases, clipboard, and Korean emoji keywords with initials such as ㄱㅅ</string>
+    <string name="korean_search_no_results" tools:ignore="MissingTranslation">No matching results</string>
+    <string name="korean_search_failed" tools:ignore="MissingTranslation">Could not load local search data</string>
+    <string name="korean_search_private_disabled" tools:ignore="MissingTranslation">Integrated search is disabled in password and private fields</string>
+    <string name="korean_search_editor_changed" tools:ignore="MissingTranslation">The input field or cursor changed. Search again.</string>
+    <string name="korean_search_insert_failed" tools:ignore="MissingTranslation">Could not insert this result</string>
+    <string name="korean_search_source_quick_phrase" tools:ignore="MissingTranslation">QUICK PHRASE</string>
+    <string name="korean_search_source_clipboard" tools:ignore="MissingTranslation">CLIPBOARD</string>
+    <string name="korean_search_source_emoji" tools:ignore="MissingTranslation">EMOJI</string>
+    <string name="korean_search_clear" tools:ignore="MissingTranslation">Clear</string>
+    <string name="korean_search_backspace" tools:ignore="MissingTranslation">Delete the last initial</string>
+    <string name="korean_search_initial_key" tools:ignore="MissingTranslation">Initial %1$s</string>
 </resources>

@@ -1,0 +1,270 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.gif
+
+import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.util.LruCache
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.core.view.setPadding
+import androidx.recyclerview.widget.RecyclerView
+import java.net.HttpURLConnection
+import java.net.URI
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.theme.Theme
+
+class GifResultAdapter(
+    private val context: Context,
+    private val theme: Theme,
+    private val onLink: (GifResult) -> Unit,
+    private val onAttach: (GifResult) -> Unit,
+    private val onSelectionChanged: () -> Unit
+) : RecyclerView.Adapter<GifResultAdapter.Holder>() {
+
+    private val items = mutableListOf<GifResult>()
+    private val selection = GifSelectionState()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val bitmapCache = LruCache<String, Bitmap>(24)
+    private var attachSupported = false
+    private var actionLocked = false
+
+    fun submit(results: List<GifResult>) {
+        val previousCount = items.size
+        selection.clear()
+        items.clear()
+        if (previousCount > 0) notifyItemRangeRemoved(0, previousCount)
+        items.addAll(results)
+        if (results.isNotEmpty()) notifyItemRangeInserted(0, results.size)
+    }
+
+    fun setAttachSupported(supported: Boolean) {
+        if (attachSupported == supported) return
+        attachSupported = supported
+        if (items.isNotEmpty()) notifyItemRangeChanged(0, items.size)
+    }
+
+    fun setActionLocked(locked: Boolean) {
+        if (actionLocked == locked) return
+        actionLocked = locked
+        selection.selectedId?.let { selected ->
+            val index = items.indexOfFirst { it.id == selected }
+            if (index >= 0) notifyItemChanged(index)
+        }
+    }
+
+    fun clearSelection() {
+        val old = selection.selectedId ?: return
+        selection.clear()
+        items.indexOfFirst { it.id == old }.takeIf { it >= 0 }?.let(::notifyItemChanged)
+        onSelectionChanged()
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder =
+        Holder(context, theme)
+
+    override fun getItemCount(): Int = items.size
+
+    override fun onBindViewHolder(holder: Holder, position: Int) {
+        val result = items[position]
+        holder.bind(result, result.id == selection.selectedId, attachSupported, actionLocked)
+    }
+
+    override fun onViewRecycled(holder: Holder) {
+        holder.thumbnailJob?.cancel()
+        holder.thumbnailJob = null
+        holder.image.setImageDrawable(null)
+    }
+
+    fun onDetached() {
+        scope.cancel()
+        bitmapCache.evictAll()
+    }
+
+    private fun toggleSelection(result: GifResult) {
+        val old = selection.selectedId
+        val next = selection.tap(result.id)
+        old?.let { id -> items.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let(::notifyItemChanged) }
+        next?.let { id -> items.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let(::notifyItemChanged) }
+        onSelectionChanged()
+    }
+
+    private fun loadThumbnail(holder: Holder, result: GifResult) {
+        holder.thumbnailJob?.cancel()
+        bitmapCache[result.thumbnailUrl]?.let {
+            holder.image.setImageBitmap(it)
+            return
+        }
+        holder.image.setImageDrawable(null)
+        holder.thumbnailJob = scope.launch {
+            val bitmap = withContext(Dispatchers.IO) { downloadBitmap(result.thumbnailUrl) }
+            if (holder.boundId != result.id || bitmap == null) return@launch
+            bitmapCache.put(result.thumbnailUrl, bitmap)
+            holder.image.setImageBitmap(bitmap)
+        }
+    }
+
+    private fun downloadBitmap(url: String): Bitmap? = runCatching {
+        val connection = URI(url).toURL().openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = 8_000
+            connection.readTimeout = 15_000
+            connection.instanceFollowRedirects = true
+            connection.setRequestProperty("User-Agent", USER_AGENT)
+            if (connection.responseCode !in 200..299) return@runCatching null
+            val contentLength = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
+            if (contentLength > MAX_THUMBNAIL_BYTES) return@runCatching null
+            val bytes = connection.inputStream.use { input ->
+                val output = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var total = 0
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    if (total > MAX_THUMBNAIL_BYTES) return@runCatching null
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray()
+            }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } finally {
+            connection.disconnect()
+        }
+    }.getOrNull()
+
+    inner class Holder(context: Context, theme: Theme) : RecyclerView.ViewHolder(FrameLayout(context)) {
+        val image = ImageView(context).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setBackgroundColor(theme.altKeyBackgroundColor)
+        }
+        private val attribution = TextView(context).apply {
+            setTextColor(Color.WHITE)
+            setBackgroundColor(0x99000000.toInt())
+            textSize = 10f
+            maxLines = 2
+            setPadding(context.dp(6), context.dp(3), context.dp(6), context.dp(3))
+        }
+        private val linkButton = Button(context).apply {
+            isAllCaps = false
+            text = context.getString(R.string.gif_link_insert)
+            textSize = 11f
+            minHeight = 0
+            minimumHeight = 0
+        }
+        private val attachButton = Button(context).apply {
+            isAllCaps = false
+            text = context.getString(R.string.gif_attach)
+            textSize = 11f
+            minHeight = 0
+            minimumHeight = 0
+        }
+        private val unsupported = TextView(context).apply {
+            text = context.getString(R.string.gif_attachment_unsupported)
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            textSize = 10f
+            setPadding(context.dp(4), context.dp(2), context.dp(4), 0)
+        }
+        private val actions = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(context.dp(6))
+            setBackgroundColor(0xc9000000.toInt())
+            addView(linkButton, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                context.dp(34)
+            ))
+            addView(attachButton, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                context.dp(34)
+            ).apply { topMargin = context.dp(4) })
+            addView(unsupported, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+
+        var thumbnailJob: Job? = null
+        var boundId: Long = -1L
+
+        init {
+            itemView.layoutParams = RecyclerView.LayoutParams(
+                RecyclerView.LayoutParams.MATCH_PARENT,
+                context.dp(122)
+            )
+            (itemView as FrameLayout).apply {
+                setPadding(context.dp(3))
+                background = GradientDrawable().apply {
+                    setColor(theme.altKeyBackgroundColor)
+                    cornerRadius = context.dp(10).toFloat()
+                }
+                addView(image, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ).apply { setMargins(context.dp(3), context.dp(3), context.dp(3), context.dp(3)) })
+                addView(attribution, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM
+                ).apply { setMargins(context.dp(3), 0, context.dp(3), context.dp(3)) })
+                addView(actions, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ).apply { setMargins(context.dp(3), context.dp(3), context.dp(3), context.dp(3)) })
+            }
+        }
+
+        fun bind(result: GifResult, selected: Boolean, supported: Boolean, locked: Boolean) {
+            boundId = result.id
+            val credit = context.getString(
+                R.string.gif_source_license,
+                result.license.author,
+                result.license.name
+            )
+            attribution.text = credit
+            itemView.contentDescription = "${result.title}. $credit"
+            actions.visibility = if (selected) View.VISIBLE else View.GONE
+            unsupported.visibility = if (supported) View.GONE else View.VISIBLE
+            linkButton.isEnabled = !locked
+            attachButton.isEnabled = supported && !locked
+            attachButton.alpha = if (attachButton.isEnabled) 1f else 0.45f
+            itemView.setOnClickListener { if (!locked) toggleSelection(result) }
+            actions.setOnClickListener { if (!locked) toggleSelection(result) }
+            linkButton.setOnClickListener { if (!locked) onLink(result) }
+            attachButton.setOnClickListener {
+                if (supported && !locked) onAttach(result)
+            }
+            loadThumbnail(this, result)
+        }
+    }
+
+    private fun Context.dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    companion object {
+        private const val MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024
+        private const val USER_AGENT =
+            "Fcitx5Android-GifSearch/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
+    }
+}

@@ -62,8 +62,11 @@ import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.gif.GifSearchWindow
+import org.fcitx.fcitx5.android.input.search.KoreanSearchWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
+import org.fcitx.fcitx5.android.input.typo.TypoRecoveryWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -303,6 +306,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 clipboardButton.setOnClickListener {
                     windowManager.attachWindow(ClipboardWindow())
                 }
+                koreanSearchButton.setOnClickListener {
+                    windowManager.attachWindow(KoreanSearchWindow())
+                }
+                typoRecoveryButton.setOnClickListener {
+                    windowManager.attachWindow(TypoRecoveryWindow())
+                }
+                gifButton.setOnClickListener {
+                    windowManager.attachWindow(GifSearchWindow())
+                }
                 moreButton.setOnClickListener {
                     windowManager.attachWindow(StatusAreaWindow())
                 }
@@ -436,6 +448,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
+        val allowsTextInspection = !capFlags.has(CapabilityFlag.PasswordOrSensitive)
+        idleUi.buttonsUi.typoRecoveryButton.apply {
+            isEnabled = allowsTextInspection
+            alpha = if (isEnabled) 1f else 0.35f
+        }
+        idleUi.buttonsUi.koreanSearchButton.apply {
+            isEnabled = allowsTextInspection
+            alpha = if (isEnabled) 1f else 0.35f
+        }
+        idleUi.buttonsUi.gifButton.apply {
+            isEnabled = allowsTextInspection
+            alpha = if (isEnabled) 1f else 0.35f
+        }
         isInlineSuggestionPresent = false
         numberRowState = NumberRowState.Auto
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

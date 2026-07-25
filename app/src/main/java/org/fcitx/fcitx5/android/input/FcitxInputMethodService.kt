@@ -73,6 +73,9 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
+import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery
+import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
+import org.fcitx.fcitx5.android.input.typo.TypoRecoverySnapshot
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.clipboardManager
@@ -488,11 +491,90 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         currentInputConnection.setSelection(target, target)
     }
 
-    fun commitText(text: String, cursor: Int = -1) {
+    fun commitText(text: String, cursor: Int = -1): Boolean {
         // Clipboard entries, emoji, and toolbar actions bypass Fcitx's CommitString event. Flush
         // the internal Hangul segment first so those direct inserts cannot overtake it.
-        if (bufferedHangulSessionActive && !submitBufferedHangul()) return
-        commitTextToEditor(text, cursor)
+        if (bufferedHangulSessionActive && !submitBufferedHangul()) return false
+        return commitTextToEditor(text, cursor)
+    }
+
+    /** Text-inspection actions do not read password/private editors, even when fully offline. */
+    fun allowsTextInspectionFeatures(): Boolean =
+        !capabilityFlags.has(CapabilityFlag.PasswordOrSensitive)
+
+    /** Network-backed input features must never inspect or contact a server for private editors. */
+    fun allowsNetworkInputFeatures(): Boolean = allowsTextInspectionFeatures()
+
+    fun matchesCurrentEditor(
+        packageName: String,
+        fieldId: Int,
+        inputType: Int,
+        selectionStart: Int,
+        selectionEnd: Int
+    ): Boolean =
+        currentInputEditorInfo.packageName == packageName &&
+            currentInputEditorInfo.fieldId == fieldId &&
+            currentInputEditorInfo.inputType == inputType &&
+            currentInputSelection.rangeEquals(selectionStart, selectionEnd)
+
+    /**
+     * Commit the current Hangul/composing segment before a rich-content transaction. Returning
+     * false is final: callers must not attach content or silently fall back to inserting a URL.
+     */
+    fun prepareRichContentCommit(): Boolean {
+        if (!allowsNetworkInputFeatures()) return false
+        return finishCompositionForDirectAction()
+    }
+
+    fun captureTypoRecoverySnapshot(): TypoRecoverySnapshot? {
+        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return null
+        if (!finishCompositionForDirectAction()) return null
+        val info = currentInputEditorInfo
+        val beforeCursor = currentInputConnection?.getTextBeforeCursor(64, 0)?.toString() ?: return null
+        val chunk = KoreanTypoRecovery.lastChunk(beforeCursor) ?: return null
+        val proposals = KoreanTypoRecovery.proposals(chunk)
+        if (proposals.isEmpty()) return null
+        return TypoRecoverySnapshot(
+            editor = TypoRecoveryEditorTarget(info.packageName, info.fieldId, info.inputType),
+            chunk = chunk,
+            proposals = proposals
+        )
+    }
+
+    fun replaceTypoRecoveryText(
+        editor: TypoRecoveryEditorTarget,
+        expected: String,
+        replacement: String
+    ): Boolean {
+        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return false
+        val info = currentInputEditorInfo
+        if (info.packageName != editor.packageName || info.fieldId != editor.fieldId ||
+            info.inputType != editor.inputType
+        ) return false
+        if (!finishCompositionForDirectAction()) return false
+        val ic = currentInputConnection ?: return false
+        if (ic.getTextBeforeCursor(expected.length, 0)?.toString() != expected) return false
+        val previousCursor = currentInputSelection.start
+        var dispatched = true
+        ic.withBatchEdit {
+            dispatched = deleteSurroundingText(expected.length, 0) && dispatched
+            if (dispatched) dispatched = commitText(replacement, 1) && dispatched
+        }
+        if (dispatched) selection.predict(previousCursor - expected.length + replacement.length)
+        return dispatched
+    }
+
+    private fun finishCompositionForDirectAction(): Boolean {
+        val ic = currentInputConnection ?: return false
+        if (bufferedHangulSessionActive) {
+            if (!submitBufferedHangul()) return false
+        } else if (composing.isNotEmpty()) {
+            composing.clear()
+            composingText = FormattedText.Empty
+            if (!ic.finishComposingText()) return false
+        }
+        postFcitxJob { reset() }
+        return true
     }
 
     private fun commitTextToEditor(text: String, cursor: Int = -1): Boolean {
