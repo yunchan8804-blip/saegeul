@@ -31,6 +31,9 @@ sealed class StatusAreaEntry(
         private fun drawableFromIconName(icon: String) = when (icon) {
             // androidkeyboard
             "tools-check-spelling" -> R.drawable.ic_baseline_spellcheck_24
+            // fcitx5-hangul: this is a one-shot conversion action while Korean
+            // completion is enabled, not an indication that Hanja input is active.
+            "fcitx-hanja-active", "fcitx-hanja-inactive" -> R.drawable.ic_status_hangul
             // fcitx5-chinese-addons
             "fcitx-chttrans-active" -> R.drawable.ic_fcitx_status_chttrans_trad
             "fcitx-chttrans-inactive" -> R.drawable.ic_fcitx_status_chttrans_simp
@@ -57,7 +60,12 @@ sealed class StatusAreaEntry(
 
         fun fromAction(it: Action): Fcitx {
             val active = it.icon.endsWith("-active") || it.isChecked
-            return Fcitx(it, it.shortText, drawableFromIconName(it.icon), active)
+            val label = when {
+                it.icon.startsWith("fcitx-hanja-") && it.longText.isNotBlank() -> it.longText
+                it.shortText.isNotBlank() -> it.shortText
+                else -> it.longText
+            }
+            return Fcitx(it, label, drawableFromIconName(it.icon), active)
         }
     }
 }
