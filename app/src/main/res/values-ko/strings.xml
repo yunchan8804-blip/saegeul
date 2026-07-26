@@ -346,6 +346,7 @@
     <string name="gif_attachment_unsupported">이 앱은 GIF 첨부를 지원하지 않음</string>
     <string name="gif_source_license">%1$s · %2$s</string>
     <string name="gif_powered_by_commons">Wikimedia Commons 공개 라이선스 결과</string>
+    <string name="gif_powered_by_noto">Animated Noto Emoji · CC BY 4.0 공개 라이선스</string>
     <string name="gif_loading">GIF 검색 중…</string>
     <string name="gif_downloading">GIF 다운로드 및 검증 중…</string>
     <string name="gif_no_results">사용 가능한 공개 라이선스 움직이는 GIF가 없음</string>
@@ -356,8 +357,8 @@
     <string name="gif_link_failed">링크를 넣지 못했어</string>
     <string name="gif_private_disabled">비밀번호·민감 입력란에서는 GIF 검색을 사용할 수 없어</string>
     <string name="gif_editor_changed">입력란이 바뀌었어. GIF를 다시 선택해줘.</string>
-    <string name="gif_query_title">GIF 검색어</string>
-    <string name="gif_query_paste_hint">하드웨어 키보드로 입력하거나 검색어를 붙여넣어줘</string>
+    <string name="gif_query_inline_hint">검색어를 입력해</string>
+    <string name="gif_query_clear">지우기</string>
     <string name="gif_search_action">검색</string>
     <string name="gif_keyword_celebrate">축하</string>
     <string name="gif_keyword_laugh">웃음</string>

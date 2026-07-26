@@ -4,12 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.gif
 
-import android.app.AlertDialog
-import android.text.InputType
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.EditText
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -32,12 +29,13 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
-    private val provider: GifProvider = WikimediaCommonsGifProvider()
+    private val provider: GifProvider = NotoAnimatedEmojiProvider()
     private val searchGate = GifSearchGate(provider)
     private val cache by lazy { GifCache(context) }
     private val committer by lazy { RichContentCommitter(service) }
     private lateinit var target: GifEditorTarget
     private var currentQuery = ""
+    private var queryState = GifSearchQueryState()
     private var searchJob: Job? = null
     private var actionJob: Job? = null
     private var retryAction: (() -> Unit)? = null
@@ -68,8 +66,40 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 return false
             }
         })
-        ui.onQueryClick = ::showQueryDialog
-        ui.onKeyword = { search(it) }
+        ui.setProviderLabel(context.getString(R.string.gif_powered_by_noto))
+        ui.onQueryClick = ::beginQueryEditing
+        ui.onKeyword = { query ->
+            queryState = GifSearchQueryState(query)
+            search(query)
+        }
+        ui.onQueryCharacter = { key ->
+            queryState.type(key)
+            ui.renderQueryEditor(queryState)
+        }
+        ui.onQueryBackspace = {
+            queryState.backspace()
+            ui.renderQueryEditor(queryState)
+        }
+        ui.onQuerySpace = {
+            queryState.space()
+            ui.renderQueryEditor(queryState)
+        }
+        ui.onQueryClear = {
+            queryState.clear()
+            ui.renderQueryEditor(queryState)
+        }
+        ui.onQueryLanguage = {
+            queryState.toggleLanguage()
+            ui.renderQueryEditor(queryState)
+        }
+        ui.onQueryShift = {
+            queryState.toggleShift()
+            ui.renderQueryEditor(queryState)
+        }
+        ui.onQuerySubmit = {
+            val query = queryState.submit()
+            search(query)
+        }
         ui.onRetry = { retryAction?.invoke() }
         return ui.root
     }
@@ -97,6 +127,8 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private fun search(query: String) {
         searchJob?.cancel()
         currentQuery = query.trim()
+        queryState = GifSearchQueryState(currentQuery)
+        ui.hideQueryEditor()
         ui.setQuery(currentQuery)
         val allowed = service.allowsNetworkInputFeatures()
         if (allowed) ui.showLoading()
@@ -123,21 +155,14 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         }
     }
 
-    private fun showQueryDialog() {
-        val editText = EditText(context).apply {
-            setText(currentQuery)
-            setSelection(text.length)
-            hint = context.getString(R.string.gif_query_paste_hint)
-            inputType = InputType.TYPE_CLASS_TEXT
-            isSingleLine = true
+    private fun beginQueryEditing() {
+        if (!service.allowsNetworkInputFeatures()) {
+            ui.showBlockingMessage(context.getString(R.string.gif_private_disabled))
+            return
         }
-        val dialog = AlertDialog.Builder(context)
-            .setTitle(R.string.gif_query_title)
-            .setView(editText)
-            .setPositiveButton(R.string.gif_search_action) { _, _ -> search(editText.text.toString()) }
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        service.showDialog(dialog)
+        searchJob?.cancel()
+        queryState = GifSearchQueryState(currentQuery)
+        ui.showQueryEditor(queryState)
     }
 
     private fun insertLink(result: GifResult) {

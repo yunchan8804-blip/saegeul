@@ -22,6 +22,7 @@ import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.keyboard.HangulKeyLegends
 
 class GifSearchUi(private val context: Context, private val theme: Theme) {
 
@@ -68,7 +69,6 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
     }
 
     private val providerLabel = TextView(context).apply {
-        text = context.getString(R.string.gif_powered_by_commons)
         setTextColor(theme.altKeyTextColor)
         alpha = 0.72f
         textSize = 10f
@@ -124,9 +124,42 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         visibility = View.GONE
     }
 
+    private val content = FrameLayout(context).apply {
+        addView(recyclerView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        addView(statusOverlay, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        addView(actionStatus, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP
+        ))
+    }
+
+    private val queryKeyboard = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(context.dp(4), context.dp(3), context.dp(4), context.dp(5))
+        visibility = View.GONE
+    }
+
+    private val letterKeys = mutableListOf<Pair<Char, TextView>>()
+    private lateinit var shiftKey: TextView
+    private lateinit var languageKey: TextView
+
     var onQueryClick: (() -> Unit)? = null
     var onKeyword: ((String) -> Unit)? = null
     var onRetry: (() -> Unit)? = null
+    var onQueryCharacter: ((Char) -> Unit)? = null
+    var onQueryBackspace: (() -> Unit)? = null
+    var onQuerySpace: (() -> Unit)? = null
+    var onQueryClear: (() -> Unit)? = null
+    var onQueryLanguage: (() -> Unit)? = null
+    var onQueryShift: (() -> Unit)? = null
+    var onQuerySubmit: (() -> Unit)? = null
 
     init {
         val keywords = listOf(
@@ -156,21 +189,27 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
             ).apply { marginEnd = context.dp(5) })
         }
 
-        val content = FrameLayout(context).apply {
-            addView(recyclerView, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ))
-            addView(statusOverlay, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ))
-            addView(actionStatus, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP
-            ))
-        }
+        queryKeyboard.addView(letterRow("qwertyuiop", horizontalInset = 0), weightedRowParams())
+        queryKeyboard.addView(letterRow("asdfghjkl", horizontalInset = 14), weightedRowParams())
+        queryKeyboard.addView(LinearLayout(context).apply {
+            gravity = Gravity.CENTER
+            shiftKey = actionKey("⇧") { onQueryShift?.invoke() }
+            addView(shiftKey, keyParams(1.25f))
+            "zxcvbnm".forEach { key -> addLetterKey(key) }
+            addView(actionKey("⌫") { onQueryBackspace?.invoke() }, keyParams(1.25f))
+        }, weightedRowParams())
+        queryKeyboard.addView(LinearLayout(context).apply {
+            gravity = Gravity.CENTER
+            languageKey = actionKey("한/영") { onQueryLanguage?.invoke() }
+            addView(languageKey, keyParams(1.35f))
+            addView(actionKey("space") { onQuerySpace?.invoke() }, keyParams(3.4f))
+            addView(actionKey(context.getString(R.string.gif_query_clear)) {
+                onQueryClear?.invoke()
+            }, keyParams(1.25f))
+            addView(actionKey(context.getString(R.string.gif_search_action), active = true) {
+                onQuerySubmit?.invoke()
+            }, keyParams(1.55f))
+        }, weightedRowParams())
         column.addView(queryRow)
         column.addView(keywordScroller, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -185,6 +224,11 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
             0,
             1f
         ))
+        column.addView(queryKeyboard, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        ))
         root.addView(column, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -192,8 +236,50 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         setQuery("")
     }
 
+    fun setProviderLabel(label: CharSequence) {
+        providerLabel.text = label
+    }
+
     fun setQuery(query: String) {
         queryText.text = query.ifBlank { context.getString(R.string.gif_recommended) }
+    }
+
+    fun showQueryEditor(state: GifSearchQueryState) {
+        content.visibility = View.GONE
+        keywordScroller.visibility = View.GONE
+        providerLabel.visibility = View.GONE
+        queryKeyboard.visibility = View.VISIBLE
+        renderQueryEditor(state)
+    }
+
+    fun renderQueryEditor(state: GifSearchQueryState) {
+        queryText.text = state.text.ifBlank { context.getString(R.string.gif_query_inline_hint) }
+        queryText.alpha = if (state.text.isBlank()) 0.65f else 1f
+        letterKeys.forEach { (key, view) ->
+            view.text = when (state.language) {
+                GifQueryLanguage.Korean ->
+                    HangulKeyLegends.legend(key.toString(), state.shifted, "Dubeolsik")
+                        ?: key.toString()
+                GifQueryLanguage.English ->
+                    (if (state.shifted) key.uppercaseChar() else key).toString()
+            }
+            view.contentDescription = view.text
+        }
+        shiftKey.alpha = if (state.shifted) 1f else 0.7f
+        shiftKey.contentDescription = if (state.shifted) "Shift on" else "Shift off"
+        languageKey.text = when (state.language) {
+            GifQueryLanguage.Korean -> "한글"
+            GifQueryLanguage.English -> "ABC"
+        }
+        languageKey.contentDescription = languageKey.text
+    }
+
+    fun hideQueryEditor() {
+        queryKeyboard.visibility = View.GONE
+        content.visibility = View.VISIBLE
+        keywordScroller.visibility = View.VISIBLE
+        providerLabel.visibility = View.VISIBLE
+        queryText.alpha = 1f
     }
 
     fun showLoading() {
@@ -247,4 +333,50 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
 
     private fun Context.dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
+
+    private fun letterRow(keys: String, horizontalInset: Int): LinearLayout =
+        LinearLayout(context).apply {
+            gravity = Gravity.CENTER
+            setPadding(context.dp(horizontalInset), 0, context.dp(horizontalInset), 0)
+            keys.forEach { key -> addLetterKey(key) }
+        }
+
+    private fun LinearLayout.addLetterKey(key: Char) {
+        val view = actionKey(key.toString()) { onQueryCharacter?.invoke(key) }
+        letterKeys += key to view
+        addView(view, keyParams(1f))
+    }
+
+    private fun actionKey(
+        label: String,
+        active: Boolean = false,
+        action: () -> Unit
+    ) = TextView(context).apply {
+        text = label
+        gravity = Gravity.CENTER
+        setTextColor(if (active) theme.genericActiveForegroundColor else theme.keyTextColor)
+        textSize = if (label.length > 4) 11f else 16f
+        background = rounded(
+            if (active) theme.genericActiveBackgroundColor else theme.keyBackgroundColor,
+            context.dp(7).toFloat()
+        )
+        setOnClickListener { action() }
+        isClickable = true
+        isFocusable = true
+        contentDescription = label
+    }
+
+    private fun keyParams(weight: Float) = LinearLayout.LayoutParams(
+        0,
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        weight
+    ).apply {
+        setMargins(context.dp(2), context.dp(2), context.dp(2), context.dp(2))
+    }
+
+    private fun weightedRowParams() = LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        0,
+        1f
+    )
 }

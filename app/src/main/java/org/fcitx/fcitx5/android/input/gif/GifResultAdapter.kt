@@ -5,12 +5,15 @@
 package org.fcitx.fcitx5.android.input.gif
 
 import android.content.Context
-import android.content.res.ColorStateList
+import android.graphics.ImageDecoder
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.drawable.Animatable
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
+import android.os.Build
 import android.util.LruCache
 import android.view.Gravity
 import android.view.View
@@ -24,6 +27,7 @@ import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import java.net.HttpURLConnection
 import java.net.URI
+import java.nio.ByteBuffer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,7 +49,9 @@ class GifResultAdapter(
     private val items = mutableListOf<GifResult>()
     private val selection = GifSelectionState()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val bitmapCache = LruCache<String, Bitmap>(24)
+    private val thumbnailCache = object : LruCache<String, ByteArray>(MAX_THUMBNAIL_CACHE_BYTES) {
+        override fun sizeOf(key: String, value: ByteArray): Int = value.size
+    }
     private var attachSupported = false
     private var actionLocked = false
 
@@ -93,12 +99,13 @@ class GifResultAdapter(
     override fun onViewRecycled(holder: Holder) {
         holder.thumbnailJob?.cancel()
         holder.thumbnailJob = null
+        (holder.image.drawable as? Animatable)?.stop()
         holder.image.setImageDrawable(null)
     }
 
     fun onDetached() {
         scope.cancel()
-        bitmapCache.evictAll()
+        thumbnailCache.evictAll()
     }
 
     private fun toggleSelection(result: GifResult) {
@@ -111,20 +118,23 @@ class GifResultAdapter(
 
     private fun loadThumbnail(holder: Holder, result: GifResult) {
         holder.thumbnailJob?.cancel()
-        bitmapCache[result.thumbnailUrl]?.let {
-            holder.image.setImageBitmap(it)
-            return
-        }
+        (holder.image.drawable as? Animatable)?.stop()
         holder.image.setImageDrawable(null)
         holder.thumbnailJob = scope.launch {
-            val bitmap = withContext(Dispatchers.IO) { downloadBitmap(result.thumbnailUrl) }
-            if (holder.boundId != result.id || bitmap == null) return@launch
-            bitmapCache.put(result.thumbnailUrl, bitmap)
-            holder.image.setImageBitmap(bitmap)
+            val drawable = withContext(Dispatchers.IO) {
+                val bytes = thumbnailCache[result.thumbnailUrl]
+                    ?: downloadBytes(result.thumbnailUrl)?.also {
+                        thumbnailCache.put(result.thumbnailUrl, it)
+                    }
+                bytes?.let(::decodeDrawable)
+            }
+            if (holder.boundId != result.id || drawable == null) return@launch
+            holder.image.setImageDrawable(drawable)
+            (drawable as? Animatable)?.start()
         }
     }
 
-    private fun downloadBitmap(url: String): Bitmap? = runCatching {
+    private fun downloadBytes(url: String): ByteArray? = runCatching {
         val connection = URI(url).toURL().openConnection() as HttpURLConnection
         try {
             connection.connectTimeout = 8_000
@@ -134,7 +144,7 @@ class GifResultAdapter(
             if (connection.responseCode !in 200..299) return@runCatching null
             val contentLength = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
             if (contentLength > MAX_THUMBNAIL_BYTES) return@runCatching null
-            val bytes = connection.inputStream.use { input ->
+            connection.inputStream.use { input ->
                 val output = java.io.ByteArrayOutputStream()
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 var total = 0
@@ -147,9 +157,28 @@ class GifResultAdapter(
                 }
                 output.toByteArray()
             }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         } finally {
             connection.disconnect()
+        }
+    }.getOrNull()
+
+    private fun decodeDrawable(bytes: ByteArray): Drawable? = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
+            ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
+                val largest = maxOf(info.size.width, info.size.height)
+                if (largest > THUMBNAIL_TARGET_PX) {
+                    val ratio = THUMBNAIL_TARGET_PX.toFloat() / largest
+                    decoder.setTargetSize(
+                        (info.size.width * ratio).toInt().coerceAtLeast(1),
+                        (info.size.height * ratio).toInt().coerceAtLeast(1)
+                    )
+                }
+            }
+        } else {
+            val bitmap: Bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                ?: return@runCatching null
+            BitmapDrawable(context.resources, bitmap)
         }
     }.getOrNull()
 
@@ -264,7 +293,9 @@ class GifResultAdapter(
 
     companion object {
         private const val MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024
+        private const val MAX_THUMBNAIL_CACHE_BYTES = 12 * 1024 * 1024
+        private const val THUMBNAIL_TARGET_PX = 360
         private const val USER_AGENT =
-            "Fcitx5Android-GifSearch/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
+            "Fcitx5Android-GifSearch/0.2 (https://github.com/fcitx5-android/fcitx5-android)"
     }
 }

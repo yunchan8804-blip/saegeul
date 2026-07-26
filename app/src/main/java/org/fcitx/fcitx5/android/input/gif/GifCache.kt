@@ -19,7 +19,9 @@ class GifCache(private val context: Context) {
 
     suspend fun getOrDownload(result: GifResult): File = withContext(Dispatchers.IO) {
         cleanupExpired()
-        check(result.byteSize in 1..MAX_BYTES) { "GIF size is outside the allowed range" }
+        check(isDeclaredSizeAllowed(result.byteSize)) {
+            "GIF size is outside the allowed range"
+        }
         directory.mkdirs()
         val target = File(directory, "${sha256(result.mediaUrl)}.gif")
         if (target.isFile && target.length() in 1..MAX_BYTES) {
@@ -32,7 +34,7 @@ class GifCache(private val context: Context) {
         try {
             val bytes = download(result.mediaUrl)
             if (!GifFileInspector.isAnimated(bytes)) {
-                throw InvalidGifException("Commons file is not an animated GIF")
+                throw InvalidGifException("Downloaded file is not an animated GIF")
             }
             partial.outputStream().use { it.write(bytes) }
             if (!partial.renameTo(target)) {
@@ -94,9 +96,13 @@ class GifCache(private val context: Context) {
     companion object {
         const val DIRECTORY_NAME = "gif-share"
         const val TTL_MS = 24L * 60L * 60L * 1000L
-        const val MAX_BYTES = WikimediaCommonsGifProvider.MAX_GIF_BYTES
+        const val UNKNOWN_SIZE = 0L
+        const val MAX_BYTES = 20L * 1024L * 1024L
+        internal fun isDeclaredSizeAllowed(size: Long): Boolean =
+            size == UNKNOWN_SIZE || size in 1..MAX_BYTES
+
         private const val USER_AGENT =
-            "Fcitx5Android-GifSearch/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
+            "Fcitx5Android-GifSearch/0.2 (https://github.com/fcitx5-android/fcitx5-android)"
     }
 }
 

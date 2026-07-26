@@ -347,6 +347,7 @@
     <string name="gif_attachment_unsupported" tools:ignore="MissingTranslation">This app does not support GIF attachments</string>
     <string name="gif_source_license" tools:ignore="MissingTranslation">%1$s · %2$s</string>
     <string name="gif_powered_by_commons" tools:ignore="MissingTranslation">Open-license results from Wikimedia Commons</string>
+    <string name="gif_powered_by_noto" tools:ignore="MissingTranslation">Animated Noto Emoji · CC BY 4.0</string>
     <string name="gif_loading" tools:ignore="MissingTranslation">Searching GIFs…</string>
     <string name="gif_downloading" tools:ignore="MissingTranslation">Downloading and verifying GIF…</string>
     <string name="gif_no_results" tools:ignore="MissingTranslation">No open-license animated GIFs found</string>
@@ -357,8 +358,8 @@
     <string name="gif_link_failed" tools:ignore="MissingTranslation">Could not insert the link</string>
     <string name="gif_private_disabled" tools:ignore="MissingTranslation">GIF search is disabled in password and private fields</string>
     <string name="gif_editor_changed" tools:ignore="MissingTranslation">The input field changed. Select the GIF again.</string>
-    <string name="gif_query_title" tools:ignore="MissingTranslation">GIF search term</string>
-    <string name="gif_query_paste_hint" tools:ignore="MissingTranslation">Type with a hardware keyboard or paste text</string>
+    <string name="gif_query_inline_hint" tools:ignore="MissingTranslation">Type a GIF search</string>
+    <string name="gif_query_clear" tools:ignore="MissingTranslation">Clear</string>
     <string name="gif_search_action" tools:ignore="MissingTranslation">Search</string>
     <string name="gif_keyword_celebrate" tools:ignore="MissingTranslation">Celebrate</string>
     <string name="gif_keyword_laugh" tools:ignore="MissingTranslation">Laugh</string>
