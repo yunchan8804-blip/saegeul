@@ -40,6 +40,8 @@ import org.fcitx.fcitx5.android.input.picker.emoticonPicker
 import org.fcitx.fcitx5.android.input.picker.symbolPicker
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
+import org.fcitx.fcitx5.android.input.voice.VoicePermissionCoordinator
+import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.unset
 import org.mechdancer.dependency.DynamicScope
@@ -417,6 +419,11 @@ class InputView(
         if (focusChangeResetKeyboard || !restarting) {
             windowManager.attachWindow(KeyboardWindow)
         }
+        VoicePermissionCoordinator.consumeForEditor(
+            info.packageName,
+            info.fieldId,
+            info.inputType
+        )?.let { windowManager.attachWindow(VoiceTranscriptionWindow(it)) }
     }
 
     override fun onStartHandleFcitxEvent() {

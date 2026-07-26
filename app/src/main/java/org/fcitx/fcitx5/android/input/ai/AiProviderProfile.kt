@@ -117,16 +117,13 @@ data class AiProviderProfile(
     val responsesEndpoint: String
         get() = "${normalized().baseUrl}/responses"
 
-    val supportsTranscription: Boolean
-        get() = "transcription" in normalized().capabilities
-
     val isConfigured: Boolean
         get() = runCatching { validate() }.isSuccess
 
     companion object {
         const val OPENAI_BASE_URL = "https://api.openai.com/v1"
         const val DEFAULT_OAUTH_SCOPES = "openid offline_access"
-        val DEFAULT_CAPABILITIES = setOf("responses", "transcription")
+        val DEFAULT_CAPABILITIES = setOf("responses")
         private val CAPABILITY_PATTERN = Regex("^[a-z][a-z0-9._-]{0,63}$")
         val oauthRedirectUri: String
             get() = BuildConfig.AI_OAUTH_REDIRECT_URI

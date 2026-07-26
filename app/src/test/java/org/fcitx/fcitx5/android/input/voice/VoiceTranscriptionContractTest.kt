@@ -42,7 +42,7 @@ class VoiceTranscriptionContractTest {
     }
 
     @Test
-    fun `unsupported computer provider falls back to an available device voice input`() {
+    fun `device dictation offers the installed voice input or a setup action`() {
         assertEquals(
             VoiceUnavailableAction.DeviceDictation,
             VoiceFallbackPolicy.action(hasDeviceVoiceInput = true)
@@ -50,6 +50,50 @@ class VoiceTranscriptionContractTest {
         assertEquals(
             VoiceUnavailableAction.ProviderSetup,
             VoiceFallbackPolicy.action(hasDeviceVoiceInput = false)
+        )
+    }
+
+    @Test
+    fun `granted microphone permission resumes once in the same editor`() {
+        val queue = VoicePermissionResumeQueue()
+        val target = VoiceEditorTarget("chat.app", 7, 1, 12)
+
+        queue.begin(41L, target)
+        queue.complete(41L, granted = true)
+
+        assertEquals(
+            VoicePermissionResumeResult(target, granted = true),
+            queue.consumeForEditor("chat.app", 7, 1)
+        )
+        assertNull(queue.consumeForEditor("chat.app", 7, 1))
+    }
+
+    @Test
+    fun `permission resume is discarded when the editor changed`() {
+        val queue = VoicePermissionResumeQueue()
+        val target = VoiceEditorTarget("chat.app", 7, 1, 12)
+
+        queue.begin(42L, target)
+        queue.complete(42L, granted = true)
+
+        assertNull(queue.consumeForEditor("other.app", 7, 1))
+        assertNull(queue.consumeForEditor("chat.app", 7, 1))
+    }
+
+    @Test
+    fun `stale permission results cannot replace the latest request`() {
+        val queue = VoicePermissionResumeQueue()
+        val oldTarget = VoiceEditorTarget("old.app", 1, 1, 0)
+        val currentTarget = VoiceEditorTarget("chat.app", 7, 1, 12)
+
+        queue.begin(1L, oldTarget)
+        queue.begin(2L, currentTarget)
+        queue.complete(1L, granted = true)
+        queue.complete(2L, granted = false)
+
+        assertEquals(
+            VoicePermissionResumeResult(currentTarget, granted = false),
+            queue.consumeForEditor("chat.app", 7, 1)
         )
     }
 }

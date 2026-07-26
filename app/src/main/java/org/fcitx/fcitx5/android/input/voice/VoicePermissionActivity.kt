@@ -16,15 +16,12 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** Process-memory callback bridge for the IME service, which cannot request runtime permissions. */
 object VoicePermissionCoordinator {
-    private data class Pending(val id: Long, val callback: (Boolean) -> Unit)
-
     private val nextId = AtomicLong(1L)
-    private var pending: Pending? = null
+    private val resumeQueue = VoicePermissionResumeQueue()
 
-    @Synchronized
-    fun request(context: Context, callback: (Boolean) -> Unit): Long? {
+    fun request(context: Context, target: VoiceEditorTarget): Long? {
         val id = nextId.getAndIncrement()
-        pending = Pending(id, callback)
+        resumeQueue.begin(id, target)
         val launched = runCatching {
             context.startActivity(
                 Intent(context, VoicePermissionActivity::class.java)
@@ -34,23 +31,22 @@ object VoicePermissionCoordinator {
             )
         }.isSuccess
         if (!launched) {
-            pending = null
+            resumeQueue.cancel(id)
             return null
         }
         return id
     }
 
-    @Synchronized
-    fun cancel(id: Long) {
-        if (pending?.id == id) pending = null
+    internal fun deliver(id: Long, granted: Boolean) {
+        resumeQueue.complete(id, granted)
     }
 
-    @Synchronized
-    internal fun deliver(id: Long, granted: Boolean) {
-        val request = pending?.takeIf { it.id == id } ?: return
-        pending = null
-        request.callback(granted)
-    }
+    fun consumeForEditor(
+        packageName: String?,
+        fieldId: Int,
+        inputType: Int
+    ): VoicePermissionResumeResult? =
+        resumeQueue.consumeForEditor(packageName, fieldId, inputType)
 }
 
 /** Process-memory-only result bridge for a user-confirmed ACTION_OPEN_DOCUMENT selection. */

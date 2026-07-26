@@ -521,8 +521,8 @@
     <string name="ai_action_translate_korean" tools:ignore="MissingTranslation">Korean</string>
     <string name="ai_action_translate_japanese" tools:ignore="MissingTranslation">Japanese</string>
     <string name="ai_action_translate_chinese" tools:ignore="MissingTranslation">Chinese</string>
-    <string name="ai_not_configured" tools:ignore="MissingTranslation">AI features are not connected yet</string>
-    <string name="ai_setup_required" tools:ignore="MissingTranslation">AI features aren’t connected yet. Complete setup once to use AI writing and transcription.</string>
+    <string name="ai_not_configured" tools:ignore="MissingTranslation">Writing AI is not connected yet</string>
+    <string name="ai_setup_required" tools:ignore="MissingTranslation">Writing AI is not connected yet. Connect a computer or enter a writing API key.</string>
     <string name="ai_setup_action" tools:ignore="MissingTranslation">Set up</string>
     <string name="ai_private_disabled" tools:ignore="MissingTranslation">AI is disabled in password and private fields</string>
     <string name="ai_offline_disabled" tools:ignore="MissingTranslation">Turn off completely offline mode to use AI</string>
@@ -532,7 +532,7 @@
     <string name="ai_undo_failed" tools:ignore="MissingTranslation">Could not undo because the text or cursor changed</string>
     <string name="privacy_ai" tools:ignore="MissingTranslation">Privacy &amp; AI</string>
     <string name="privacy_network_controls" tools:ignore="MissingTranslation">Network controls</string>
-    <string name="ai_provider_settings" tools:ignore="MissingTranslation">AI provider</string>
+    <string name="ai_provider_settings" tools:ignore="MissingTranslation">Writing AI connection</string>
     <string name="ai_clear_custom_provider" tools:ignore="MissingTranslation">Remove custom provider</string>
     <string name="ai_provider_configured_summary" tools:ignore="MissingTranslation">%1$s · %2$s · %3$s</string>
     <string name="ai_provider_source_custom" tools:ignore="MissingTranslation">encrypted BYOK profile</string>
@@ -547,7 +547,7 @@
     <string name="ai_quality_model_hint" tools:ignore="MissingTranslation">Quality model</string>
     <string name="ai_provider_security_note" tools:ignore="MissingTranslation">The key is encrypted with Android Keystore in no-backup storage. It is excluded from app backups, exports, logs, and the clipboard.</string>
     <string name="ai_provider_invalid" tools:ignore="MissingTranslation">Check the key, HTTPS URL, and model names</string>
-    <string name="ai_auth_mode_title" tools:ignore="MissingTranslation">Connect AI</string>
+    <string name="ai_auth_mode_title" tools:ignore="MissingTranslation">Connect writing AI</string>
     <string name="ai_auth_mode_auto_discovery" tools:ignore="MissingTranslation">Find my computer automatically (recommended)</string>
     <string name="ai_auth_mode_api_key" tools:ignore="MissingTranslation">Direct API key</string>
     <string name="ai_auth_mode_oauth" tools:ignore="MissingTranslation">OAuth 2.0 login (PKCE)</string>
@@ -694,15 +694,40 @@
     <string name="personal_dictionary_delete_confirm">Delete “%1$s”?</string>
     <string name="personal_dictionary_privacy">Personal dictionary privacy</string>
     <string name="personal_dictionary_privacy_summary">Stored in app-owned no-backup storage and excluded from user-data export. The keyboard never learns input automatically or stores source text, selection history, or app package names. Personal candidates are disabled in password, private, no-spellcheck, and no-personalized-learning editors.</string>
-    <string name="voice_precision_title">AI precision dictation</string>
+    <string name="voice_provider_settings">Voice dictation</string>
+    <string name="voice_provider_mode_title">Dictation method</string>
+    <string name="voice_provider_mode_device">Device dictation (recommended)</string>
+    <string name="voice_provider_mode_openai">OpenAI API precision transcription</string>
+    <string name="voice_provider_mode_device_summary">Uses the device voice input. This app does not send an STT API key.</string>
+    <string name="voice_provider_mode_openai_summary">Sends audio to the official OpenAI Audio API only after recording stops.</string>
+    <string name="voice_openai_api_settings">OpenAI speech-to-text</string>
+    <string name="voice_provider_status_missing">Not connected · enter a separate STT API key</string>
+    <string name="voice_provider_status_unreadable">The encrypted STT setting cannot be read · remove and reconnect it</string>
+    <string name="voice_provider_configured_summary">Connected · %1$s · Keystore encrypted</string>
+    <string name="voice_provider_key_hint">OpenAI STT API key</string>
+    <string name="voice_provider_key_unchanged_hint">STT API key (leave blank to keep it)</string>
+    <string name="voice_provider_security_note">This key is used only for speech-to-text. It is encrypted with Android Keystore in no-backup storage and is never shared with the writing AI, backups, exports, logs, or clipboard.</string>
+    <string name="voice_model_accurate">Accuracy first · gpt-4o-transcribe</string>
+    <string name="voice_model_efficient">Lower cost and faster · gpt-4o-mini-transcribe</string>
+    <string name="voice_provider_invalid">Check the STT API key and transcription model</string>
+    <string name="voice_provider_save_failed">Could not save the voice transcription setting</string>
+    <string name="voice_provider_saved">OpenAI speech-to-text connected</string>
+    <string name="voice_provider_key_remove">Remove STT API key</string>
+    <string name="voice_provider_key_remove_confirm">Remove the separately stored STT API key and return to device dictation?</string>
+    <string name="voice_provider_removed">STT API key removed · device dictation selected</string>
+    <string name="voice_provider_setup_required">OpenAI online transcription is selected, but its separate STT API key is missing. Connect it in Voice dictation settings.</string>
+    <string name="voice_device_provider_name">Device voice input</string>
+    <string name="voice_device_dictation_ready">Your selected device voice input handles speech and inserts its result directly into the current field.</string>
+    <string name="voice_device_dictation_unavailable">No device voice input is enabled. Enable one or connect OpenAI speech-to-text in settings.</string>
+    <string name="voice_openai_provider_name">OpenAI speech-to-text</string>
+    <string name="voice_openai_provider_label">OpenAI STT · %1$s</string>
+    <string name="voice_precision_title">Precision dictation</string>
     <string name="voice_precision_ready">Audio is sent only after you stop recording, and text is inserted only after you review the transcript.</string>
     <string name="voice_record_start">Start recording</string>
     <string name="voice_device_dictation_title">Device dictation</string>
     <string name="voice_use_device_dictation">Use device dictation</string>
-    <string name="voice_provider_unsupported_device_fallback">The connected computer Codex cannot receive audio files. You can dictate immediately with the device voice input instead.</string>
     <string name="voice_record_stop">Stop recording</string>
     <string name="voice_recording">Recording %1$d sec</string>
-    <string name="voice_provider_unsupported">The connected computer’s Codex CLI supports writing but not audio-file transcription. This app does not claim support without a public audio integration.</string>
     <string name="voice_transcribing_segment">Recording stopped · creating an accurate Korean transcript…</string>
     <string name="voice_transcribing_button">Transcribing…</string>
     <string name="voice_preview_instruction">Review the final transcript before inserting it</string>
@@ -712,8 +737,8 @@
     <string name="voice_permission_required">Microphone permission is required. The keyboard opens a private system permission screen because an IME service cannot request it directly.</string>
     <string name="voice_permission_denied">Microphone permission was not granted. No audio was recorded or sent.</string>
     <string name="voice_permission_allow">Allow microphone</string>
-    <string name="voice_private_disabled">AI dictation is disabled in password, sensitive, and no-personalized-learning fields</string>
-    <string name="voice_policy_disabled">AI dictation is blocked by offline mode or this app’s network/AI policy</string>
+    <string name="voice_private_disabled">Dictation is disabled in password, sensitive, and no-personalized-learning fields</string>
+    <string name="voice_policy_disabled">Dictation is blocked by offline mode or this app’s network policy</string>
     <string name="voice_cursor_required">Place a single cursor in the target input field before recording</string>
     <string name="voice_editor_changed">The target app, field, or cursor changed. The transcript was not inserted.</string>
     <string name="voice_record_failed">Could not record usable audio. No audio was retained.</string>

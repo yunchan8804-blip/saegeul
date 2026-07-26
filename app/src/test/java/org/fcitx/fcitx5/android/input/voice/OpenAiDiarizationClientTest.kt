@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -48,7 +47,7 @@ class OpenAiDiarizationClientTest {
                 }"""
             }
         }
-        val client = OpenAiDiarizationClient(AiProviderProfile(apiKey = "secret"), transport)
+        val client = OpenAiDiarizationClient(VoiceProviderProfile(apiKey = "secret"), transport)
 
         val result = client.transcribe(source)
 

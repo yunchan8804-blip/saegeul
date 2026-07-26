@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
-import org.fcitx.fcitx5.android.input.ai.AiProviderKind
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -43,12 +41,12 @@ class MeetingDiarizationContractTest {
 
     @Test
     fun `capability fails closed outside the standard OpenAI endpoint`() {
-        val standard = AiProviderProfile(apiKey = "key")
-        val compatible = standard.copy(kind = AiProviderKind.OpenAICompatible)
+        val standard = VoiceProviderProfile(apiKey = "key")
+        val unsupportedModel = standard.copy(diarizationModel = "custom-diarize")
         val customEndpoint = standard.copy(baseUrl = "https://provider.example/v1")
 
         assertTrue(MeetingDiarizationCapability.supports(standard))
-        assertFalse(MeetingDiarizationCapability.supports(compatible))
+        assertFalse(MeetingDiarizationCapability.supports(unsupportedModel))
         assertFalse(MeetingDiarizationCapability.supports(customEndpoint))
     }
 

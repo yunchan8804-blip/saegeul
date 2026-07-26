@@ -72,6 +72,8 @@ import org.fcitx.fcitx5.android.input.search.KoreanSearchWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryWindow
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeStore
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderPolicy
 import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -516,7 +518,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             alpha = if (isEnabled) 1f else 0.35f
         }
         idleUi.buttonsUi.precisionDictationButton.apply {
-            isEnabled = allowsAi
+            val voiceMode = VoiceProviderModeStore(context).load()
+            isEnabled = allowsTextInspection && VoiceProviderPolicy.allowsSelectedMode(
+                voiceMode,
+                allowsNetwork
+            )
             alpha = if (isEnabled) 1f else 0.35f
         }
         idleUi.buttonsUi.ocrButton.apply {

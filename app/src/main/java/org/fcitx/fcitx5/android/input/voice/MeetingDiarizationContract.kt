@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
-import org.fcitx.fcitx5.android.input.ai.AiProviderKind
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import java.util.Locale
 
 data class MeetingSpeakerSegment(
@@ -22,10 +20,10 @@ data class MeetingDiarizationResult(
 )
 
 object MeetingDiarizationCapability {
-    fun supports(profile: AiProviderProfile): Boolean {
+    fun supports(profile: VoiceProviderProfile): Boolean {
         val normalized = runCatching(profile::validate).getOrNull() ?: return false
-        return normalized.kind == AiProviderKind.OpenAI &&
-            normalized.baseUrl == AiProviderProfile.OPENAI_BASE_URL
+        return normalized.baseUrl == VoiceProviderProfile.OPENAI_BASE_URL &&
+            normalized.diarizationModel == VoiceProviderProfile.DIARIZATION_MODEL
     }
 }
 

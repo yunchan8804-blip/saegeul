@@ -11,10 +11,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
-import org.fcitx.fcitx5.android.input.ai.AiBearerTokenProvider
 import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
-import org.fcitx.fcitx5.android.input.ai.ProfileAiBearerTokenProvider
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -38,26 +35,25 @@ class VoiceTranscriptionException(message: String) : Exception(message)
 
 /** Accuracy-first segment transcription. This is deliberately not labelled as Realtime. */
 class OpenAiTranscriptionClient(
-    private val profile: AiProviderProfile,
-    private val model: String = VoiceTranscriptionModels.ACCURACY,
-    private val transport: VoiceHttpTransport = UrlConnectionVoiceTransport(),
-    private val authorizationProvider: AiBearerTokenProvider = ProfileAiBearerTokenProvider
+    private val profile: VoiceProviderProfile,
+    private val model: String = profile.transcriptionModel,
+    private val transport: VoiceHttpTransport = UrlConnectionVoiceTransport()
 ) {
     suspend fun transcribe(wav: ByteArray): VoiceTranscriptionResult = withContext(Dispatchers.IO) {
         require(wav.size in MIN_WAV_BYTES..MAX_WAV_BYTES) { "Audio payload size is invalid" }
         val validated = profile.validate()
         val request = buildRequest(wav, model)
         try {
-            val authorization = authorizationProvider.authorizationHeader(validated)
+            val authorization = "Bearer ${validated.apiKey}"
             val payload = try {
                 transport.post(
-                    url = "${validated.baseUrl}/audio/transcriptions",
+                    url = validated.endpoint,
                     authorization = authorization,
                     request = request
                 )
             } catch (exception: AiHttpStatusException) {
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                    throw authorizationProvider.onUnauthorized(validated)
+                    throw VoiceTranscriptionException("OpenAI rejected the STT API key")
                 }
                 throw VoiceTranscriptionException(
                     exception.message ?: "Transcription provider request failed"

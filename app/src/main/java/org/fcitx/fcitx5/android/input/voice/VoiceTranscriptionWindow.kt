@@ -18,11 +18,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
-import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
-import org.fcitx.fcitx5.android.input.ai.AiReauthenticationRequiredException
 import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
-import org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -32,18 +28,19 @@ import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.mechdancer.dependency.manager.must
 
 /** Preview-first, bounded segment dictation. It never claims to be a Realtime session. */
-class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscriptionWindow>() {
+class VoiceTranscriptionWindow(
+    private val permissionResume: VoicePermissionResumeResult? = null
+) : InputWindow.ExtendedInputWindow<VoiceTranscriptionWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
-    private val authorizationProvider by lazy { AndroidAiBearerTokenProvider(context) }
 
     private lateinit var ui: VoiceTranscriptionUi
-    private var profile: AiProviderProfile? = null
+    private var mode: VoiceProviderMode = VoiceProviderMode.DeviceDictation
+    private var profile: VoiceProviderProfile? = null
     private var target: VoiceEditorTarget? = null
     private var recorder: PcmMemoryRecorder? = null
     private var sessionJob: Job? = null
-    private var permissionRequestId: Long? = null
     private var transcript: String? = null
     private var systemVoiceInput: Pair<String, InputMethodSubtype>? = null
     private var attached = false
@@ -70,14 +67,17 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
     override fun onAttached() {
         attached = true
         val allowsTextInspection = service.allowsTextInspectionFeatures()
-        val allowsAiInput = service.allowsAiInputFeatures()
-        val resolved = if (allowsTextInspection && allowsAiInput) {
-            AiProviderResolver.resolve(context).profile
-        } else null
+        val resolved = VoiceProviderResolver.resolve(context)
+        mode = resolved.mode
+        profile = resolved.profile
+        val allowsSelectedVoice = VoiceProviderPolicy.allowsSelectedMode(
+            mode,
+            service.allowsNetworkInputFeatures()
+        )
         when (AiFeatureEntryGate.evaluate(
             allowsTextInspection = allowsTextInspection,
-            allowsAiInput = allowsAiInput,
-            hasConfiguredProfile = resolved != null
+            allowsAiInput = allowsSelectedVoice,
+            hasConfiguredProfile = mode == VoiceProviderMode.DeviceDictation || profile != null
         )) {
             AiFeatureEntryGate.PrivateEditor -> {
                 ui.showError(context.getString(R.string.voice_private_disabled), canRetry = false)
@@ -88,28 +88,27 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
                 return
             }
             AiFeatureEntryGate.SetupRequired -> {
-                ui.showSetupRequired(context.getString(R.string.ai_setup_required))
+                ui.showSetupRequired(context.getString(R.string.voice_provider_setup_required))
                 return
             }
             AiFeatureEntryGate.Ready -> Unit
         }
-        resolved ?: return
-        profile = resolved
-        if (!resolved.supportsTranscription) {
-            showUnsupportedProvider(resolved)
-            return
+        when (mode) {
+            VoiceProviderMode.DeviceDictation -> showDeviceDictation()
+            VoiceProviderMode.OpenAiApi -> profile?.let {
+                ui.showReady(voiceProviderLabel(it))
+                resumeAfterPermissionIfNeeded()
+            }
         }
-        ui.showReady(resolved.displayName)
     }
 
     override fun onDetached() {
         attached = false
         cancelWork(clearUi = false)
-        permissionRequestId?.let(VoicePermissionCoordinator::cancel)
-        permissionRequestId = null
         transcript = null
         target = null
         systemVoiceInput = null
+        profile = null
     }
 
     private fun beginRecording() {
@@ -128,27 +127,40 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
             startRecordingWithPermission()
             return
         }
-        permissionRequestId?.let(VoicePermissionCoordinator::cancel)
-        ui.showPermissionRequired()
-        val requestId = VoicePermissionCoordinator.request(context) { granted ->
-            permissionRequestId = null
-            if (!attached) return@request
-            if (granted) startRecordingWithPermission() else ui.showPermissionRequired(denied = true)
+        val boundTarget = captureTarget()
+        if (boundTarget == null) {
+            ui.showError(context.getString(R.string.voice_cursor_required), canRetry = false)
+            return
         }
-        permissionRequestId = requestId
+        ui.showPermissionRequired()
+        val requestId = VoicePermissionCoordinator.request(context, boundTarget)
         if (requestId == null) ui.showPermissionRequired(denied = true)
     }
 
-    private fun showUnsupportedProvider(provider: AiProviderProfile) {
+    private fun resumeAfterPermissionIfNeeded() {
+        val resume = permissionResume ?: return
+        if (!resume.granted) {
+            ui.showPermissionRequired(denied = true)
+            return
+        }
+        if (!hasMicrophonePermission()) {
+            ui.showPermissionRequired(denied = true)
+            return
+        }
+        if (!validateTarget(resume.target, showError = true)) return
+        startRecordingWithPermission(resume.target)
+    }
+
+    private fun showDeviceDictation() {
         systemVoiceInput = findDeviceVoiceInput()
         val action = VoiceFallbackPolicy.action(systemVoiceInput != null)
-        ui.showProviderUnsupported(
-            provider.displayName,
+        ui.showDeviceDictation(
+            context.getString(R.string.voice_device_provider_name),
             context.getString(
                 if (action == VoiceUnavailableAction.DeviceDictation) {
-                    R.string.voice_provider_unsupported_device_fallback
+                    R.string.voice_device_dictation_ready
                 } else {
-                    R.string.voice_provider_unsupported
+                    R.string.voice_device_dictation_unavailable
                 }
             ),
             action
@@ -159,7 +171,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
         if (!validatePolicy()) return
         val voiceInput = systemVoiceInput ?: findDeviceVoiceInput()
         if (voiceInput == null) {
-            profile?.let(::showUnsupportedProvider)
+            showDeviceDictation()
             return
         }
         val (id, subtype) = voiceInput
@@ -171,14 +183,15 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
             AppPrefs.getInstance().keyboard.preferredVoiceInput.getValue()
         )
 
-    private fun startRecordingWithPermission() {
+    private fun startRecordingWithPermission(resumedTarget: VoiceEditorTarget? = null) {
         if (!validatePolicy() || !hasMicrophonePermission()) return
         cancelWork(clearUi = false)
-        val boundTarget = captureTarget()
+        val boundTarget = resumedTarget ?: captureTarget()
         if (boundTarget == null) {
             ui.showError(context.getString(R.string.voice_cursor_required), canRetry = false)
             return
         }
+        if (resumedTarget != null && !validateTarget(boundTarget, showError = true)) return
         val configuredProfile = profile ?: return
         target = boundTarget
         transcript = null
@@ -200,10 +213,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
                 recorder = null
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 ui.showTranscribing()
-                val result = OpenAiTranscriptionClient(
-                    configuredProfile,
-                    authorizationProvider = authorizationProvider
-                ).transcribe(captured.bytes)
+                val result = OpenAiTranscriptionClient(configuredProfile).transcribe(captured.bytes)
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 transcript = result.text
                 commitGate.resetForNewTranscript()
@@ -212,20 +222,16 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
                 throw exception
             } catch (exception: Exception) {
                 if (attached) {
-                    if (exception is AiReauthenticationRequiredException) {
-                        ui.showSetupRequired(context.getString(R.string.ai_oauth_reauth_required))
-                    } else {
-                        ui.showError(
-                            context.getString(
+                    ui.showError(
+                        context.getString(
                             when (exception) {
                                 is VoiceRecordingException -> R.string.voice_record_failed
                                 is VoiceTranscriptionException -> R.string.voice_transcription_failed
                                 else -> R.string.voice_transcription_failed
                             }
-                            ),
-                            canRetry = true
-                        )
-                    }
+                        ),
+                        canRetry = true
+                    )
                 }
             } finally {
                 if (recorder === activeRecorder) recorder = null
@@ -254,7 +260,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
         target = null
         commitGate.resetForNewTranscript()
         if (clearUi && attached) {
-            profile?.let { ui.showReady(it.displayName) }
+            renderReadyState()
         }
     }
 
@@ -289,8 +295,11 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
     private fun validatePolicy(): Boolean {
         return when (AiFeatureEntryGate.evaluate(
             allowsTextInspection = service.allowsTextInspectionFeatures(),
-            allowsAiInput = service.allowsAiInputFeatures(),
-            hasConfiguredProfile = profile != null
+            allowsAiInput = VoiceProviderPolicy.allowsSelectedMode(
+                mode,
+                service.allowsNetworkInputFeatures()
+            ),
+            hasConfiguredProfile = mode == VoiceProviderMode.DeviceDictation || profile != null
         )) {
             AiFeatureEntryGate.Ready -> true
             AiFeatureEntryGate.PrivateEditor -> {
@@ -302,7 +311,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
                 false
             }
             AiFeatureEntryGate.SetupRequired -> {
-                ui.showSetupRequired(context.getString(R.string.ai_setup_required))
+                ui.showSetupRequired(context.getString(R.string.voice_provider_setup_required))
                 false
             }
         }
@@ -330,4 +339,16 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
     private fun returnToKeyboard() {
         windowManager.attachWindow(KeyboardWindow)
     }
+
+    private fun renderReadyState() {
+        when (mode) {
+            VoiceProviderMode.DeviceDictation -> showDeviceDictation()
+            VoiceProviderMode.OpenAiApi -> profile?.let {
+                ui.showReady(voiceProviderLabel(it))
+            } ?: ui.showSetupRequired(context.getString(R.string.voice_provider_setup_required))
+        }
+    }
+
+    private fun voiceProviderLabel(configured: VoiceProviderProfile): String =
+        context.getString(R.string.voice_openai_provider_label, configured.transcriptionModel)
 }

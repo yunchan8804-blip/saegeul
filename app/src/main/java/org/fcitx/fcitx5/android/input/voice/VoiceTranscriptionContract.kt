@@ -11,9 +11,56 @@ data class VoiceEditorTarget(
     val cursor: Int
 )
 
-object VoiceTranscriptionModels {
-    /** Accuracy-first file transcription; realtime uses a separate transcription session. */
-    const val ACCURACY = "gpt-4o-transcribe"
+data class VoicePermissionResumeResult(
+    val target: VoiceEditorTarget,
+    val granted: Boolean
+)
+
+/**
+ * Process-memory handoff across the permission Activity boundary.
+ *
+ * Opening a runtime-permission Activity hides and restarts the IME. The result therefore cannot
+ * safely start AudioRecord from the old input window. Keep the intent until the original editor is
+ * active again, then let InputView restore the voice window exactly once.
+ */
+internal class VoicePermissionResumeQueue {
+    private data class Pending(val id: Long, val target: VoiceEditorTarget)
+
+    private var pending: Pending? = null
+    private var completed: VoicePermissionResumeResult? = null
+
+    @Synchronized
+    fun begin(id: Long, target: VoiceEditorTarget) {
+        pending = Pending(id, target)
+        completed = null
+    }
+
+    @Synchronized
+    fun complete(id: Long, granted: Boolean) {
+        val request = pending?.takeIf { it.id == id } ?: return
+        pending = null
+        completed = VoicePermissionResumeResult(request.target, granted)
+    }
+
+    @Synchronized
+    fun cancel(id: Long) {
+        if (pending?.id == id) pending = null
+    }
+
+    @Synchronized
+    fun consumeForEditor(
+        packageName: String?,
+        fieldId: Int,
+        inputType: Int
+    ): VoicePermissionResumeResult? {
+        val result = completed ?: return null
+        completed = null
+        return result.takeIf {
+            packageName == it.target.packageName &&
+                fieldId == it.target.fieldId &&
+                inputType == it.target.inputType
+        }
+    }
 }
 
 object VoiceTranscriptPolicy {

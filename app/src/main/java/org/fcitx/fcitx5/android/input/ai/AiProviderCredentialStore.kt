@@ -144,8 +144,8 @@ class AiProviderCredentialStore(context: Context) {
                 }
             }
         } ?: if (authMode == AiAuthMode.OAuthPkce) {
-            // Older discovered profiles never persisted capabilities. Fail closed for audio and
-            // require reconnection to a manifest that explicitly advertises transcription.
+            // Older discovered profiles never persisted capabilities. Writing remains fail-closed
+            // to the one API surface this profile owns.
             setOf("responses")
         } else {
             AiProviderProfile.DEFAULT_CAPABILITIES

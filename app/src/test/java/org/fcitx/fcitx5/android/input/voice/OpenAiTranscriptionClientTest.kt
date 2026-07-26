@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,13 +30,13 @@ class OpenAiTranscriptionClientTest {
             """{"text":" 안녕하세요 ","model":"gpt-4o-transcribe-live"}"""
         }
         val client = OpenAiTranscriptionClient(
-            AiProviderProfile(baseUrl = "https://provider.test/v1", apiKey = "test-key"),
+            VoiceProviderProfile(apiKey = "test-key"),
             transport = transport
         )
 
         val result = client.transcribe(ByteArray(64) { it.toByte() })
 
-        assertEquals("https://provider.test/v1/audio/transcriptions", url)
+        assertEquals("https://api.openai.com/v1/audio/transcriptions", url)
         assertEquals("Bearer test-key", authorization)
         assertTrue(hasModel)
         assertTrue(hasLanguage)

@@ -23,19 +23,7 @@ class AiProviderDiscoveryManifestTest {
         assertEquals("Home AI", verified.profile.displayName)
         assertEquals("https://computer.example/v1", verified.profile.baseUrl)
         assertEquals("fast", verified.profile.fastModel)
-        assertTrue("responses" in verified.capabilities)
-        assertTrue(verified.profile.supportsTranscription)
-    }
-
-    @Test
-    fun `manifest capability reaches the stored provider contract`() {
-        val textOnly = AiProviderDiscoveryManifestCodec.decode(
-            validManifest().replace(", \"transcription\"", ""),
-            MANIFEST_URL
-        )
-
-        assertEquals(setOf("responses"), textOnly.profile.capabilities)
-        assertFalse(textOnly.profile.supportsTranscription)
+        assertEquals(setOf("responses"), verified.capabilities)
     }
 
     @Test
@@ -80,7 +68,7 @@ class AiProviderDiscoveryManifestTest {
     fun `manifest requires Responses capability and fixed well-known path`() {
         assertTrue(runCatching {
             AiProviderDiscoveryManifestCodec.decode(
-                validManifest().replace("\"responses\", ", ""),
+                validManifest().replace("[\"responses\"]", "[\"unsupported\"]"),
                 MANIFEST_URL
             )
         }.isFailure)
@@ -132,7 +120,7 @@ class AiProviderDiscoveryManifestTest {
             "balanced": "balanced",
             "quality": "quality"
           },
-          "capabilities": ["responses", "transcription"]
+          "capabilities": ["responses"]
         }
     """.trimIndent()
 

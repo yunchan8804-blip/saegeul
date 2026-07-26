@@ -219,7 +219,7 @@ class VoiceTranscriptionUi(
         }
     }
 
-    fun showProviderUnsupported(
+    fun showDeviceDictation(
         providerName: String,
         message: String,
         action: VoiceUnavailableAction

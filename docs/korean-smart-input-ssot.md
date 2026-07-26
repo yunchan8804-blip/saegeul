@@ -364,10 +364,11 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
 | `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | push-to-talk·권한·한국어 hint·최종 preview·exactly-once commit 구현, Realtime partial transcript GATE | L |
-| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, capability gate, preview 구현; 표준 transcription endpoint 실기기 gate 남음 | L |
+| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, preview와 최초 권한 복귀 구현; 실제 STT key 품질·Z Fold6 gate 남음 | L |
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, OpenAI profile·실기기 gate | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
-| `VOICE-05` | 미지원 공급자 휴대폰 받아쓰기 fallback | `DONE` | `transcription` 미지원 공급자에서는 죽은 녹음 버튼을 노출하지 않는다. 사용 가능한 system voice IME가 있으면 `휴대폰 받아쓰기 사용`으로 즉시 전환하고, 없으면 `설정하기`를 제공한다 | S |
+| `VOICE-05` | 휴대폰 받아쓰기 기본 모드 | `DONE` | 글쓰기 AI 연결 여부와 무관한 기본 음성 모드다. system voice IME가 있으면 즉시 전환하고, 없으면 Android 음성 입력 설정 안내를 제공한다 | S |
+| `VOICE-06` | 독립 STT 공급자·보안 저장소 | `DONE` | 글쓰기 AI/OAuth와 분리된 OpenAI STT key·모델 선택, 공식 endpoint allowlist, Keystore/no-backup 저장과 즉시 삭제 | M |
 | `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입 구현, 실기기 정확도 gate | L |
 
 ### 6.5 편의·기기·보안 기능
@@ -729,7 +730,12 @@ compose preview까지만 확인했고 메시지는 전송하지 않았으며, �
 
 ### 8.1 provider 경계
 
-- `AiProvider`는 text generation, transcription, realtime capability를 명시한다.
+- 글쓰기 `AiProviderProfile`은 Responses API만 소유한다. PC Codex/Claude OAuth companion 또는
+  OpenAI-compatible 글쓰기 endpoint가 음성 전사를 암묵적으로 제공한다고 추정하지 않는다.
+- 음성은 별도 `VoiceProviderProfile`과 모드(`DeviceDictation`, `OpenAiApi`)를 사용한다. 기본값은
+  네트워크와 API key가 필요 없는 `DeviceDictation`이다.
+- `OpenAiApi` 음성 모드는 공식 `https://api.openai.com/v1/audio/transcriptions`만 허용하며,
+  `gpt-4o-transcribe`와 `gpt-4o-mini-transcribe` 중 하나를 명시적으로 선택한다.
 - model ID를 UI 문자열이나 action 코드에 직접 흩뿌리지 않고 registry와 profile로 관리한다.
 - 최신·추천 모델은 구현 시 OpenAI 공식 resolver와 문서로 다시 검증한다.
 - 2026-07-26 기준 후보는 다음과 같지만 영구 상수로 간주하지 않는다.
@@ -747,7 +753,7 @@ compose preview까지만 확인했고 메시지는 전송하지 않았으며, �
 Responses API typed streaming event를 기본 text integration 후보로 사용한다. 모든 workload를 Sol로
 보내지 않고 latency, cost, quality 역할을 분리한다.
 
-2026-07-27 `VOICE-02` 구현은 현재 앱의 request-response transport 경계를 지키기 위해
+2026-07-27 `VOICE-02` 구현은 글쓰기 AI transport와 분리된 STT 전용 profile을 사용하며
 `gpt-4o-transcribe` `/audio/transcriptions` 구간 전사로 제한한다. UI 명칭은 `AI 정밀 받아쓰기`이며
 실시간·부분 전사라고 표시하지 않는다. 16 kHz mono PCM은 UI countdown 없이 최대 5분의 안전 상한으로
 메모리에 보관해 WAV로 만들고,
@@ -766,8 +772,8 @@ permission dialog와 focus 복귀는 별도 gate다.
 
 - 일반 배포 기본 경로는 backend가 standard provider key를 보관한다.
 - Realtime client에는 backend가 발급한 짧은 수명의 ephemeral token을 사용한다.
-- 개인용 advanced BYOK를 제공할 경우 Android Keystore로 암호화하고 ciphertext는
-  `noBackupFilesDir` 아래에 저장한다.
+- 개인용 advanced BYOK는 workload별로 분리한다. 글쓰기 key는 `noBackupFilesDir/ai/provider.bin`,
+  STT key는 별도 Keystore alias와 `noBackupFilesDir/voice/provider.bin`에 저장한다.
 - BYOK standard key는 추출 위험이 0이라고 표시하지 않는다.
 - key와 token을 `AppPrefs`, 일반 SharedPreferences, user-data ZIP, log, crash report에 넣지 않는다.
 - 기능별 사용량, 실패 유형, provider만 표시하며 prompt와 결과 원문은 기본 저장하지 않는다.
@@ -921,11 +927,18 @@ private/offline/app별 AI 차단과 editor identity가 하나라도 맞지 않�
 `exported=false` 투명 permission Activity에서만 요청한다. private/no-personalized/offline/app AI 차단,
 editor identity 변경, 취소에서는 전송 또는 입력을 fail-closed한다.
 
-공급자 profile에는 manifest의 capability를 암호화해 보존한다. `transcription`을 명시하지 않은 provider는
-녹음을 시작하지 않고 지원하지 않는 이유를 표시한다. 이 상태에서 활성 system voice IME가 있으면
-비활성 `녹음 시작` 버튼 대신 `휴대폰 받아쓰기 사용`을 제공해 해당 IME로 전환한다. system voice IME가
-없을 때만 AI 공급자 `설정하기`를 제공한다. 이 fallback은 기기 음성 입력이며 Codex 전사로 표시하거나
-집계하지 않는다. 현재 Codex CLI 0.145.0의 `codex exec`는 text와
+음성 모드는 글쓰기 provider capability와 분리한다. 기본 `휴대폰 받아쓰기`는 활성 system voice IME로
+즉시 전환하고, `OpenAI 음성 전사`를 사용자가 고른 경우에만 별도 STT key와 모델을 요구한다. 음성 toolbar
+활성 상태도 글쓰기 AI 연결 여부가 아니라 현재 음성 모드와 editor privacy/network policy만 따른다.
+
+최초 `RECORD_AUDIO` 권한 dialog는 IME를 숨기고 다시 시작할 수 있다. 따라서 기존 window callback에서
+바로 `AudioRecord`를 시작하지 않는다. 요청 시 package/field/input type을 process memory에 묶고,
+권한 결과 뒤 같은 editor가 다시 활성화된 경우에만 음성 window를 한 번 복구해 녹음을 시작한다. 다른
+editor, stale request, process death에서는 결과를 폐기한다. 2026-07-27 A35에서 권한을 철회한 상태로
+`녹음 시작` 1회 탭 -> 권한 승인 -> 같은 Chrome editor 복귀 -> `녹음 중` 표시와 audio HAL capture를
+확인했다.
+
+현재 Codex CLI 0.145.0의 `codex exec`는 text와
 `--image`만 입력으로 받고 audio option이 없다. ChatGPT desktop의 Codex Voice는 공식 UI 기능이지만
 Android companion이 audio를 보내 transcript를 돌려받을 공개 자동화 계약은 없다. 따라서 구독 OAuth
 token을 추출해 비공식 endpoint를 호출하거나 표준 API 사용량으로 위장하지 않는다. 공개 bridge가 생기기
@@ -969,7 +982,10 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | Z Fold6 UI | `PASS` | cover 화면에서 AI toolbar, 원문 preview와 전체 action group이 잘림 없이 표시됨 |
 | AI 결과 우선 UI | `CODE_DONE` | 결과 상태에서 보이지 않는 `weight=1` status container를 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 이동, 결과 card가 전체 가용 높이를 사용 |
 | AI 직접 지시문 | `PASS` | 기능별 두벌식 복제판 제거. 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme을 그대로 쓰되 output은 내부 최대 300자 buffer로 격리; A35에서 영문 입력·후보·숫자판·천지인 picker·picker restart prompt 보존과 target editor 무변경 통과, pure buffer Unicode·preedit·limit 회귀 테스트 통과 |
-| 음성 capability gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. discovery manifest capability를 암호화 profile SSOT로 보존하고 `transcription` 미선언 Codex/Claude companion은 미지원 이유와 활성 `휴대폰 받아쓰기 사용`을 표시한다. A35·Z Fold6에서 버튼 탭 후 Google voice IME 전환과 입력 focus 유지를 확인했고 fallback 정책 unit test 및 companion Python 7 tests 통과 |
+| 음성 모드 gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. 글쓰기 Codex/Claude companion과 STT를 분리하고 기본 `휴대폰 받아쓰기`를 제공한다. A35·Z Fold6에서 Google voice IME 전환과 입력 focus 유지를 확인했고 fallback 정책 unit test 및 companion Python 7 tests 통과 |
+| 독립 STT 설정 | `PASS` | 글쓰기 AI/OAuth와 분리된 휴대폰 받아쓰기·OpenAI STT 모드, 정확도/효율 모델, STT 전용 Keystore/no-backup key 저장·삭제와 공식 endpoint allowlist 구현 |
+| 최초 마이크 권한 복귀 | `PASS/A35` | 권한 Activity가 IME를 재시작해도 같은 editor identity에서 결과를 한 번만 소비한다. A35 권한 철회 상태의 첫 탭·승인 직후 `녹음 중` 및 audio HAL capture 확인; 다른 editor·stale request 회귀 테스트 통과 |
+| OpenAI 실제 전사 품질 | `GATE` | dummy key로 녹음·요청·401 오류 경계만 검증했다. 실제 STT key를 저장하지 않은 상태이며 한국어 정확도·preview·1회 입력은 사용자 key로 별도 검증 필요 |
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI, 7개 신규 테스트 |
 | AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트 |
@@ -1023,8 +1039,8 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 
 ### 단계 4 — 음성
 
-1. push-to-talk audio capture와 permission UX. (`IN_PROGRESS`: 코드 완료, 두 기기 permission/focus gate)
-2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: elapsed-only 5분 safety capture·capability gate·preview 완료, 표준 endpoint live 품질 gate)
+1. push-to-talk audio capture와 permission UX. (`IN_PROGRESS`: A35 최초 권한 자동 복귀 PASS, Z Fold6 gate)
+2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview 완료, 실제 key live 품질 gate)
 3. `VOICE-01` realtime partial transcript. (`GATE`: Realtime WebSocket와 ephemeral token backend)
 4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 코드·테스트 완료, 표준 OpenAI·실기기 gate)
 5. `VOICE-04` Codex 구독 OAuth voice bridge. (`BLOCK`: desktop UI 외 공개 CLI·HTTP audio 계약 없음)
@@ -1093,6 +1109,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | OCR은 proprietary ML SDK 대신 Apache-2.0 Tesseract 계열과 pinned 한국어 fast model을 사용하며 원본·결과를 저장하지 않음 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
 | 2026-07-26 | AI text action은 선택/현재 문단 preview 후에만 network를 호출하고 결과 교체·추가·undo를 명시적 동작으로 제한 |
+| 2026-07-27 | 글쓰기 AI와 음성 STT profile/key를 분리하고 휴대폰 받아쓰기를 기본값으로 유지. 최초 마이크 권한 뒤에는 동일 editor에서만 음성 window와 녹음을 정확히 한 번 재개 |
 | 2026-07-26 | 동적 빠른 문구는 기존 `.mb` 형식을 유지하고, 명시적 미리보기 뒤 정확히 한 번 삽입 |
 | 2026-07-27 | AI·GIF·검색 등 IME 내부 text 입력은 활성 `KeyboardWindow`와 Fcitx 엔진을 재사용하며 기능별 두벌식 복제판을 금지 |
 | 2026-07-27 | provider manifest capability를 profile SSOT로 보존하고 실제 `transcription` 미선언 provider에서는 음성 capture를 시작하지 않음 |

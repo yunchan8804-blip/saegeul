@@ -7,11 +7,14 @@ package org.fcitx.fcitx5.android.ui.main.settings.behavior
 import android.os.Bundle
 import android.os.Build
 import android.text.InputType
+import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.CheckBox
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.Preference
@@ -41,6 +44,11 @@ import org.fcitx.fcitx5.android.input.gif.GifProviderSelectionStore
 import org.fcitx.fcitx5.android.input.gif.GiphyCredentialState
 import org.fcitx.fcitx5.android.input.gif.GiphyProviderConfiguration
 import org.fcitx.fcitx5.android.input.gif.GiphyProviderCredentialStore
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderCredentialStore
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderMode
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeStore
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderProfile
+import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionModel
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
@@ -49,6 +57,9 @@ import splitties.dimensions.dp
 /** User-visible controls for network input, BYOK credentials, and local traces. */
 class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     private lateinit var providerPreference: Preference
+    private lateinit var voiceModePreference: Preference
+    private lateinit var voiceProviderPreference: Preference
+    private lateinit var clearVoiceProviderPreference: Preference
     private lateinit var usagePreference: Preference
     private lateinit var gifSelectionPreference: Preference
     private lateinit var gifProviderPreference: Preference
@@ -86,6 +97,33 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(R.string.ai_clear_custom_provider, onClick = {
                     clearAiProvider()
                 })
+            }
+            addCategory(R.string.voice_provider_settings) {
+                voiceModePreference = Preference(ctx).apply {
+                    setTitle(R.string.voice_provider_mode_title)
+                    setIcon(R.drawable.ic_baseline_keyboard_voice_24)
+                    setOnPreferenceClickListener {
+                        showVoiceModeDialog()
+                        true
+                    }
+                }
+                addPreference(voiceModePreference)
+                voiceProviderPreference = Preference(ctx).apply {
+                    setTitle(R.string.voice_openai_api_settings)
+                    setOnPreferenceClickListener {
+                        showVoiceProviderDialog()
+                        true
+                    }
+                }
+                addPreference(voiceProviderPreference)
+                clearVoiceProviderPreference = Preference(ctx).apply {
+                    setTitle(R.string.voice_provider_key_remove)
+                    setOnPreferenceClickListener {
+                        showRemoveVoiceProviderDialog()
+                        true
+                    }
+                }
+                addPreference(clearVoiceProviderPreference)
             }
             addCategory(R.string.gif_provider_settings) {
                 gifSelectionPreference = Preference(ctx).apply {
@@ -183,6 +221,24 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 "$source · $authentication"
             )
         } ?: getString(R.string.ai_not_configured)
+        val voiceMode = VoiceProviderModeStore(ctx).load()
+        val voiceStore = VoiceProviderCredentialStore(ctx)
+        val voiceProfile = voiceStore.load()
+        voiceModePreference.summary = getString(
+            when (voiceMode) {
+                VoiceProviderMode.DeviceDictation -> R.string.voice_provider_mode_device_summary
+                VoiceProviderMode.OpenAiApi -> R.string.voice_provider_mode_openai_summary
+            }
+        )
+        voiceProviderPreference.summary = when {
+            voiceProfile != null -> getString(
+                R.string.voice_provider_configured_summary,
+                voiceModelName(voiceProfile.transcriptionModel)
+            )
+            voiceStore.hasStoredProfile() -> getString(R.string.voice_provider_status_unreadable)
+            else -> getString(R.string.voice_provider_status_missing)
+        }
+        clearVoiceProviderPreference.isEnabled = voiceStore.hasStoredProfile()
         val usage = AiUsageStore(ctx).snapshot()
         usagePreference.summary = getString(
             R.string.ai_usage_summary,
@@ -242,6 +298,145 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
+
+    private fun showVoiceModeDialog() {
+        val ctx = requireContext()
+        val store = VoiceProviderModeStore(ctx)
+        val values = VoiceProviderMode.entries
+        val labels = arrayOf(
+            getString(R.string.voice_provider_mode_device),
+            getString(R.string.voice_provider_mode_openai)
+        )
+        var selected = values.indexOf(store.load()).coerceAtLeast(0)
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.voice_provider_mode_title)
+            .setSingleChoiceItems(labels, selected) { _, index -> selected = index }
+            .setPositiveButton(R.string.save) { _, _ ->
+                val mode = values[selected]
+                runCatching { store.save(mode) }
+                    .onSuccess {
+                        refreshSummaries()
+                        if (mode == VoiceProviderMode.OpenAiApi &&
+                            VoiceProviderCredentialStore(ctx).load() == null
+                        ) {
+                            view?.post { showVoiceProviderDialog() }
+                        }
+                    }
+                    .onFailure {
+                        Toast.makeText(ctx, R.string.voice_provider_save_failed, Toast.LENGTH_SHORT)
+                            .show()
+                    }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showVoiceProviderDialog() {
+        val ctx = requireContext()
+        val store = VoiceProviderCredentialStore(ctx)
+        val configured = store.load()
+        val apiKey = EditText(ctx).apply {
+            setHint(
+                if (configured == null) {
+                    R.string.voice_provider_key_hint
+                } else {
+                    R.string.voice_provider_key_unchanged_hint
+                }
+            )
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+            }
+            maxLines = 1
+            isSaveEnabled = false
+        }
+        val accurate = RadioButton(ctx).apply {
+            id = View.generateViewId()
+            setText(R.string.voice_model_accurate)
+        }
+        val efficient = RadioButton(ctx).apply {
+            id = View.generateViewId()
+            setText(R.string.voice_model_efficient)
+        }
+        val models = RadioGroup(ctx).apply {
+            orientation = RadioGroup.VERTICAL
+            addView(accurate)
+            addView(efficient)
+            check(
+                if (configured?.transcriptionModel == VoiceTranscriptionModel.Efficient.id) {
+                    efficient.id
+                } else {
+                    accurate.id
+                }
+            )
+        }
+        val horizontal = ctx.dp(20)
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            addView(apiKey)
+            addView(models)
+        }
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle(R.string.voice_openai_api_settings)
+            .setMessage(R.string.voice_provider_security_note)
+            .setView(container)
+            .setPositiveButton(R.string.save, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val key = apiKey.text.toString().trim().ifEmpty { configured?.apiKey.orEmpty() }
+                val model = if (models.checkedRadioButtonId == efficient.id) {
+                    VoiceTranscriptionModel.Efficient.id
+                } else {
+                    VoiceTranscriptionModel.Accurate.id
+                }
+                val profile = VoiceProviderProfile(apiKey = key, transcriptionModel = model)
+                val validated = runCatching(profile::validate)
+                    .onFailure { error ->
+                        apiKey.error = error.message ?: getString(R.string.voice_provider_invalid)
+                    }
+                    .getOrNull() ?: return@setOnClickListener
+                runCatching {
+                    store.save(validated)
+                    VoiceProviderModeStore(ctx).save(VoiceProviderMode.OpenAiApi)
+                }.onSuccess {
+                    apiKey.text?.clear()
+                    dialog.dismiss()
+                    refreshSummaries()
+                    Toast.makeText(ctx, R.string.voice_provider_saved, Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    apiKey.error = getString(R.string.voice_provider_save_failed)
+                }
+            }
+        }
+        dialog.setOnDismissListener { apiKey.text?.clear() }
+        dialog.show()
+    }
+
+    private fun showRemoveVoiceProviderDialog() {
+        val ctx = requireContext()
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.voice_provider_key_remove)
+            .setMessage(R.string.voice_provider_key_remove_confirm)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                VoiceProviderCredentialStore(ctx).clear()
+                VoiceProviderModeStore(ctx).save(VoiceProviderMode.DeviceDictation)
+                refreshSummaries()
+                Toast.makeText(ctx, R.string.voice_provider_removed, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun voiceModelName(model: String): String = getString(
+        if (model == VoiceTranscriptionModel.Efficient.id) {
+            R.string.voice_model_efficient
+        } else {
+            R.string.voice_model_accurate
+        }
+    )
 
     private fun showProviderDialog() {
         val ctx = requireContext()

@@ -13,10 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
-import org.fcitx.fcitx5.android.input.ai.AiBearerTokenProvider
 import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
-import org.fcitx.fcitx5.android.input.ai.ProfileAiBearerTokenProvider
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -46,9 +43,8 @@ internal object DiarizationMultipartContract {
 }
 
 class OpenAiDiarizationClient(
-    private val profile: AiProviderProfile,
-    private val transport: DiarizationHttpTransport = UrlConnectionDiarizationTransport(),
-    private val authorizationProvider: AiBearerTokenProvider = ProfileAiBearerTokenProvider
+    private val profile: VoiceProviderProfile,
+    private val transport: DiarizationHttpTransport = UrlConnectionDiarizationTransport()
 ) {
     suspend fun transcribe(source: MeetingAudioSource): MeetingDiarizationResult =
         withContext(Dispatchers.IO) {
@@ -56,22 +52,22 @@ class OpenAiDiarizationClient(
             if (!MeetingDiarizationCapability.supports(validated)) {
                 throw VoiceTranscriptionException("Provider does not declare OpenAI diarization support")
             }
-            val authorization = authorizationProvider.authorizationHeader(validated)
+            val authorization = "Bearer ${validated.apiKey}"
             val payload = try {
                 transport.post(
-                    url = "${validated.baseUrl}/audio/transcriptions",
+                    url = validated.endpoint,
                     authorization = authorization,
-                    request = DiarizationRequest(source)
+                    request = DiarizationRequest(source, validated.diarizationModel)
                 )
             } catch (exception: AiHttpStatusException) {
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                    throw authorizationProvider.onUnauthorized(validated)
+                    throw VoiceTranscriptionException("OpenAI rejected the STT API key")
                 }
                 throw VoiceTranscriptionException(
                     exception.message ?: "Diarization provider request failed"
                 )
             }
-            parseResponse(payload, DiarizationRequest.MODEL)
+            parseResponse(payload, validated.diarizationModel)
         }
 
     fun cancel() {

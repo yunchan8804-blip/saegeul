@@ -13,11 +13,7 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
-import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
-import org.fcitx.fcitx5.android.input.ai.AiReauthenticationRequiredException
 import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
-import org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -30,10 +26,9 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
-    private val authorizationProvider by lazy { AndroidAiBearerTokenProvider(context) }
 
     private lateinit var ui: MeetingTranscriptionUi
-    private var profile: AiProviderProfile? = null
+    private var profile: VoiceProviderProfile? = null
     private var target: VoiceEditorTarget? = null
     private var pickerRequestId: Long? = null
     private var requestJob: Job? = null
@@ -64,14 +59,13 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
     override fun onAttached() {
         attached = true
         val allowsTextInspection = service.allowsTextInspectionFeatures()
-        val allowsAiInput = service.allowsAiInputFeatures()
-        val resolved = if (allowsTextInspection && allowsAiInput) {
-            AiProviderResolver.resolve(context).profile
-        } else null
+        val allowsOnlineVoice = service.allowsNetworkInputFeatures()
+        val effective = VoiceProviderResolver.resolve(context)
+        val resolved = effective.profile.takeIf { effective.mode == VoiceProviderMode.OpenAiApi }
         profile = resolved
         when (AiFeatureEntryGate.evaluate(
             allowsTextInspection = allowsTextInspection,
-            allowsAiInput = allowsAiInput,
+            allowsAiInput = allowsOnlineVoice,
             hasConfiguredProfile = resolved != null
         )) {
             AiFeatureEntryGate.PrivateEditor -> showBlocked(
@@ -82,8 +76,8 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
             )
             AiFeatureEntryGate.NetworkPolicyBlocked -> showBlocked(
                 local(
-                    "오프라인 모드 또는 이 앱의 AI 차단 설정 때문에 사용할 수 없어.",
-                    "Offline mode or this app's AI policy blocks transcription."
+                    "오프라인 모드 또는 이 앱의 네트워크 차단 설정 때문에 사용할 수 없어.",
+                    "Offline mode or this app's network policy blocks transcription."
                 )
             )
             AiFeatureEntryGate.SetupRequired -> showSetupRequired()
@@ -91,10 +85,10 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 resolved != null && !MeetingDiarizationCapability.supports(resolved)
             ) showBlocked(
                 local(
-                    "현재 연결된 AI에서는 화자 분리를 사용할 수 없어. AI 연결 설정에서 지원 모델을 확인해줘.",
-                    "Speaker transcription isn’t available with the current AI connection. Check the supported model in AI settings."
+                    "현재 음성 전사 연결에서는 화자 분리를 사용할 수 없어. 음성 설정에서 연결을 확인해줘.",
+                    "Speaker transcription isn’t available with the current voice connection. Check the model in voice settings."
                 )
-            ) else if (resolved != null) ui.showReady(resolved.displayName)
+            ) else if (resolved != null) ui.showReady(voiceProviderName())
         }
     }
 
@@ -120,7 +114,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
             if (!attached) return@request
             if (uri == null) {
                 clearReviewState()
-                ui.showReady(configured.displayName)
+                ui.showReady(voiceProviderName())
                 return@request
             }
             processSelectedAudio(uri, configured, boundTarget)
@@ -136,7 +130,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
 
     private fun processSelectedAudio(
         uri: android.net.Uri,
-        configured: AiProviderProfile,
+        configured: VoiceProviderProfile,
         boundTarget: VoiceEditorTarget
     ) {
         if (!validateTarget(boundTarget, showError = true)) return
@@ -147,10 +141,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 val source = ContentUriMeetingAudioSource.inspect(context, uri)
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 ui.showLoading(source.metadata.durationMillis)
-                val transcriber = OpenAiDiarizationClient(
-                    configured,
-                    authorizationProvider = authorizationProvider
-                )
+                val transcriber = OpenAiDiarizationClient(configured)
                 activeClient = transcriber
                 client = transcriber
                 val result = transcriber.transcribe(source)
@@ -163,11 +154,6 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 throw exception
             } catch (exception: Exception) {
                 if (attached) {
-                    if (exception is AiReauthenticationRequiredException) {
-                        clearReviewState(keepTarget = true)
-                        ui.showSetupRequired(context.getString(R.string.ai_oauth_reauth_required))
-                        return@launch
-                    }
                     val message = if (exception is MeetingAudioException) {
                         local(
                             "지원되는 60분·24MB 이하 음성 파일을 골라줘.",
@@ -221,10 +207,10 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
         )
     }
 
-    private fun validatePolicy(configured: AiProviderProfile?): Boolean {
+    private fun validatePolicy(configured: VoiceProviderProfile?): Boolean {
         when (AiFeatureEntryGate.evaluate(
             allowsTextInspection = service.allowsTextInspectionFeatures(),
-            allowsAiInput = service.allowsAiInputFeatures(),
+            allowsAiInput = service.allowsNetworkInputFeatures(),
             hasConfiguredProfile = configured != null
         )) {
             AiFeatureEntryGate.PrivateEditor -> showBlocked(local(
@@ -232,8 +218,8 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 "This is disabled in sensitive or private editors."
             ))
             AiFeatureEntryGate.NetworkPolicyBlocked -> showBlocked(local(
-                "오프라인 모드 또는 앱 정책이 AI 전사를 차단하고 있어.",
-                "Offline mode or app policy blocks AI transcription."
+                "오프라인 모드 또는 앱 정책이 온라인 전사를 차단하고 있어.",
+                "Offline mode or app policy blocks online transcription."
             ))
             AiFeatureEntryGate.SetupRequired -> showSetupRequired()
             AiFeatureEntryGate.Ready -> {
@@ -241,8 +227,8 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                     return true
                 }
                 showBlocked(local(
-                    "현재 연결된 AI에서는 화자 분리를 사용할 수 없어. AI 연결 설정에서 지원 모델을 확인해줘.",
-                    "Speaker transcription isn’t available with the current AI connection. Check the supported model in AI settings."
+                    "현재 음성 전사 연결에서는 화자 분리를 사용할 수 없어. 음성 설정에서 연결을 확인해줘.",
+                    "Speaker transcription isn’t available with the current voice connection. Check voice settings."
                 ))
             }
         }
@@ -279,7 +265,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
         clearReviewState()
         if (clearUi && attached) {
             val configured = profile
-            if (validatePolicy(configured) && configured != null) ui.showReady(configured.displayName)
+            if (validatePolicy(configured) && configured != null) ui.showReady(voiceProviderName())
         }
     }
 
@@ -297,7 +283,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
 
     private fun showSetupRequired() {
         clearReviewState()
-        ui.showSetupRequired(context.getString(R.string.ai_setup_required))
+        ui.showSetupRequired(context.getString(R.string.voice_provider_setup_required))
     }
 
     private fun returnToKeyboard() {
@@ -310,4 +296,6 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
         } else {
             english
         }
+
+    private fun voiceProviderName(): String = context.getString(R.string.voice_openai_provider_name)
 }
