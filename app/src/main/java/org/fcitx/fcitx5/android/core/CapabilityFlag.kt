@@ -73,9 +73,7 @@ enum class CapabilityFlag(val flag: ULong) {
     /**
      * Whether client support commit string with cursor location.
      */
-    CommitStringWithCursor(1UL shl 41),
-
-    PasswordOrSensitive(Password.flag or Sensitive.flag);
+    CommitStringWithCursor(1UL shl 41);
 
 }
 

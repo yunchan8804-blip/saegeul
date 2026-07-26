@@ -29,6 +29,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
 import org.fcitx.fcitx5.android.core.FcitxEvent.CandidateListEvent
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
@@ -454,7 +455,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
-        val allowsTextInspection = !capFlags.has(CapabilityFlag.PasswordOrSensitive)
+        val allowsTextInspection = !EditorPrivacyPolicy.forbidsTextInspection(info, capFlags)
         idleUi.buttonsUi.typoRecoveryButton.apply {
             isEnabled = allowsTextInspection
             alpha = if (isEnabled) 1f else 0.35f
@@ -474,7 +475,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         voiceInputSubtype = InputMethodUtil.findVoiceSubtype(preferredVoiceInput)
         val shouldShowVoiceInput =
-            showVoiceInputButton && voiceInputSubtype != null && !capFlags.has(CapabilityFlag.Password)
+            showVoiceInputButton && voiceInputSubtype != null && allowsTextInspection
         idleUi.setHideKeyboardIsVoiceInput(
             shouldShowVoiceInput,
             if (shouldShowVoiceInput) switchToVoiceInputCallback else hideKeyboardCallback

@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -733,7 +734,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /** Text-inspection actions do not read password/private editors, even when fully offline. */
     fun allowsTextInspectionFeatures(): Boolean =
-        !capabilityFlags.has(CapabilityFlag.PasswordOrSensitive)
+        !EditorPrivacyPolicy.forbidsTextInspection(currentInputEditorInfo, capabilityFlags)
 
     /** Network-backed input features must never inspect or contact a server for private editors. */
     fun allowsNetworkInputFeatures(): Boolean = allowsTextInspectionFeatures()
