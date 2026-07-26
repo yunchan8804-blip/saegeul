@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.voice
 import android.Manifest
 import android.content.pm.PackageManager
 import android.view.View
+import android.view.inputmethod.InputMethodSubtype
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -14,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
 import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
@@ -26,6 +28,7 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.mechdancer.dependency.manager.must
 
 /** Preview-first, bounded segment dictation. It never claims to be a Realtime session. */
@@ -42,6 +45,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
     private var sessionJob: Job? = null
     private var permissionRequestId: Long? = null
     private var transcript: String? = null
+    private var systemVoiceInput: Pair<String, InputMethodSubtype>? = null
     private var attached = false
     private val commitGate = VoiceCommitGate()
 
@@ -55,6 +59,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
             onCancel = ::cancelSession
             onInsert = ::insertTranscript
             onPermission = ::requestMicrophonePermission
+            onDeviceDictation = ::switchToDeviceDictation
             onMeeting = { windowManager.attachWindow(MeetingTranscriptionWindow()) }
             onClose = ::returnToKeyboard
             onSetupRequested = { AiSettingsNavigator.open(context) }
@@ -91,10 +96,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
         resolved ?: return
         profile = resolved
         if (!resolved.supportsTranscription) {
-            ui.showProviderUnsupported(
-                resolved.displayName,
-                context.getString(R.string.voice_provider_unsupported)
-            )
+            showUnsupportedProvider(resolved)
             return
         }
         ui.showReady(resolved.displayName)
@@ -107,6 +109,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
         permissionRequestId = null
         transcript = null
         target = null
+        systemVoiceInput = null
     }
 
     private fun beginRecording() {
@@ -135,6 +138,38 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
         permissionRequestId = requestId
         if (requestId == null) ui.showPermissionRequired(denied = true)
     }
+
+    private fun showUnsupportedProvider(provider: AiProviderProfile) {
+        systemVoiceInput = findDeviceVoiceInput()
+        val action = VoiceFallbackPolicy.action(systemVoiceInput != null)
+        ui.showProviderUnsupported(
+            provider.displayName,
+            context.getString(
+                if (action == VoiceUnavailableAction.DeviceDictation) {
+                    R.string.voice_provider_unsupported_device_fallback
+                } else {
+                    R.string.voice_provider_unsupported
+                }
+            ),
+            action
+        )
+    }
+
+    private fun switchToDeviceDictation() {
+        if (!validatePolicy()) return
+        val voiceInput = systemVoiceInput ?: findDeviceVoiceInput()
+        if (voiceInput == null) {
+            profile?.let(::showUnsupportedProvider)
+            return
+        }
+        val (id, subtype) = voiceInput
+        InputMethodUtil.switchInputMethod(service, id, subtype)
+    }
+
+    private fun findDeviceVoiceInput(): Pair<String, InputMethodSubtype>? =
+        InputMethodUtil.findVoiceSubtype(
+            AppPrefs.getInstance().keyboard.preferredVoiceInput.getValue()
+        )
 
     private fun startRecordingWithPermission() {
         if (!validatePolicy() || !hasMicrophonePermission()) return

@@ -26,6 +26,7 @@ class VoiceTranscriptionUi(
     var onCancel: (() -> Unit)? = null
     var onInsert: (() -> Unit)? = null
     var onPermission: (() -> Unit)? = null
+    var onDeviceDictation: (() -> Unit)? = null
     var onMeeting: (() -> Unit)? = null
     var onClose: (() -> Unit)? = null
     var onSetupRequested: (() -> Unit)? = null
@@ -96,6 +97,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showReady(providerName: String) {
+        title.setText(R.string.voice_precision_title)
         provider.text = context.getString(R.string.ai_provider, providerName)
         status.setText(R.string.voice_precision_ready)
         transcriptScroller.visibility = View.GONE
@@ -217,15 +219,38 @@ class VoiceTranscriptionUi(
         }
     }
 
-    fun showProviderUnsupported(providerName: String, message: String) {
+    fun showProviderUnsupported(
+        providerName: String,
+        message: String,
+        action: VoiceUnavailableAction
+    ) {
+        title.setText(
+            if (action == VoiceUnavailableAction.DeviceDictation) {
+                R.string.voice_device_dictation_title
+            } else {
+                R.string.voice_precision_title
+            }
+        )
         provider.text = context.getString(R.string.ai_provider, providerName)
         status.text = message
         transcriptScroller.visibility = View.GONE
         hideMeeting()
         primary.apply {
-            isEnabled = false
-            setText(R.string.voice_record_start)
-            setOnClickListener(null)
+            isEnabled = true
+            setText(
+                if (action == VoiceUnavailableAction.DeviceDictation) {
+                    R.string.voice_use_device_dictation
+                } else {
+                    R.string.ai_setup_action
+                }
+            )
+            setOnClickListener {
+                if (action == VoiceUnavailableAction.DeviceDictation) {
+                    onDeviceDictation?.invoke()
+                } else {
+                    onSetupRequested?.invoke()
+                }
+            }
         }
         secondary.apply {
             isEnabled = true

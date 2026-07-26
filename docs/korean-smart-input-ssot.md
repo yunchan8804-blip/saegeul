@@ -367,6 +367,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, capability gate, preview 구현; 표준 transcription endpoint 실기기 gate 남음 | L |
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, OpenAI profile·실기기 gate | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
+| `VOICE-05` | 미지원 공급자 휴대폰 받아쓰기 fallback | `DONE` | `transcription` 미지원 공급자에서는 죽은 녹음 버튼을 노출하지 않는다. 사용 가능한 system voice IME가 있으면 `휴대폰 받아쓰기 사용`으로 즉시 전환하고, 없으면 `설정하기`를 제공한다 | S |
 | `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입 구현, 실기기 정확도 gate | L |
 
 ### 6.5 편의·기기·보안 기능
@@ -921,7 +922,10 @@ private/offline/app별 AI 차단과 editor identity가 하나라도 맞지 않�
 editor identity 변경, 취소에서는 전송 또는 입력을 fail-closed한다.
 
 공급자 profile에는 manifest의 capability를 암호화해 보존한다. `transcription`을 명시하지 않은 provider는
-녹음을 시작하지 않고 지원하지 않는 이유를 표시한다. 현재 Codex CLI 0.145.0의 `codex exec`는 text와
+녹음을 시작하지 않고 지원하지 않는 이유를 표시한다. 이 상태에서 활성 system voice IME가 있으면
+비활성 `녹음 시작` 버튼 대신 `휴대폰 받아쓰기 사용`을 제공해 해당 IME로 전환한다. system voice IME가
+없을 때만 AI 공급자 `설정하기`를 제공한다. 이 fallback은 기기 음성 입력이며 Codex 전사로 표시하거나
+집계하지 않는다. 현재 Codex CLI 0.145.0의 `codex exec`는 text와
 `--image`만 입력으로 받고 audio option이 없다. ChatGPT desktop의 Codex Voice는 공식 UI 기능이지만
 Android companion이 audio를 보내 transcript를 돌려받을 공개 자동화 계약은 없다. 따라서 구독 OAuth
 token을 추출해 비공식 endpoint를 호출하거나 표준 API 사용량으로 위장하지 않는다. 공개 bridge가 생기기
@@ -965,7 +969,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | Z Fold6 UI | `PASS` | cover 화면에서 AI toolbar, 원문 preview와 전체 action group이 잘림 없이 표시됨 |
 | AI 결과 우선 UI | `CODE_DONE` | 결과 상태에서 보이지 않는 `weight=1` status container를 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 이동, 결과 card가 전체 가용 높이를 사용 |
 | AI 직접 지시문 | `PASS` | 기능별 두벌식 복제판 제거. 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme을 그대로 쓰되 output은 내부 최대 300자 buffer로 격리; A35에서 영문 입력·후보·숫자판·천지인 picker·picker restart prompt 보존과 target editor 무변경 통과, pure buffer Unicode·preedit·limit 회귀 테스트 통과 |
-| 음성 capability gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. discovery manifest capability를 암호화 profile SSOT로 보존하고 `transcription` 미선언 Codex/Claude companion은 녹음 전에 버튼 비활성·미지원 이유를 표시; companion Python 7 tests 통과 |
+| 음성 capability gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. discovery manifest capability를 암호화 profile SSOT로 보존하고 `transcription` 미선언 Codex/Claude companion은 미지원 이유와 활성 `휴대폰 받아쓰기 사용`을 표시한다. A35·Z Fold6에서 버튼 탭 후 Google voice IME 전환과 입력 focus 유지를 확인했고 fallback 정책 unit test 및 companion Python 7 tests 통과 |
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `00:40:12`, Z Fold6 `00:40:33`에 코드 커밋 `f82cb09f`의 동일 `0.1.2-107-gf82cb09f` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI, 7개 신규 테스트 |
 | AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트 |
@@ -1093,3 +1097,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | AI·GIF·검색 등 IME 내부 text 입력은 활성 `KeyboardWindow`와 Fcitx 엔진을 재사용하며 기능별 두벌식 복제판을 금지 |
 | 2026-07-27 | provider manifest capability를 profile SSOT로 보존하고 실제 `transcription` 미선언 provider에서는 음성 capture를 시작하지 않음 |
 | 2026-07-27 | Codex desktop Voice는 공개 companion audio 계약이 생기기 전까지 `BLOCK`; 구독 OAuth token의 비공식 endpoint 사용 금지 |
+| 2026-07-27 | 음성 미지원 공급자 화면은 비활성 녹음 버튼을 금지하고, 활성 system voice IME가 있으면 `휴대폰 받아쓰기 사용`, 없으면 `설정하기`를 제공 |

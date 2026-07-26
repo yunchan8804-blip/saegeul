@@ -695,6 +695,9 @@
     <string name="voice_precision_title">AI 정밀 받아쓰기</string>
     <string name="voice_precision_ready">녹음을 멈춘 뒤에만 음성을 전송하고, 전사문을 확인한 뒤에만 글을 넣어.</string>
     <string name="voice_record_start">녹음 시작</string>
+    <string name="voice_device_dictation_title">휴대폰 받아쓰기</string>
+    <string name="voice_use_device_dictation">휴대폰 받아쓰기 사용</string>
+    <string name="voice_provider_unsupported_device_fallback">연결된 컴퓨터 Codex는 음성 파일을 직접 받을 수 없어. 대신 휴대폰의 음성 입력으로 바로 받아쓸 수 있어.</string>
     <string name="voice_record_stop">녹음 중지</string>
     <string name="voice_recording">녹음 중 %1$d초</string>
     <string name="voice_provider_unsupported">연결된 컴퓨터의 Codex CLI는 글쓰기는 지원하지만 음성 파일 전사는 지원하지 않아. 공개 오디오 연결점이 없는 기능을 지원한다고 표시하지 않아.</string>

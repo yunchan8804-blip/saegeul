@@ -697,6 +697,9 @@
     <string name="voice_precision_title">AI precision dictation</string>
     <string name="voice_precision_ready">Audio is sent only after you stop recording, and text is inserted only after you review the transcript.</string>
     <string name="voice_record_start">Start recording</string>
+    <string name="voice_device_dictation_title">Device dictation</string>
+    <string name="voice_use_device_dictation">Use device dictation</string>
+    <string name="voice_provider_unsupported_device_fallback">The connected computer Codex cannot receive audio files. You can dictate immediately with the device voice input instead.</string>
     <string name="voice_record_stop">Stop recording</string>
     <string name="voice_recording">Recording %1$d sec</string>
     <string name="voice_provider_unsupported">The connected computer’s Codex CLI supports writing but not audio-file transcription. This app does not claim support without a public audio integration.</string>

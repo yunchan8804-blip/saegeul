@@ -38,6 +38,20 @@ object VoiceTranscriptPolicy {
     }
 }
 
+enum class VoiceUnavailableAction {
+    DeviceDictation,
+    ProviderSetup
+}
+
+object VoiceFallbackPolicy {
+    fun action(hasDeviceVoiceInput: Boolean): VoiceUnavailableAction =
+        if (hasDeviceVoiceInput) {
+            VoiceUnavailableAction.DeviceDictation
+        } else {
+            VoiceUnavailableAction.ProviderSetup
+        }
+}
+
 /** One reviewed transcript can dispatch at most one editor mutation. */
 internal class VoiceCommitGate {
     private var consumed = false

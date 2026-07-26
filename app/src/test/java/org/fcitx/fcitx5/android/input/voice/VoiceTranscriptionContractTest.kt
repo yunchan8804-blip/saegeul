@@ -40,4 +40,16 @@ class VoiceTranscriptionContractTest {
         gate.resetForNewTranscript()
         assertTrue(gate.claim())
     }
+
+    @Test
+    fun `unsupported computer provider falls back to an available device voice input`() {
+        assertEquals(
+            VoiceUnavailableAction.DeviceDictation,
+            VoiceFallbackPolicy.action(hasDeviceVoiceInput = true)
+        )
+        assertEquals(
+            VoiceUnavailableAction.ProviderSetup,
+            VoiceFallbackPolicy.action(hasDeviceVoiceInput = false)
+        )
+    }
 }
