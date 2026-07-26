@@ -50,6 +50,27 @@ class NotoAnimatedEmojiProviderTest {
         assertFalse(GifCache.isDeclaredSizeAllowed(-1))
     }
 
+    @Test
+    fun localRankingCollapsesSkinToneVariantsForPageDiversity() {
+        val variants = listOf(
+            NotoAnimatedEmojiProvider.NotoIcon(
+                "1f44d_1f3fb", 100, listOf("thumbs up"), listOf("people")
+            ),
+            NotoAnimatedEmojiProvider.NotoIcon(
+                "1f44d", 90, listOf("thumbs up"), listOf("people")
+            ),
+            NotoAnimatedEmojiProvider.NotoIcon(
+                "1f44f", 80, listOf("clapping hands"), listOf("people")
+            )
+        )
+
+        val results = provider.searchCatalog(variants, "굿", limit = 10)
+
+        assertEquals(2, results.size)
+        assertEquals(1, results.count { it.mediaUrl.contains("/1f44d") })
+        assertTrue(results.any { it.mediaUrl.contains("/1f44f/") })
+    }
+
     companion object {
         private val SAMPLE_CATALOG = """
             {"icons":[

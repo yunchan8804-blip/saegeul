@@ -684,4 +684,25 @@
     <string name="secret_vault_confirm_change_summary">저장 전에 이 암호화 작업을 인증해</string>
     <string name="secret_vault_saved">암호화된 금고를 저장했어</string>
     <string name="secret_vault_save_failed">금고를 변경하지 않았어</string>
+    <string name="ocr_title">이미지에서 한글 추출</string>
+    <string name="ocr_engine_attribution">기기 내 처리 · Tesseract 5 · Apache-2.0 · 공식 tessdata_fast 한국어 모델</string>
+    <string name="ocr_checking_model">기기 내 한국어 OCR 모델을 확인 중…</string>
+    <string name="ocr_model_missing">검증된 한국어 모델 1.7MB를 한 번 받아야 해. 이미지와 인식 결과는 전송하지 않아.</string>
+    <string name="ocr_model_missing_offline">한국어 OCR 모델이 없고 현재 오프라인 또는 앱 정책이 최초 다운로드를 차단하고 있어.</string>
+    <string name="ocr_model_download">한국어 모델 받기</string>
+    <string name="ocr_model_downloading">공식 한국어 모델을 받고 무결성을 확인 중…</string>
+    <string name="ocr_model_download_failed">한국어 OCR 모델을 검증하거나 설치하지 못했어.</string>
+    <string name="ocr_ready">JPEG·PNG·WebP 이미지 하나를 골라. 메모리에서 축소해 기기 안에서 처리하며 키보드는 원본을 저장하지 않아.</string>
+    <string name="ocr_pick_image">이미지 선택</string>
+    <string name="ocr_waiting_for_image">시스템 이미지 선택을 기다리는 중…</string>
+    <string name="ocr_recognizing">기기 안에서 한글을 추출 중…</string>
+    <string name="ocr_preview">입력할 줄만 직접 선택해</string>
+    <string name="ocr_insert">선택한 글 넣기</string>
+    <string name="ocr_private_disabled">비밀번호·민감·개인화 학습 금지 입력창에서는 이미지 OCR을 사용할 수 없어.</string>
+    <string name="ocr_cursor_required">일반 입력창에 커서 하나를 놓고 다시 시도해.</string>
+    <string name="ocr_editor_changed">앱·입력창·커서가 바뀌어서 아무것도 넣지 않았어.</string>
+    <string name="ocr_unsupported_image">15MB 이하의 올바른 JPEG·PNG·WebP 이미지를 골라.</string>
+    <string name="ocr_no_text">이 이미지에서 안전한 범위의 글을 추출하지 못했어.</string>
+    <string name="ocr_failed">기기 내 OCR에 실패했어. 이미지와 결과는 저장하지 않았어.</string>
+    <string name="ocr_commit_failed">입력에 실패했어. 두 번째 입력이나 클립보드 대체는 시도하지 않았어.</string>
 </resources>

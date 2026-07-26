@@ -59,19 +59,19 @@ class GifResultAdapter(
     private var actionLocked = false
 
     fun submit(results: List<GifResult>) {
+        val replacement = GifResultAccumulator.replacement(results)
         val previousCount = items.size
         selection.clear()
         viewed.clear()
         items.clear()
         if (previousCount > 0) notifyItemRangeRemoved(0, previousCount)
-        items.addAll(results)
-        if (results.isNotEmpty()) notifyItemRangeInserted(0, results.size)
+        items.addAll(replacement)
+        if (replacement.isNotEmpty()) notifyItemRangeInserted(0, replacement.size)
     }
 
     fun append(results: List<GifResult>): Int {
         if (results.isEmpty()) return 0
-        val existing = items.asSequence().map { it.providerId to it.id }.toHashSet()
-        val additions = results.filter { existing.add(it.providerId to it.id) }
+        val additions = GifResultAccumulator.additions(items, results)
         if (additions.isEmpty()) return 0
         val start = items.size
         items.addAll(additions)

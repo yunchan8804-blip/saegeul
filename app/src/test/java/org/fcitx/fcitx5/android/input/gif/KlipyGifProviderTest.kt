@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.gif
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -110,7 +111,42 @@ class KlipyGifProviderTest {
         }
     }
 
+    @Test
+    fun successfulEmptyFirstPageRetriesBoundedKoreanFallbackWithoutMixing() = runBlocking {
+        val requested = mutableListOf<String>()
+        val provider = KlipyGifProvider("unit-test-key", responseLoader = { url ->
+            requested += url
+            if (requested.size == 1) EMPTY_RESPONSE else MIXED_RESPONSE
+        })
+
+        val page = provider.searchPage("ㅋㅋㅋ", page = 1, limit = 24)
+
+        assertEquals(2, requested.size)
+        assertTrue(requested[0].contains("q=%E3%85%8B%E3%85%8B%E3%85%8B"))
+        assertTrue(requested[1].contains("q=%EC%9B%83%EA%B8%B4%20%EB%B0%98%EC%9D%91"))
+        assertEquals(listOf("Funny reaction"), page.items.map(GifResult::title))
+        assertFalse(page.hasNext)
+        assertTrue(page.items.all { it.providerId == "klipy" })
+    }
+
+    @Test
+    fun nonEmptyExactResultNeverMakesExpansionRequest() = runBlocking {
+        var requests = 0
+        val provider = KlipyGifProvider("unit-test-key", responseLoader = {
+            requests++
+            MIXED_RESPONSE
+        })
+
+        provider.searchPage("축하", page = 1, limit = 24)
+
+        assertEquals(1, requests)
+    }
+
     companion object {
+        private val EMPTY_RESPONSE = """
+            {"result":true,"data":{"has_next":false,"data":[]}}
+        """.trimIndent()
+
         private val MIXED_RESPONSE = """
             {
               "result": true,

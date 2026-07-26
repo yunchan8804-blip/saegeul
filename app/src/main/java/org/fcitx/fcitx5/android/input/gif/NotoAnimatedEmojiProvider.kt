@@ -75,26 +75,33 @@ class NotoAnimatedEmojiProvider(
                 .ifEmpty { catalog.sortedByDescending(NotoIcon::popularity) }
                 .take(safeLimit)
         } else {
-            val normalized = trimmed.lowercase()
-            val terms = buildSearchTerms(normalized)
-            catalog.mapNotNull { icon ->
+            val terms = KoreanGifQueryPlanner.localSearchTerms(trimmed)
+            val scored = catalog.mapNotNull { icon ->
                 val text = (icon.tags + icon.categories + KOREAN_TAGS[icon.codepoint].orEmpty())
                     .joinToString(" ")
                     .lowercase()
+                val searchableTags = icon.tags + KOREAN_TAGS[icon.codepoint].orEmpty()
                 val score = terms.maxOfOrNull { term ->
-                    when {
-                        term == text -> 120
-                        icon.tags.any { it == term } -> 100
-                        icon.tags.any { it.startsWith(term) } -> 75
-                        text.contains(term) -> 50
+                    val match = when {
+                        searchableTags.any { it == term.value } -> 1000
+                        searchableTags.any { it.startsWith(term.value) } -> 700
+                        text.contains(term.value) -> 450
                         else -> 0
                     }
+                    if (match == 0) 0 else match + term.weight
                 } ?: 0
                 (icon to score).takeIf { score > 0 }
-            }.sortedWith(
+            }
+            val bestScore = scored.maxOfOrNull { it.second } ?: 0
+            scored.asSequence()
+                .filter { (_, score) -> score >= bestScore - RELEVANCE_WINDOW }
+                .sortedWith(
                 compareByDescending<Pair<NotoIcon, Int>> { it.second }
                     .thenByDescending { it.first.popularity }
-            ).take(safeLimit).map(Pair<NotoIcon, Int>::first)
+            ).map(Pair<NotoIcon, Int>::first)
+                .distinctBy { emojiFamilyKey(it.codepoint) }
+                .take(safeLimit)
+                .toList()
         }
         return selected.map(::toResult)
     }
@@ -123,13 +130,10 @@ class NotoAnimatedEmojiProvider(
         }
     }
 
-    private fun buildSearchTerms(query: String): Set<String> = buildSet {
-        add(query)
-        query.split(Regex("\\s+")).filter(String::isNotBlank).forEach(::add)
-        KOREAN_QUERY_EXPANSIONS.forEach { (korean, expansions) ->
-            if (query.contains(korean)) addAll(expansions)
-        }
-    }
+    private fun emojiFamilyKey(codepoint: String): String = codepoint
+        .split('_')
+        .filterNot(SKIN_TONE_CODEPOINTS::contains)
+        .joinToString("_")
 
     private fun toResult(icon: NotoIcon): GifResult {
         val codepoint = icon.codepoint
@@ -181,6 +185,7 @@ class NotoAnimatedEmojiProvider(
         private const val PROVIDER_ID = "animated_noto_emoji"
         private const val GIF_MIME = "image/gif"
         private const val MAX_QUERY_LENGTH = 80
+        private const val RELEVANCE_WINDOW = 24
         private const val CATALOG_URL =
             "https://googlefonts.github.io/noto-emoji-animation/data/api.json"
         private const val LANDING_PAGE = "https://googlefonts.github.io/noto-emoji-animation/"
@@ -188,37 +193,15 @@ class NotoAnimatedEmojiProvider(
         private const val USER_AGENT =
             "Fcitx5Android-GifSearch/0.2 (https://github.com/fcitx5-android/fcitx5-android)"
         private val CODEPOINT_PATTERN = Regex("[0-9a-f]+(?:_[0-9a-f]+)*")
+        private val SKIN_TONE_CODEPOINTS = setOf(
+            "1f3fb", "1f3fc", "1f3fd", "1f3fe", "1f3ff"
+        )
 
         private val FEATURED_CODEPOINTS = listOf(
             "1f602", "1f923", "1f973", "1f44f", "1f389", "1f970",
             "1f60d", "1f44d", "2764_fe0f", "1f917", "1f64f", "1f929",
             "1f631", "1f914", "1f644", "1f62d", "1f621", "1f97a",
             "1f609", "1f60e", "1f525", "2728", "1f4af", "2705"
-        )
-
-        private val KOREAN_QUERY_EXPANSIONS = mapOf(
-            "축하" to listOf("partying face", "party popper", "confetti ball", "clapping hands"),
-            "생일" to listOf("birthday cake", "partying face", "wrapped gift", "party popper"),
-            "박수" to listOf("clapping hands", "raising hands"),
-            "웃" to listOf("laughing", "joy", "rofl", "grin", "smile"),
-            "ㅋㅋ" to listOf("laughing", "joy", "rofl"),
-            "행복" to listOf("smile", "joy", "heart face"),
-            "사랑" to listOf("heart eyes", "heart face", "red heart", "kissing heart"),
-            "감사" to listOf("folded hands", "clapping hands", "heart hands"),
-            "미안" to listOf("folded hands", "pleading", "bow"),
-            "놀람" to listOf("screaming", "surprised", "astonished", "exploding head"),
-            "화남" to listOf("angry", "rage", "cursing"),
-            "슬픔" to listOf("sad", "crying", "loudly crying", "pensive"),
-            "울음" to listOf("crying", "loudly crying", "holding back tears"),
-            "당황" to listOf("grimacing", "flushed", "melting", "dotted line face"),
-            "생각" to listOf("thinking face", "monocle", "raised eyebrow"),
-            "졸림" to listOf("sleeping", "yawn", "sleepy"),
-            "안녕" to listOf("waving hand", "salute"),
-            "최고" to listOf("thumbs up", "hundred points", "fire"),
-            "좋아" to listOf("thumbs up", "heart eyes", "check mark"),
-            "싫어" to listOf("thumbs down", "unamused", "cross mark"),
-            "응원" to listOf("raising hands", "clapping hands", "flexed biceps", "fire"),
-            "하트" to listOf("red heart", "heart hands", "sparkling heart", "two hearts")
         )
 
         private val KOREAN_TAGS = mapOf(

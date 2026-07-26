@@ -685,4 +685,25 @@
     <string name="secret_vault_confirm_change_summary" tools:ignore="MissingTranslation">Authenticate this encryption operation before saving</string>
     <string name="secret_vault_saved" tools:ignore="MissingTranslation">Encrypted vault saved</string>
     <string name="secret_vault_save_failed" tools:ignore="MissingTranslation">The vault was not changed</string>
+    <string name="ocr_title" tools:ignore="MissingTranslation">Korean text from image</string>
+    <string name="ocr_engine_attribution" tools:ignore="MissingTranslation">On-device · Tesseract 5 · Apache-2.0 · official tessdata_fast Korean model</string>
+    <string name="ocr_checking_model" tools:ignore="MissingTranslation">Checking the local Korean OCR model…</string>
+    <string name="ocr_model_missing" tools:ignore="MissingTranslation">Download the verified 1.7 MB Korean model once. Images and recognized text are never sent.</string>
+    <string name="ocr_model_missing_offline" tools:ignore="MissingTranslation">The Korean OCR model is not installed, and current offline or app policy blocks its one-time download.</string>
+    <string name="ocr_model_download" tools:ignore="MissingTranslation">Download Korean model</string>
+    <string name="ocr_model_downloading" tools:ignore="MissingTranslation">Downloading and verifying the official Korean model…</string>
+    <string name="ocr_model_download_failed" tools:ignore="MissingTranslation">The Korean OCR model could not be verified or installed.</string>
+    <string name="ocr_ready" tools:ignore="MissingTranslation">Choose one JPEG, PNG, or WebP image. It is downscaled in memory, processed on-device, and never saved by the keyboard.</string>
+    <string name="ocr_pick_image" tools:ignore="MissingTranslation">Choose image</string>
+    <string name="ocr_waiting_for_image" tools:ignore="MissingTranslation">Waiting for your system image selection…</string>
+    <string name="ocr_recognizing" tools:ignore="MissingTranslation">Extracting Korean text on-device…</string>
+    <string name="ocr_preview" tools:ignore="MissingTranslation">Select only the lines you want to insert</string>
+    <string name="ocr_insert" tools:ignore="MissingTranslation">Insert selected text</string>
+    <string name="ocr_private_disabled" tools:ignore="MissingTranslation">Image OCR is disabled in password, sensitive, and no-personalized-learning editors.</string>
+    <string name="ocr_cursor_required" tools:ignore="MissingTranslation">Place one cursor in a regular text field, then try again.</string>
+    <string name="ocr_editor_changed" tools:ignore="MissingTranslation">The app, editor, or cursor changed. Nothing was inserted.</string>
+    <string name="ocr_unsupported_image" tools:ignore="MissingTranslation">Choose a valid JPEG, PNG, or WebP image up to 15 MB.</string>
+    <string name="ocr_no_text" tools:ignore="MissingTranslation">No safe, bounded text could be extracted from this image.</string>
+    <string name="ocr_failed" tools:ignore="MissingTranslation">On-device OCR failed. The image and result were not saved.</string>
+    <string name="ocr_commit_failed" tools:ignore="MissingTranslation">Insertion failed. No second insertion or clipboard fallback was attempted.</string>
 </resources>

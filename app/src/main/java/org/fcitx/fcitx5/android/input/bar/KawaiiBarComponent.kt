@@ -67,6 +67,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.gif.GifSearchWindow
+import org.fcitx.fcitx5.android.input.ocr.OcrWindow
 import org.fcitx.fcitx5.android.input.search.KoreanSearchWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
@@ -344,6 +345,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 precisionDictationButton.setOnClickListener {
                     windowManager.attachWindow(VoiceTranscriptionWindow())
                 }
+                ocrButton.setOnClickListener {
+                    windowManager.attachWindow(OcrWindow())
+                }
                 gifButton.setOnClickListener {
                     windowManager.attachWindow(GifSearchWindow())
                 }
@@ -503,6 +507,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         idleUi.buttonsUi.precisionDictationButton.apply {
             isEnabled = allowsAi
+            alpha = if (isEnabled) 1f else 0.35f
+        }
+        idleUi.buttonsUi.ocrButton.apply {
+            isEnabled = allowsTextInspection
             alpha = if (isEnabled) 1f else 0.35f
         }
         isInlineSuggestionPresent = false

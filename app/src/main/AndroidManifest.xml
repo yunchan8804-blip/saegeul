@@ -136,6 +136,14 @@
             android:taskAffinity=""
             android:theme="@style/Theme.VoicePermission" />
 
+        <!-- One-shot system image picker for local OCR. The selected URI is never persisted. -->
+        <activity
+            android:name=".input.ocr.OcrDocumentActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.VoicePermission" />
+
         <!--
           External Sharesheet targets must be exported. This no-display boundary accepts only
           ACTION_SEND text/plain, keeps the bounded payload in process memory, and finishes.

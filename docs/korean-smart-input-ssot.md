@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `Fold 분할 레이아웃·선택형 GIPHY·회의 화자 분리 통합 checkpoint`
+현재 활성 구현 마일스톤: `한국어 다음 단어·GIF 밈 품질·로컬 OCR 통합 checkpoint`
 
 ## 2. 상태 표기
 
@@ -145,7 +145,7 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | `KO-04` | 앱별 키보드 profile | `IN_PROGRESS` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자·국어사전 후보 | `IN_PROGRESS` | bundled 한자·음훈 후보 구현, 국어사전 정의 source는 별도 gate | M |
 | `KO-06` | 개인 단어장 | `IN_PROGRESS` | opt-in 로컬 사전과 개인 후보 우선순위 구현, 두 기기 후보 검증 남음 | L |
-| `KO-07` | 한국어 조사·문맥 후보 | `IN_PROGRESS` | 받침별 조사 후보 MVP 구현, 다음 어절 추천은 후속 gate | L |
+| `KO-07` | 한국어 조사·문맥 후보 | `IN_PROGRESS` | 받침별 조사와 로컬 다음 어절 후보 구현, 두 기기 UX gate | L |
 | `KO-08` | 한국식 감정표현 추천 | `IN_PROGRESS` | 로컬 emoji·kaomoji·ㅋㅋ/ㅎㅎ 강도 후보 구현, 두 기기 검증 남음 | M |
 | `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 두 음절부터 로컬 접두어 후보, 선택한 후보만 정확히 한 번 확정 | M |
 
@@ -360,7 +360,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | push-to-talk·권한·한국어 hint·최종 preview·exactly-once commit 구현, Realtime partial transcript GATE | L |
 | `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 30초 in-memory WAV 구간 전사 구현, 두 기기 정확도·취소 UX gate 남음 | L |
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, OpenAI profile·실기기 gate | L |
-| `MM-01` | OCR·사진 속 한글 입력 | `BACKLOG` | 사용자가 고른 이미지에 한해 OCR, preview 후 삽입 | L |
+| `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입 구현, 실기기 정확도 gate | L |
 
 ### 6.5 편의·기기·보안 기능
 
@@ -411,6 +411,33 @@ dialog까지 정상 진입했다. 권한은 자동 승인하지 않았다. A35�
 두 번째 checkpoint의 단독 통합 검증은 app JVM 51 suites·219 tests, failure/error/skipped 0과
 arm64 app·Hangul plugin assemble을 통과했다. GIPHY key·회의 음원·화자 전사 원문은 prefs, cache,
 backup, 일반 log에 저장하지 않는다.
+
+`f5d212f8` 기준 app/plugin `0.1.2-98-gf5d212f8`를 A35 `SM-A356N`과 Z Fold6
+`SM-F956N`에 덮어 설치하고 두 기기 모두 debug Fcitx IME를 다시 선택했다. A35에서 `?123` 숫자판
+전환을 다시 확인했고, GIPHY key가 없는 상태가 `네트워크 요청 0회`로 표시되는 것을 확인했다.
+회의 파일 화면은 현재 TwentyOz 호환 profile에서 capability 확인 전 차단되며, 사용자 파일은 고르거나
+전송하지 않았다. Fold6 cover에서는 compact split을 끈 상태를 유지하고 expanded split만 켰다.
+실제 펼침·회전·중앙 공백 입력 검증은 물리 자세 전환 gate로 남긴다.
+
+### 6.8 한국어 다음 단어·GIF 밈 품질·로컬 OCR checkpoint 계약
+
+| ID | 구현 계약 | 현재 자동 증거 | 남은 완료 게이트 |
+| --- | --- | --- | --- |
+| `KO-07` | 실제 공백 경계 뒤에만 project-curated 로컬 다음 어절을 미선택 후보로 표시한다. 기존 완성·개인 단어·한자 후보와 mode를 섞지 않고, 선택 시 현재 후보 membership을 다시 확인한 뒤 1회 확정한다. | 64KiB·500행 fail-closed parser, 중복·limit·민감 editor policy, A35·Z Fold6 arm64 native test | 두 기기에서 직접 입력·자동완성 선택 뒤 공백·후보 선택·취소·민감 editor UI 검증 |
+| `GIF-02` | KLIPY exact query의 성공한 첫 page가 비었을 때만 한국어 반응 intent를 최대 2개 시도한다. 원 결과와 합치지 않고 recovery page를 단일 page로 종료한다. Noto는 로컬 tag 가중치와 emoji family 다양성을 적용한다. GIPHY에는 query 보정·재정렬·필터를 적용하지 않는다. | GIF 17 suites·64 tests, provider isolation·stable dedupe·safe fallback·Noto family diversity | KLIPY production access·branding review, 실제 희소 query의 두 기기 grid 품질 matrix |
+| `MM-01` | JPEG·PNG·WebP content URI만 system document picker로 1회 받는다. 최대 15MiB·100MP source를 4MP 이하로 축소하고 Tesseract 한국어 모델로 기기 안에서 인식한다. 결과는 기본 미선택 줄별 preview 뒤 선택분만 1회 입력한다. | OCR contract·image bound·고정 commit/크기/SHA-256 model install tests 9개와 Kotlin compile | A35·Z Fold6 실제 한국어 인쇄물·회전 이미지 정확도, picker 취소·focus 이동, F-Droid용 native AAR 재현성 또는 source build 전환 |
+
+이 checkpoint의 통합 자동 검증은 app JVM 56 suites·236 tests, failure/error/skipped 0과 arm64
+app·Hangul plugin assemble을 통과했다. lint에서 새로 발견한 Android 6 `contentLengthLong` 1건은
+API guard로 수정했고, 재실행 결과 이번 OCR·GIF·toolbar 변경 파일의 lint 항목은 0건이다. 전체 lint는
+선행 부채 286 errors·67 warnings 때문에 계속 실패하며 첫 항목은 기존 `fragment_setup.xml`의
+`android:tint`다.
+
+OCR engine과 `tessdata_fast` 한국어 모델은 Apache-2.0 계열의 공개 소스다. 모델은 사용자가 명시한
+다운로드 동작에서만 고정 HTTPS URL로 받고, 응답 크기와 SHA-256을 모두 검증해
+`noBackupFilesDir/ocr/tesseract`에 둔다. 선택한 원본 이미지·content URI·인식 결과는 prefs, cache,
+backup, 일반 log에 저장하지 않으며 Bitmap은 작업 종료 시 지우고 recycle한다. 모델 설치 뒤 OCR은
+완전 offline mode에서도 동작하지만 password·sensitive·`NoSpellCheck` editor에서는 picker 전 차단한다.
 
 ## 7. GIF-01 상세 계약
 
@@ -524,6 +551,23 @@ Commons provider와 license parser는 보존하지만 기본 반응 GIF 화면�
 | KLIPY | `GIF-02` 우선 후보 | 1천만+ catalog, 한국어 검색·지역화, 키보드 사례가 있으나 API key·attribution·partner 승인이 필요 |
 | GIPHY | optional provider `IN_PROGRESS` | 별도 provider·보안 key·branding·analytics 구현 완료, production/media-copy 승인 gate |
 
+2026-07-26 공급자 재검토는 각 사업자의 1차 문서를 기준으로 했다.
+
+- [KLIPY Developers](https://klipy.com/developers)는 test key를 시간당 100회로 제한하고,
+  Partner Panel의 content filter·branding 적용 뒤 production access를 요청하도록 안내한다.
+  [KLIPY API Overview](https://klipy.com/api-overview)는 지역화, contextual category, `Search KLIPY`
+  placeholder와 Powered by KLIPY attribution을 권장한다.
+- [GIPHY API Best Practices](https://developers.giphy.com/docs/api/)는 Powered by GIPHY, client-side
+  request와 action analytics를 요구하고, 결과 재정렬·필터링·다른 공급자와 같은 grid 혼합 및 승인 없는
+  media URL/asset cache를 금지한다. [Search endpoint](https://developers.giphy.com/docs/api/endpoint/)는
+  사용자가 입력한 정확한 query를 보정·확장 없이 보내도록 명시한다.
+- [Animated Noto Emoji](https://googlefonts.github.io/noto-emoji-animation/)는 공개 animation catalog로
+  계속 사용하되, Noto Emoji의 자산별 라이선스 경계는
+  [공식 Noto Emoji 저장소](https://github.com/googlefonts/noto-emoji)의 표시를 함께 확인한다.
+
+따라서 API key·production 승인 없이 새 상용 공급자를 추가하지 않는다. GIPHY query는 확장하거나
+재정렬하지 않고, 한국어 검색 품질 보강은 KLIPY와 기기 내 Noto 검색에만 적용한다.
+
 Commons tab을 구현할 때는 기존 MediaWiki MIME·license allowlist·restriction 필터를 그대로 유지하고,
 다른 provider 결과와 같은 grid에 섞지 않는다.
 
@@ -544,8 +588,8 @@ Commons tab을 구현할 때는 기존 MediaWiki MIME·license allowlist·restri
 - test key는 개발 검증에만 사용한다. 배포 전 production key, attribution 검수, partner 조건 승인을
   `GIF-02-PROD` owner gate로 처리한다.
 
-GIPHY는 충분한 catalog를 제공하지만 KLIPY 결과와 혼합하지 않는 별도 optional provider 후보로만
-유지한다. 현재 MVP에는 넣지 않는다.
+GIPHY는 충분한 catalog를 제공하지만 KLIPY 결과와 혼합하지 않는 명시적 선택형 optional provider로만
+유지한다. production review가 확인되지 않은 key에서는 요청을 만들지 않는다.
 
 KLIPY 결과는 단일 첫 page로 끝내지 않는다. provider page·`has_next`를 모델에 보존하고 grid 끝에서
 다음 page를 요청하며 media identity로 중복 제거한다. 새 query generation이 시작되면 이전 page 응답은
@@ -554,6 +598,23 @@ chip과 직접 입력 query는 같은 safe-search gate를 거친다. 명시적 �
 클라이언트에서도 제외하고, partner filter를 최종 source of truth로 유지한다. Noto는 UI에서
 `작은 공개 fallback`이라고 표시해 리액션 catalog처럼 오인시키지 않는다.
 
+한국어 밈 검색 품질 계약은 다음과 같다.
+
+1. KLIPY에는 사용자가 입력한 query를 먼저 그대로 보낸다. 성공 응답의 첫 page가 비었을 때만
+   `ㅋㅋ`·퇴근·월요일·머쓱·인정·놀람·축하·응원·감사·사과·사랑·분노·슬픔 등 검증된 한국어
+   반응 intent의 fallback query를 최대 2개 순차 시도한다.
+2. 원 query 결과와 fallback query 결과를 합치거나 재정렬하지 않는다. fallback이 성공하면 해당
+   단일 page만 표시해 다음 page에서 query identity가 바뀌는 문제를 막는다.
+3. KLIPY 결과는 공급자 순서를 유지하면서 동일 slug ID 또는 동일 media URL만 제거한다. grid의 다음
+   page도 동일 provider만 허용한다.
+4. Noto 검색은 query와 catalog tag가 모두 기기 안에 있으므로 한국어 채팅 표현을 공식 영어 tag로
+   확장해 점수화할 수 있다. 직접 tag match, prefix, 포함, popularity 순으로 결정하고 피부색 변형은
+   한 emoji family에서 하나만 남겨 첫 화면의 반응 종류를 늘린다.
+5. GIPHY에는 이 planner를 절대 적용하지 않는다. exact query, provider order, duplicate까지 응답 그대로
+   유지하되 다른 provider ID가 같은 grid로 들어오는 것만 fail-closed로 차단한다.
+6. 모든 fallback query도 기존 safe-search를 다시 통과하며, 원 요청의 network error를 다른 query로
+   숨기지 않고 사용자에게 retry 가능한 오류로 표시한다.
+
 GIPHY optional provider는 위 계약을 코드로 구현했다. 별도 Keystore/no-backup credential,
 명시적 provider 선택, `Powered by GIPHY`, `rating=g`, `lang=ko`, `country_code=KR`, pagination과
 공식 load/click/sent analytics URL을 사용한다. key와 사용자가 확인한 production review가 모두 없으면
@@ -561,8 +622,9 @@ GIPHY optional provider는 위 계약을 코드로 구현했다. 별도 Keystore
 승인이 없으면 link만 허용하고 원본 download·disk cache·GIF 첨부는 비활성화한다. KLIPY/Commons/Noto와
 같은 grid response나 cache namespace에는 혼합하지 않는다.
 
-Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 사용하지 않는다. 공급자 상태는
-구현 시점에 공식 문서로 다시 검증한다.
+[Google Tenor FAQ](https://support.google.com/tenor/answer/10455265?hl=en)가 명시한 대로 Tenor API는
+2026-06-30 종료됐으므로 새로운 기본 공급자로 사용하지 않는다. 공급자 상태는 구현 시점에 공식 문서로
+다시 검증한다.
 
 ### 7.10 cache와 cleanup
 
@@ -787,7 +849,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 코드·테스트 완료, Fold6 펼침·회전 gate)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
-6. `KO-07` 다음 어절과 `MM-01`을 explicit user action과 privacy 경계로 구현한다.
+6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`IN_PROGRESS`: 코드·자동 테스트 완료, 두 기기 UX·정확도와 OCR native 배포 gate)
 
 ## 10. 공통 검증 게이트
 
@@ -836,6 +898,9 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | Fold split은 compact/expanded와 세로/가로 profile을 독립 저장하고 불명확한 posture에서는 일반 layout을 유지 |
 | 2026-07-26 | GIPHY는 production review key와 별도 provider 선택이 있을 때만 활성화하며 media-copy 승인 전에는 link-only로 제한 |
 | 2026-07-26 | 회의 화자 분리는 system picker의 명시 선택 audio만 stream하고 segment review 없이 자동 입력하거나 요약하지 않음 |
+| 2026-07-26 | 한국어 다음 단어는 실제 공백 경계 뒤의 project-curated 로컬 후보만 기본 미선택으로 표시하고 사용자 입력을 학습·저장하지 않음 |
+| 2026-07-26 | GIPHY exact query 계약은 보존하고 한국 밈 query fallback은 성공한 empty KLIPY 첫 page와 로컬 Noto에만 적용 |
+| 2026-07-26 | OCR은 proprietary ML SDK 대신 Apache-2.0 Tesseract 계열과 pinned 한국어 fast model을 사용하며 원본·결과를 저장하지 않음 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
 | 2026-07-26 | AI text action은 선택/현재 문단 preview 후에만 network를 호출하고 결과 교체·추가·undo를 명시적 동작으로 제한 |
 | 2026-07-26 | 동적 빠른 문구는 기존 `.mb` 형식을 유지하고, 명시적 미리보기 뒤 정확히 한 번 삽입 |

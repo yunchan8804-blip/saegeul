@@ -964,6 +964,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return finishCompositionForDirectAction()
     }
 
+    /** Finishes composition for user-selected, entirely on-device OCR without requiring network. */
+    fun prepareOcrCommit(): Boolean {
+        if (!allowsTextInspectionFeatures()) return false
+        return finishCompositionForDirectAction()
+    }
+
     /** Captures a bounded local context only after the user explicitly opens particle suggestions. */
     fun captureKoreanParticleSnapshot(): KoreanParticleSnapshot? {
         if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return null

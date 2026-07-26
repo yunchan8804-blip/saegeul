@@ -27,7 +27,8 @@ import kotlinx.serialization.json.longOrNull
  */
 class KlipyGifProvider(
     apiKey: String,
-    private val json: Json = Json { ignoreUnknownKeys = true }
+    private val json: Json = Json { ignoreUnknownKeys = true },
+    private val responseLoader: (suspend (String) -> String)? = null
 ) : PagedGifProvider {
 
     private val encodedApiKey: String = apiKey.trim().also {
@@ -43,8 +44,24 @@ class KlipyGifProvider(
             return GifSearchPage(emptyList(), hasNext = false)
         }
         val safePage = page.coerceIn(1, MAX_PAGE)
-        val url = buildApiUrl(query, safeLimit, safePage)
-        return withContext(Dispatchers.IO) {
+        val exact = requestPage(query, safeLimit, safePage)
+        if (safePage != 1 || query.isBlank() || exact.items.isNotEmpty()) return exact
+
+        // Preserve the provider's ranking. Retry only after a successful empty first page, and
+        // never combine the exact and recovery queries into one grid.
+        KoreanGifQueryPlanner.emptyResultFallbacks(query).forEach { fallback ->
+            val recovered = requestPage(fallback, safeLimit, page = 1)
+            if (recovered.items.isNotEmpty()) {
+                // A recovery page intentionally stops here so page 2 cannot switch query identity.
+                return recovered.copy(hasNext = false)
+            }
+        }
+        return exact
+    }
+
+    private suspend fun requestPage(query: String, limit: Int, page: Int): GifSearchPage {
+        val url = buildApiUrl(query, limit, page)
+        val body = responseLoader?.invoke(url) ?: withContext(Dispatchers.IO) {
             val connection = try {
                 URI(url).toURL().openConnection() as HttpURLConnection
             } catch (_: Exception) {
@@ -53,7 +70,8 @@ class KlipyGifProvider(
             try {
                 connection.connectTimeout = CONNECT_TIMEOUT_MILLIS
                 connection.readTimeout = READ_TIMEOUT_MILLIS
-                connection.instanceFollowRedirects = true
+                // The API key is in the path. Never forward it to a redirect target.
+                connection.instanceFollowRedirects = false
                 connection.setRequestProperty("Accept", "application/json")
                 connection.setRequestProperty("Accept-Language", "ko-KR,ko;q=0.9")
                 connection.setRequestProperty("User-Agent", USER_AGENT)
@@ -66,16 +84,16 @@ class KlipyGifProvider(
                     connection.errorStream?.close()
                     throw GifNetworkException("KLIPY API HTTP $status")
                 }
-                val body = try {
+                try {
                     connection.inputStream.bufferedReader().use { it.readText() }
                 } catch (_: Exception) {
                     throw GifNetworkException("KLIPY response could not be read")
                 }
-                parsePageResponse(body, safeLimit)
             } finally {
                 connection.disconnect()
             }
         }
+        return parsePageResponse(body, limit)
     }
 
     internal fun buildApiUrl(
@@ -117,6 +135,7 @@ class KlipyGifProvider(
         val results = items.asSequence()
             .mapNotNull(::parseGif)
             .filter { GifSafeSearchPolicy.isAllowedResult(it.title, it.canonicalUrl) }
+            .distinctBy { it.id }
             .distinctBy { it.mediaUrl }
             .take(limit.coerceIn(0, MAX_RESULTS))
             .toList()

@@ -148,6 +148,7 @@ dependencies {
     implementation(libs.flexbox)
     implementation(libs.dependency)
     implementation(libs.timber)
+    implementation(libs.tesseract4android)
     implementation(libs.splitties.bitflags)
     implementation(libs.splitties.dimensions)
     implementation(libs.splitties.resources)

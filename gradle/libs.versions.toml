@@ -9,6 +9,7 @@ test = "1.7.0"
 splitties = "3.0.0"
 aboutlibraries = "14.0.1"
 arrow = "2.2.2.1"
+tesseract4android = "4.9.0"
 
 [libraries]
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }
@@ -45,6 +46,7 @@ imagecropper = { module = "com.vanniktech:android-image-cropper", version = "4.7
 flexbox = { module = "com.google.android.flexbox:flexbox", version = "3.0.0" }
 dependency = { module = "org.mechdancer:dependency", version = "0.1.2" }
 timber = { module = "com.jakewharton.timber:timber", version = "5.0.1" }
+tesseract4android = { module = "cz.adaptech.tesseract4android:tesseract4android", version.ref = "tesseract4android" }
 splitties-bitflags = { module = "com.louiscad.splitties:splitties-bitflags", version.ref = "splitties" }
 splitties-dimensions = { module = "com.louiscad.splitties:splitties-dimensions", version.ref = "splitties" }
 splitties-resources = { module = "com.louiscad.splitties:splitties-resources", version.ref = "splitties" }
