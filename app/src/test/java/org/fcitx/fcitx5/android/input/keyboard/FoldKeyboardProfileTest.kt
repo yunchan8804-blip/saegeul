@@ -111,4 +111,27 @@ class FoldKeyboardProfileTest {
         assertEquals(200, row.gapPx)
         assertEquals(2f / 3f, row.percentWidths.sum(), 0.0001f)
     }
+
+    @Test
+    fun `text split keeps Dubeolsik consonants hieuh and pieup on the left`() {
+        val homeBoundary = TextKeyboardSplitPolicy.boundaryIndex(rowIndex = 1, keyCount = 9)
+        val bottomBoundary = TextKeyboardSplitPolicy.boundaryIndex(rowIndex = 2, keyCount = 9)
+
+        assertEquals(5, homeBoundary)
+        assertEquals(5, bottomBoundary)
+        assertTrue("ㅎ on physical G must stay left of the split", 4 < homeBoundary!!)
+        assertTrue("ㅍ on physical V must stay left of the split", 4 < bottomBoundary!!)
+    }
+
+    @Test
+    fun `calculator applies a valid semantic boundary`() {
+        val row = ThumbSplitLayoutCalculator.calculate(
+            List(9) { 0.1f },
+            parentWidthPx = 1000,
+            requestedGapPx = 100,
+            preferredBoundaryIndex = 5
+        )
+
+        assertEquals(5, row.boundaryIndex)
+    }
 }

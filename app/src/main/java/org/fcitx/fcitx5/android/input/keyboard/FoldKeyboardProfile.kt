@@ -133,7 +133,8 @@ object ThumbSplitLayoutCalculator {
     fun calculate(
         originalPercentWidths: List<Float>,
         parentWidthPx: Int,
-        requestedGapPx: Int
+        requestedGapPx: Int,
+        preferredBoundaryIndex: Int? = null
     ): ThumbSplitRowLayout {
         if (originalPercentWidths.size < 2 || parentWidthPx <= 0 || requestedGapPx <= 0) {
             return ThumbSplitRowLayout(originalPercentWidths, -1, 0)
@@ -151,8 +152,18 @@ object ThumbSplitLayoutCalculator {
             percentWidths = originalPercentWidths.map { width ->
                 if (width > 0f) width * scale else width
             },
-            boundaryIndex = originalPercentWidths.size / 2,
+            boundaryIndex = preferredBoundaryIndex
+                ?.takeIf { it in 1 until originalPercentWidths.size }
+                ?: originalPercentWidths.size / 2,
             gapPx = gapPx
         )
     }
+}
+
+/** Physical QWERTY hand boundary: T/G/V stay on the left and Y/H/B start the right. */
+internal object TextKeyboardSplitPolicy {
+    private val boundaryByRow = intArrayOf(5, 5, 5, 3)
+
+    fun boundaryIndex(rowIndex: Int, keyCount: Int): Int? =
+        boundaryByRow.getOrNull(rowIndex)?.takeIf { it in 1 until keyCount }
 }

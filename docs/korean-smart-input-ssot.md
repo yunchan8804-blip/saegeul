@@ -369,7 +369,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
 | `UX-01` | Smart clipboard action | `IN_PROGRESS` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹 구현, 기기 검증 남음 | M |
-| `UX-02` | Fold·tablet 분할 키보드 | `IN_PROGRESS` | compact/expanded·세로/가로 profile과 중앙 non-touch gap 구현, unfolded 검증 gate | L |
+| `UX-02` | Fold·tablet 분할 키보드 | `IN_PROGRESS` | compact/expanded·세로/가로 profile, 중앙 non-touch gap, 두벌식 자음·모음 손 경계 구현; 회전·중앙 무입력 검증 gate | L |
 | `UX-03` | 폭 적응형 기능 툴바 | `DONE` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환하고 모든 제어를 최소 48dp로 유지 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
@@ -407,7 +407,7 @@ dialog까지 정상 진입했다. 권한은 자동 승인하지 않았다. A35�
 
 | ID | 구현 계약 | 자동 검증 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `UX-02` | compact와 expanded profile을 독립 저장하고 각각 세로/가로 중앙 간격을 둔다. 두 축이 모두 600dp 이상일 때만 expanded로 판정하며 size가 불명확하면 일반 layout을 유지한다. 숫자판은 split하지 않는다. | profile 경계·방향·독립 toggle·gap cap·fill key를 포함한 8 tests | Z Fold6 cover/펼침·회전·한글/영문/모바일 표면·중앙 무입력·`?123` 왕복 |
+| `UX-02` | compact와 expanded profile을 독립 저장하고 각각 세로/가로 중앙 간격을 둔다. 두 축이 모두 600dp 이상일 때만 expanded로 판정하며 size가 불명확하면 일반 layout을 유지한다. Text surface는 물리 손 경계 `T/G/V`까지 왼쪽에 유지하고 숫자판은 split하지 않는다. | profile 경계·방향·독립 toggle·gap cap·fill key·두벌식 `ㅎ/ㅍ` 경계를 포함한 10 tests | Z Fold6 펼침 회전·모바일 표면·중앙 무입력·`?123` 왕복 |
 | `GIF-03` | GIPHY는 사용자가 명시적으로 고르는 별도 provider다. production review 확인 key가 없으면 network 0회이며 KLIPY로 자동 fallback하지 않는다. rating `g`, 한국어·한국 locale, Powered by GIPHY, canonical/media 분리와 load/click/sent analytics를 적용한다. | provider parser·pagination·안전등급·credential·resolver·analytics tests | 실제 production key review; GIF 첨부는 별도 media-copy 서면 승인 필요 |
 | `VOICE-03` | `ACTION_OPEN_DOCUMENT`로 고른 content URI만 최대 60분·24MiB 범위에서 stream하고 화자·timestamp segment를 preview한다. 사용자가 체크한 segment만 16,000자 이하로 정확히 한 번 입력한다. | MIME/확장자·크기·시간·multipart·response parser·selection·commit tests | 표준 OpenAI profile과 실제 회의 음원 정확도·picker 복귀·취소·두 기기 UI |
 
@@ -420,7 +420,12 @@ backup, 일반 log에 저장하지 않는다.
 전환을 다시 확인했고, GIPHY key가 없는 상태가 `네트워크 요청 0회`로 표시되는 것을 확인했다.
 회의 파일 화면은 현재 TwentyOz 호환 profile에서 capability 확인 전 차단되며, 사용자 파일은 고르거나
 전송하지 않았다. Fold6 cover에서는 compact split을 끈 상태를 유지하고 expanded split만 켰다.
-실제 펼침·회전·중앙 공백 입력 검증은 물리 자세 전환 gate로 남긴다.
+실제 펼침 상태의 회전·모바일 표면·중앙 공백 입력 검증은 물리 자세 전환 gate로 남긴다.
+
+Z Fold6 내부 화면 `1856×2160`에서 기존 index 반분이 두벌식 둘째·셋째 행의 `ㅎ(G)`·`ㅍ(V)`을
+모음 쪽으로 넘기는 결함을 재현했다. Text surface에 물리 QWERTY 손 경계 `5/5/5/3`을 적용하고
+회귀 테스트를 추가한 뒤, 같은 펼친 화면에서 `ㅎ`과 `ㅍ`이 왼쪽 자음 그룹으로 복귀하고 영어
+`G/V`도 왼쪽에 유지되는 것을 무선 ADB 캡처로 확인했다.
 
 ### 6.8 한국어 다음 단어·GIF 밈 품질·로컬 OCR checkpoint 계약
 
@@ -921,7 +926,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 1. `KO-05` 한자·사전과 `KO-06` 개인 단어장. (`IN_PROGRESS`: 개인 단어장 코드 완료, 두 기기 gate)
 2. `UX-01` smart clipboard action. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
-4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 코드·테스트 완료, Fold6 펼침·회전 gate)
+4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 펼친 Fold6 한글·영문 손 경계 통과, 회전·모바일·중앙 무입력 gate)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
 6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`IN_PROGRESS`: 코드·자동 테스트 완료, 두 기기 UX·정확도와 OCR native 배포 gate)
 7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)

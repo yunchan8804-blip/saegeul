@@ -385,13 +385,16 @@ abstract class BaseKeyboard(
         if (width > 0) applyThumbSplitLayout(width)
     }
 
+    protected open fun thumbSplitBoundaryIndex(rowIndex: Int, keyCount: Int): Int? = null
+
     private fun applyThumbSplitLayout(parentWidthPx: Int) {
         keyRows.forEachIndexed { rowIndex, row ->
             val originalWidths = originalRowPercentWidths[rowIndex]
             val layout = ThumbSplitLayoutCalculator.calculate(
                 originalWidths,
                 parentWidthPx,
-                if (thumbSplitEnabled) thumbSplitGapPx else 0
+                if (thumbSplitEnabled) thumbSplitGapPx else 0,
+                thumbSplitBoundaryIndex(rowIndex, originalWidths.size)
             )
             val leftGap = layout.gapPx / 2
             val rightGap = layout.gapPx - leftGap

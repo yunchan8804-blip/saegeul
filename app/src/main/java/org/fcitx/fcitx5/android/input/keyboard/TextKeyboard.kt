@@ -96,6 +96,9 @@ class TextKeyboard(
     private var hangulInputMethodActive = false
     private var hangulKeyboardLayout: String? = null
 
+    override fun thumbSplitBoundaryIndex(rowIndex: Int, keyCount: Int): Int? =
+        TextKeyboardSplitPolicy.boundaryIndex(rowIndex, keyCount)
+
     init {
         updateLangSwitchKey(showLangSwitchKey.getValue())
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
