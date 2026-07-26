@@ -14,6 +14,8 @@
 
     <style name="Theme.DialogTheme" parent="@android:style/Theme.DeviceDefault.Light.Dialog" />
 
+    <style name="Theme.OAuthDialog" parent="Theme.AppCompat.Light.Dialog.Alert" />
+
     <style name="Theme.VoicePermission" parent="@android:style/Theme.Translucent.NoTitleBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>

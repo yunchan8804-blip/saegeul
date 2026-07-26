@@ -21,17 +21,34 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     private class ResponsiveToolbarLayout(context: Context) : FlexboxLayout(context) {
         var onNeedsSecondRowChanged: ((Boolean) -> Unit)? = null
+            set(value) {
+                field = value
+                // The toolbar can already be measured before KawaiiBarComponent installs this
+                // callback. Replay the current decision so the host is not left one row high
+                // with the wrapped AI/voice/OCR/GIF buttons clipped below it.
+                if (value != null && width > 0) {
+                    val needsSecondRow = calculateNeedsSecondRow(width)
+                    lastNeedsSecondRow = needsSecondRow
+                    value(needsSecondRow)
+                }
+            }
 
         private var lastNeedsSecondRow: Boolean? = null
 
-        override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
-            super.onSizeChanged(width, height, oldWidth, oldHeight)
-            if (width <= 0) return
-            val needsSecondRow = ToolbarLayoutPolicy.needsSecondRow(
+        private fun calculateNeedsSecondRow(width: Int): Boolean =
+            ToolbarLayoutPolicy.needsSecondRow(
                 availableWidth = width,
                 itemSize = context.dp(ToolbarLayoutPolicy.TOUCH_TARGET_DP),
                 itemCount = childCount
             )
+
+        fun needsSecondRow(): Boolean =
+            if (width > 0) calculateNeedsSecondRow(width) else lastNeedsSecondRow ?: false
+
+        override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+            super.onSizeChanged(width, height, oldWidth, oldHeight)
+            if (width <= 0) return
+            val needsSecondRow = calculateNeedsSecondRow(width)
             if (lastNeedsSecondRow == needsSecondRow) return
             lastNeedsSecondRow = needsSecondRow
             onNeedsSecondRowChanged?.invoke(needsSecondRow)
@@ -52,6 +69,8 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         set(value) {
             responsiveRoot.onNeedsSecondRowChanged = value
         }
+
+    fun needsSecondRow(): Boolean = responsiveRoot.needsSecondRow()
 
     private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
         val size = ctx.dp(ToolbarLayoutPolicy.TOUCH_TARGET_DP)

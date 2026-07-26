@@ -21,6 +21,20 @@
     <queries tools:node="removeAll" />
 
     <queries>
+        <!--
+          AppAuth discovers full browsers with an http VIEW probe, then optionally checks the
+          Custom Tabs service. Android 11+ hides both unless they are declared here.
+        -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+
+            <category android:name="android.intent.category.BROWSABLE" />
+
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
         <intent>
             <action android:name="${applicationId}.plugin.MANIFEST" />
         </intent>
@@ -151,7 +165,7 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity=""
-            android:theme="@style/Theme.DialogTheme" />
+            android:theme="@style/Theme.OAuthDialog" />
 
         <!-- Local-network discovery is only a hint; trusted configuration is fetched over HTTPS. -->
         <activity

@@ -71,7 +71,7 @@ class OpenAiTranscriptionClient(
 
     companion object {
         private const val MIN_WAV_BYTES = 44
-        private const val MAX_WAV_BYTES = 2 * 1024 * 1024
+        private const val MAX_WAV_BYTES = 12 * 1024 * 1024
         private val JSON = Json { ignoreUnknownKeys = true }
 
         internal fun buildRequest(wav: ByteArray, model: String): VoiceMultipartRequest {

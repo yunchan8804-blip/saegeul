@@ -136,11 +136,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showRecording(elapsedSeconds: Int) {
-        status.text = context.getString(
-            R.string.voice_recording,
-            elapsedSeconds,
-            PcmMemoryRecorder.MAX_DURATION_SECONDS
-        )
+        status.text = context.getString(R.string.voice_recording, elapsedSeconds)
         transcriptScroller.visibility = View.GONE
         hideMeeting()
         primary.apply {
@@ -213,6 +209,23 @@ class VoiceTranscriptionUi(
             isEnabled = true
             setText(R.string.ai_setup_action)
             setOnClickListener { onSetupRequested?.invoke() }
+        }
+        secondary.apply {
+            isEnabled = true
+            setText(R.string.ai_back)
+            setOnClickListener { onClose?.invoke() }
+        }
+    }
+
+    fun showProviderUnsupported(providerName: String, message: String) {
+        provider.text = context.getString(R.string.ai_provider, providerName)
+        status.text = message
+        transcriptScroller.visibility = View.GONE
+        hideMeeting()
+        primary.apply {
+            isEnabled = false
+            setText(R.string.voice_record_start)
+            setOnClickListener(null)
         }
         secondary.apply {
             isEnabled = true

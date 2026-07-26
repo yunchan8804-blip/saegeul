@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import android.view.Gravity
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
@@ -14,14 +16,21 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.wm.InputWindow
+import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.mechdancer.dependency.manager.must
 
 /** Preview-first AI writing assistant. Network requests only begin after an action tap. */
 class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
+    private val inputView by manager.inputView()
     private val theme by manager.theme()
+    private val windowManager: InputWindowManager by manager.must()
     private val usageStore by lazy { AiUsageStore(context) }
     private val authorizationProvider by lazy { AndroidAiBearerTokenProvider(context) }
 
@@ -29,31 +38,51 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     private var snapshot: AiInputSnapshot? = null
     private var profile: AiProviderProfile? = null
     private var lastAction: AiAction? = null
+    private var lastCustomInstruction: String? = null
     private var appliedEdit: AiAppliedEdit? = null
     private var renderedSuggestions: List<String> = emptyList()
     private val applyGate = AiExactlyOnceApplyGate()
     private var requestJob: Job? = null
     private var intakeJob: Job? = null
     private var replySourceOrigin: AiReplySourceOrigin? = null
+    private lateinit var clipboardBarButton: ToolButton
+    private var clipboardBarAvailable = false
+    private var clipboardBarInteractionEnabled = true
+    private var pendingCustomInstruction: String? = null
 
     override val title: String by lazy { context.getString(R.string.ai_assistant_title) }
-    override val showTitle: Boolean = false
+    override val showTitle: Boolean = true
 
     override fun onCreateView(): View {
         ui = AiAssistantUi(context, theme).apply {
-            onActionSelected = ::generate
+            onActionSelected = { action -> generate(action) }
+            onCustomPromptRequested = ::openPromptKeyboard
             onSuggestionReplace = { applySuggestion(it, AiApplyMode.Replace) }
             onSuggestionAppend = { applySuggestion(it, AiApplyMode.Append) }
             onSelectedChangesApply = ::applySelectedChanges
             onUndo = ::undo
-            onRetry = { lastAction?.let(::generate) }
+            onRetry = { lastAction?.let { generate(it, lastCustomInstruction) } }
             onClipboardSourceRequested = ::showClipboardSourcePicker
             onSetupRequested = { AiSettingsNavigator.open(context) }
         }
         return ui.root
     }
 
+    override fun onCreateBarExtension(): View = LinearLayout(context).apply {
+        gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        clipboardBarButton = ToolButton(context, R.drawable.ic_clipboard, theme).apply {
+            contentDescription = context.getString(R.string.ai_clipboard_source_select)
+            visibility = View.GONE
+            setOnClickListener { showClipboardSourcePicker() }
+        }
+        val size = KawaiiBarComponent.HEIGHT.dp()
+        addView(clipboardBarButton, LinearLayout.LayoutParams(size, size))
+        renderClipboardBarButton()
+    }
+
     override fun onAttached() {
+        inputView.setAssistantContentExpanded(true)
+        setClipboardBarAvailable(false)
         val allowsTextInspection = service.allowsTextInspectionFeatures()
         val allowsAiInput = service.allowsAiInputFeatures()
         // Do not even open the local credential store in an editor that is already denied by
@@ -83,6 +112,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         resolved ?: return
         profile = resolved
         ui.setIntakeAvailable(true)
+        setClipboardBarAvailable(true)
         // Reuse the established capture boundary to finish any composing span before binding an
         // external source. The captured editor text is ignored when an explicit source is present.
         val capturedEditorSource = service.captureAiInputSnapshot()
@@ -93,7 +123,9 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             return
         }
         replySourceOrigin = null
-        snapshot = capturedEditorSource
+        snapshot = capturedEditorSource ?: captureReplyTarget()?.let { target ->
+            AiInputSnapshot(target, "", AiSourceKind.BeforeCursor)
+        }
         val captured = snapshot
         if (captured == null) {
             ui.showError(
@@ -104,28 +136,58 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             return
         }
         ui.showSourcePreview(captured.source, resolved.displayName)
+        consumePendingCustomInstruction()
     }
 
     override fun onDetached() {
         requestJob?.cancel()
         intakeJob?.cancel()
+        inputView.setAssistantContentExpanded(false)
     }
 
-    private fun generate(action: AiAction) {
+    private fun openPromptKeyboard(initialText: String) {
+        if (!service.allowsAiInputFeatures()) {
+            ui.showError(context.getString(R.string.ai_network_policy_disabled), canRetry = false)
+            return
+        }
+        val started = inputView.beginAiPromptInput(
+            initialText = initialText,
+            onSubmit = { instruction ->
+                pendingCustomInstruction = instruction
+                windowManager.attachWindow(this)
+            },
+            onCancel = {
+                windowManager.attachWindow(this)
+            }
+        )
+        if (!started) {
+            ui.showError(context.getString(R.string.ai_editor_changed), canRetry = false)
+        }
+    }
+
+    private fun consumePendingCustomInstruction() {
+        val instruction = pendingCustomInstruction ?: return
+        pendingCustomInstruction = null
+        generate(AiAction.Custom, instruction)
+    }
+
+    private fun generate(action: AiAction, customInstruction: String? = null) {
         val source = snapshot ?: return
         val provider = profile ?: return
         if (!validateCurrentSource(source)) return
         requestJob?.cancel()
         lastAction = action
+        lastCustomInstruction = customInstruction
         renderedSuggestions = emptyList()
         applyGate.resetForReviewedResult()
         ui.showLoading(action, provider.displayName)
+        setClipboardBarInteractionEnabled(false)
         requestJob = service.lifecycleScope.launch {
             try {
                 val result = OpenAiResponsesClient(
                     provider,
                     authorizationProvider = authorizationProvider
-                ).generate(action, source.source)
+                ).generate(action, source.source, customInstruction)
                 usageStore.recordSuccess(
                     action,
                     provider.kind,
@@ -155,6 +217,8 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                         canRetry = true
                     )
                 }
+            } finally {
+                setClipboardBarInteractionEnabled(true)
             }
         }
     }
@@ -234,6 +298,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         }
         intakeJob?.cancel()
         ui.setIntakeInteractionEnabled(false)
+        setClipboardBarInteractionEnabled(false)
         intakeJob = service.lifecycleScope.launch {
             try {
                 val entries = ClipboardManager.searchableEntries(AiClipboardIntakePolicy.MAX_CHOICES)
@@ -286,6 +351,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                 ui.showError(context.getString(R.string.ai_clipboard_source_failed), canRetry = false)
             } finally {
                 ui.setIntakeInteractionEnabled(true)
+                setClipboardBarInteractionEnabled(true)
             }
         }
     }
@@ -304,6 +370,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         snapshot = bound
         replySourceOrigin = source.origin
         lastAction = null
+        lastCustomInstruction = null
         renderedSuggestions = emptyList()
         applyGate.resetForReviewedResult()
         appliedEdit = null
@@ -357,6 +424,25 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             target.selectionStart,
             target.selectionEnd
         )
+
+    private fun setClipboardBarAvailable(available: Boolean) {
+        clipboardBarAvailable = available
+        renderClipboardBarButton()
+    }
+
+    private fun setClipboardBarInteractionEnabled(enabled: Boolean) {
+        clipboardBarInteractionEnabled = enabled
+        renderClipboardBarButton()
+    }
+
+    private fun renderClipboardBarButton() {
+        if (!::clipboardBarButton.isInitialized) return
+        clipboardBarButton.visibility = if (clipboardBarAvailable) View.VISIBLE else View.GONE
+        clipboardBarButton.isEnabled = clipboardBarAvailable && clipboardBarInteractionEnabled
+        clipboardBarButton.alpha = if (clipboardBarButton.isEnabled) 1f else 0.45f
+    }
+
+    private fun Int.dp(): Int = (this * context.resources.displayMetrics.density).toInt()
 
     private companion object {
         const val CLIPBOARD_LABEL_CHARACTERS = 80

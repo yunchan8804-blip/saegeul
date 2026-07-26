@@ -35,6 +35,7 @@ data class AiProviderProfile(
     val oauthRevocationEndpoint: String = "",
     val oauthClientId: String = "",
     val oauthScopes: String = DEFAULT_OAUTH_SCOPES,
+    val capabilities: Set<String> = DEFAULT_CAPABILITIES,
     val fastModel: String = "gpt-5.6-luna",
     val balancedModel: String = "gpt-5.6-terra",
     val qualityModel: String = "gpt-5.6-sol"
@@ -54,6 +55,9 @@ data class AiProviderProfile(
             .distinct()
             .joinToString(" ")
             .take(1_000),
+        capabilities = capabilities.map(String::trim)
+            .filter(CAPABILITY_PATTERN::matches)
+            .toSet(),
         fastModel = fastModel.trim().ifEmpty { "gpt-5.6-luna" }.take(120),
         balancedModel = balancedModel.trim().ifEmpty { "gpt-5.6-terra" }.take(120),
         qualityModel = qualityModel.trim().ifEmpty { "gpt-5.6-sol" }.take(120)
@@ -98,6 +102,9 @@ data class AiProviderProfile(
                 require(profile.oauthScopes.isNotEmpty()) { "OAuth scopes are empty" }
             }
         }
+        require("responses" in profile.capabilities) {
+            "Provider does not declare Responses support"
+        }
         return profile
     }
 
@@ -110,12 +117,17 @@ data class AiProviderProfile(
     val responsesEndpoint: String
         get() = "${normalized().baseUrl}/responses"
 
+    val supportsTranscription: Boolean
+        get() = "transcription" in normalized().capabilities
+
     val isConfigured: Boolean
         get() = runCatching { validate() }.isSuccess
 
     companion object {
         const val OPENAI_BASE_URL = "https://api.openai.com/v1"
         const val DEFAULT_OAUTH_SCOPES = "openid offline_access"
+        val DEFAULT_CAPABILITIES = setOf("responses", "transcription")
+        private val CAPABILITY_PATTERN = Regex("^[a-z][a-z0-9._-]{0,63}$")
         val oauthRedirectUri: String
             get() = BuildConfig.AI_OAUTH_REDIRECT_URI
 

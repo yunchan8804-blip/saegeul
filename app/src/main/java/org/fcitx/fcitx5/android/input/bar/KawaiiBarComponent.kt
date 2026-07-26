@@ -630,6 +630,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private fun updateBarHeight() {
+        // Re-evaluate from the measured toolbar on every state transition. Compact/Fold displays
+        // can finish measuring before the callback is installed, or while the idle state is still
+        // Empty, so a callback-only cache can leave the wrapped second row clipped.
+        toolbarNeedsSecondRow = idleUi.buttonsUi.needsSecondRow()
         val secondRowVisible =
             activeBarState == KawaiiBarStateMachine.State.Idle &&
                 idleUi.currentState == IdleUi.State.Toolbar &&

@@ -26,6 +26,15 @@ class AiProviderProfileTest {
         assertEquals("fast", profile.model(AiModelTier.Fast))
         assertEquals("balanced", profile.model(AiModelTier.Balanced))
         assertEquals("quality", profile.model(AiModelTier.Quality))
+        assertTrue(profile.supportsTranscription)
+    }
+
+    @Test
+    fun `provider capabilities fail closed for undeclared transcription`() {
+        val textOnly = oauthProfile().copy(capabilities = setOf("responses")).validate()
+
+        assertFalse(textOnly.supportsTranscription)
+        assertFalse(oauthProfile().copy(capabilities = setOf("transcription")).isConfigured)
     }
 
     @Test

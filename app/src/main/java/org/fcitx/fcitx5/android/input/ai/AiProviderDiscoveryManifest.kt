@@ -88,6 +88,7 @@ object AiProviderDiscoveryManifestCodec {
             oauthRevocationEndpoint = wire.oauth.revocationEndpoint,
             oauthClientId = wire.oauth.clientId,
             oauthScopes = wire.oauth.scopes.joinToString(" "),
+            capabilities = capabilities,
             fastModel = wire.models.fast,
             balancedModel = wire.models.balanced,
             qualityModel = wire.models.quality

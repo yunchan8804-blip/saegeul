@@ -124,6 +124,7 @@ class AiProviderCredentialStore(context: Context) {
         .put("oauthRevocationEndpoint", profile.oauthRevocationEndpoint)
         .put("oauthClientId", profile.oauthClientId)
         .put("oauthScopes", profile.oauthScopes)
+        .put("capabilities", profile.capabilities.toList())
         .put("fastModel", profile.fastModel)
         .put("balancedModel", profile.balancedModel)
         .put("qualityModel", profile.qualityModel)
@@ -132,13 +133,28 @@ class AiProviderCredentialStore(context: Context) {
 
     private fun decode(bytes: ByteArray): AiProviderProfile {
         val json = JSONObject(bytes.toString(Charsets.UTF_8))
+        val kind = runCatching { AiProviderKind.valueOf(json.optString("kind")) }
+            .getOrDefault(AiProviderKind.OpenAICompatible)
+        val authMode = runCatching { AiAuthMode.valueOf(json.optString("authMode")) }
+            .getOrDefault(AiAuthMode.ApiKey)
+        val capabilities = json.optJSONArray("capabilities")?.let { array ->
+            buildSet {
+                repeat(array.length()) { index ->
+                    array.optString(index).takeIf(String::isNotBlank)?.let(::add)
+                }
+            }
+        } ?: if (authMode == AiAuthMode.OAuthPkce) {
+            // Older discovered profiles never persisted capabilities. Fail closed for audio and
+            // require reconnection to a manifest that explicitly advertises transcription.
+            setOf("responses")
+        } else {
+            AiProviderProfile.DEFAULT_CAPABILITIES
+        }
         return AiProviderProfile(
-            kind = runCatching { AiProviderKind.valueOf(json.optString("kind")) }
-                .getOrDefault(AiProviderKind.OpenAICompatible),
+            kind = kind,
             displayName = json.optString("displayName"),
             baseUrl = json.optString("baseUrl"),
-            authMode = runCatching { AiAuthMode.valueOf(json.optString("authMode")) }
-                .getOrDefault(AiAuthMode.ApiKey),
+            authMode = authMode,
             apiKey = json.optString("apiKey"),
             oauthAuthorizationEndpoint = json.optString("oauthAuthorizationEndpoint"),
             oauthTokenEndpoint = json.optString("oauthTokenEndpoint"),
@@ -148,6 +164,7 @@ class AiProviderCredentialStore(context: Context) {
                 "oauthScopes",
                 AiProviderProfile.DEFAULT_OAUTH_SCOPES
             ),
+            capabilities = capabilities,
             fastModel = json.optString("fastModel"),
             balancedModel = json.optString("balancedModel"),
             qualityModel = json.optString("qualityModel")

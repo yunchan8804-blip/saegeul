@@ -35,17 +35,24 @@ class OpenAiResponsesClient(
     private val transport: AiHttpTransport = UrlConnectionAiTransport(),
     private val authorizationProvider: AiBearerTokenProvider = ProfileAiBearerTokenProvider
 ) {
-    suspend fun generate(action: AiAction, input: String): AiGenerationResult =
+    suspend fun generate(
+        action: AiAction,
+        input: String,
+        customInstruction: String? = null
+    ): AiGenerationResult =
         withContext(Dispatchers.IO) {
             val cleanInput = input.trim()
-            require(cleanInput.isNotEmpty()) { "AI input is empty" }
+            require(cleanInput.isNotEmpty() || action == AiAction.Custom) { "AI input is empty" }
             require(cleanInput.length <= MAX_INPUT_CHARACTERS) { "AI input is too long" }
+            val requestInput = cleanInput.ifEmpty {
+                "Create a new message from the explicit writing request."
+            }
             val validated = profile.validate()
             val model = validated.model(action.tier)
             val request = buildJsonObject {
                 put("model", model)
-                put("instructions", action.developerInstruction())
-                put("input", cleanInput)
+                put("instructions", action.developerInstruction(customInstruction))
+                put("input", requestInput)
                 put("store", false)
                 put("max_output_tokens", MAX_OUTPUT_TOKENS)
                 put("reasoning", buildJsonObject { put("effort", "none") })

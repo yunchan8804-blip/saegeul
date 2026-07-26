@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.ai.AiPromptInputBar
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
@@ -63,6 +64,7 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.view
 import splitties.views.dsl.core.wrapContent
 import splitties.views.imageDrawable
+import kotlin.math.max
 
 @SuppressLint("ViewConstructor")
 class InputView(
@@ -104,6 +106,7 @@ class InputView(
     private val kawaiiBar = KawaiiBarComponent()
     private val horizontalCandidate = HorizontalCandidateComponent()
     private val keyboardWindow = KeyboardWindow()
+    private val aiPromptInputBar = AiPromptInputBar(themedContext, theme)
     private val symbolPicker = symbolPicker()
     private val emojiPicker = emojiPicker()
     private val emoticonPicker = emoticonPicker()
@@ -187,6 +190,17 @@ class InputView(
             return dp(value)
         }
 
+    private var assistantContentExpanded = false
+    private var aiPromptOnSubmit: ((String) -> Unit)? = null
+    private var aiPromptOnCancel: (() -> Unit)? = null
+
+    private val inputContentHeightPx: Int
+        get() = if (assistantContentExpanded) {
+            max(keyboardHeightPx, resources.displayMetrics.heightPixels * 48 / 100)
+        } else {
+            keyboardHeightPx
+        }
+
     @Keep
     private val onKeyboardSizeChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
         if (keyboardSizePrefs.any { it.key == key }) {
@@ -260,6 +274,10 @@ class InputView(
         updateKeyboardSize()
 
         add(preedit.ui.root, lParams(matchParent, wrapContent) {
+            above(aiPromptInputBar)
+            centerHorizontally()
+        })
+        add(aiPromptInputBar, lParams(matchParent, dp(56)) {
             above(keyboardView)
             centerHorizontally()
         })
@@ -273,11 +291,14 @@ class InputView(
         })
 
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
+
+        aiPromptInputBar.onCancel = { finishAiPromptInput(submit = false) }
+        aiPromptInputBar.onSubmit = { finishAiPromptInput(submit = true) }
     }
 
     private fun updateKeyboardSize() {
         windowManager.view.updateLayoutParams {
-            height = keyboardHeightPx
+            height = inputContentHeightPx
         }
         bottomPaddingSpace.updateLayoutParams {
             height = keyboardBottomPaddingPx
@@ -313,6 +334,70 @@ class InputView(
         kawaiiBar.view.setPadding(sidePadding, 0, sidePadding, 0)
     }
 
+    /** Gives result-heavy assistant surfaces more room, then restores the user's keyboard size. */
+    fun setAssistantContentExpanded(expanded: Boolean) {
+        if (assistantContentExpanded == expanded) return
+        assistantContentExpanded = expanded
+        windowManager.view.updateLayoutParams {
+            height = inputContentHeightPx
+        }
+        requestLayout()
+    }
+
+    /**
+     * Reattaches the one canonical keyboard surface and redirects its engine output into an
+     * IME-owned prompt buffer. The target editor is never used as scratch space.
+     */
+    fun beginAiPromptInput(
+        initialText: String,
+        onSubmit: (String) -> Unit,
+        onCancel: () -> Unit
+    ): Boolean {
+        aiPromptOnSubmit = onSubmit
+        aiPromptOnCancel = onCancel
+        val started = service.beginAiPromptCapture(initialText) { committed, preeditText ->
+            aiPromptInputBar.post {
+                aiPromptInputBar.render(committed, preeditText)
+            }
+        }
+        if (!started) {
+            aiPromptOnSubmit = null
+            aiPromptOnCancel = null
+            return false
+        }
+        setAssistantContentExpanded(false)
+        aiPromptInputBar.visibility = VISIBLE
+        windowManager.attachWindow(KeyboardWindow)
+        requestLayout()
+        return true
+    }
+
+    fun submitAiPromptInput() {
+        finishAiPromptInput(submit = true)
+    }
+
+    private fun finishAiPromptInput(submit: Boolean) {
+        val text = if (submit) service.finishAiPromptCapture() else {
+            service.cancelAiPromptCapture()
+            null
+        }
+        if (submit && text.isNullOrBlank()) return
+        aiPromptInputBar.visibility = GONE
+        val submitted = aiPromptOnSubmit
+        val cancelled = aiPromptOnCancel
+        aiPromptOnSubmit = null
+        aiPromptOnCancel = null
+        requestLayout()
+        if (text != null) submitted?.invoke(text) else cancelled?.invoke()
+    }
+
+    private fun discardAiPromptInput() {
+        service.cancelAiPromptCapture()
+        aiPromptInputBar.visibility = GONE
+        aiPromptOnSubmit = null
+        aiPromptOnCancel = null
+    }
+
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
         bottomPaddingSpace.updateLayoutParams<LayoutParams> {
             bottomMargin = getNavBarBottomInset(insets)
@@ -324,6 +409,9 @@ class InputView(
      * called when [InputView] is about to show, or restart
      */
     fun startInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean = false) {
+        // Dialogs such as the Hangul surface picker can restart the same editor. Keep the
+        // internal target in that case, but fail closed as soon as editor identity changes.
+        if (!service.shouldRetainAiPromptCapture(info)) discardAiPromptInput()
         broadcaster.onStartInput(info, capFlags)
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
         if (focusChangeResetKeyboard || !restarting) {
@@ -387,6 +475,7 @@ class InputView(
     }
 
     override fun onDetachedFromWindow() {
+        discardAiPromptInput()
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         // clear DynamicScope, implies that InputView should not be attached again after detached.
         scope.clear()

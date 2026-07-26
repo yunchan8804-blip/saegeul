@@ -90,6 +90,13 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
         }
         resolved ?: return
         profile = resolved
+        if (!resolved.supportsTranscription) {
+            ui.showProviderUnsupported(
+                resolved.displayName,
+                context.getString(R.string.voice_provider_unsupported)
+            )
+            return
+        }
         ui.showReady(resolved.displayName)
     }
 

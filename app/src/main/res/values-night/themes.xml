@@ -12,5 +12,7 @@
 
     <style name="Theme.DialogTheme" parent="@android:style/Theme.DeviceDefault.Dialog" />
 
+    <style name="Theme.OAuthDialog" parent="Theme.AppCompat.Dialog.Alert" />
+
     <style name="InputViewSnackbarTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar" />
 </resources>

@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.TextUtils
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.view.Gravity
@@ -46,6 +47,7 @@ class AiAssistantUi(
     }
 
     var onActionSelected: ((AiAction) -> Unit)? = null
+    var onCustomPromptRequested: ((String) -> Unit)? = null
     var onSuggestionReplace: ((String) -> Unit)? = null
     var onSuggestionAppend: ((String) -> Unit)? = null
     var onSelectedChangesApply: ((AiTextPatch, Set<Int>) -> Unit)? = null
@@ -59,46 +61,39 @@ class AiAssistantUi(
     private var intakeAvailable = false
     private var replySourceOrigin: AiReplySourceOrigin? = null
 
-    private val provider = TextView(context).apply {
-        setTextColor(theme.altKeyTextColor)
-        textSize = 11f
-        gravity = Gravity.CENTER_VERTICAL or Gravity.END
-        maxLines = 1
-        visibility = View.GONE
-    }
-    private val sourceLabel = sectionLabel(R.string.ai_source_label)
     private val sourceText = TextView(context).apply {
         setTextColor(theme.keyTextColor)
-        textSize = 14f
-        maxLines = 3
-        setPadding(dp(10), dp(6), dp(10), dp(6))
+        textSize = 13f
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        setPadding(dp(10), dp(4), dp(10), dp(4))
         background = rounded(theme.altKeyBackgroundColor, dp(10))
     }
     private val sourceSection = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        addView(LinearLayout(context).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(sourceLabel, LinearLayout.LayoutParams(0, dp(28), 1f))
-            addView(provider, LinearLayout.LayoutParams(0, dp(28), 1f))
-        }, matchWrap())
-        addView(sourceText, matchWrap().apply { topMargin = dp(2) })
+        addView(sourceText, matchWrap())
     }
-    private val clipboardSourceButton = compactButton(
-        R.string.ai_clipboard_source_select,
-        active = false
-    ).apply {
-        setOnClickListener { onClipboardSourceRequested?.invoke() }
+
+    private var promptValue = ""
+    private val promptText = TextView(context).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        setTextColor(theme.keyTextColor)
+        textSize = 14f
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        setPadding(dp(12), 0, dp(8), 0)
+        background = rounded(theme.altKeyBackgroundColor, dp(10))
+        setOnClickListener { requestPromptEditor() }
     }
-    private val intakeSection = LinearLayout(context).apply {
-        gravity = Gravity.END
-        addView(
-            clipboardSourceButton,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(38)
-            )
-        )
-        visibility = View.GONE
+    private val promptRunButton = compactButton(R.string.ai_direct_prompt_run, active = true).apply {
+        setOnClickListener { requestPromptEditor() }
+    }
+    private val promptRow = LinearLayout(context).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        addView(promptText, LinearLayout.LayoutParams(0, dp(40), 1f))
+        addView(promptRunButton, LinearLayout.LayoutParams(dp(64), dp(40)).apply {
+            marginStart = dp(6)
+        })
     }
 
     private val actionSection = LinearLayout(context).apply {
@@ -185,8 +180,8 @@ class AiAssistantUi(
     }
 
     init {
-        root.addView(sourceSection, matchWrap().apply { topMargin = dp(2) })
-        root.addView(intakeSection, matchWrap().apply { topMargin = dp(3) })
+        root.addView(promptRow, matchWrap().apply { topMargin = dp(2) })
+        root.addView(sourceSection, matchWrap().apply { topMargin = dp(4) })
         root.addView(actionSection, matchWrap().apply { topMargin = dp(4) })
         root.addView(statusArea, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -199,6 +194,7 @@ class AiAssistantUi(
             1f
         ).apply { topMargin = dp(4) })
         root.addView(footer, matchWrap().apply { topMargin = dp(4) })
+        renderPromptEntry()
     }
 
     /** Shows the exact editor text that will be sent, before any network request begins. */
@@ -208,16 +204,17 @@ class AiAssistantUi(
         origin: AiReplySourceOrigin? = null
     ) {
         replySourceOrigin = origin
-        sourceLabel.setText(
-            when (origin) {
-                AiReplySourceOrigin.Shared -> R.string.ai_reply_source_shared
-                AiReplySourceOrigin.Clipboard -> R.string.ai_reply_source_clipboard
-                null -> R.string.ai_source_label
-            }
-        )
-        sourceText.text = source
-        sourceText.visibility = View.VISIBLE
-        sourceSection.visibility = View.VISIBLE
+        promptValue = ""
+        renderPromptEntry()
+        promptRow.visibility = View.VISIBLE
+        sourceText.text = source.replace(Regex("\\s+"), " ").trim()
+        sourceText.contentDescription = when (origin) {
+            AiReplySourceOrigin.Shared -> context.getString(R.string.ai_reply_source_shared)
+            AiReplySourceOrigin.Clipboard -> context.getString(R.string.ai_reply_source_clipboard)
+            null -> context.getString(R.string.ai_source_label)
+        } + ": " + source
+        sourceText.visibility = if (source.isBlank()) View.GONE else View.VISIBLE
+        sourceSection.visibility = sourceText.visibility
         actionSection.visibility = View.VISIBLE
         setProvider(providerLabel)
         selectedAction = null
@@ -225,6 +222,7 @@ class AiAssistantUi(
         results.removeAllViews()
         resultsScroll.visibility = View.GONE
         progress.visibility = View.GONE
+        statusArea.visibility = View.VISIBLE
         status.apply {
             setText(R.string.ai_select_action)
             setTextColor(theme.altKeyTextColor)
@@ -240,12 +238,14 @@ class AiAssistantUi(
     fun showLoading(action: AiAction, providerLabel: String) {
         selectedAction = action
         setProvider(providerLabel)
-        sourceText.visibility = View.VISIBLE
-        sourceSection.visibility = View.VISIBLE
+        promptRow.visibility = View.GONE
+        sourceText.visibility = if (sourceText.text.isNullOrBlank()) View.GONE else View.VISIBLE
+        sourceSection.visibility = sourceText.visibility
         actionSection.visibility = View.GONE
         updateActionButtons(enabled = false)
         results.removeAllViews()
         resultsScroll.visibility = View.GONE
+        statusArea.visibility = View.VISIBLE
         status.visibility = View.GONE
         progress.visibility = View.VISIBLE
         retryButton.visibility = View.GONE
@@ -264,11 +264,13 @@ class AiAssistantUi(
     ) {
         selectedAction = action
         setProvider(providerLabel)
+        promptRow.visibility = View.GONE
         sourceText.visibility = View.GONE
-        sourceSection.visibility = View.VISIBLE
+        sourceSection.visibility = View.GONE
         actionSection.visibility = View.GONE
         updateActionButtons(enabled = true)
         progress.visibility = View.GONE
+        statusArea.visibility = View.GONE
         status.visibility = View.GONE
         retryButton.visibility = View.GONE
         setupButton.visibility = View.GONE
@@ -293,13 +295,15 @@ class AiAssistantUi(
 
     fun showError(message: String, providerLabel: String? = null, canRetry: Boolean = true) {
         setProvider(providerLabel)
-        sourceText.visibility = View.VISIBLE
-        sourceSection.visibility = View.VISIBLE
+        promptRow.visibility = View.VISIBLE
+        sourceText.visibility = if (sourceText.text.isNullOrBlank()) View.GONE else View.VISIBLE
+        sourceSection.visibility = sourceText.visibility
         actionSection.visibility = View.GONE
         updateActionButtons(enabled = true)
         results.removeAllViews()
         resultsScroll.visibility = View.GONE
         progress.visibility = View.GONE
+        statusArea.visibility = View.VISIBLE
         status.apply {
             text = context.getString(R.string.ai_error, message)
             setTextColor(Color.rgb(220, 85, 85))
@@ -314,6 +318,7 @@ class AiAssistantUi(
 
     fun showSetupRequired(message: String) {
         setProvider(null)
+        promptRow.visibility = View.GONE
         sourceText.visibility = View.GONE
         sourceSection.visibility = View.GONE
         actionSection.visibility = View.GONE
@@ -321,6 +326,7 @@ class AiAssistantUi(
         results.removeAllViews()
         resultsScroll.visibility = View.GONE
         progress.visibility = View.GONE
+        statusArea.visibility = View.VISIBLE
         status.apply {
             text = message
             setTextColor(theme.keyTextColor)
@@ -340,15 +346,9 @@ class AiAssistantUi(
 
     fun setIntakeAvailable(available: Boolean) {
         intakeAvailable = available
-        intakeSection.visibility = if (available) View.VISIBLE else View.GONE
-        clipboardSourceButton.isEnabled = available
-        clipboardSourceButton.alpha = if (available) 1f else 0.45f
     }
 
-    fun setIntakeInteractionEnabled(enabled: Boolean) {
-        clipboardSourceButton.isEnabled = intakeAvailable && enabled
-        clipboardSourceButton.alpha = if (clipboardSourceButton.isEnabled) 1f else 0.45f
-    }
+    fun setIntakeInteractionEnabled(enabled: Boolean) = Unit
 
     private fun resultCard(
         action: AiAction,
@@ -383,7 +383,14 @@ class AiAssistantUi(
 
             addView(LinearLayout(context).apply {
                 gravity = Gravity.END
-                if (replySourceOrigin != null) {
+                if (source.isEmpty()) {
+                    addView(compactButton(R.string.ai_insert, active = true).apply {
+                        setOnClickListener { onSuggestionReplace?.invoke(suggestion) }
+                    }, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(42)
+                    ))
+                } else if (replySourceOrigin != null) {
                     addView(compactButton(R.string.ai_insert_reply, active = true).apply {
                         setOnClickListener { onSuggestionReplace?.invoke(suggestion) }
                     }, LinearLayout.LayoutParams(
@@ -492,6 +499,18 @@ class AiAssistantUi(
         }, matchWrap())
     }
 
+    private fun requestPromptEditor() {
+        onCustomPromptRequested?.invoke(promptValue)
+    }
+
+    private fun renderPromptEntry() {
+        promptText.text = promptValue.ifBlank { context.getString(R.string.ai_direct_prompt_hint) }
+        promptText.alpha = if (promptValue.isBlank()) 0.65f else 1f
+        // This button opens the real active keyboard; generation happens from its prompt strip.
+        promptRunButton.isEnabled = true
+        promptRunButton.alpha = 1f
+    }
+
     private fun actionButton(action: AiAction): Button =
         compactButton(action.labelRes(), active = false).apply {
             actionButtons[action] = this
@@ -517,10 +536,7 @@ class AiAssistantUi(
         }
     }
 
-    private fun setProvider(label: String?) {
-        provider.text = label?.let { context.getString(R.string.ai_provider, it) }.orEmpty()
-        provider.visibility = if (label.isNullOrBlank()) View.GONE else View.VISIBLE
-    }
+    private fun setProvider(label: String?) = Unit
 
     private fun updateFooterVisibility() {
         footer.visibility = if (
@@ -562,6 +578,7 @@ class AiAssistantUi(
         AiAction.CustomerService -> R.string.ai_action_customer_service
         AiAction.Compose -> R.string.ai_action_compose
         AiAction.Reply -> R.string.ai_action_reply
+        AiAction.Custom -> R.string.ai_action_custom
         AiAction.TranslateEnglish -> R.string.ai_action_translate_english
         AiAction.TranslateKorean -> R.string.ai_action_translate_korean
         AiAction.TranslateJapanese -> R.string.ai_action_translate_japanese

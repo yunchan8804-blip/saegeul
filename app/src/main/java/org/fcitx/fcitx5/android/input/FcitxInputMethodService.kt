@@ -88,6 +88,7 @@ import org.fcitx.fcitx5.android.input.ai.AiAppliedEdit
 import org.fcitx.fcitx5.android.input.ai.AiApplyMode
 import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
 import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
+import org.fcitx.fcitx5.android.input.ai.AiPromptCaptureSession
 import org.fcitx.fcitx5.android.input.ai.AiSourceKind
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
@@ -197,6 +198,26 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @Volatile
     private var snippetCatalog = SnippetCatalog.builtIns()
     private var snippetRefreshJob: Job? = null
+
+    private data class ActiveAiPromptCapture(
+        val session: AiPromptCaptureSession,
+        val onChanged: (committed: String, preedit: String) -> Unit,
+        val packageName: String?,
+        val fieldId: Int,
+        val inputType: Int
+    )
+
+    private var activeAiPromptCapture: ActiveAiPromptCapture? = null
+
+    val isAiPromptCaptureActive: Boolean
+        get() = activeAiPromptCapture != null
+
+    fun shouldRetainAiPromptCapture(info: EditorInfo): Boolean =
+        activeAiPromptCapture?.let { capture ->
+            capture.packageName == info.packageName &&
+                capture.fieldId == info.fieldId &&
+                capture.inputType == info.inputType
+        } == true
 
     val bufferedHangulPrefix: String
         get() = if (bufferedHangulSessionActive) bufferedHangul.prefix else ""
@@ -333,7 +354,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
                 val snippetBoundary = boundaryForText(event.data.text)
-                if (snippetBoundary != null && tryExpandSnippet(snippetBoundary)) {
+                if (captureAiPromptCommit(event.data.text)) {
+                    // AI prompt capture owns this commit; never forward it to the target editor.
+                } else if (snippetBoundary != null && tryExpandSnippet(snippetBoundary)) {
                     // The boundary is part of the atomic snippet replacement.
                 } else if (beginDynamicPhrasePreview(event.data.text)) {
                     // Dynamic templates are committed only from their explicit preview action.
@@ -344,6 +367,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
             }
             is FcitxEvent.KeyEvent -> event.data.let event@{
+                if (handleAiPromptForwardedKey(it)) return@event
                 if (handleBufferedHangulForwardedKey(it)) return@event
                 if (it.states.virtual) {
                     // KeyEvent from virtual keyboard
@@ -449,11 +473,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
             }
             is FcitxEvent.ClientPreeditEvent -> {
-                updateComposingText(event.data)
+                if (!updateAiPromptPreedit(event.data.toString())) {
+                    updateComposingText(event.data)
+                }
             }
             is FcitxEvent.DeleteSurroundingEvent -> {
                 val (before, after) = event.data
-                handleDeleteSurrounding(before, after)
+                if (!deleteAiPromptBeforeCursor(before)) {
+                    handleDeleteSurrounding(before, after)
+                }
+            }
+            is FcitxEvent.InputPanelEvent -> {
+                if (isAiPromptCaptureActive && bufferedHangulSessionActive) {
+                    updateAiPromptPreedit(event.data.preedit.toString())
+                }
             }
             is FcitxEvent.IMChangeEvent -> {
                 val wasBufferedHangul = bufferedHangulSessionActive
@@ -506,6 +539,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleBackspaceKey() {
+        if (deleteAiPromptBeforeCursor(1)) return
         val lastSelection = selection.latest
         if (lastSelection.isNotEmpty()) {
             selection.predict(lastSelection.start)
@@ -537,6 +571,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleReturnKey() {
+        if (isAiPromptCaptureActive) {
+            inputView?.submitAiPromptInput()
+            return
+        }
         currentInputEditorInfo.run {
             if (inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL ||
                 imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_ENTER_ACTION)
@@ -704,10 +742,98 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun commitText(text: String, cursor: Int = -1): Boolean {
+        if (captureAiPromptCommit(text)) return true
         // Clipboard entries, emoji, and toolbar actions bypass Fcitx's CommitString event. Flush
         // the internal Hangul segment first so those direct inserts cannot overtake it.
         if (bufferedHangulSessionActive && !submitBufferedHangul()) return false
         return commitTextToEditor(text, cursor)
+    }
+
+    /** Starts an internal text target while leaving the real keyboard and Fcitx engine active. */
+    fun beginAiPromptCapture(
+        initialText: String,
+        onChanged: (committed: String, preedit: String) -> Unit
+    ): Boolean {
+        if (!allowsAiInputFeatures()) return false
+        cancelAiPromptCapture()
+        if (!finishCompositionForDirectAction()) return false
+        clearBufferedHangul()
+        val info = currentInputEditorInfo
+        val capture = ActiveAiPromptCapture(
+            session = AiPromptCaptureSession(initialText),
+            onChanged = onChanged,
+            packageName = info.packageName,
+            fieldId = info.fieldId,
+            inputType = info.inputType
+        )
+        activeAiPromptCapture = capture
+        notifyAiPromptChanged(capture)
+        postFcitxJob { reset() }
+        return true
+    }
+
+    /** Returns the reviewed instruction and closes capture; a blank prompt stays open. */
+    fun finishAiPromptCapture(): String? {
+        val capture = activeAiPromptCapture ?: return null
+        val instruction = capture.session.submission()
+        if (instruction.isBlank()) return null
+        activeAiPromptCapture = null
+        resetComposingState()
+        postFcitxJob { reset() }
+        return instruction
+    }
+
+    fun cancelAiPromptCapture() {
+        if (activeAiPromptCapture == null) return
+        activeAiPromptCapture = null
+        resetComposingState()
+        postFcitxJob { reset() }
+    }
+
+    private fun captureAiPromptCommit(text: String): Boolean {
+        val capture = activeAiPromptCapture ?: return false
+        capture.session.commit(text)
+        notifyAiPromptChanged(capture)
+        return true
+    }
+
+    private fun updateAiPromptPreedit(text: String): Boolean {
+        val capture = activeAiPromptCapture ?: return false
+        capture.session.updatePreedit(text)
+        notifyAiPromptChanged(capture)
+        return true
+    }
+
+    private fun deleteAiPromptBeforeCursor(codePoints: Int): Boolean {
+        val capture = activeAiPromptCapture ?: return false
+        capture.session.deleteBeforeCursor(codePoints)
+        notifyAiPromptChanged(capture)
+        return true
+    }
+
+    private fun notifyAiPromptChanged(capture: ActiveAiPromptCapture) {
+        capture.onChanged(capture.session.committedText, capture.session.preeditText)
+    }
+
+    /** Consumes only keys that Fcitx chose to forward; engine-owned composition stays untouched. */
+    private fun handleAiPromptForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
+        if (!isAiPromptCaptureActive) return false
+        if (!data.states.virtual) cachedKeyEvents.remove(data.timestamp)
+        if (data.up) return true
+        val hasShortcutModifier = data.states.ctrl || data.states.alt || data.states.meta ||
+            data.states.has(KeyState.Super) || data.states.has(KeyState.Super2) ||
+            data.states.has(KeyState.Hyper)
+        if (hasShortcutModifier) return true
+        when (data.sym.sym) {
+            FcitxKeyMapping.FcitxKey_BackSpace -> deleteAiPromptBeforeCursor(1)
+            FcitxKeyMapping.FcitxKey_Return -> inputView?.submitAiPromptInput()
+            FcitxKeyMapping.FcitxKey_Left,
+            FcitxKeyMapping.FcitxKey_Right -> Unit // The internal target intentionally uses an end cursor.
+            else -> if (data.unicode > 0) {
+                captureAiPromptCommit(Character.toString(data.unicode))
+            }
+        }
+        return true
     }
 
     /**
@@ -868,15 +994,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         connection.commitText(suggestion, 1)
                     }
                     AiSourceKind.BeforeCursor -> {
-                        if (connection.getTextBeforeCursor(snapshot.source.length, 0)?.toString() != snapshot.source) {
-                            return null
+                        if (snapshot.source.isEmpty()) {
+                            connection.commitText(suggestion, 1)
+                        } else {
+                            if (connection.getTextBeforeCursor(snapshot.source.length, 0)
+                                    ?.toString() != snapshot.source
+                            ) {
+                                return null
+                            }
+                            var success = true
+                            connection.withBatchEdit {
+                                success = deleteSurroundingText(snapshot.source.length, 0) && success
+                                if (success) success = commitText(suggestion, 1)
+                            }
+                            success
                         }
-                        var success = true
-                        connection.withBatchEdit {
-                            success = deleteSurroundingText(snapshot.source.length, 0) && success
-                            if (success) success = commitText(suggestion, 1)
-                        }
-                        success
                     }
                 }
                 if (!dispatched) return null
@@ -1103,6 +1235,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleBufferedHangulForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
+        if (isAiPromptCaptureActive) return false
         if (!data.states.virtual && data.up && consumedPhysicalKeysDown.remove(data.sym.sym)) {
             cachedKeyEvents.remove(data.timestamp)
             return true
@@ -1831,6 +1964,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // because of https://android.googlesource.com/platform/frameworks/base.git/+/refs/tags/android-11.0.0_r45/core/java/android/view/inputmethod/BaseInputConnection.java#851
     // it's not possible to set cursor inside composing text
     private fun updateComposingText(text: FormattedText) {
+        if (updateAiPromptPreedit(text.toString())) return
         // A stale empty ClientPreeditEvent can race the capability change. In buffered mode the
         // engine renders preedit in Fcitx's own input panel, never in the target InputConnection.
         if (bufferedHangulSessionActive) return
@@ -1890,6 +2024,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Also updates internal composing state of [FcitxInputMethodService].
      */
     fun finishComposing() {
+        activeAiPromptCapture?.let { capture ->
+            capture.session.commitPreedit()
+            notifyAiPromptChanged(capture)
+            return
+        }
         if (bufferedHangulSessionActive) {
             submitBufferedHangul()
             return

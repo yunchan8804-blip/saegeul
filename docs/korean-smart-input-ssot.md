@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `반응형 2행 툴바·일반 사용자 AI 설정 CTA·원격 AI OAuth 통합 checkpoint`
+현재 활성 구현 마일스톤: `PC Codex·Claude OAuth companion·단일 키보드 표면 AI 입력·WPF tray checkpoint`
 
 ## 2. 상태 표기
 
@@ -117,6 +117,8 @@
 8. 지원하지 않는 editor나 engine을 지원한다고 표시하지 않는다.
 9. 사용자 데이터 백업에 API key, ephemeral token, 민감 빠른 문구 평문, 임시 GIF를 포함하지 않는다.
 10. 링크·텍스트·rich content는 가능한 경우 clipboard를 거치지 않고 `InputConnection`으로 전달한다.
+11. AI 지시문, GIF·통합 검색 등 IME가 소유한 모든 text 입력은 현재 `KeyboardWindow`의 layout,
+    Fcitx 조합, 후보, 숫자·기호 전환, theme, 높이를 재사용한다. 기능별 두벌식 복제판을 만들지 않는다.
 
 ## 6. 통합 제품 백로그
 
@@ -349,20 +351,22 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `AI-00` | AI provider·보안 기반 | `DONE` | provider profile, key vault, privacy gate, usage 표시 | L |
 | `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `IN_PROGRESS` | Unicode-safe diff·선택 적용 구현, 두 기기 실사용 gate 남음 | M |
 | `AI-02` | 존댓말·말투 변환 | `IN_PROGRESS` | 존댓말·카톡·업무·거절·사과·고객응대 action 구현, action별 실기기 matrix 남음 | M |
-| `AI-03` | 빠른 문장 생성 | `IN_PROGRESS` | 의도 기반 후보·명시적 교체/추가 구현과 A35 live 통과, 3개 후보 품질 gate 남음 | M |
+| `AI-03` | 빠른 문장 생성 | `IN_PROGRESS` | 프리셋과 활성 키보드 표면 직접 지시문, 빈 입력창 신규 문장 후보, 명시적 교체/추가 구현; Fold6·3개 후보 품질 matrix 남음 | M |
 | `AI-04` | 답장 초안 | `IN_PROGRESS` | 선택·문단·명시적 clipboard·Sharesheet intake 구현, 두 기기 검증 남음 | M |
 | `AI-05` | 키보드 번역 | `IN_PROGRESS` | 한↔영·일·중 action과 preview 구현, 언어별 실기기 matrix 남음 | M |
 | `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
-| `AI-07` | 원격 호환 endpoint OAuth | `IN_PROGRESS` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인 구현; 실제 IdP·두 기기 gate | L |
+| `AI-07` | 원격 호환 endpoint OAuth | `DONE` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인; PC CLI companion과 두 기기 live 통과 | L |
 | `AI-08` | 일반 사용자 AI 연결 안내 | `DONE` | 미연결·OAuth 만료 상태에 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
+| `AI-09` | 내 컴퓨터 자동 발견·연결 | `DONE` | mDNS 발견, Tailscale HTTPS manifest 검증, 연결 확인, AppAuth login과 PC 재시작 후 DPAPI grant 복구; A35·Z Fold6 통과 | L |
 
 ### 6.4 음성·멀티모달 기능
 
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
 | `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | push-to-talk·권한·한국어 hint·최종 preview·exactly-once commit 구현, Realtime partial transcript GATE | L |
-| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 30초 in-memory WAV 구간 전사 구현, 두 기기 정확도·취소 UX gate 남음 | L |
+| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, capability gate, preview 구현; 표준 transcription endpoint 실기기 gate 남음 | L |
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, OpenAI profile·실기기 gate | L |
+| `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
 | `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입 구현, 실기기 정확도 gate | L |
 
 ### 6.5 편의·기기·보안 기능
@@ -386,7 +390,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `AI-04` | `ACTION_SEND text/plain` 또는 사용자가 누른 clipboard 행만 4,000자 이하로 process memory에 5분 보관 | action/MIME/TTL/private gate·editor identity·exactly-once 테스트 | Sharesheet→키보드 preview→답장 생성·삽입을 두 기기에서 확인 |
 | `UX-01` | 최대 10개 명시 선택, plain text·합치기·한국 전화·명시적 계좌 grouping·PII mask preview | transformer·선택 상태·private gate·exactly-once 테스트 | 일반 editor 두 기기와 private editor 차단 확인 |
 | `SEC-01` | vault 전용 auth-bound AES-GCM, 매 read/write `CryptoObject` identity 확인, package allowlist, 60초 memory session | codec·allowlist·TTL·앱 전환·손상·commit gate 테스트 | Android 11+ 생체/기기 인증 prompt, 앱 전환 재잠금, 허용/비허용 package 확인 |
-| `VOICE-02` | 30초 16 kHz mono in-memory WAV, `gpt-4o-transcribe`, 한국어 hint, preview 뒤 1회 삽입 | PCM/WAV·multipart·privacy·stale editor·commit 테스트 | 두 기기 permission/focus 복귀, 실제 provider 정확도와 취소 확인 |
+| `VOICE-02` | elapsed-only 16 kHz mono in-memory WAV, 5분 safety boundary, 명시 `transcription` capability, 한국어 hint, preview 뒤 1회 삽입 | PCM/WAV·multipart·capability·privacy·stale editor·commit 테스트 | 표준 transcription endpoint로 두 기기 permission/focus 복귀, 정확도와 취소 확인 |
 
 이 checkpoint의 통합 자동 검증은 app JVM 45 suites·190 tests, failure/error/skipped 0과
 arm64 app·Hangul plugin assemble까지 통과했다. 상태를 `DONE`으로 올리는 것은 위 실기기 게이트가
@@ -742,9 +746,10 @@ compose preview까지만 확인했고 메시지는 전송하지 않았으며, �
 Responses API typed streaming event를 기본 text integration 후보로 사용한다. 모든 workload를 Sol로
 보내지 않고 latency, cost, quality 역할을 분리한다.
 
-2026-07-26 `VOICE-01` 1차 구현은 현재 앱의 request-response transport 경계를 지키기 위해
+2026-07-27 `VOICE-02` 구현은 현재 앱의 request-response transport 경계를 지키기 위해
 `gpt-4o-transcribe` `/audio/transcriptions` 구간 전사로 제한한다. UI 명칭은 `AI 정밀 받아쓰기`이며
-실시간·부분 전사라고 표시하지 않는다. 16 kHz mono PCM은 최대 30초만 메모리에 보관해 WAV로 만들고,
+실시간·부분 전사라고 표시하지 않는다. 16 kHz mono PCM은 UI countdown 없이 최대 5분의 안전 상한으로
+메모리에 보관해 WAV로 만들고,
 전사 요청 종료·취소·window detach 시 byte array를 지운다. 파일·cache·SharedPreferences·backup·log에
 음성이나 전사문을 남기지 않는다. `RECORD_AUDIO`는 IME service가 직접 요청하지 않고 `exported=false`
 투명 Activity에서만 요청한다. 현재 IME는 Android background activity start 예외에 해당하지만 실기기
@@ -856,14 +861,36 @@ manifest v1 contract는 다음과 같다. `redirect_uri`는 설치 variant에 �
     "balanced": "balanced-model",
     "quality": "quality-model"
   },
-  "capabilities": ["responses", "transcription"]
+  "capabilities": ["responses"]
 }
 ```
 
-컴퓨터 쪽 `scripts/ai-provider-companion.py`는 provider manifest를 표준 TLS로 먼저 검증한 뒤 dependency
-없이 mDNS로 광고한다. `--manifest-url`을 생략하면 `FCITX_AI_MANIFEST_URL`, Tailscale self DNS name,
-local FQDN 순서로 well-known URL을 찾는다. 이 helper는 API key를 읽거나 요청을 proxy하지 않는다.
-실제 AI gateway가 OAuth/OIDC와 manifest를 제공하는 것이 선행 조건이다.
+`transcription`은 provider가 실제 `/audio/transcriptions` 호환 endpoint를 구현한 경우에만 배열에
+추가한다. 현재 Codex·Claude CLI companion은 `responses`만 선언한다.
+
+컴퓨터 쪽 기본 경로는 `scripts/ai-provider-companion.py`가 제공하는 로컬 CLI gateway다. 사용자가 PC에서
+이미 로그인한 Codex(ChatGPT 구독 OAuth)와 Claude Code(Claude 구독 OAuth)를 그대로 사용하며, Android에
+OpenAI·Anthropic API key나 CLI의 `auth.json`, OAuth access token을 복사하지 않는다. 휴대폰에는 companion
+전용 Authorization Code + PKCE 권한만 발급한다. 이 companion grant는
+`%LOCALAPPDATA%/Fcitx5Android/ai-companion-oauth.bin`에 Windows DPAPI current-user 범위로 암호화해
+보존하므로 PC 재시작 뒤에도 다시 로그인하지 않고 refresh할 수 있다.
+
+요청 실행 경계는 다음으로 고정한다.
+
+- Codex: `codex exec --ephemeral --sandbox read-only --skip-git-repo-check --ignore-user-config
+  --ignore-rules -c approval_policy=never -c web_search=disabled --color never -C <empty-sandbox> -`
+- Claude Code: `claude -p --safe-mode --tools '' --permission-mode dontAsk --no-session-persistence
+  --output-format json`
+- 자식 process에서는 API key·token override 환경 변수를 제거해 CLI에 저장된 구독 OAuth 로그인을 강제한다.
+- 한 번에 한 요청만 실행하고 prompt·결과·Bearer token을 log에 남기지 않으며, strict suggestion JSON 외
+  출력은 거부한다. Fast·Quality는 Codex, Balanced는 Claude로 route한다.
+
+gateway는 loopback `127.0.0.1:9211`, tailnet 공개면은 Tailscale Serve HTTPS `:9210`, 발견은
+`_fcitx-ai._tcp.local.`을 사용한다. WPF tray `tools/FcitxAiCompanionTray`가 상태·backend·시작·중지·재시작·
+local health 열기를 제공하고 helper process를 감시해 장애 시 복구한다.
+`scripts/install-ai-provider-companion-tray.ps1`은 single-file tray를 `%LOCALAPPDATA%/Fcitx5Android/tray`에
+배포하고 현재 사용자 logon 예약 작업 `Fcitx5 Android AI Companion`을 설치한다. 기존 독립 OAuth
+provider를 광고할 때만 `--manifest-url`의 advertise-only 호환 모드를 사용한다.
 
 현재 targetSdk 36에서는 기존 local-network NSD 경로를 쓴다. targetSdk 37 전환 시 Android local
 network protection을 별도 milestone로 올리고, broad `ACCESS_LOCAL_NETWORK` 요청보다 system service
@@ -886,11 +913,23 @@ private/offline/app별 AI 차단과 editor identity가 하나라도 맞지 않�
 
 ### 8.4 음성 privacy와 정확한 제품 명칭
 
-현재 구현은 `AI 정밀 받아쓰기`인 `VOICE-02`다. `VOICE-01` 실시간이라고 표시하지 않는다. 녹음은
-최대 30초·16 kHz mono PCM이며 메모리에서 WAV multipart로 바꿔 전송한 뒤 모든 byte array를 지운다.
+현재 구현은 `AI 정밀 받아쓰기`인 `VOICE-02`다. `VOICE-01` 실시간이라고 표시하지 않는다. UI는 30초를
+권장하거나 countdown하지 않고 사용자가 멈출 때까지 elapsed time만 보여 준다. 녹음은 16 kHz mono PCM,
+5분의 내부 memory safety boundary이며 WAV multipart 전송 뒤 모든 byte array를 지운다.
 음성·전사문을 file, cache, prefs, backup, log에 저장하지 않는다. `RECORD_AUDIO` 권한은
 `exported=false` 투명 permission Activity에서만 요청한다. private/no-personalized/offline/app AI 차단,
 editor identity 변경, 취소에서는 전송 또는 입력을 fail-closed한다.
+
+공급자 profile에는 manifest의 capability를 암호화해 보존한다. `transcription`을 명시하지 않은 provider는
+녹음을 시작하지 않고 지원하지 않는 이유를 표시한다. 현재 Codex CLI 0.145.0의 `codex exec`는 text와
+`--image`만 입력으로 받고 audio option이 없다. ChatGPT desktop의 Codex Voice는 공식 UI 기능이지만
+Android companion이 audio를 보내 transcript를 돌려받을 공개 자동화 계약은 없다. 따라서 구독 OAuth
+token을 추출해 비공식 endpoint를 호출하거나 표준 API 사용량으로 위장하지 않는다. 공개 bridge가 생기기
+전까지 PC CLI companion은 `responses`만 제공하고 `VOICE-04`는 `BLOCK`이다.
+
+공식 기준: [ChatGPT Work and Codex Voice](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex),
+[Voice Dictation FAQ](https://help.openai.com/en/articles/12168547-voice-dictation-faq),
+[GPT-4o Transcribe](https://developers.openai.com/api/docs/models/gpt-4o-transcribe).
 
 `VOICE-01` realtime delta는 `gpt-realtime-whisper` WebSocket, item별 delta/completed 조정, backend
 ephemeral token 발급이 함께 준비될 때 별도로 구현한다. 장기 표준 API key를 실시간 client에 내장하는
@@ -910,11 +949,13 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | --- | --- | --- |
 | 공급자 profile | `PASS` | OpenAI·OpenAI-compatible HTTPS endpoint, Fast/Balanced/Quality model tier를 pure model로 검증; 평문 HTTP는 loopback·private·Tailscale도 차단 |
 | API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
-| OAuth public client | `CODE_DONE` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현 |
+| OAuth public client | `PASS` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현; AppCompat dialog theme와 Android 11+ browser query 회귀 수정 |
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
-| OAuth 통합 build/test | `PASS` | `:app:testDebugUnitTest` 56 suites·240 tests failure/error/skipped 0, `:app:assembleDebug -PbuildABI=arm64-v8a`, debug merged manifest redirect scheme 일치 |
-| OAuth live provider | `GATE` | 실제 compatible endpoint의 client 등록·redirect·scope와 A35·Z Fold6 login/refresh/revoke를 검증해야 함 |
-| 컴퓨터 자동 연결 마법사 | `PASS` | 59 suites·252 tests 0 failure; A35·Z Fold6 cover에서 같은 LAN의 `alpaca-home test`를 각각 1대로 발견하고 Tailscale HTTPS manifest 검증·확인창 통과; 502 응답에서는 profile/token 파일 없이 fail-closed; 발견 행 crash와 navigation-bar inset 회귀 수정 |
+| OAuth 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 61 suites·261 tests failure/error/skipped 0, `:app:assembleDebug -PbuildABI=arm64-v8a`, debug merged manifest redirect scheme 일치 |
+| OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과; PC 재시작용 companion grant는 Windows DPAPI로 보존 |
+| 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |
+| PC 유료 CLI 실행 | `PASS` | Codex CLI `exec`는 ChatGPT 로그인, Claude Code `-p`는 Max 로그인으로 실행; API/token 환경 변수 제거, tool·web·write·session persistence 차단, A35에서 Codex 맞춤법과 Claude 존댓말 실제 생성 성공, Fold에서 Codex 생성 성공 |
+| PC WPF tray·자동 실행 | `PASS` | single-file WPF tray의 current-user logon 예약 작업 설치 후 helper를 종료하자 tray-owned 새 PID가 `127.0.0.1:9211` health와 Tailscale HTTPS manifest를 자동 복구; 2026-07-27 Release build warning/error 0, 예약 작업 `Running`, health `ok`, Codex·Claude backend 모두 healthy |
 | Responses client | `PASS` | `/responses`, `store=false`, JSON suggestion parse, redirect 금지, prompt/result 비로그와 sanitized error 구현 |
 | text/action test | `PASS` | AI 5 suites·12 tests, failure 0. action prompt, provider validation, selection/문단 source, 응답 parse, usage 원문 비저장을 검증 |
 | Privacy dashboard | `PASS` | A35에서 현재 provider, 전송 원칙, 기능별 집계 usage, usage 삭제와 GIF cache 삭제 UI 렌더 확인 |
@@ -922,7 +963,10 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | A35 생성 결과 | `PASS` | `meeting 30 minutes late polite` 선택 범위로 한국어 지각 안내 초안 생성, 결과 card와 공급자 표시 확인 |
 | 교체 exactly-once·undo | `PASS` | Chrome URL editor에서 결과를 한 번 교체한 뒤 `실행 취소`로 원문이 정확히 복원됨 |
 | Z Fold6 UI | `PASS` | cover 화면에서 AI toolbar, 원문 preview와 전체 action group이 잘림 없이 표시됨 |
-| 두 기기 최종 설치 | `PASS` | A35·Z Fold6에 동일 arm64 app/plugin 재설치, debug Fcitx IME 재선택 |
+| AI 결과 우선 UI | `CODE_DONE` | 결과 상태에서 보이지 않는 `weight=1` status container를 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 이동, 결과 card가 전체 가용 높이를 사용 |
+| AI 직접 지시문 | `PASS` | 기능별 두벌식 복제판 제거. 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme을 그대로 쓰되 output은 내부 최대 300자 buffer로 격리; A35에서 영문 입력·후보·숫자판·천지인 picker·picker restart prompt 보존과 target editor 무변경 통과, pure buffer Unicode·preedit·limit 회귀 테스트 통과 |
+| 음성 capability gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. discovery manifest capability를 암호화 profile SSOT로 보존하고 `transcription` 미선언 Codex/Claude companion은 녹음 전에 버튼 비활성·미지원 이유를 표시; companion Python 7 tests 통과 |
+| 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `00:34:52`, Z Fold6 `00:35:14`에 동일 `0.1.2-106-g321d55df` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI, 7개 신규 테스트 |
 | AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트 |
 | action별 품질 matrix | `GATE` | 말투 6종, 답장, 번역 4개, 3후보 보장을 provider/model별로 실제 기기 검증해야 함 |
@@ -963,22 +1007,23 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 ### 단계 3 — AI 기반과 text 기능
 
 1. `AI-00`, `AI-06`, `SEC-02` 공급자·Keystore·privacy/usage 기반. (`DONE`)
-2. `AI-07` endpoint OAuth public-client flow와 token lifecycle. (`IN_PROGRESS`: 코드 완료, 실제 IdP·두 기기 gate)
+2. `AI-07` endpoint OAuth public-client flow와 token lifecycle. (`DONE`: PC CLI companion·두 기기 login·generation 통과)
 3. `AI-08` 일반 사용자용 AI 연결·재로그인 CTA. (`DONE`: 코드·테스트·두 기기 미연결 안내와 설정 직행 통과)
-4. `AI-09` 컴퓨터 자동 발견·검증·연결 마법사. (`IN_PROGRESS`: 코드 완료, 두 기기 mDNS·실제 IdP gate)
+4. `AI-09` 컴퓨터 자동 발견·검증·연결 마법사. (`DONE`: 두 기기 mDNS·Tailscale HTTPS·PKCE·DPAPI 재시작 복구 통과)
 5. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
 6. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
 7. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
-8. `AI-03` 문장 생성. (`IN_PROGRESS`: A35 live 통과, 3후보 보장)
+8. `AI-03` 문장 생성. (`IN_PROGRESS`: 프리셋·직접 지시문·빈 입력창 생성 코드 완료, 두 기기 결과 UI와 3후보 품질 gate)
 9. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
 10. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
 
 ### 단계 4 — 음성
 
 1. push-to-talk audio capture와 permission UX. (`IN_PROGRESS`: 코드 완료, 두 기기 permission/focus gate)
-2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: in-memory WAV와 final preview 완료, live 품질 gate)
+2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: elapsed-only 5분 safety capture·capability gate·preview 완료, 표준 endpoint live 품질 gate)
 3. `VOICE-01` realtime partial transcript. (`GATE`: Realtime WebSocket와 ephemeral token backend)
 4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 코드·테스트 완료, 표준 OpenAI·실기기 gate)
+5. `VOICE-04` Codex 구독 OAuth voice bridge. (`BLOCK`: desktop UI 외 공개 CLI·HTTP audio 계약 없음)
 
 ### 단계 5 — 개인화·대화면·장기 기능
 
@@ -1045,3 +1090,6 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
 | 2026-07-26 | AI text action은 선택/현재 문단 preview 후에만 network를 호출하고 결과 교체·추가·undo를 명시적 동작으로 제한 |
 | 2026-07-26 | 동적 빠른 문구는 기존 `.mb` 형식을 유지하고, 명시적 미리보기 뒤 정확히 한 번 삽입 |
+| 2026-07-27 | AI·GIF·검색 등 IME 내부 text 입력은 활성 `KeyboardWindow`와 Fcitx 엔진을 재사용하며 기능별 두벌식 복제판을 금지 |
+| 2026-07-27 | provider manifest capability를 profile SSOT로 보존하고 실제 `transcription` 미선언 provider에서는 음성 capture를 시작하지 않음 |
+| 2026-07-27 | Codex desktop Voice는 공개 companion audio 계약이 생기기 전까지 `BLOCK`; 구독 OAuth token의 비공식 endpoint 사용 금지 |

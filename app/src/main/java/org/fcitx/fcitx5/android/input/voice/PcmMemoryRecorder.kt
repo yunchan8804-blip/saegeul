@@ -142,13 +142,14 @@ class PcmMemoryRecorder {
 
     companion object {
         const val SAMPLE_RATE = 16_000
-        const val MAX_DURATION_SECONDS = 30
+        // A safety boundary, not a suggested utterance length. The UI shows elapsed time only.
+        const val SAFETY_MAX_DURATION_SECONDS = 5 * 60
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
         private const val BITS_PER_SAMPLE = 16
         private const val BYTES_PER_SAMPLE = BITS_PER_SAMPLE / 8
         private const val BYTES_PER_SECOND = SAMPLE_RATE * BYTES_PER_SAMPLE
-        private const val MAX_PCM_BYTES = BYTES_PER_SECOND * MAX_DURATION_SECONDS
+        private const val MAX_PCM_BYTES = BYTES_PER_SECOND * SAFETY_MAX_DURATION_SECONDS
         private const val MIN_PCM_BYTES = BYTES_PER_SECOND / 4
         private const val READ_BUFFER_BYTES = 4_096
         private const val WAV_HEADER_BYTES = 44

@@ -96,7 +96,12 @@ class CommonKeyActionListener :
                 is SymAction -> service.postFcitxJob {
                     sendKey(action.sym, action.states)
                 }
-                is CommitAction -> if (service.isBufferedHangulSessionActive) {
+                is CommitAction -> if (service.isAiPromptCaptureActive) {
+                    service.postFcitxJob {
+                        commitAndReset()
+                        service.lifecycleScope.launch { service.commitText(action.text) }
+                    }
+                } else if (service.isBufferedHangulSessionActive) {
                     // The buffered path snapshots and resets the engine itself. Running
                     // commitAndReset first can race its CommitString event with this insert.
                     service.commitText(action.text)
@@ -137,7 +142,11 @@ class CommonKeyActionListener :
                 }
                 is ShowInputMethodPickerAction -> showInputMethodPicker()
                 is MoveSelectionAction -> {
-                    when (backspaceSwipeState) {
+                    if (service.isAiPromptCaptureActive) {
+                        // The internal AI prompt intentionally has an end cursor and must never
+                        // move the selection in the app that opened the keyboard.
+                        backspaceSwipeState = Reset
+                    } else when (backspaceSwipeState) {
                         Stopped -> {
                             backspaceSwipeState = if (
                                 preeditState.isEmpty &&
@@ -156,7 +165,9 @@ class CommonKeyActionListener :
                     }
                 }
                 is DeleteSelectionAction -> {
-                    when (backspaceSwipeState) {
+                    if (service.isAiPromptCaptureActive) {
+                        backspaceSwipeState = Stopped
+                    } else when (backspaceSwipeState) {
                         Stopped -> {}
                         Selection -> service.deleteSelection()
                         Reset -> if (action.totalCnt < 0) { // swipe left

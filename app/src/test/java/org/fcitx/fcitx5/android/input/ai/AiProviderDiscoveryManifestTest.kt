@@ -24,6 +24,18 @@ class AiProviderDiscoveryManifestTest {
         assertEquals("https://computer.example/v1", verified.profile.baseUrl)
         assertEquals("fast", verified.profile.fastModel)
         assertTrue("responses" in verified.capabilities)
+        assertTrue(verified.profile.supportsTranscription)
+    }
+
+    @Test
+    fun `manifest capability reaches the stored provider contract`() {
+        val textOnly = AiProviderDiscoveryManifestCodec.decode(
+            validManifest().replace(", \"transcription\"", ""),
+            MANIFEST_URL
+        )
+
+        assertEquals(setOf("responses"), textOnly.profile.capabilities)
+        assertFalse(textOnly.profile.supportsTranscription)
     }
 
     @Test

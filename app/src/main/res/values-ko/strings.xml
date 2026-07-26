@@ -472,6 +472,9 @@
     <string name="ai_assistant_title">AI 글쓰기</string>
     <string name="ai_back">키보드</string>
     <string name="ai_source_label">동작을 고르면 전송할 원문</string>
+    <string name="ai_direct_prompt_hint">직접 지시문 입력</string>
+    <string name="ai_direct_prompt_run">실행</string>
+    <string name="ai_direct_prompt_clear">지우기</string>
     <string name="ai_actions_writing">쓰기</string>
     <string name="ai_actions_tone">말투</string>
     <string name="ai_actions_translation">번역</string>
@@ -484,6 +487,7 @@
     <string name="ai_error_empty_result">공급자가 사용할 수 있는 결과를 주지 않았어</string>
     <string name="ai_result_number">제안 %1$d</string>
     <string name="ai_replace">교체</string>
+    <string name="ai_insert">넣기</string>
     <string name="ai_append">뒤에 넣기</string>
     <string name="ai_diff_changes">적용할 교정만 선택해</string>
     <string name="ai_diff_apply_selected">선택한 교정 적용</string>
@@ -511,6 +515,7 @@
     <string name="ai_action_customer_service">고객응대</string>
     <string name="ai_action_compose">문장 3개</string>
     <string name="ai_action_reply">답장 3개</string>
+    <string name="ai_action_custom">직접 지시</string>
     <string name="ai_action_translate_english">영어</string>
     <string name="ai_action_translate_korean">한국어</string>
     <string name="ai_action_translate_japanese">일본어</string>
@@ -688,10 +693,11 @@
     <string name="personal_dictionary_privacy">개인 단어장 개인정보 보호</string>
     <string name="personal_dictionary_privacy_summary">앱 전용 백업 제외 저장소에 원자적으로 저장하며 사용자 데이터 내보내기에도 포함하지 않아. 입력을 자동 학습하거나 입력 원문·선택 기록·앱 패키지 이름을 저장하지 않아. 비밀번호·민감·맞춤법 검사 금지·개인화 학습 금지 입력창에서는 개인 후보를 사용하지 않아.</string>
     <string name="voice_precision_title">AI 정밀 받아쓰기</string>
-    <string name="voice_precision_ready">최대 30초를 메모리에만 녹음해. 녹음을 멈춘 뒤에만 음성을 전송하고, 검토한 뒤에만 글을 넣어.</string>
+    <string name="voice_precision_ready">녹음을 멈춘 뒤에만 음성을 전송하고, 전사문을 확인한 뒤에만 글을 넣어.</string>
     <string name="voice_record_start">녹음 시작</string>
     <string name="voice_record_stop">녹음 중지</string>
-    <string name="voice_recording">녹음 중 %1$d / %2$d초</string>
+    <string name="voice_recording">녹음 중 %1$d초</string>
+    <string name="voice_provider_unsupported">연결된 컴퓨터의 Codex CLI는 글쓰기는 지원하지만 음성 파일 전사는 지원하지 않아. 공개 오디오 연결점이 없는 기능을 지원한다고 표시하지 않아.</string>
     <string name="voice_transcribing_segment">녹음 완료 · 정확한 한국어 문장으로 전사 중…</string>
     <string name="voice_transcribing_button">전사 중…</string>
     <string name="voice_preview_instruction">최종 전사문을 검토한 뒤 입력해</string>

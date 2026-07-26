@@ -72,6 +72,30 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun `custom writing request is sent as a bounded instruction`() = runBlocking {
+        var capturedBody = ""
+        val transport = AiHttpTransport { _, _, body ->
+            capturedBody = body
+            """{"status":"completed","output_text":"{\"suggestions\":[\"짧게 정리했어\"]}"}"""
+        }
+        val client = OpenAiResponsesClient(
+            AiProviderProfile(
+                baseUrl = "https://provider.test/v1",
+                apiKey = "test-key",
+                balancedModel = "balanced-test"
+            ),
+            transport
+        )
+
+        client.generate(AiAction.Custom, "긴 원문", "두 문장으로 줄여줘")
+
+        val instruction = Json.parseToJsonElement(capturedBody).jsonObject
+            .getValue("instructions").jsonPrimitive.content
+        assertTrue(instruction.contains("두 문장으로 줄여줘"))
+        assertTrue(instruction.contains("JSON output format"))
+    }
+
+    @Test
     fun `oauth bearer is used once and 401 requires explicit reauthentication`() = runBlocking {
         var requests = 0
         var authorization = ""
