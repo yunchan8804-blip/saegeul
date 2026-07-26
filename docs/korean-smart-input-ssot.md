@@ -966,7 +966,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | AI 결과 우선 UI | `CODE_DONE` | 결과 상태에서 보이지 않는 `weight=1` status container를 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 이동, 결과 card가 전체 가용 높이를 사용 |
 | AI 직접 지시문 | `PASS` | 기능별 두벌식 복제판 제거. 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme을 그대로 쓰되 output은 내부 최대 300자 buffer로 격리; A35에서 영문 입력·후보·숫자판·천지인 picker·picker restart prompt 보존과 target editor 무변경 통과, pure buffer Unicode·preedit·limit 회귀 테스트 통과 |
 | 음성 capability gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. discovery manifest capability를 암호화 profile SSOT로 보존하고 `transcription` 미선언 Codex/Claude companion은 녹음 전에 버튼 비활성·미지원 이유를 표시; companion Python 7 tests 통과 |
-| 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `00:34:52`, Z Fold6 `00:35:14`에 동일 `0.1.2-106-g321d55df` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
+| 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `00:40:12`, Z Fold6 `00:40:33`에 코드 커밋 `f82cb09f`의 동일 `0.1.2-107-gf82cb09f` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI, 7개 신규 테스트 |
 | AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트 |
 | action별 품질 matrix | `GATE` | 말투 6종, 답장, 번역 4개, 3후보 보장을 provider/model별로 실제 기기 검증해야 함 |
