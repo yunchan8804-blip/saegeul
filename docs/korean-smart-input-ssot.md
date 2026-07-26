@@ -158,7 +158,8 @@ A35와 Z Fold6의 일반 editor 및 buffered 호환 editor 실기기 검증이�
 | A35 명시적 선택 | `PASS` | `안녕하세요` 후보 tap 뒤 editor hierarchy의 compose text가 `안녕하세요` 정확히 한 번임을 확인; 메시지는 전송하지 않고 draft 삭제 |
 | A35 미선택 space | `PASS` | 후보를 누르지 않고 space 입력 뒤 compose text가 `안녕 `으로 유지되고 자동완성 후보로 치환되지 않음을 확인 |
 | 민감 editor 차단 | `CODE` | `Password`, `Sensitive`, `NoSpellCheck` capability 중 하나라도 있으면 사전 조회 전에 fail-closed |
-| 최종 Z Fold6 설치 | `BLOCK` | 현재 ADB/mDNS에 A35만 보여 무선 디버깅 재연결 대기 |
+| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, `0.1.2-86-g08f4e443` app/plugin 재설치 및 debug Fcitx IME 재선택; app `09:47:14`, plugin `09:47:17` |
+| 최종 Z Fold6 설치 | `BLOCK` | `192.168.0.89:35933` mDNS 광고는 간헐적으로 보이지만 TCP 연결이 거부되고 `adb devices`에는 A35만 보여 무선 디버깅 재연결 대기 |
 
 #### KO-02 상세 계약
 
