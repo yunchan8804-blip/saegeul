@@ -10,6 +10,7 @@ import android.app.NotificationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -29,6 +30,8 @@ import org.fcitx.fcitx5.android.data.quickphrase.BuiltinQuickPhrase
 import org.fcitx.fcitx5.android.data.quickphrase.CustomQuickPhrase
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhrase
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
+import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseProfile
+import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseProfileStore
 import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
 import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
@@ -145,7 +148,8 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
             private fun showImportOrCreateDialog() {
                 val actions = arrayOf(
                     getString(R.string.import_from_file),
-                    getString(R.string.create_new)
+                    getString(R.string.create_new),
+                    getString(R.string.dynamic_phrase_profile)
                 )
                 AlertDialog.Builder(requireContext())
                     .setTitle(R.string.quickphrase_editor)
@@ -153,6 +157,7 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
                         when (i) {
                             0 -> launcher.launch("*/*")
                             1 -> showCreateQuickPhraseDialog()
+                            2 -> showDynamicPhraseProfileDialog()
                         }
                     }
                     .setNegativeButton(android.R.string.cancel, null)
@@ -197,6 +202,64 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
         }.also {
             uiInitialized = true
         }
+    }
+
+    private fun showDynamicPhraseProfileDialog() {
+        val ctx = requireContext()
+        val store = DynamicPhraseProfileStore(ctx)
+        val profile = store.load()
+        val (nameLayout, nameField) = ctx.materialTextInput {
+            setHint(R.string.dynamic_phrase_variable_name)
+        }
+        val (phoneLayout, phoneField) = ctx.materialTextInput {
+            setHint(R.string.dynamic_phrase_variable_phone)
+        }
+        val (addressLayout, addressField) = ctx.materialTextInput {
+            setHint(R.string.dynamic_phrase_variable_address)
+        }
+        nameField.setText(profile.name)
+        phoneField.apply {
+            inputType = InputType.TYPE_CLASS_PHONE
+            setText(profile.phone)
+        }
+        addressField.apply {
+            minLines = 2
+            maxLines = 4
+            setText(profile.address)
+        }
+        val layout = ctx.verticalLayout {
+            setPaddingDp(20, 10, 20, 0)
+            add(nameLayout, lParams(matchParent))
+            add(phoneLayout, lParams(matchParent))
+            add(addressLayout, lParams(matchParent))
+        }
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.dynamic_phrase_profile)
+            .setMessage(R.string.dynamic_phrase_profile_security)
+            .setView(layout)
+            .setPositiveButton(R.string.save, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+            .onPositiveButtonClick {
+                runCatching {
+                    store.save(
+                        DynamicPhraseProfile(
+                            name = nameField.str,
+                            phone = phoneField.str,
+                            address = addressField.str
+                        )
+                    )
+                }.fold(
+                    onSuccess = {
+                        addressField.error = null
+                        true
+                    },
+                    onFailure = {
+                        addressField.error = getString(R.string.dynamic_phrase_profile_save_failed)
+                        false
+                    }
+                )
+            }
     }
 
     private fun createNotificationChannel() {

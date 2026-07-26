@@ -394,4 +394,24 @@
     <string name="korean_search_clear">지움</string>
     <string name="korean_search_backspace">마지막 초성 지우기</string>
     <string name="korean_search_initial_key">초성 %1$s</string>
+    <string name="dynamic_phrase">동적 빠른 문구</string>
+    <string name="dynamic_phrase_template">원본 문구</string>
+    <string name="dynamic_phrase_preview">입력 미리보기</string>
+    <string name="dynamic_phrase_insert">넣기</string>
+    <string name="dynamic_phrase_insert_failed">동적 문구를 입력하지 못했어</string>
+    <string name="dynamic_phrase_editor_changed">입력창이나 커서가 바뀌었어. 문구를 다시 선택해줘.</string>
+    <string name="dynamic_phrase_missing_value">%1$s 값이 설정되지 않았어</string>
+    <string name="dynamic_phrase_private_blocked">비밀번호·민감 입력창에서는 %1$s 값을 사용할 수 없어</string>
+    <string name="dynamic_phrase_sensitive_clipboard">%1$s에 민감한 데이터가 있어 사용할 수 없어</string>
+    <string name="dynamic_phrase_variable_date">날짜</string>
+    <string name="dynamic_phrase_variable_time">시간</string>
+    <string name="dynamic_phrase_variable_name">이름</string>
+    <string name="dynamic_phrase_variable_phone">전화번호</string>
+    <string name="dynamic_phrase_variable_address">주소</string>
+    <string name="dynamic_phrase_variable_clipboard">클립보드</string>
+    <string name="dynamic_phrase_profile">동적 문구 개인정보 설정</string>
+    <string name="dynamic_phrase_profile_security">이름·전화번호·주소는 Android Keystore로 암호화하고 백업에서 제외해.</string>
+    <string name="dynamic_phrase_profile_save_failed">개인정보를 안전하게 저장하지 못했어</string>
+    <string name="dynamic_phrase_template_help">변수: {날짜}, {시간}, {이름}, {전화번호}, {주소}, {클립보드}</string>
+    <string name="quickphrase">상용구</string>
 </resources>

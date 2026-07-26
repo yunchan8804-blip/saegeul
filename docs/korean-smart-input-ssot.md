@@ -73,9 +73,10 @@
 | `KO-BASE-07` | 앱 및 plugin 한국어 번역 확대 | `DONE` | build와 두 기기 설치 |
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | 5 JVM 테스트와 A35 Discord 교체·실행 취소 |
 | `KO-02` | 초성 통합 검색 | `DONE` | 6 JVM 테스트와 A35 `ㄱㅅ` 검색·1회 삽입 |
+| `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 7 JVM 테스트와 A35 날짜·profile·clipboard 미리보기·1회 삽입 |
 
-현재 변경은 dirty tree에 있으므로 새로운 기능을 대규모로 겹치기 전에 검증 가능한 checkpoint를
-남겨야 한다. 기존 사용자의 변경을 삭제하거나 되돌리지 않는다.
+한국어 기준선과 GIF·KO-01·KO-02는 각각 검증 가능한 checkpoint commit으로 고정돼 있다.
+새 기능은 현재 milestone의 공통 게이트와 두 기기 설치를 마친 뒤 다음 항목으로 넘어간다.
 
 ## 5. 변경 불가 제품 원칙
 
@@ -108,7 +109,7 @@
 | --- | --- | --- | --- | --- |
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | `dkssud→안녕`, `ㅗ디ㅣㅐ→hello`, preview 후 교체 | S |
 | `KO-02` | 초성 통합 검색 | `DONE` | 빠른 문구·clipboard·emoji를 `ㄱㅅ` 등으로 검색 | M |
-| `KO-03` | 동적 빠른 문구 | `NEXT` | 날짜·시간·이름·전화·주소·clipboard 변수, preview | M |
+| `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 날짜·시간·이름·전화·주소·clipboard 변수, preview | M |
 | `KO-04` | 앱별 키보드 profile | `NEXT` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자·국어사전 후보 | `BACKLOG` | 한글 단어의 한자, 음훈, 동음이의어를 로컬 후보로 표시 | M |
 | `KO-06` | 개인 단어장 | `BACKLOG` | 이름·회사명·전문용어를 opt-in으로 로컬 우선 후보에 반영 | L |
@@ -133,6 +134,44 @@
 
 완료 게이트는 초성 matcher·정렬·dedupe·민감 항목 제외 테스트, 전체 JVM test와 arm64 build,
 A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문자열 clipboard 검색 검증이다.
+
+#### KO-03 상세 계약
+
+1. 기존 `.mb` 빠른 문구 파일 형식과 Fcitx quickphrase addon은 변경하지 않는다. 문구 값에
+   지원 토큰이 포함된 경우에만 Android 입력 계층에서 동적 미리보기를 연다.
+2. MVP 토큰은 `{날짜}`, `{시간}`, `{이름}`, `{전화번호}`, `{주소}`, `{클립보드}`이며 영문
+   호환 alias `{date}`, `{time}`, `{name}`, `{phone}`, `{address}`, `{clipboard}`도 허용한다.
+3. `{날짜}`는 `yyyy년 M월 d일`, `{시간}`은 기기 시간대의 `HH:mm`으로 확장한다. 미리보기가
+   열린 시점의 값을 고정해 확인한 문자열과 실제 삽입 문자열이 달라지지 않게 한다.
+4. 지원하지 않는 `{토큰}`은 원문 그대로 보존한다. 지원 토큰의 값이 비어 있거나 정책상
+   차단되면 삽입 버튼을 비활성화하고 누락 이유를 변수별로 표시한다.
+5. `{이름}`, `{전화번호}`, `{주소}` profile은 Android Keystore AES-GCM으로 암호화하고
+   `noBackupFilesDir`에 저장한다. SharedPreferences, 사용자 ZIP export, clipboard, log에는
+   평문을 남기지 않는다.
+6. `{클립보드}`는 Fcitx clipboard의 최신 non-sensitive text만 사용한다. sensitive 항목,
+   password/sensitive/no-personalized-learning editor에서는 값을 읽지 않는다.
+7. 날짜·시간만 쓰는 문구는 private editor에서도 사용할 수 있지만, 개인 profile 또는
+   clipboard 토큰이 하나라도 있으면 해당 값은 fail-closed한다.
+8. 미리보기에서 사용자가 `넣기`를 누른 경우에만 editor identity와 selection을 다시 확인하고
+   확장 결과를 `commitText()`로 정확히 한 번 삽입한다. editor가 바뀌면 삽입하지 않는다.
+9. 기존 조합과 buffered Hangul prefix를 먼저 정리한 뒤 미리보기를 연다. 취소하거나 실패해도
+   원본 토큰 문구를 자동 삽입하지 않는다.
+10. 빠른 문구 편집 화면에 지원 토큰 안내를, 빠른 문구 목록의 추가 메뉴에 암호화 profile
+    설정 진입점을 제공한다.
+
+#### KO-03 구현·검증 증거 (2026-07-26)
+
+| 범위 | 결과 | 증거 |
+| --- | --- | --- |
+| template JVM test | `PASS` | 7개, failure/error 0. 한·영 token, 시각 고정, 미지원 token 보존, 누락 값, private editor, sensitive clipboard 포함 |
+| 전체 JVM/build | `PASS` | app 71개, failure/error/skipped 0; arm64 app과 Hangul plugin build 성공 |
+| 암호화 profile | `PASS` | A35에서 Android Keystore AES-GCM 저장 후 `no_backup/dynamic-phrase/profile.bin`만 생성됨을 확인; 검증용 profile은 종료 후 삭제 |
+| A35 날짜·시간 | `PASS` | `오늘은 {날짜} {시간}입니다.`가 미리보기에서 고정된 한국어 날짜·시간으로 치환되고 원본 trigger 없이 정확히 한 번 삽입됨 |
+| A35 개인 profile | `PASS` | `{이름} / {전화번호} / {주소}`가 암호화 profile 값으로 미리보기되고 editor hierarchy에서 삽입 문자열 1회 확인 |
+| A35 clipboard | `PASS` | 최신 non-sensitive `KO03_CLIPBOARD`가 `받은 내용: KO03_CLIPBOARD`로 치환됨; 원문 quickphrase는 자동 삽입되지 않음 |
+| 민감 입력 | `PASS` | `privateEditorAllowsDateAndTimeButBlocksPersonalAndClipboard`, `sensitiveClipboardIsNeverExpanded`가 삽입 비활성 정책 검증 |
+| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, `0.1.2-84-g8cf7f78d` app/plugin 재설치 및 debug Fcitx IME 재선택; app `09:11:31`, plugin `09:11:33` |
+| 최종 Z Fold6 설치 | `BLOCK` | 무선 디버깅 endpoint가 mDNS에서 사라져 재연결 대기 |
 
 #### KO-02 구현·검증 증거 (2026-07-26)
 
@@ -410,8 +449,8 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 
 1. `KO-01` 한/영 오타 복구. (`DONE`)
 2. `KO-02` 초성 통합 검색. (`DONE`)
-3. `KO-03` 동적 빠른 문구. (`NEXT`)
-4. `KO-04` 앱별 profile과 network policy.
+3. `KO-03` 동적 빠른 문구. (`IN_PROGRESS`: Z Fold6 최종 설치 gate만 남음)
+4. `KO-04` 앱별 profile과 network policy. (`NEXT`)
 
 ### 단계 3 — AI 기반과 text 기능
 
@@ -473,3 +512,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | GIF MVP 기본 provider는 Wikimedia Commons, GIPHY는 별도 optional provider |
 | 2026-07-26 | GIF attach 실패 뒤 link 자동 삽입 금지 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
+| 2026-07-26 | 동적 빠른 문구는 기존 `.mb` 형식을 유지하고, 명시적 미리보기 뒤 정확히 한 번 삽입 |

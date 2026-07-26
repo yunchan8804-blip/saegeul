@@ -30,6 +30,8 @@ import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
+import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
+import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
@@ -105,6 +107,10 @@ class InputView(
     private val symbolPicker = symbolPicker()
     private val emojiPicker = emojiPicker()
     private val emoticonPicker = emoticonPicker()
+
+    fun showDynamicPhrasePreview(template: String, editor: DynamicPhraseEditorTarget) {
+        windowManager.attachWindow(DynamicPhraseWindow(template, editor))
+    }
 
     private fun setupScope() {
         scope += this@InputView.wrapToUniqueComponent()

@@ -69,10 +69,12 @@ import org.fcitx.fcitx5.android.data.clipboard.TRANSIENT_BUFFERED_PASTE_LABEL
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
+import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseTemplate
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
+import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
 import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
 import org.fcitx.fcitx5.android.input.typo.TypoRecoverySnapshot
@@ -287,7 +289,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
-                if (bufferedHangulSessionActive) {
+                if (beginDynamicPhrasePreview(event.data.text)) {
+                    // Dynamic templates are committed only from their explicit preview action.
+                } else if (bufferedHangulSessionActive) {
                     bufferedHangul.capture(event.data.text)
                 } else {
                     commitText(event.data.text, event.data.cursor)
@@ -496,6 +500,56 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // the internal Hangul segment first so those direct inserts cannot overtake it.
         if (bufferedHangulSessionActive && !submitBufferedHangul()) return false
         return commitTextToEditor(text, cursor)
+    }
+
+    /**
+     * Consume a dynamic quick-phrase commit and replace it with a frozen preview. Failure is
+     * final: never insert the unresolved template as an implicit fallback.
+     */
+    private fun beginDynamicPhrasePreview(template: String): Boolean {
+        if (!DynamicPhraseTemplate.containsSupportedToken(template)) return false
+        if (!prepareDynamicPhrasePreview()) return true
+        val view = inputView
+        if (view == null) {
+            Timber.w("Unable to preview a dynamic phrase without an input view")
+            return true
+        }
+        val info = currentInputEditorInfo
+        val currentSelection = currentInputSelection
+        view.showDynamicPhrasePreview(
+            template,
+            DynamicPhraseEditorTarget(
+                packageName = info.packageName,
+                fieldId = info.fieldId,
+                inputType = info.inputType,
+                selectionStart = currentSelection.start,
+                selectionEnd = currentSelection.end
+            )
+        )
+        return true
+    }
+
+    /**
+     * A quick-phrase commit replaces its trigger preedit. Remove that preedit instead of finishing
+     * it as literal text, while preserving any Hangul segment owned by buffered compatibility mode.
+     */
+    private fun prepareDynamicPhrasePreview(): Boolean {
+        val ic = currentInputConnection ?: return false
+        if (bufferedHangulSessionActive) {
+            if (!submitBufferedHangul()) return false
+        } else if (composing.isNotEmpty()) {
+            val start = composing.start
+            resetComposingState()
+            selection.predict(start)
+            var dispatched = true
+            ic.withBatchEdit {
+                dispatched = commitText("", 1) && dispatched
+                dispatched = finishComposingText() && dispatched
+            }
+            if (!dispatched) return false
+        }
+        postFcitxJob { reset() }
+        return true
     }
 
     /** Text-inspection actions do not read password/private editors, even when fully offline. */

@@ -44,6 +44,10 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         contentDescription = ctx.getString(R.string.clipboard)
     }
 
+    val quickPhraseButton = toolButton(R.drawable.ic_baseline_format_quote_24).apply {
+        contentDescription = ctx.getString(R.string.quickphrase)
+    }
+
     val koreanSearchButton = toolButton(R.drawable.ic_baseline_search_24).apply {
         contentDescription = ctx.getString(R.string.korean_search)
     }

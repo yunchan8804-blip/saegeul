@@ -306,6 +306,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 clipboardButton.setOnClickListener {
                     windowManager.attachWindow(ClipboardWindow())
                 }
+                quickPhraseButton.setOnClickListener {
+                    service.postFcitxJob {
+                        reset()
+                        triggerQuickPhrase()
+                    }
+                }
                 koreanSearchButton.setOnClickListener {
                     windowManager.attachWindow(KoreanSearchWindow())
                 }

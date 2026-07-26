@@ -395,4 +395,24 @@
     <string name="korean_search_clear" tools:ignore="MissingTranslation">Clear</string>
     <string name="korean_search_backspace" tools:ignore="MissingTranslation">Delete the last initial</string>
     <string name="korean_search_initial_key" tools:ignore="MissingTranslation">Initial %1$s</string>
+    <string name="dynamic_phrase" tools:ignore="MissingTranslation">Dynamic phrase</string>
+    <string name="dynamic_phrase_template" tools:ignore="MissingTranslation">Template</string>
+    <string name="dynamic_phrase_preview" tools:ignore="MissingTranslation">Preview</string>
+    <string name="dynamic_phrase_insert" tools:ignore="MissingTranslation">Insert</string>
+    <string name="dynamic_phrase_insert_failed" tools:ignore="MissingTranslation">Could not insert the dynamic phrase</string>
+    <string name="dynamic_phrase_editor_changed" tools:ignore="MissingTranslation">The input field or cursor changed. Select the phrase again.</string>
+    <string name="dynamic_phrase_missing_value" tools:ignore="MissingTranslation">%1$s is not configured</string>
+    <string name="dynamic_phrase_private_blocked" tools:ignore="MissingTranslation">%1$s is unavailable in password and private fields</string>
+    <string name="dynamic_phrase_sensitive_clipboard" tools:ignore="MissingTranslation">%1$s contains sensitive data and cannot be used</string>
+    <string name="dynamic_phrase_variable_date" tools:ignore="MissingTranslation">Date</string>
+    <string name="dynamic_phrase_variable_time" tools:ignore="MissingTranslation">Time</string>
+    <string name="dynamic_phrase_variable_name" tools:ignore="MissingTranslation">Name</string>
+    <string name="dynamic_phrase_variable_phone" tools:ignore="MissingTranslation">Phone number</string>
+    <string name="dynamic_phrase_variable_address" tools:ignore="MissingTranslation">Address</string>
+    <string name="dynamic_phrase_variable_clipboard" tools:ignore="MissingTranslation">Clipboard</string>
+    <string name="dynamic_phrase_profile" tools:ignore="MissingTranslation">Dynamic phrase profile</string>
+    <string name="dynamic_phrase_profile_security" tools:ignore="MissingTranslation">Name, phone number, and address are encrypted with Android Keystore and excluded from backups.</string>
+    <string name="dynamic_phrase_profile_save_failed" tools:ignore="MissingTranslation">Could not securely save the profile</string>
+    <string name="dynamic_phrase_template_help" tools:ignore="MissingTranslation">Variables: {date}, {time}, {name}, {phone}, {address}, {clipboard} · Korean aliases are also supported</string>
+    <string name="quickphrase" tools:ignore="MissingTranslation">Quick phrase</string>
 </resources>

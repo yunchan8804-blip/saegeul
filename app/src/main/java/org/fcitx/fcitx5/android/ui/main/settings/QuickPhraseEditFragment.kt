@@ -67,6 +67,7 @@ class QuickPhraseEditFragment : ProgressFragment(), OnItemChangedListener<QuickP
                 }
                 val (phraseLayout, phraseField) = materialTextInput {
                     setHint(R.string.quickphrase_phrase)
+                    helperText = getString(R.string.dynamic_phrase_template_help)
                 }
                 entry?.apply {
                     keywordField.setText(keyword)
