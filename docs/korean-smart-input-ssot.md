@@ -170,7 +170,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | A35 개인 profile | `PASS` | `{이름} / {전화번호} / {주소}`가 암호화 profile 값으로 미리보기되고 editor hierarchy에서 삽입 문자열 1회 확인 |
 | A35 clipboard | `PASS` | 최신 non-sensitive `KO03_CLIPBOARD`가 `받은 내용: KO03_CLIPBOARD`로 치환됨; 원문 quickphrase는 자동 삽입되지 않음 |
 | 민감 입력 | `PASS` | `privateEditorAllowsDateAndTimeButBlocksPersonalAndClipboard`, `sensitiveClipboardIsNeverExpanded`가 삽입 비활성 정책 검증 |
-| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, `0.1.2-84-g8cf7f78d` app/plugin 재설치 및 debug Fcitx IME 재선택; app `09:11:31`, plugin `09:11:33` |
+| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, `0.1.2-84-g9522b817` app/plugin 재설치 및 debug Fcitx IME 재선택; app `09:12:45`, plugin `09:12:47` |
 | 최종 Z Fold6 설치 | `BLOCK` | 무선 디버깅 endpoint가 mDNS에서 사라져 재연결 대기 |
 
 #### KO-02 구현·검증 증거 (2026-07-26)
