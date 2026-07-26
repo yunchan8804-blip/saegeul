@@ -12,6 +12,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
+import org.fcitx.fcitx5.android.input.ai.AiBearerTokenProvider
+import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
+import org.fcitx.fcitx5.android.input.ai.ProfileAiBearerTokenProvider
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -37,18 +40,29 @@ class VoiceTranscriptionException(message: String) : Exception(message)
 class OpenAiTranscriptionClient(
     private val profile: AiProviderProfile,
     private val model: String = VoiceTranscriptionModels.ACCURACY,
-    private val transport: VoiceHttpTransport = UrlConnectionVoiceTransport()
+    private val transport: VoiceHttpTransport = UrlConnectionVoiceTransport(),
+    private val authorizationProvider: AiBearerTokenProvider = ProfileAiBearerTokenProvider
 ) {
     suspend fun transcribe(wav: ByteArray): VoiceTranscriptionResult = withContext(Dispatchers.IO) {
         require(wav.size in MIN_WAV_BYTES..MAX_WAV_BYTES) { "Audio payload size is invalid" }
         val validated = profile.validate()
         val request = buildRequest(wav, model)
         try {
-            val payload = transport.post(
-                url = "${validated.baseUrl}/audio/transcriptions",
-                authorization = "Bearer ${validated.apiKey}",
-                request = request
-            )
+            val authorization = authorizationProvider.authorizationHeader(validated)
+            val payload = try {
+                transport.post(
+                    url = "${validated.baseUrl}/audio/transcriptions",
+                    authorization = authorization,
+                    request = request
+                )
+            } catch (exception: AiHttpStatusException) {
+                if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                    throw authorizationProvider.onUnauthorized(validated)
+                }
+                throw VoiceTranscriptionException(
+                    exception.message ?: "Transcription provider request failed"
+                )
+            }
             parseResponse(payload, model)
         } finally {
             request.body.fill(0)
@@ -128,7 +142,7 @@ class UrlConnectionVoiceTransport : VoiceHttpTransport {
             connection.outputStream.use { it.write(request.body) }
             val status = connection.responseCode
             if (status !in 200..299) {
-                throw VoiceTranscriptionException("Transcription provider HTTP $status")
+                throw AiHttpStatusException(status, "Transcription provider HTTP $status")
             }
             val bytes = connection.inputStream.use { input ->
                 val output = ByteArrayOutputStream()

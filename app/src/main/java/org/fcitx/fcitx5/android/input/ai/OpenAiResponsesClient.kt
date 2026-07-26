@@ -32,7 +32,8 @@ fun interface AiHttpTransport {
 
 class OpenAiResponsesClient(
     private val profile: AiProviderProfile,
-    private val transport: AiHttpTransport = UrlConnectionAiTransport()
+    private val transport: AiHttpTransport = UrlConnectionAiTransport(),
+    private val authorizationProvider: AiBearerTokenProvider = ProfileAiBearerTokenProvider
 ) {
     suspend fun generate(action: AiAction, input: String): AiGenerationResult =
         withContext(Dispatchers.IO) {
@@ -50,11 +51,15 @@ class OpenAiResponsesClient(
                 put("reasoning", buildJsonObject { put("effort", "none") })
                 put("text", buildJsonObject { put("verbosity", "low") })
             }
-            val response = transport.post(
-                validated.responsesEndpoint,
-                "Bearer ${validated.apiKey}",
-                request.toString()
-            )
+            val authorization = authorizationProvider.authorizationHeader(validated)
+            val response = try {
+                transport.post(validated.responsesEndpoint, authorization, request.toString())
+            } catch (exception: AiHttpStatusException) {
+                if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                    throw authorizationProvider.onUnauthorized(validated)
+                }
+                throw AiProviderException(exception.message ?: "AI provider request failed")
+            }
             parseResponse(response, action.maxSuggestions, model, cleanInput.length)
         }
 
@@ -154,7 +159,8 @@ class UrlConnectionAiTransport : AiHttpTransport {
                     val error = root["error"] as? JsonObject
                     (error?.get("code") as? JsonPrimitive)?.contentOrNull
                 }.getOrNull().orEmpty()
-                throw AiProviderException(
+                throw AiHttpStatusException(
+                    status,
                     if (code.isEmpty()) "AI provider HTTP $status" else "AI provider HTTP $status ($code)"
                 )
             }

@@ -516,7 +516,7 @@
     <string name="ai_action_translate_korean" tools:ignore="MissingTranslation">Korean</string>
     <string name="ai_action_translate_japanese" tools:ignore="MissingTranslation">Japanese</string>
     <string name="ai_action_translate_chinese" tools:ignore="MissingTranslation">Chinese</string>
-    <string name="ai_not_configured" tools:ignore="MissingTranslation">Configure an AI provider and API key in Privacy &amp; AI settings</string>
+    <string name="ai_not_configured" tools:ignore="MissingTranslation">Configure an AI provider and authentication in Privacy &amp; AI settings</string>
     <string name="ai_private_disabled" tools:ignore="MissingTranslation">AI is disabled in password and private fields</string>
     <string name="ai_offline_disabled" tools:ignore="MissingTranslation">Turn off completely offline mode to use AI</string>
     <string name="ai_no_source" tools:ignore="MissingTranslation">Select text or type an instruction immediately before the cursor</string>
@@ -540,6 +540,31 @@
     <string name="ai_quality_model_hint" tools:ignore="MissingTranslation">Quality model</string>
     <string name="ai_provider_security_note" tools:ignore="MissingTranslation">The key is encrypted with Android Keystore in no-backup storage. It is excluded from app backups, exports, logs, and the clipboard.</string>
     <string name="ai_provider_invalid" tools:ignore="MissingTranslation">Check the key, HTTPS URL, and model names</string>
+    <string name="ai_auth_mode_title" tools:ignore="MissingTranslation">Authentication method</string>
+    <string name="ai_auth_mode_api_key" tools:ignore="MissingTranslation">Direct API key</string>
+    <string name="ai_auth_mode_oauth" tools:ignore="MissingTranslation">OAuth 2.0 login (PKCE)</string>
+    <string name="ai_auth_api_key" tools:ignore="MissingTranslation">API key</string>
+    <string name="ai_auth_oauth_connected" tools:ignore="MissingTranslation">OAuth connected</string>
+    <string name="ai_auth_oauth_reauth" tools:ignore="MissingTranslation">OAuth sign-in required</string>
+    <string name="ai_oauth_authorization_endpoint_hint" tools:ignore="MissingTranslation">Authorization endpoint (HTTPS)</string>
+    <string name="ai_oauth_token_endpoint_hint" tools:ignore="MissingTranslation">Token endpoint (HTTPS)</string>
+    <string name="ai_oauth_revocation_endpoint_hint" tools:ignore="MissingTranslation">Revocation endpoint (HTTPS, optional)</string>
+    <string name="ai_oauth_client_id_hint" tools:ignore="MissingTranslation">Public client ID (no client secret)</string>
+    <string name="ai_oauth_scopes_hint" tools:ignore="MissingTranslation">Scopes separated by spaces</string>
+    <string name="ai_oauth_security_note" tools:ignore="MissingTranslation">Uses an external browser, Authorization Code, state, and PKCE S256. No client secret is accepted. Tokens are Keystore-encrypted in no-backup storage. This login uses your endpoint’s OAuth/OIDC, not Tailscale OAuth Apps or Serve identity headers; Tailscale is only the network path. All endpoints must use HTTPS, including private, loopback, MagicDNS, and .ts.net addresses.</string>
+    <string name="ai_oauth_save_and_sign_in" tools:ignore="MissingTranslation">Save and sign in</string>
+    <string name="ai_oauth_browser_waiting" tools:ignore="MissingTranslation">Complete the secure sign-in in your browser…</string>
+    <string name="ai_oauth_profile_missing" tools:ignore="MissingTranslation">The OAuth provider profile is missing</string>
+    <string name="ai_oauth_pkce_unavailable" tools:ignore="MissingTranslation">Secure PKCE S256 is unavailable on this device</string>
+    <string name="ai_oauth_browser_unavailable" tools:ignore="MissingTranslation">No supported browser is available for OAuth sign-in</string>
+    <string name="ai_oauth_authorization_failed" tools:ignore="MissingTranslation">OAuth authorization was canceled or failed</string>
+    <string name="ai_oauth_state_mismatch" tools:ignore="MissingTranslation">OAuth state validation failed. Nothing was saved.</string>
+    <string name="ai_oauth_profile_changed" tools:ignore="MissingTranslation">The OAuth provider changed during sign-in. Start again with the current profile.</string>
+    <string name="ai_oauth_token_failed" tools:ignore="MissingTranslation">Could not exchange the authorization code for a token</string>
+    <string name="ai_oauth_connected" tools:ignore="MissingTranslation">OAuth account connected</string>
+    <string name="ai_oauth_reauth_required" tools:ignore="MissingTranslation">The OAuth session expired. Sign in again in Privacy &amp; AI settings.</string>
+    <string name="ai_provider_removed" tools:ignore="MissingTranslation">AI provider and local credentials removed</string>
+    <string name="ai_oauth_revocation_failed" tools:ignore="MissingTranslation">Local tokens were removed, but the remote server did not confirm revocation</string>
     <string name="privacy_local_data" tools:ignore="MissingTranslation">Local data</string>
     <string name="ai_usage_title" tools:ignore="MissingTranslation">AI usage summary</string>
     <string name="ai_usage_summary" tools:ignore="MissingTranslation">Requests %1$d · success %2$d · failure %3$d · sent characters %4$d</string>

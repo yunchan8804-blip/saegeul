@@ -14,6 +14,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
+import org.fcitx.fcitx5.android.input.ai.AiBearerTokenProvider
+import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
+import org.fcitx.fcitx5.android.input.ai.ProfileAiBearerTokenProvider
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -44,7 +47,8 @@ internal object DiarizationMultipartContract {
 
 class OpenAiDiarizationClient(
     private val profile: AiProviderProfile,
-    private val transport: DiarizationHttpTransport = UrlConnectionDiarizationTransport()
+    private val transport: DiarizationHttpTransport = UrlConnectionDiarizationTransport(),
+    private val authorizationProvider: AiBearerTokenProvider = ProfileAiBearerTokenProvider
 ) {
     suspend fun transcribe(source: MeetingAudioSource): MeetingDiarizationResult =
         withContext(Dispatchers.IO) {
@@ -52,11 +56,21 @@ class OpenAiDiarizationClient(
             if (!MeetingDiarizationCapability.supports(validated)) {
                 throw VoiceTranscriptionException("Provider does not declare OpenAI diarization support")
             }
-            val payload = transport.post(
-                url = "${validated.baseUrl}/audio/transcriptions",
-                authorization = "Bearer ${validated.apiKey}",
-                request = DiarizationRequest(source)
-            )
+            val authorization = authorizationProvider.authorizationHeader(validated)
+            val payload = try {
+                transport.post(
+                    url = "${validated.baseUrl}/audio/transcriptions",
+                    authorization = authorization,
+                    request = DiarizationRequest(source)
+                )
+            } catch (exception: AiHttpStatusException) {
+                if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                    throw authorizationProvider.onUnauthorized(validated)
+                }
+                throw VoiceTranscriptionException(
+                    exception.message ?: "Diarization provider request failed"
+                )
+            }
             parseResponse(payload, DiarizationRequest.MODEL)
         }
 
@@ -184,7 +198,7 @@ class UrlConnectionDiarizationTransport : DiarizationHttpTransport {
             }
             val status = connection.responseCode
             if (status !in 200..299) {
-                throw VoiceTranscriptionException("Diarization provider HTTP $status")
+                throw AiHttpStatusException(status, "Diarization provider HTTP $status")
             }
             return readBounded(connection.inputStream)
         } finally {

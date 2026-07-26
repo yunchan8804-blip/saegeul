@@ -38,14 +38,25 @@ class AiProviderCredentialStore(context: Context) {
                 val payload = ByteArray(payloadSize).also(input::readFully)
                 EncryptedPayload(iv, payload)
             }
-            decode(decrypt(encrypted)).validate()
+            val plaintext = decrypt(encrypted)
+            try {
+                decode(plaintext).validate()
+            } finally {
+                plaintext.fill(0)
+                encrypted.payload.fill(0)
+            }
         }.getOrNull()
     }
 
     fun save(profile: AiProviderProfile) {
         val validated = profile.validate()
         file.parentFile?.mkdirs()
-        val encrypted = encrypt(encode(validated))
+        val plaintext = encode(validated)
+        val encrypted = try {
+            encrypt(plaintext)
+        } finally {
+            plaintext.fill(0)
+        }
         val bytes = ByteArrayOutputStream().use { bytes ->
             DataOutputStream(bytes).use { output ->
                 output.writeInt(MAGIC)
@@ -63,6 +74,9 @@ class AiProviderCredentialStore(context: Context) {
         } catch (error: Throwable) {
             atomicFile.failWrite(stream)
             throw error
+        } finally {
+            bytes.fill(0)
+            encrypted.payload.fill(0)
         }
     }
 
@@ -103,7 +117,13 @@ class AiProviderCredentialStore(context: Context) {
         .put("kind", profile.kind.name)
         .put("displayName", profile.displayName)
         .put("baseUrl", profile.baseUrl)
+        .put("authMode", profile.authMode.name)
         .put("apiKey", profile.apiKey)
+        .put("oauthAuthorizationEndpoint", profile.oauthAuthorizationEndpoint)
+        .put("oauthTokenEndpoint", profile.oauthTokenEndpoint)
+        .put("oauthRevocationEndpoint", profile.oauthRevocationEndpoint)
+        .put("oauthClientId", profile.oauthClientId)
+        .put("oauthScopes", profile.oauthScopes)
         .put("fastModel", profile.fastModel)
         .put("balancedModel", profile.balancedModel)
         .put("qualityModel", profile.qualityModel)
@@ -117,7 +137,17 @@ class AiProviderCredentialStore(context: Context) {
                 .getOrDefault(AiProviderKind.OpenAICompatible),
             displayName = json.optString("displayName"),
             baseUrl = json.optString("baseUrl"),
+            authMode = runCatching { AiAuthMode.valueOf(json.optString("authMode")) }
+                .getOrDefault(AiAuthMode.ApiKey),
             apiKey = json.optString("apiKey"),
+            oauthAuthorizationEndpoint = json.optString("oauthAuthorizationEndpoint"),
+            oauthTokenEndpoint = json.optString("oauthTokenEndpoint"),
+            oauthRevocationEndpoint = json.optString("oauthRevocationEndpoint"),
+            oauthClientId = json.optString("oauthClientId"),
+            oauthScopes = json.optString(
+                "oauthScopes",
+                AiProviderProfile.DEFAULT_OAUTH_SCOPES
+            ),
             fastModel = json.optString("fastModel"),
             balancedModel = json.optString("balancedModel"),
             qualityModel = json.optString("qualityModel")

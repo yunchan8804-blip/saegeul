@@ -70,4 +70,37 @@ class OpenAiResponsesClientTest {
         assertEquals("requested", result.model)
         assertEquals(4, result.inputCharacters)
     }
+
+    @Test
+    fun `oauth bearer is used once and 401 requires explicit reauthentication`() = runBlocking {
+        var requests = 0
+        var authorization = ""
+        val profile = AiProviderProfile(
+            kind = AiProviderKind.OpenAICompatible,
+            baseUrl = "https://ai.example.test/v1",
+            authMode = AiAuthMode.OAuthPkce,
+            oauthAuthorizationEndpoint = "https://auth.example.test/authorize",
+            oauthTokenEndpoint = "https://auth.example.test/token",
+            oauthClientId = "android-public",
+            oauthScopes = "openid ai.invoke"
+        )
+        val tokenProvider = object : AiBearerTokenProvider {
+            override suspend fun authorizationHeader(profile: AiProviderProfile): String =
+                "Bearer oauth-access-token"
+        }
+        val transport = AiHttpTransport { _, header, _ ->
+            requests++
+            authorization = header
+            throw AiHttpStatusException(401, "unauthorized")
+        }
+
+        val failure = runCatching {
+            OpenAiResponsesClient(profile, transport, tokenProvider)
+                .generate(AiAction.Proofread, "테스트")
+        }.exceptionOrNull()
+
+        assertEquals("Bearer oauth-access-token", authorization)
+        assertEquals(1, requests)
+        assertTrue(failure is AiReauthenticationRequiredException)
+    }
 }

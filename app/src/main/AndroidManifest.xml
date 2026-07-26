@@ -144,6 +144,15 @@
             android:taskAffinity=""
             android:theme="@style/Theme.VoicePermission" />
 
+        <!-- OAuth is launched only from settings; AppAuth owns the exported browser callback. -->
+        <activity
+            android:name=".input.ai.AiOAuthLoginActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.DialogTheme" />
+
         <!--
           External Sharesheet targets must be exported. This no-display boundary accepts only
           ACTION_SEND text/plain, keeps the bounded payload in process memory, and finishes.

@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
+import org.fcitx.fcitx5.android.input.ai.AiReauthenticationRequiredException
+import org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -25,6 +27,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
+    private val authorizationProvider by lazy { AndroidAiBearerTokenProvider(context) }
 
     private lateinit var ui: MeetingTranscriptionUi
     private var profile: AiProviderProfile? = null
@@ -133,7 +136,10 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 val source = ContentUriMeetingAudioSource.inspect(context, uri)
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 ui.showLoading(source.metadata.durationMillis)
-                val transcriber = OpenAiDiarizationClient(configured)
+                val transcriber = OpenAiDiarizationClient(
+                    configured,
+                    authorizationProvider = authorizationProvider
+                )
                 activeClient = transcriber
                 client = transcriber
                 val result = transcriber.transcribe(source)
@@ -146,7 +152,12 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 throw exception
             } catch (exception: Exception) {
                 if (attached) {
-                    val message = if (exception is MeetingAudioException) {
+                    val message = if (exception is AiReauthenticationRequiredException) {
+                        local(
+                            "OAuth 연결이 만료됐어. AI 설정에서 다시 로그인해.",
+                            "The OAuth session expired. Sign in again in AI settings."
+                        )
+                    } else if (exception is MeetingAudioException) {
                         local(
                             "지원되는 60분·24MB 이하 음성 파일을 골라줘.",
                             "Choose a supported audio file up to 60 minutes and 24 MB."

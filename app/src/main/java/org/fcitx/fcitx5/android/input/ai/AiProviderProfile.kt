@@ -13,6 +13,11 @@ enum class AiProviderKind {
     OpenAICompatible
 }
 
+enum class AiAuthMode {
+    ApiKey,
+    OAuthPkce
+}
+
 enum class AiModelTier {
     Fast,
     Balanced,
@@ -23,7 +28,13 @@ data class AiProviderProfile(
     val kind: AiProviderKind = AiProviderKind.OpenAI,
     val displayName: String = "OpenAI",
     val baseUrl: String = OPENAI_BASE_URL,
+    val authMode: AiAuthMode = AiAuthMode.ApiKey,
     val apiKey: String = "",
+    val oauthAuthorizationEndpoint: String = "",
+    val oauthTokenEndpoint: String = "",
+    val oauthRevocationEndpoint: String = "",
+    val oauthClientId: String = "",
+    val oauthScopes: String = DEFAULT_OAUTH_SCOPES,
     val fastModel: String = "gpt-5.6-luna",
     val balancedModel: String = "gpt-5.6-terra",
     val qualityModel: String = "gpt-5.6-sol"
@@ -34,6 +45,15 @@ data class AiProviderProfile(
         }.take(80),
         baseUrl = normalizeBaseUrl(baseUrl),
         apiKey = apiKey.trim(),
+        oauthAuthorizationEndpoint = normalizeEndpoint(oauthAuthorizationEndpoint),
+        oauthTokenEndpoint = normalizeEndpoint(oauthTokenEndpoint),
+        oauthRevocationEndpoint = normalizeEndpoint(oauthRevocationEndpoint),
+        oauthClientId = oauthClientId.trim().take(240),
+        oauthScopes = oauthScopes.trim().split(Regex("\\s+"))
+            .filter(String::isNotBlank)
+            .distinct()
+            .joinToString(" ")
+            .take(1_000),
         fastModel = fastModel.trim().ifEmpty { "gpt-5.6-luna" }.take(120),
         balancedModel = balancedModel.trim().ifEmpty { "gpt-5.6-terra" }.take(120),
         qualityModel = qualityModel.trim().ifEmpty { "gpt-5.6-sol" }.take(120)
@@ -41,16 +61,43 @@ data class AiProviderProfile(
 
     fun validate(): AiProviderProfile {
         val profile = normalized()
-        require(profile.apiKey.isNotEmpty()) { "API key is empty" }
-        val uri = URI(profile.baseUrl)
-        require(uri.userInfo == null && uri.query == null && uri.fragment == null) {
-            "Provider URL must not contain credentials, query, or fragment"
+        AiEndpointPolicy.requireHttps(profile.baseUrl, "Provider URL")
+        when (profile.authMode) {
+            AiAuthMode.ApiKey -> {
+                require(profile.apiKey.isNotEmpty()) { "API key is empty" }
+                require(profile.oauthAuthorizationEndpoint.isEmpty()) {
+                    "API key and OAuth configuration cannot be mixed"
+                }
+                require(profile.oauthTokenEndpoint.isEmpty()) {
+                    "API key and OAuth configuration cannot be mixed"
+                }
+                require(profile.oauthRevocationEndpoint.isEmpty()) {
+                    "API key and OAuth configuration cannot be mixed"
+                }
+                require(profile.oauthClientId.isEmpty()) {
+                    "API key and OAuth configuration cannot be mixed"
+                }
+            }
+            AiAuthMode.OAuthPkce -> {
+                require(profile.kind == AiProviderKind.OpenAICompatible) {
+                    "OAuth is supported only for OpenAI-compatible providers"
+                }
+                require(profile.apiKey.isEmpty()) { "API key and OAuth cannot be mixed" }
+                AiEndpointPolicy.requireHttps(
+                    profile.oauthAuthorizationEndpoint,
+                    "OAuth authorization endpoint"
+                )
+                AiEndpointPolicy.requireHttps(profile.oauthTokenEndpoint, "OAuth token endpoint")
+                if (profile.oauthRevocationEndpoint.isNotEmpty()) {
+                    AiEndpointPolicy.requireHttps(
+                        profile.oauthRevocationEndpoint,
+                        "OAuth revocation endpoint"
+                    )
+                }
+                require(profile.oauthClientId.isNotEmpty()) { "OAuth client ID is empty" }
+                require(profile.oauthScopes.isNotEmpty()) { "OAuth scopes are empty" }
+            }
         }
-        val loopback = uri.host == "localhost" || uri.host == "127.0.0.1" || uri.host == "::1"
-        require(uri.scheme == "https" || (uri.scheme == "http" && loopback)) {
-            "Provider URL must use HTTPS"
-        }
-        require(!uri.host.isNullOrBlank()) { "Provider URL has no host" }
         return profile
     }
 
@@ -68,10 +115,47 @@ data class AiProviderProfile(
 
     companion object {
         const val OPENAI_BASE_URL = "https://api.openai.com/v1"
+        const val DEFAULT_OAUTH_SCOPES = "openid offline_access"
+        val oauthRedirectUri: String
+            get() = BuildConfig.AI_OAUTH_REDIRECT_URI
 
         internal fun normalizeBaseUrl(value: String): String = value.trim()
             .ifEmpty { OPENAI_BASE_URL }
             .trimEnd('/')
+
+        private fun normalizeEndpoint(value: String): String = value.trim().trimEnd('/')
+    }
+}
+
+object AiOAuthCallbackContract {
+    fun matchesCurrentProfile(
+        profile: AiProviderProfile,
+        clientId: String,
+        authorizationEndpoint: String,
+        tokenEndpoint: String,
+        redirectUri: String
+    ): Boolean {
+        val validated = runCatching(profile::validate).getOrNull() ?: return false
+        return validated.authMode == AiAuthMode.OAuthPkce &&
+            clientId == validated.oauthClientId &&
+            authorizationEndpoint == validated.oauthAuthorizationEndpoint &&
+            tokenEndpoint == validated.oauthTokenEndpoint &&
+            redirectUri == AiProviderProfile.oauthRedirectUri
+    }
+}
+
+/** HTTPS is mandatory even on RFC1918, loopback, and Tailscale/MagicDNS addresses. */
+object AiEndpointPolicy {
+    fun requireHttps(value: String, label: String) {
+        val uri = runCatching { URI(value) }
+            .getOrElse { throw IllegalArgumentException("$label is invalid") }
+        require(uri.isAbsolute && uri.scheme.equals("https", ignoreCase = true)) {
+            "$label must use HTTPS"
+        }
+        require(!uri.host.isNullOrBlank()) { "$label has no host" }
+        require(uri.userInfo == null && uri.query == null && uri.fragment == null) {
+            "$label must not contain credentials, query, or fragment"
+        }
     }
 }
 

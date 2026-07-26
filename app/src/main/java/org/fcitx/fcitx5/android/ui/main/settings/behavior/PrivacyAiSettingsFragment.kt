@@ -16,6 +16,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore
@@ -23,6 +25,10 @@ import org.fcitx.fcitx5.android.input.ai.EffectiveAiProfile
 import org.fcitx.fcitx5.android.input.ai.AiProviderKind
 import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
+import org.fcitx.fcitx5.android.input.ai.AiAuthMode
+import org.fcitx.fcitx5.android.input.ai.AiOAuthLoginActivity
+import org.fcitx.fcitx5.android.input.ai.AiOAuthSessionManager
+import org.fcitx.fcitx5.android.input.ai.AiOAuthSessionStore
 import org.fcitx.fcitx5.android.input.ai.AiUsageStore
 import org.fcitx.fcitx5.android.input.gif.GifCache
 import org.fcitx.fcitx5.android.input.gif.GifProviderCredentialState
@@ -71,14 +77,13 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     setTitle(R.string.ai_provider_settings)
                     setIcon(R.drawable.ic_baseline_auto_awesome_24)
                     setOnPreferenceClickListener {
-                        showProviderDialog()
+                        showProviderModeDialog()
                         true
                     }
                 }
                 addPreference(providerPreference)
                 addPreference(R.string.ai_clear_custom_provider, onClick = {
-                    AiProviderCredentialStore(ctx).clear()
-                    refreshSummaries()
+                    clearAiProvider()
                 })
             }
             addCategory(R.string.gif_provider_settings) {
@@ -162,11 +167,19 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 EffectiveAiProfile.Source.BundledDebug -> getString(R.string.ai_provider_source_bundled)
                 EffectiveAiProfile.Source.Missing -> getString(R.string.ai_provider_source_missing)
             }
+            val authentication = when (profile.authMode) {
+                AiAuthMode.ApiKey -> getString(R.string.ai_auth_api_key)
+                AiAuthMode.OAuthPkce -> if (AiOAuthSessionStore(ctx).hasSession(profile)) {
+                    getString(R.string.ai_auth_oauth_connected)
+                } else {
+                    getString(R.string.ai_auth_oauth_reauth)
+                }
+            }
             getString(
                 R.string.ai_provider_configured_summary,
                 profile.displayName,
                 profile.baseUrl,
-                source
+                "$source · $authentication"
             )
         } ?: getString(R.string.ai_not_configured)
         val usage = AiUsageStore(ctx).snapshot()
@@ -209,10 +222,25 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             gifProvider.giphyCredentialState != GiphyCredentialState.Missing
     }
 
+    private fun showProviderModeDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.ai_auth_mode_title)
+            .setItems(
+                arrayOf(
+                    getString(R.string.ai_auth_mode_api_key),
+                    getString(R.string.ai_auth_mode_oauth)
+                )
+            ) { _, which ->
+                if (which == 0) showProviderDialog() else showOAuthProviderDialog()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun showProviderDialog() {
         val ctx = requireContext()
         val store = AiProviderCredentialStore(ctx)
-        val custom = store.load()
+        val custom = store.load()?.takeIf { it.authMode == AiAuthMode.ApiKey }
         val effective = custom ?: AiProviderResolver.resolve(ctx).profile
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -276,22 +304,172 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     },
                     displayName = name.text.toString(),
                     baseUrl = baseUrl.text.toString(),
+                    authMode = AiAuthMode.ApiKey,
                     apiKey = key,
                     fastModel = fast.text.toString(),
                     balancedModel = balanced.text.toString(),
                     qualityModel = quality.text.toString()
                 )
-                runCatching { store.save(profile) }
-                    .onSuccess {
-                        dialog.dismiss()
-                        refreshSummaries()
-                    }
+                val validated = runCatching(profile::validate)
                     .onFailure { error ->
                         apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
                     }
+                    .getOrNull() ?: return@setOnClickListener
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                replaceProviderProfile(validated) { result ->
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                    result.onSuccess {
+                        dialog.dismiss()
+                        refreshSummaries()
+                    }.onFailure { error ->
+                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
+                    }
+                }
             }
         }
         dialog.show()
+    }
+
+    private fun showOAuthProviderDialog() {
+        val ctx = requireContext()
+        val store = AiProviderCredentialStore(ctx)
+        val custom = store.load()?.takeIf { it.authMode == AiAuthMode.OAuthPkce }
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            val horizontal = ctx.dp(20)
+            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+        }
+        fun field(hint: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT) =
+            EditText(ctx).apply {
+                setHint(hint)
+                setText(value)
+                inputType = type
+                maxLines = 1
+                isSaveEnabled = false
+                container.addView(
+                    this,
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                )
+            }
+        val uriType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+        val name = field(R.string.ai_provider_name_hint, custom?.displayName.orEmpty())
+        val baseUrl = field(R.string.ai_provider_url_hint, custom?.baseUrl.orEmpty(), uriType)
+        val authorizationEndpoint = field(
+            R.string.ai_oauth_authorization_endpoint_hint,
+            custom?.oauthAuthorizationEndpoint.orEmpty(),
+            uriType
+        )
+        val tokenEndpoint = field(
+            R.string.ai_oauth_token_endpoint_hint,
+            custom?.oauthTokenEndpoint.orEmpty(),
+            uriType
+        )
+        val revocationEndpoint = field(
+            R.string.ai_oauth_revocation_endpoint_hint,
+            custom?.oauthRevocationEndpoint.orEmpty(),
+            uriType
+        )
+        val clientId = field(R.string.ai_oauth_client_id_hint, custom?.oauthClientId.orEmpty())
+        val scopes = field(
+            R.string.ai_oauth_scopes_hint,
+            custom?.oauthScopes ?: AiProviderProfile.DEFAULT_OAUTH_SCOPES
+        )
+        val fast = field(R.string.ai_fast_model_hint, custom?.fastModel ?: "gpt-5.6-luna")
+        val balanced = field(
+            R.string.ai_balanced_model_hint,
+            custom?.balancedModel ?: "gpt-5.6-terra"
+        )
+        val quality = field(R.string.ai_quality_model_hint, custom?.qualityModel ?: "gpt-5.6-sol")
+
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle(R.string.ai_auth_mode_oauth)
+            .setMessage(R.string.ai_oauth_security_note)
+            .setView(container)
+            .setPositiveButton(R.string.ai_oauth_save_and_sign_in, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val profile = AiProviderProfile(
+                    kind = AiProviderKind.OpenAICompatible,
+                    displayName = name.text.toString(),
+                    baseUrl = baseUrl.text.toString(),
+                    authMode = AiAuthMode.OAuthPkce,
+                    apiKey = "",
+                    oauthAuthorizationEndpoint = authorizationEndpoint.text.toString(),
+                    oauthTokenEndpoint = tokenEndpoint.text.toString(),
+                    oauthRevocationEndpoint = revocationEndpoint.text.toString(),
+                    oauthClientId = clientId.text.toString(),
+                    oauthScopes = scopes.text.toString(),
+                    fastModel = fast.text.toString(),
+                    balancedModel = balanced.text.toString(),
+                    qualityModel = quality.text.toString()
+                )
+                val validated = runCatching(profile::validate)
+                    .onFailure { error ->
+                        baseUrl.error = error.message ?: getString(R.string.ai_provider_invalid)
+                    }
+                    .getOrNull() ?: return@setOnClickListener
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                replaceProviderProfile(validated) { result ->
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                    result.onSuccess {
+                        dialog.dismiss()
+                        refreshSummaries()
+                        startActivity(AiOAuthLoginActivity.createIntent(ctx))
+                    }.onFailure { error ->
+                        baseUrl.error = error.message ?: getString(R.string.ai_provider_invalid)
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    /** Revoke/clear the previous OAuth session before either auth mode or provider identity changes. */
+    private fun replaceProviderProfile(
+        profile: AiProviderProfile,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        val ctx = requireContext()
+        val store = AiProviderCredentialStore(ctx)
+        lifecycleScope.launch {
+            val result = runCatching {
+                val previous = store.load()
+                if (previous?.authMode == AiAuthMode.OAuthPkce) {
+                    runCatching { AiOAuthSessionManager(ctx).revokeAndClear(previous) }
+                } else {
+                    AiOAuthSessionStore(ctx).clear()
+                }
+                store.save(profile)
+            }
+            onComplete(result)
+        }
+    }
+
+    private fun clearAiProvider() {
+        val ctx = requireContext()
+        val store = AiProviderCredentialStore(ctx)
+        val profile = store.load()
+        lifecycleScope.launch {
+            val revoked = if (profile?.authMode == AiAuthMode.OAuthPkce) {
+                runCatching { AiOAuthSessionManager(ctx).revokeAndClear(profile) }
+                    .getOrDefault(false)
+            } else {
+                AiOAuthSessionStore(ctx).clear()
+                true
+            }
+            store.clear()
+            refreshSummaries()
+            Toast.makeText(
+                ctx,
+                if (revoked) R.string.ai_provider_removed else R.string.ai_oauth_revocation_failed,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private fun showGifProviderSelectionDialog() {

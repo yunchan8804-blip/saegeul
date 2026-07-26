@@ -23,6 +23,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val theme by manager.theme()
     private val usageStore by lazy { AiUsageStore(context) }
+    private val authorizationProvider by lazy { AndroidAiBearerTokenProvider(context) }
 
     private lateinit var ui: AiAssistantUi
     private var snapshot: AiInputSnapshot? = null
@@ -109,7 +110,10 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         ui.showLoading(action, provider.displayName)
         requestJob = service.lifecycleScope.launch {
             try {
-                val result = OpenAiResponsesClient(provider).generate(action, source.source)
+                val result = OpenAiResponsesClient(
+                    provider,
+                    authorizationProvider = authorizationProvider
+                ).generate(action, source.source)
                 usageStore.recordSuccess(
                     action,
                     provider.kind,
@@ -131,7 +135,11 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                     source.source.length
                 )
                 ui.showError(
-                    exception.message ?: context.getString(R.string.ai_apply_failed),
+                    if (exception is AiReauthenticationRequiredException) {
+                        context.getString(R.string.ai_oauth_reauth_required)
+                    } else {
+                        exception.message ?: context.getString(R.string.ai_apply_failed)
+                    },
                     provider.displayName,
                     canRetry = true
                 )

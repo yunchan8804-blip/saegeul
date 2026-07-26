@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `한국어 다음 단어·GIF 밈 품질·로컬 OCR 통합 checkpoint`
+현재 활성 구현 마일스톤: `한국어 다음 단어·GIF 밈 품질·로컬 OCR·원격 AI OAuth 통합 checkpoint`
 
 ## 2. 상태 표기
 
@@ -352,6 +352,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `AI-04` | 답장 초안 | `IN_PROGRESS` | 선택·문단·명시적 clipboard·Sharesheet intake 구현, 두 기기 검증 남음 | M |
 | `AI-05` | 키보드 번역 | `IN_PROGRESS` | 한↔영·일·중 action과 preview 구현, 언어별 실기기 matrix 남음 | M |
 | `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
+| `AI-07` | 원격 호환 endpoint OAuth | `IN_PROGRESS` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인 구현; 실제 IdP·두 기기 gate | L |
 
 ### 6.4 음성·멀티모달 기능
 
@@ -740,6 +741,54 @@ permission dialog와 focus 복귀는 별도 gate다.
 - key와 token을 `AppPrefs`, 일반 SharedPreferences, user-data ZIP, log, crash report에 넣지 않는다.
 - 기능별 사용량, 실패 유형, provider만 표시하며 prompt와 결과 원문은 기본 저장하지 않는다.
 
+#### 8.2.1 API key와 endpoint OAuth는 상호 배타적이다
+
+- `API key 직접 입력`은 기존 BYOK 경로이며 요청마다 그 key 하나만 `Authorization: Bearer`로 보낸다.
+- `OAuth 2.0 로그인 (PKCE)`은 사용자가 운영하거나 신뢰하는 OpenAI-compatible endpoint가 제공하는
+  OAuth/OIDC Authorization Code flow다. OpenAI standard API가 일반 모바일 사용자 OAuth를 제공한다고
+  가정하지 않는다.
+- Android 앱은 public client다. client secret 입력란·저장 필드·token request 인증을 만들지 않는다.
+  인가는 AppAuth 외부 browser/Custom Tab에서 수행하고 WebView를 쓰지 않는다.
+- authorization request는 무작위 `state`와 PKCE verifier를 만들고 `S256` 외 method면 시작 전에
+  fail-closed한다. callback은 요청 state와 정확히 일치해야 token exchange를 수행한다.
+- redirect URI는 `${applicationId}.oauth:/callback` 단일 규칙이며 release는
+  `org.fcitx.fcitx5.android.oauth:/callback`, debug는
+  `org.fcitx.fcitx5.android.debug.oauth:/callback`이다. endpoint 등록값과 정확히 일치해야 하며 open
+  redirect나 동적 redirect 입력은 지원하지 않는다.
+- browser 왕복과 token 교환 callback 시마다 현재 profile의 client ID, authorization endpoint,
+  token endpoint, redirect URI를 원래 request와 정확히 비교한다. 설정이 중간에 바뀌면 이전 응답을
+  새 profile token으로 저장하지 않고 fail-closed한다.
+- access/refresh token과 AppAuth state는 `noBackupFilesDir/ai/oauth-session.bin`에 Android Keystore
+  AES-GCM으로 암호화한다. profile fingerprint가 달라지면 token을 재사용하지 않는다.
+- AI text·정확 전사·회의 전사는 같은 Bearer resolver를 쓴다. 만료 전 refresh를 한 번 수행하며,
+  refresh 실패나 resource server의 `401`은 token을 폐기하고 명시적 재로그인 오류로 끝낸다.
+  원 요청 자동 재시도, API key fallback, OAuth/API-key header 혼합은 금지한다.
+- 로그아웃은 revocation endpoint가 설정돼 있으면 refresh token 우선으로 폐기를 요청한다. 원격 응답과
+  관계없이 local token은 반드시 삭제하고, 원격 폐기 미확인은 사용자에게 구분해 알린다.
+- OAuth→API key 전환이나 OAuth profile 교체도 이전 profile의 revocation을 먼저 시도하고 local OAuth
+  state는 반드시 삭제한 다음 새 profile을 저장한다. 오래된 refresh token을 새 provider에 남기지 않는다.
+- password, sensitive, private/no-personalized-learning editor와 offline/app별 차단 상태에서는 기존
+  privacy gate가 token refresh를 포함한 모든 AI network call보다 먼저 실행된다.
+
+#### 8.2.2 HTTPS·Tailscale 경계
+
+- API base, authorization, token, revocation endpoint는 모두 `https://`만 허용한다. public host뿐 아니라
+  loopback, RFC1918, CGNAT/Tailscale IP, MagicDNS, `.ts.net`에도 평문 HTTP 예외를 두지 않는다.
+- Tailscale과 MagicDNS는 Android에서 원격 컴퓨터까지 가는 network path다. Tailscale Serve를 쓰면
+  tailnet 내부 HTTPS와 ACL, backend용 identity header를 구성할 수 있지만, 이 앱의 endpoint OAuth
+  Bearer 발급과 같은 인증 계층으로 간주하거나 자동 혼합하지 않는다.
+- Tailscale OAuth Apps는 Tailscale API/internal tool 권한용 별도 기능이며 2026-06-30 현재 alpha다.
+  OpenAI-compatible endpoint 사용자 로그인으로 사용하지 않고 Tailscale OAuth client secret을 Android에
+  넣지 않는다.
+- 공식 기준:
+  [AppAuth Android](https://github.com/openid/AppAuth-Android),
+  [RFC 8252 Native Apps](https://www.rfc-editor.org/rfc/rfc8252),
+  [RFC 9700 OAuth Security BCP](https://www.rfc-editor.org/rfc/rfc9700),
+  [OpenAI production key security](https://developers.openai.com/api/docs/guides/production-best-practices),
+  [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns),
+  [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve),
+  [Tailscale OAuth Apps](https://tailscale.com/docs/features/oauth-apps).
+
 ### 8.3 text 읽기와 교체
 
 - IME가 임의의 chat bubble이나 화면 전체를 읽을 수 있다고 가정하지 않는다.
@@ -778,8 +827,12 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 
 | 범위 | 결과 | 증거 |
 | --- | --- | --- |
-| 공급자 profile | `PASS` | OpenAI·OpenAI-compatible HTTPS endpoint, Fast/Balanced/Quality model tier와 loopback 개발 예외를 pure model로 검증 |
+| 공급자 profile | `PASS` | OpenAI·OpenAI-compatible HTTPS endpoint, Fast/Balanced/Quality model tier를 pure model로 검증; 평문 HTTP는 loopback·private·Tailscale도 차단 |
 | API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
+| OAuth public client | `CODE_DONE` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현 |
+| OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
+| OAuth 통합 build/test | `PASS` | `:app:testDebugUnitTest` 56 suites·240 tests failure/error/skipped 0, `:app:assembleDebug -PbuildABI=arm64-v8a`, debug merged manifest redirect scheme 일치 |
+| OAuth live provider | `GATE` | 실제 compatible endpoint의 client 등록·redirect·scope와 A35·Z Fold6 login/refresh/revoke를 검증해야 함 |
 | Responses client | `PASS` | `/responses`, `store=false`, JSON suggestion parse, redirect 금지, prompt/result 비로그와 sanitized error 구현 |
 | text/action test | `PASS` | AI 5 suites·12 tests, failure 0. action prompt, provider validation, selection/문단 source, 응답 parse, usage 원문 비저장을 검증 |
 | Privacy dashboard | `PASS` | A35에서 현재 provider, 전송 원칙, 기능별 집계 usage, usage 삭제와 GIF cache 삭제 UI 렌더 확인 |
@@ -828,12 +881,13 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 ### 단계 3 — AI 기반과 text 기능
 
 1. `AI-00`, `AI-06`, `SEC-02` 공급자·Keystore·privacy/usage 기반. (`DONE`)
-2. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
-3. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
-4. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
-5. `AI-03` 문장 생성. (`IN_PROGRESS`: A35 live 통과, 3후보 보장)
-6. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
-7. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
+2. `AI-07` endpoint OAuth public-client flow와 token lifecycle. (`IN_PROGRESS`: 코드 완료, 실제 IdP·두 기기 gate)
+3. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
+4. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
+5. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
+6. `AI-03` 문장 생성. (`IN_PROGRESS`: A35 live 통과, 3후보 보장)
+7. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
+8. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
 
 ### 단계 4 — 음성
 

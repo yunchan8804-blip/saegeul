@@ -17,6 +17,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
+import org.fcitx.fcitx5.android.input.ai.AiReauthenticationRequiredException
+import org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -29,6 +31,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
+    private val authorizationProvider by lazy { AndroidAiBearerTokenProvider(context) }
 
     private lateinit var ui: VoiceTranscriptionUi
     private var profile: AiProviderProfile? = null
@@ -142,7 +145,10 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
                 recorder = null
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 ui.showTranscribing()
-                val result = OpenAiTranscriptionClient(configuredProfile).transcribe(captured.bytes)
+                val result = OpenAiTranscriptionClient(
+                    configuredProfile,
+                    authorizationProvider = authorizationProvider
+                ).transcribe(captured.bytes)
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 transcript = result.text
                 commitGate.resetForNewTranscript()
@@ -152,7 +158,9 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
             } catch (exception: Exception) {
                 if (attached) {
                     ui.showError(
-                        context.getString(
+                        if (exception is AiReauthenticationRequiredException) {
+                            context.getString(R.string.ai_oauth_reauth_required)
+                        } else context.getString(
                             when (exception) {
                                 is VoiceRecordingException -> R.string.voice_record_failed
                                 is VoiceTranscriptionException -> R.string.voice_transcription_failed
