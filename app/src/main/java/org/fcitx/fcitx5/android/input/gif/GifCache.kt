@@ -22,8 +22,8 @@ class GifCache(private val context: Context) {
         check(isDeclaredSizeAllowed(result.byteSize)) {
             "GIF size is outside the allowed range"
         }
-        directory.mkdirs()
-        val target = File(directory, "${sha256(result.mediaUrl)}.gif")
+        val providerDirectory = File(directory, safeProviderId(result.providerId)).apply { mkdirs() }
+        val target = File(providerDirectory, "${sha256(result.mediaUrl)}.gif")
         if (target.isFile && target.length() in 1..MAX_BYTES) {
             val bytes = target.readBytes()
             if (GifFileInspector.isAnimated(bytes)) return@withContext target
@@ -50,12 +50,33 @@ class GifCache(private val context: Context) {
 
     fun cleanupExpired(now: Long = System.currentTimeMillis()) {
         if (!directory.isDirectory) return
-        directory.listFiles()?.forEach { file ->
-            if (!file.isFile || file.name.endsWith(".partial") || now - file.lastModified() > TTL_MS) {
-                file.delete()
+        directory.listFiles()?.forEach { providerDirectory ->
+            if (!providerDirectory.isDirectory) {
+                providerDirectory.delete()
+                return@forEach
             }
+            providerDirectory.listFiles()?.forEach { file ->
+                if (!file.isFile || file.name.endsWith(".partial") || now - file.lastModified() > TTL_MS) {
+                    file.delete()
+                }
+            }
+            if (providerDirectory.listFiles().isNullOrEmpty()) providerDirectory.delete()
         }
     }
+
+    fun clear() {
+        directory.listFiles()?.forEach { providerDirectory ->
+            providerDirectory.listFiles()?.forEach(File::delete)
+            providerDirectory.delete()
+        }
+    }
+
+    private fun safeProviderId(providerId: String): String = providerId
+        .lowercase()
+        .map { character -> if (character.isLetterOrDigit() || character == '-') character else '_' }
+        .joinToString("")
+        .take(48)
+        .ifEmpty { "unknown" }
 
     private fun download(url: String): ByteArray {
         val connection = URI(url).toURL().openConnection() as HttpURLConnection

@@ -83,6 +83,12 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
+import org.fcitx.fcitx5.android.input.ai.AiAppliedEdit
+import org.fcitx.fcitx5.android.input.ai.AiApplyMode
+import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
+import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
+import org.fcitx.fcitx5.android.input.ai.AiSourceKind
+import org.fcitx.fcitx5.android.input.ai.AiTextSource
 import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
 import org.fcitx.fcitx5.android.input.typo.TypoRecoverySnapshot
@@ -162,6 +168,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val prefs = AppPrefs.getInstance()
     private val inlineSuggestions by prefs.keyboard.inlineSuggestions
     private val ignoreSystemCursor by prefs.advanced.ignoreSystemCursor
+    private val offlineMode by prefs.advanced.offlineMode
     private val autoSnippetExpansion by prefs.advanced.autoSnippetExpansion
     private val bufferedHangulInputPref = prefs.advanced.bufferedHangulInput
     private val bufferedHangulTransport by prefs.advanced.bufferedHangulTransport
@@ -737,7 +744,130 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         !EditorPrivacyPolicy.forbidsTextInspection(currentInputEditorInfo, capabilityFlags)
 
     /** Network-backed input features must never inspect or contact a server for private editors. */
-    fun allowsNetworkInputFeatures(): Boolean = allowsTextInspectionFeatures()
+    fun allowsNetworkInputFeatures(): Boolean = allowsTextInspectionFeatures() && !offlineMode
+
+    /** Captures only an explicit selection or the current paragraph before the cursor. No network runs here. */
+    fun captureAiInputSnapshot(): AiInputSnapshot? {
+        if (!allowsNetworkInputFeatures()) return null
+        if (!finishCompositionForDirectAction()) return null
+        val info = currentInputEditorInfo
+        val range = currentInputSelection
+        val connection = currentInputConnection ?: return null
+        val selected = if (range.isNotEmpty()) {
+            connection.getSelectedText(0)?.toString()?.takeIf(String::isNotBlank)
+        } else null
+        val sourceKind = if (selected != null) AiSourceKind.Selection else AiSourceKind.BeforeCursor
+        val source = selected ?: AiTextSource.beforeCursor(
+            connection.getTextBeforeCursor(AiTextSource.MAX_CHARACTERS, 0)?.toString().orEmpty()
+        ) ?: return null
+        return AiInputSnapshot(
+            AiEditorTarget(
+                info.packageName,
+                info.fieldId,
+                info.inputType,
+                range.start,
+                range.end
+            ),
+            source,
+            sourceKind
+        )
+    }
+
+    /** Applies one reviewed AI suggestion. Failure is final and never falls back to clipboard. */
+    fun applyAiSuggestion(
+        snapshot: AiInputSnapshot,
+        suggestion: String,
+        mode: AiApplyMode
+    ): AiAppliedEdit? {
+        if (!allowsNetworkInputFeatures() || suggestion.isBlank()) return null
+        if (!matchesCurrentEditor(snapshot.editor)) return null
+        if (!finishCompositionForDirectAction()) return null
+        val connection = currentInputConnection ?: return null
+        val cursorBefore = currentInputSelection.start
+        return when (mode) {
+            AiApplyMode.Replace -> {
+                val dispatched = when (snapshot.sourceKind) {
+                    AiSourceKind.Selection -> {
+                        if (connection.getSelectedText(0)?.toString() != snapshot.source) {
+                            return null
+                        }
+                        connection.commitText(suggestion, 1)
+                    }
+                    AiSourceKind.BeforeCursor -> {
+                        if (connection.getTextBeforeCursor(snapshot.source.length, 0)?.toString() != snapshot.source) {
+                            return null
+                        }
+                        var success = true
+                        connection.withBatchEdit {
+                            success = deleteSurroundingText(snapshot.source.length, 0) && success
+                            if (success) success = commitText(suggestion, 1)
+                        }
+                        success
+                    }
+                }
+                if (!dispatched) return null
+                val start = if (snapshot.sourceKind == AiSourceKind.Selection) {
+                    snapshot.editor.selectionStart
+                } else {
+                    cursorBefore - snapshot.source.length
+                }
+                selection.predict(start + suggestion.length)
+                AiAppliedEdit(
+                    editor = snapshot.editor.copy(
+                        selectionStart = start + suggestion.length,
+                        selectionEnd = start + suggestion.length
+                    ),
+                    inserted = suggestion,
+                    restore = snapshot.source
+                )
+            }
+            AiApplyMode.Append -> {
+                val start = when (snapshot.sourceKind) {
+                    AiSourceKind.Selection -> snapshot.editor.selectionEnd
+                    AiSourceKind.BeforeCursor -> cursorBefore
+                }
+                if (snapshot.sourceKind == AiSourceKind.Selection &&
+                    !connection.setSelection(start, start)
+                ) return null
+                val inserted = "\n$suggestion"
+                if (!connection.commitText(inserted, 1)) return null
+                selection.predict(start + inserted.length)
+                AiAppliedEdit(
+                    editor = snapshot.editor.copy(
+                        selectionStart = start + inserted.length,
+                        selectionEnd = start + inserted.length
+                    ),
+                    inserted = inserted,
+                    restore = ""
+                )
+            }
+        }
+    }
+
+    fun undoAiEdit(edit: AiAppliedEdit): Boolean {
+        if (!allowsNetworkInputFeatures() || !matchesCurrentEditor(edit.editor)) return false
+        if (!finishCompositionForDirectAction()) return false
+        val connection = currentInputConnection ?: return false
+        if (connection.getTextBeforeCursor(edit.inserted.length, 0)?.toString() != edit.inserted) {
+            return false
+        }
+        val cursorBefore = currentInputSelection.start
+        var dispatched = true
+        connection.withBatchEdit {
+            dispatched = deleteSurroundingText(edit.inserted.length, 0) && dispatched
+            if (dispatched && edit.restore.isNotEmpty()) {
+                dispatched = commitText(edit.restore, 1)
+            }
+        }
+        if (dispatched) selection.predict(cursorBefore - edit.inserted.length + edit.restore.length)
+        return dispatched
+    }
+
+    private fun matchesCurrentEditor(target: AiEditorTarget): Boolean =
+        currentInputEditorInfo.packageName == target.packageName &&
+            currentInputEditorInfo.fieldId == target.fieldId &&
+            currentInputEditorInfo.inputType == target.inputType &&
+            currentInputSelection.rangeEquals(target.selectionStart, target.selectionEnd)
 
     fun matchesCurrentEditor(
         packageName: String,

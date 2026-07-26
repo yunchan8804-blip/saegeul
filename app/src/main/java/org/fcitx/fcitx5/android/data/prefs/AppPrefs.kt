@@ -42,6 +42,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
         val ignoreSystemCursor = switch(R.string.ignore_sys_cursor, "ignore_system_cursor", false)
+        val offlineMode = switch(
+            R.string.offline_mode,
+            "offline_mode",
+            false,
+            R.string.offline_mode_summary
+        )
         val autoSnippetExpansion = switch(
             R.string.auto_snippet_expansion,
             "auto_snippet_expansion",
@@ -429,6 +435,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.verboseLog,
                 internal.editorInfoInspector,
                 advanced.ignoreSystemCursor,
+                advanced.offlineMode,
                 advanced.disableAnimation,
                 advanced.vivoKeypressWorkaround
             ).forEach {

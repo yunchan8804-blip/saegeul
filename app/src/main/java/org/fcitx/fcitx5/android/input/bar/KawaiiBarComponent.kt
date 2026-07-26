@@ -50,6 +50,7 @@ import org.fcitx.fcitx5.android.input.bar.ui.IdleUi
 import org.fcitx.fcitx5.android.input.bar.ui.TitleUi
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.ai.AiAssistantWindow
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.FlexboxExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.GridExpandedCandidateWindow
@@ -107,6 +108,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandedCandidateStyle by prefs.keyboard.expandedCandidateStyle
     private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
+    private val offlineMode by prefs.advanced.offlineMode
     private val showVoiceInputButton by prefs.keyboard.showVoiceInputButton
     private val preferredVoiceInput by prefs.keyboard.preferredVoiceInput
 
@@ -319,6 +321,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 typoRecoveryButton.setOnClickListener {
                     windowManager.attachWindow(TypoRecoveryWindow())
                 }
+                aiAssistantButton.setOnClickListener {
+                    windowManager.attachWindow(AiAssistantWindow())
+                }
                 gifButton.setOnClickListener {
                     windowManager.attachWindow(GifSearchWindow())
                 }
@@ -456,6 +461,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
         val allowsTextInspection = !EditorPrivacyPolicy.forbidsTextInspection(info, capFlags)
+        val allowsNetwork = allowsTextInspection && !offlineMode
         idleUi.buttonsUi.typoRecoveryButton.apply {
             isEnabled = allowsTextInspection
             alpha = if (isEnabled) 1f else 0.35f
@@ -465,7 +471,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             alpha = if (isEnabled) 1f else 0.35f
         }
         idleUi.buttonsUi.gifButton.apply {
-            isEnabled = allowsTextInspection
+            isEnabled = allowsNetwork
+            alpha = if (isEnabled) 1f else 0.35f
+        }
+        idleUi.buttonsUi.aiAssistantButton.apply {
+            isEnabled = allowsNetwork
             alpha = if (isEnabled) 1f else 0.35f
         }
         isInlineSuggestionPresent = false

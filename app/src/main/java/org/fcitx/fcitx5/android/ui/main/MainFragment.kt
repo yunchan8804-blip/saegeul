@@ -95,6 +95,11 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.drawable.ic_baseline_more_horiz_24,
                     SettingsRoute.Advanced
                 )
+                addDestinationPreference(
+                    R.string.privacy_ai,
+                    R.drawable.ic_baseline_auto_awesome_24,
+                    SettingsRoute.PrivacyAi
+                )
             }
         }
     }

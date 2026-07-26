@@ -15,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -29,7 +30,10 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
-    private val provider: GifProvider = NotoAnimatedEmojiProvider()
+    private val provider: GifProvider = BuildConfig.KLIPY_API_KEY.trim()
+        .takeIf(String::isNotEmpty)
+        ?.let(::KlipyGifProvider)
+        ?: NotoAnimatedEmojiProvider()
     private val searchGate = GifSearchGate(provider)
     private val cache by lazy { GifCache(context) }
     private val committer by lazy { RichContentCommitter(service) }
@@ -66,7 +70,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 return false
             }
         })
-        ui.setProviderLabel(context.getString(R.string.gif_powered_by_noto))
+        ui.setProviderLabel(provider.displayName)
         ui.onQueryClick = ::beginQueryEditing
         ui.onKeyword = { query ->
             queryState = GifSearchQueryState(query)

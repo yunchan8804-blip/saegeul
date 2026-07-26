@@ -9,12 +9,32 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+fun String.asBuildConfigString(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val debugAiProviderName = providers.gradleProperty("AI_PROVIDER_NAME").orElse("OpenAI")
+val debugAiProviderBaseUrl = providers.gradleProperty("AI_PROVIDER_BASE_URL")
+    .orElse("https://api.openai.com/v1")
+val debugAiProviderApiKey = providers.gradleProperty("AI_PROVIDER_API_KEY").orElse("")
+val debugKlipyApiKey = providers.gradleProperty("KLIPY_API_KEY").orElse("")
+
 android {
     namespace = "org.fcitx.fcitx5.android"
 
     defaultConfig {
         applicationId = "org.fcitx.fcitx5.android"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "AI_PROVIDER_NAME", "OpenAI".asBuildConfigString())
+        buildConfigField(
+            "String",
+            "AI_PROVIDER_BASE_URL",
+            "https://api.openai.com/v1".asBuildConfigString()
+        )
+        buildConfigField("String", "AI_PROVIDER_API_KEY", "".asBuildConfigString())
+        buildConfigField("String", "AI_FAST_MODEL", "gpt-5.6-luna".asBuildConfigString())
+        buildConfigField("String", "AI_BALANCED_MODEL", "gpt-5.6-terra".asBuildConfigString())
+        buildConfigField("String", "AI_QUALITY_MODEL", "gpt-5.6-sol".asBuildConfigString())
+        buildConfigField("String", "KLIPY_API_KEY", "".asBuildConfigString())
 
         @Suppress("UnstableApiUsage")
         externalNativeBuild {
@@ -36,6 +56,7 @@ android {
     buildFeatures {
         viewBinding = true
         resValues = true
+        buildConfig = true
     }
 
     buildTypes {
@@ -49,6 +70,26 @@ android {
             resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
             resValue("string", "app_name", "@string/app_name_debug")
+            buildConfigField(
+                "String",
+                "AI_PROVIDER_NAME",
+                debugAiProviderName.get().asBuildConfigString()
+            )
+            buildConfigField(
+                "String",
+                "AI_PROVIDER_BASE_URL",
+                debugAiProviderBaseUrl.get().asBuildConfigString()
+            )
+            buildConfigField(
+                "String",
+                "AI_PROVIDER_API_KEY",
+                debugAiProviderApiKey.get().asBuildConfigString()
+            )
+            buildConfigField(
+                "String",
+                "KLIPY_API_KEY",
+                debugKlipyApiKey.get().asBuildConfigString()
+            )
         }
     }
 

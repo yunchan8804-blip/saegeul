@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `KO-BASE-08 숫자·기호 전환 상태 복구`의 Z Fold6 설치 검증
+현재 활성 구현 마일스톤: `AI text MVP·GIF-02 실사용 공급자 checkpoint`
 
 ## 2. 상태 표기
 
@@ -122,9 +122,14 @@
 
 | ID | 기능 | 상태 | 가치 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `GIF-01` | 공개 라이선스 GIF 검색·링크·첨부 MVP | `DONE` | 키보드 이탈 없이 반응 GIF 사용 | L |
+| `GIF-01` | GIF 검색·링크·첨부 파이프라인 | `DONE` | 키보드 이탈 없이 GIF 검색·전달 | L |
+| `GIF-02` | 실사용 리액션 GIF 공급자 | `IN_PROGRESS` | KLIPY 한국어 검색·밈 catalog 구현 완료, production key·승인 gate 남음 | M |
 
-`GIF-01`의 상세 계약은 7절에 있다.
+`GIF-01`의 전송 파이프라인 계약과 `GIF-02`의 공급자 계약은 7절에 있다. 사용자 실사용 결과
+Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 리액션 GIF catalog로는 현저히
+부족했다. KLIPY 공급자를 별도 source와 cache namespace로 구현하고 A35·Z Fold6에서 실사용 catalog를
+검증했다. 다만 저장소에 test key를 넣지 않으며 production key와 partner 승인이 끝날 때까지
+`GIF-02`의 배포 상태는 `IN_PROGRESS`로 유지한다.
 
 ### 6.2 1차 한국어 로컬 기능
 
@@ -303,13 +308,13 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `AI-00` | AI provider·보안 기반 | `BACKLOG` | provider profile, key vault, privacy gate, usage 표시 | L |
-| `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `BACKLOG` | diff, 부분 적용, 전체 교체, undo | M |
-| `AI-02` | 존댓말·말투 변환 | `BACKLOG` | 반말/존댓말, 업무, 카톡, 거절, 사과, 고객응대 | M |
-| `AI-03` | 빠른 문장 생성 | `BACKLOG` | 의도와 톤으로 초안 3개, 선택 결과만 삽입 | M |
-| `AI-04` | 답장 초안 | `BACKLOG` | 사용자가 복사·선택한 상대 문장과 답장 의도만 전송 | M |
-| `AI-05` | 키보드 번역 | `BACKLOG` | 한↔영·일·중, 원문/번역문 비교와 명시적 교체 | M |
-| `AI-06` | AI provider profile | `BACKLOG` | OpenAI, 사용자 proxy, 승인된 호환 endpoint를 분리 | M |
+| `AI-00` | AI provider·보안 기반 | `DONE` | provider profile, key vault, privacy gate, usage 표시 | L |
+| `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `IN_PROGRESS` | preview·전체 교체·undo 구현, diff·부분 적용 gate 남음 | M |
+| `AI-02` | 존댓말·말투 변환 | `IN_PROGRESS` | 존댓말·카톡·업무·거절·사과·고객응대 action 구현, action별 실기기 matrix 남음 | M |
+| `AI-03` | 빠른 문장 생성 | `IN_PROGRESS` | 의도 기반 후보·명시적 교체/추가 구현과 A35 live 통과, 3개 후보 품질 gate 남음 | M |
+| `AI-04` | 답장 초안 | `IN_PROGRESS` | 선택·현재 문단 범위와 답장 후보 구현, clipboard/share intake 남음 | M |
+| `AI-05` | 키보드 번역 | `IN_PROGRESS` | 한↔영·일·중 action과 preview 구현, 언어별 실기기 matrix 남음 | M |
+| `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
 
 ### 6.4 음성·멀티모달 기능
 
@@ -327,15 +332,16 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `UX-01` | Smart clipboard action | `BACKLOG` | 서식 제거, 합치기, 전화·계좌 형식화, 개인정보 마스킹 | M |
 | `UX-02` | Fold·tablet 분할 키보드 | `BACKLOG` | cover/unfolded posture별 profile과 양손 thumb layout | L |
 | `SEC-01` | 민감 빠른 문구 금고 | `BACKLOG` | Keystore 암호화, 생체 인증, package allowlist | L |
-| `SEC-02` | Privacy dashboard | `BACKLOG` | 기능별 전송 범위, provider, 최근 사용량, 즉시 삭제 | M |
-| `SEC-03` | 완전 offline mode | `BACKLOG` | 네트워크 기능과 원격 provider를 한 번에 차단 | S |
+| `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
+| `SEC-03` | 완전 offline mode | `IN_PROGRESS` | AI·GIF toolbar와 network gate 통합, 실제 기기 zero-request gate 남음 | S |
 
 ## 7. GIF-01 상세 계약
 
 ### 7.1 핵심 UX
 
 1. 키보드 toolbar의 GIF 버튼으로 `GifSearchWindow`를 연다.
-2. 첫 화면은 Animated Noto Emoji의 검증된 기본 결과를, 검색 뒤에는 한국어 query 결과를 grid로 표시한다.
+2. 승인된 KLIPY key가 있으면 첫 화면에 KLIPY 인기 결과와 한국어 query 결과를 grid로 표시한다.
+   key가 없는 공개 build에서는 Animated Noto Emoji를 fallback으로 사용한다.
 3. 검색창은 IME가 자기 자신을 다시 호출하는 `AlertDialog/EditText`가 아니라 GIF surface 안의
    독립 한글·영문 인라인 자판을 사용한다. query는 대상 editor의 `InputConnection`에 쓰지 않는다.
 4. thumbnail을 탭하면 해당 카드 자체 위에 반투명 selection overlay를 표시한다.
@@ -411,7 +417,7 @@ stale search response가 최신 query 결과를 덮지 않도록 request generat
 
 canonical page URL과 downloadable media URL을 혼동하지 않는다.
 
-### 7.7 Animated Noto Emoji 기본 공급자
+### 7.7 Animated Noto Emoji 공개 fallback 공급자
 
 - Google의 [Animated Noto Emoji](https://googlefonts.github.io/noto-emoji-animation/) 공식 catalog를
   사용한다. 2026-07-26 라이브 확인 기준 881개 항목이며 media는 실제 `512.gif`다.
@@ -423,6 +429,8 @@ canonical page URL과 downloadable media URL을 혼동하지 않는다.
   안전하게 fallback한다. 첨부 원본은 별도 `image/gif` URL을 사용한다.
 - author는 Google, license는 CC BY 4.0으로 카드에 항상 표시하며 canonical page와 media URL을 분리한다.
 - catalog 장애 때도 동일한 공개 자산의 검증된 curated subset을 사용한다.
+- 이 공급자는 움직이는 이모지용 공개 fallback이다. 영화·방송·밈·인물 반응을 포함하는 실사용
+  GIF 검색의 기본 공급자로 간주하지 않는다.
 
 ### 7.8 Wikimedia Commons 보조 공급자와 공급자 평가
 
@@ -432,24 +440,33 @@ Commons provider와 license parser는 보존하지만 기본 반응 GIF 화면�
 
 | 후보 | 결정 | 근거 |
 | --- | --- | --- |
-| Animated Noto Emoji | 기본 provider | key 불필요, CC BY 4.0, 881개 실제 animated asset, 로컬 한국어 검색 |
+| Animated Noto Emoji | 공개 fallback | key 불필요, CC BY 4.0이지만 리액션·밈 recall이 현저히 낮음 |
 | Wikimedia Commons | 별도 tab backlog | license metadata는 우수하지만 반응 GIF recall·품질이 낮음 |
 | Openverse | 기본 제외 | 라이브 GIF 검색이 사실상 Wikimedia 결과에 집중되고 한국어 recall 개선이 없음 |
 | GifCities | 제외 | GeoCities archive 자산으로 현대 반응 품질과 개별 저작권 상태가 불명확 |
-| GIPHY·KLIPY | 선택적 provider backlog | API key·attribution·저장/캐시 제한을 별도 transport로 구현해야 함 |
+| KLIPY | `GIF-02` 우선 후보 | 1천만+ catalog, 한국어 검색·지역화, 키보드 사례가 있으나 API key·attribution·partner 승인이 필요 |
+| GIPHY | `GIF-02` 대안 | 충분한 catalog지만 API key·Powered by GIPHY·결과 비혼합 계약과 production 승인이 필요 |
 
 Commons tab을 구현할 때는 기존 MediaWiki MIME·license allowlist·restriction 필터를 그대로 유지하고,
 다른 provider 결과와 같은 grid에 섞지 않는다.
 
-### 7.9 선택적 상용 catalog 공급자
+### 7.9 KLIPY 실사용 catalog 공급자
 
-GIPHY 또는 KLIPY는 `GIF-01` 완료 조건이 아니며 별도 backlog로 둔다.
+`KlipyGifProvider`는 `GIF-02`의 실사용 공급자로 구현됐다. 2026-07-26 라이브 probe와 A35 검색에서
+`축하`, `웃겨`, `고마워` 한국어 query가 실제 GIF rendition과 밈·인물·캐릭터 반응 결과를 반환했다.
 
-- 별도 provider/tab과 별도 API key 설정을 사용한다.
-- provider attribution과 최신 API 정책을 UI에 표시한다.
-- 공개 라이선스 결과와 혼합하거나 동일한 disk cache 경로로 저장하지 않는다.
-- 장기 disk cache를 금지하는 약관과 `Commit Content` 수신 앱의 지연 read를 동시에 만족시키기 위해,
-  구현 전 streaming `ContentProvider` 또는 공급자 승인 경로를 확정한다.
+- API key는 constructor/BuildConfig 주입만 허용하며 source, log, error, metadata에 넣지 않는다.
+- 공개 release 기본값은 빈 key다. key가 없으면 공개 Animated Noto Emoji fallback을 사용한다.
+- `/gifs/trending`과 `/gifs/search` 결과를 별도 KLIPY provider model로 parse하고 공개 공급자 결과와
+  같은 grid response 또는 disk directory에 혼합하지 않는다.
+- canonical `klipy.com/gifs/{slug}`와 downloadable GIF rendition을 분리한다.
+- 모든 카드에 `Powered by KLIPY`와 KLIPY API Terms attribution을 표시한다.
+- query는 UTF-8로 encode하고 `locale=ko`를 지정하며, API 응답·media·canonical URL 모두 HTTPS만 허용한다.
+- test key는 개발 검증에만 사용한다. 배포 전 production key, attribution 검수, partner 조건 승인을
+  `GIF-02-PROD` owner gate로 처리한다.
+
+GIPHY는 충분한 catalog를 제공하지만 KLIPY 결과와 혼합하지 않는 별도 optional provider 후보로만
+유지한다. 현재 MVP에는 넣지 않는다.
 
 Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 사용하지 않는다. 공급자 상태는
 구현 시점에 공식 문서로 다시 검증한다.
@@ -457,7 +474,7 @@ Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 �
 ### 7.10 cache와 cleanup
 
 - thumbnail memory cache와 original GIF disk cache를 분리한다.
-- original GIF는 app `cacheDir/gif-share` 아래에만 저장한다.
+- original GIF는 app `cacheDir/gif-share/{providerId}` 아래에만 저장한다.
 - partial download는 별도 확장자로 쓰고 검증 뒤 atomic rename한다.
 - MIME, GIF87a/GIF89a signature, byte limit를 모두 통과해야 공유한다.
 - MVP original 최대 크기는 20 MiB다.
@@ -496,17 +513,22 @@ Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 �
 
 | 범위 | 결과 | 증거 |
 | --- | --- | --- |
-| GIF unit/state test | `PASS` | GIF 19개, failure/error 0. Noto catalog·한국어 query·인라인 조합·size policy와 기존 parser/license/MIME/private gate 포함 |
-| app 전체 JVM test | `PASS` | 25 suites, 93개, failure/error/skipped 0 |
+| GIF unit/state test | `PASS` | KLIPY parser 7개와 기존 GIF 19개, failure/error 0. 한국어 query·canonical/media 분리·HTTPS·key 비노출·MIME/private gate 포함 |
+| app 전체 JVM test | `PASS` | 31 suites, 112개, failure/error/skipped 0 |
 | arm64 app/plugin build | `PASS` | `:app:assembleDebug`, `:plugin:hangul:assembleDebug` |
-| A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, `b7e7c394` 포함 app과 Hangul plugin 최종 APK 재설치 |
+| A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, AI·KLIPY 통합 app과 Hangul plugin 최종 APK 재설치, debug Fcitx IME 재선택 |
 | 기본 source live probe | `PASS` | catalog 881개, party WebP·GIF 모두 HTTP 200, GIF MIME과 957,983-byte 응답 확인 |
 | 검색 입력·preview | `PASS` | A35에서 검색창 탭 즉시 독립 자판 표시, `cnrgk→축하`, 결과 grid 표시. 0.7초 간격 화면의 GIF 영역 256,605 pixel 변화 확인 |
 | 일반 text editor | `PASS` | Chrome은 `contentMimeTypes`에 GIF 미지원; 첨부 disabled 설명 표시, Noto canonical URL을 focused editor에 정확히 1회 입력 |
 | GIF 지원 editor | `PASS` | Discord `contentMimeTypes=[image/*]`; 1,176,505-byte animated GIF를 `commitContent`로 전달해 전송 전 compose preview가 실제 표시됨 |
 | attach 실패 fallback | `PASS` | attach 경로에는 URL commit이 없고 실패는 상태 표시만 수행 |
 | private editor network | `PASS` | `GifSearchGateTest.privateEditorMakesZeroProviderRequests`가 provider 호출 0을 검증 |
-| Z Fold6 설치 | `PASS` | `SM-F956N`, wireless ADB로 `b7e7c394` 포함 app과 Hangul plugin 재설치, Fcitx 입력기 서비스 등록 및 기본 입력기 전환 확인 |
+| Z Fold6 설치 | `PASS` | `SM-F956N`, wireless ADB로 동일 app과 Hangul plugin 재설치, Fcitx 입력기 서비스 등록 및 기본 입력기 전환 확인 |
+| KLIPY 한국어 검색 | `PASS` | A35에서 `축하` 검색 결과가 캐릭터·밈 GIF grid로 표시되고 카드 overlay가 선택 카드 위로 이동 |
+| KLIPY link exactly-once | `PASS` | Chrome URL editor의 실제 text에서 canonical `https://klipy.com/gifs/...` occurrence가 정확히 1개 |
+| KLIPY 미지원 editor | `PASS` | Chrome overlay에서 `GIF 첨부` disabled와 `이 앱은 GIF 첨부를 지원하지 않음`을 동시에 표시 |
+| KLIPY Fold UI | `PASS` | Z Fold6 cover 화면에서 toolbar 진입, 2열 인기 GIF grid와 attribution 렌더 확인 |
+| KLIPY production 승인 | `GATE` | source에 key를 넣지 않음. 공개 배포 전 전용 production key·partner 약관 승인 필요 |
 
 `GIF-01`의 코드, 자동 테스트, A35 기능 검증, A35·Z Fold6 설치 게이트가 모두 통과했다. 2026-07-26
 사용자 피드백으로 기존 `AlertDialog/EditText` 검색과 Commons 기본 결과의 실사용 실패를 재현한 뒤
@@ -553,6 +575,27 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 - AI 결과는 원문, diff, 후보를 보여주고 `교체`, `뒤에 넣기`, `복사`, `취소`를 구분한다.
 - 교체 뒤 최소 한 번의 undo 경로를 제공한다.
 
+### 8.4 AI text MVP 구현·검증 증거 (2026-07-26)
+
+| 범위 | 결과 | 증거 |
+| --- | --- | --- |
+| 공급자 profile | `PASS` | OpenAI·OpenAI-compatible HTTPS endpoint, Fast/Balanced/Quality model tier와 loopback 개발 예외를 pure model로 검증 |
+| API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
+| Responses client | `PASS` | `/responses`, `store=false`, JSON suggestion parse, redirect 금지, prompt/result 비로그와 sanitized error 구현 |
+| text/action test | `PASS` | AI 5 suites·12 tests, failure 0. action prompt, provider validation, selection/문단 source, 응답 parse, usage 원문 비저장을 검증 |
+| Privacy dashboard | `PASS` | A35에서 현재 provider, 전송 원칙, 기능별 집계 usage, usage 삭제와 GIF cache 삭제 UI 렌더 확인 |
+| 명시적 network action | `PASS` | AI window를 열 때는 원문 preview만 표시하고 `문장 3개`를 누른 뒤에만 Responses request 실행 |
+| A35 생성 결과 | `PASS` | `meeting 30 minutes late polite` 선택 범위로 한국어 지각 안내 초안 생성, 결과 card와 공급자 표시 확인 |
+| 교체 exactly-once·undo | `PASS` | Chrome URL editor에서 결과를 한 번 교체한 뒤 `실행 취소`로 원문이 정확히 복원됨 |
+| Z Fold6 UI | `PASS` | cover 화면에서 AI toolbar, 원문 preview와 전체 action group이 잘림 없이 표시됨 |
+| 두 기기 최종 설치 | `PASS` | A35·Z Fold6에 동일 arm64 app/plugin 재설치, debug Fcitx IME 재선택 |
+| AI-01 diff·부분 적용 | `GATE` | 전체 교체·뒤에 붙이기·undo는 동작하나 맞춤법 diff와 부분 적용 UI가 남음 |
+| action별 품질 matrix | `GATE` | 말투 6종, 답장, 번역 4개, 3후보 보장을 provider/model별로 실제 기기 검증해야 함 |
+
+사용량 저장소는 action·성공/실패·입출력 문자 수·마지막 provider/model만 집계하며 prompt, 결과,
+API key, endpoint URL 필드를 갖지 않는다. 개인 debug build의 공급자 credential도 Gradle environment
+property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 노출하지 않는다.
+
 ## 9. 권장 구현 순서
 
 ### 단계 0 — 현재 기준선 보존
@@ -561,7 +604,7 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 2. 현재 한글 배열·테마·다국어 변경의 test/build/device 증거를 유지한다.
 3. 큰 기능 묶음 전 review 가능한 checkpoint를 만든다.
 
-### 단계 1 — GIF-01 완료
+### 단계 1 — GIF pipeline과 실사용 catalog
 
 1. Animated Noto 기본 provider, Commons 보조 provider와 license policy pure model·test.
 2. repository, search generation, thumbnail loader.
@@ -570,6 +613,8 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 5. FileProvider, original cache, `RichContentCommitter`.
 6. sensitive/private gate, error, retry, cleanup.
 7. JVM test, build, A35/Fold6 지원·미지원 editor 검증.
+8. KLIPY provider, 한국어 검색, provider별 cache, 두 기기 catalog 검증. (`DONE`)
+9. 전용 production key와 partner 승인. (`GATE`)
 
 ### 단계 2 — 로컬 한국어 quick wins
 
@@ -582,12 +627,13 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 
 ### 단계 3 — AI 기반과 text 기능
 
-1. `AI-00`, `SEC-02`, `SEC-03`을 먼저 구현한다.
-2. `AI-01` 맞춤법·띄어쓰기.
-3. `AI-02` 말투 변환.
-4. `AI-03` 문장 생성.
-5. `AI-05` 번역.
-6. `AI-04` 답장 초안.
+1. `AI-00`, `AI-06`, `SEC-02` 공급자·Keystore·privacy/usage 기반. (`DONE`)
+2. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
+3. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용)
+4. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
+5. `AI-03` 문장 생성. (`IN_PROGRESS`: A35 live 통과, 3후보 보장)
+6. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
+7. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake)
 
 ### 단계 4 — 음성
 
@@ -639,6 +685,8 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | AI·로컬·음성·GIF 기능을 이 문서의 통합 backlog로 관리 |
 | 2026-07-26 | GIF MVP 기본 provider는 Wikimedia Commons, GIPHY는 별도 optional provider |
 | 2026-07-26 | 실사용 실패를 근거로 GIF 검색을 인라인 한글·영문 자판으로 교체하고 기본 provider를 Animated Noto Emoji로 변경. Commons는 별도 공개 미디어 tab backlog로 이동 |
+| 2026-07-26 | Animated Noto의 밈·리액션 부족을 근거로 KLIPY를 실사용 catalog로 구현. key 없는 공개 build는 Noto fallback을 유지하고 production key·partner 승인은 별도 gate로 둠 |
 | 2026-07-26 | GIF attach 실패 뒤 link 자동 삽입 금지 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
+| 2026-07-26 | AI text action은 선택/현재 문단 preview 후에만 network를 호출하고 결과 교체·추가·undo를 명시적 동작으로 제한 |
 | 2026-07-26 | 동적 빠른 문구는 기존 `.mb` 형식을 유지하고, 명시적 미리보기 뒤 정확히 한 번 삽입 |

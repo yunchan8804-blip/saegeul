@@ -155,6 +155,8 @@
     <string name="buffered_hangul_input_summary" tools:ignore="MissingTranslation">Keep Hangul composition inside Fcitx and send each completed segment as one unit. Experimental; verify behavior in the target app.</string>
     <string name="auto_snippet_expansion" tools:ignore="MissingTranslation">Automatic snippet expansion</string>
     <string name="auto_snippet_expansion_summary" tools:ignore="MissingTranslation">Expand built-in aliases such as :address1 and enabled quick-phrase keywords beginning with : when Space or Enter is pressed</string>
+    <string name="offline_mode" tools:ignore="MissingTranslation">Completely offline mode</string>
+    <string name="offline_mode_summary" tools:ignore="MissingTranslation">Block AI, GIF search, transcription, and every remote input provider</string>
     <string name="mobile_hangul_layout" tools:ignore="MissingTranslation">Korean keyboard surface</string>
     <string name="mobile_hangul_physical" tools:ignore="MissingTranslation">Physical layout</string>
     <string name="mobile_hangul_chunjiin" tools:ignore="MissingTranslation">Chunjiin</string>
@@ -421,4 +423,65 @@
     <string name="snippet_missing_value" tools:ignore="MissingTranslation">This snippet needs a value in the encrypted profile</string>
     <string name="snippet_insert_failed" tools:ignore="MissingTranslation">Could not expand the snippet; the trigger was preserved</string>
     <string name="quickphrase" tools:ignore="MissingTranslation">Quick phrase</string>
+    <string name="ai_assistant_title" tools:ignore="MissingTranslation">AI writing</string>
+    <string name="ai_back" tools:ignore="MissingTranslation">Keyboard</string>
+    <string name="ai_source_label" tools:ignore="MissingTranslation">Text to send after you choose an action</string>
+    <string name="ai_actions_writing" tools:ignore="MissingTranslation">Writing</string>
+    <string name="ai_actions_tone" tools:ignore="MissingTranslation">Tone</string>
+    <string name="ai_actions_translation" tools:ignore="MissingTranslation">Translate</string>
+    <string name="ai_select_action" tools:ignore="MissingTranslation">Review the source, then choose an AI action</string>
+    <string name="ai_loading" tools:ignore="MissingTranslation">Generating suggestions…</string>
+    <string name="ai_provider" tools:ignore="MissingTranslation">Provider: %1$s</string>
+    <string name="ai_retry" tools:ignore="MissingTranslation">Retry</string>
+    <string name="ai_undo" tools:ignore="MissingTranslation">Undo</string>
+    <string name="ai_error" tools:ignore="MissingTranslation">AI error: %1$s</string>
+    <string name="ai_error_empty_result" tools:ignore="MissingTranslation">The provider returned no usable suggestion</string>
+    <string name="ai_result_number" tools:ignore="MissingTranslation">Suggestion %1$d</string>
+    <string name="ai_replace" tools:ignore="MissingTranslation">Replace</string>
+    <string name="ai_append" tools:ignore="MissingTranslation">Append</string>
+    <string name="ai_action_proofread" tools:ignore="MissingTranslation">Proofread</string>
+    <string name="ai_action_polite" tools:ignore="MissingTranslation">Polite</string>
+    <string name="ai_action_casual" tools:ignore="MissingTranslation">Chat</string>
+    <string name="ai_action_business" tools:ignore="MissingTranslation">Business</string>
+    <string name="ai_action_decline" tools:ignore="MissingTranslation">Decline</string>
+    <string name="ai_action_apology" tools:ignore="MissingTranslation">Apology</string>
+    <string name="ai_action_customer_service" tools:ignore="MissingTranslation">Customer support</string>
+    <string name="ai_action_compose" tools:ignore="MissingTranslation">3 drafts</string>
+    <string name="ai_action_reply" tools:ignore="MissingTranslation">3 replies</string>
+    <string name="ai_action_translate_english" tools:ignore="MissingTranslation">English</string>
+    <string name="ai_action_translate_korean" tools:ignore="MissingTranslation">Korean</string>
+    <string name="ai_action_translate_japanese" tools:ignore="MissingTranslation">Japanese</string>
+    <string name="ai_action_translate_chinese" tools:ignore="MissingTranslation">Chinese</string>
+    <string name="ai_not_configured" tools:ignore="MissingTranslation">Configure an AI provider and API key in Privacy &amp; AI settings</string>
+    <string name="ai_private_disabled" tools:ignore="MissingTranslation">AI is disabled in password and private fields</string>
+    <string name="ai_offline_disabled" tools:ignore="MissingTranslation">Turn off completely offline mode to use AI</string>
+    <string name="ai_no_source" tools:ignore="MissingTranslation">Select text or type an instruction immediately before the cursor</string>
+    <string name="ai_editor_changed" tools:ignore="MissingTranslation">The input field, text, or cursor changed. Open AI writing again.</string>
+    <string name="ai_apply_failed" tools:ignore="MissingTranslation">Could not apply this suggestion. No fallback was attempted.</string>
+    <string name="ai_undo_failed" tools:ignore="MissingTranslation">Could not undo because the text or cursor changed</string>
+    <string name="privacy_ai" tools:ignore="MissingTranslation">Privacy &amp; AI</string>
+    <string name="privacy_network_controls" tools:ignore="MissingTranslation">Network controls</string>
+    <string name="ai_provider_settings" tools:ignore="MissingTranslation">AI provider</string>
+    <string name="ai_clear_custom_provider" tools:ignore="MissingTranslation">Remove custom provider</string>
+    <string name="ai_provider_configured_summary" tools:ignore="MissingTranslation">%1$s · %2$s · %3$s</string>
+    <string name="ai_provider_source_custom" tools:ignore="MissingTranslation">encrypted BYOK profile</string>
+    <string name="ai_provider_source_bundled" tools:ignore="MissingTranslation">private debug build profile</string>
+    <string name="ai_provider_source_missing" tools:ignore="MissingTranslation">not configured</string>
+    <string name="ai_provider_name_hint" tools:ignore="MissingTranslation">Provider name</string>
+    <string name="ai_provider_url_hint" tools:ignore="MissingTranslation">Responses API base URL</string>
+    <string name="ai_provider_key_hint" tools:ignore="MissingTranslation">API key</string>
+    <string name="ai_provider_key_unchanged_hint" tools:ignore="MissingTranslation">API key (leave blank to keep it)</string>
+    <string name="ai_fast_model_hint" tools:ignore="MissingTranslation">Fast model</string>
+    <string name="ai_balanced_model_hint" tools:ignore="MissingTranslation">Balanced model</string>
+    <string name="ai_quality_model_hint" tools:ignore="MissingTranslation">Quality model</string>
+    <string name="ai_provider_security_note" tools:ignore="MissingTranslation">The key is encrypted with Android Keystore in no-backup storage. It is excluded from app backups, exports, logs, and the clipboard.</string>
+    <string name="ai_provider_invalid" tools:ignore="MissingTranslation">Check the key, HTTPS URL, and model names</string>
+    <string name="privacy_local_data" tools:ignore="MissingTranslation">Local data</string>
+    <string name="ai_usage_title" tools:ignore="MissingTranslation">AI usage summary</string>
+    <string name="ai_usage_summary" tools:ignore="MissingTranslation">Requests %1$d · success %2$d · failure %3$d · sent characters %4$d</string>
+    <string name="ai_usage_clear" tools:ignore="MissingTranslation">Clear AI usage summary</string>
+    <string name="gif_cache_clear" tools:ignore="MissingTranslation">Clear downloaded GIF cache</string>
+    <string name="gif_cache_cleared" tools:ignore="MissingTranslation">GIF cache cleared</string>
+    <string name="privacy_guarantees" tools:ignore="MissingTranslation">Privacy guarantees</string>
+    <string name="privacy_guarantees_summary" tools:ignore="MissingTranslation">Password and private fields disable text inspection and network features. AI sends only the previewed selection or current paragraph after an explicit action. Requests use store=false. Usage stores counters only, never text, keys, or URLs.</string>
 </resources>

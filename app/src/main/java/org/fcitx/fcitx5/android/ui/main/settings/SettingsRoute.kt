@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.behavior.AdvancedSettingsFragme
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.CandidatesSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeyboardSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.PrivacyAiSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.SymbolSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.global.GlobalConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodConfigFragment
@@ -85,6 +86,9 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object Advanced : SettingsRoute()
+
+    @Serializable
+    data object PrivacyAi : SettingsRoute()
 
     @Serializable
     data object Developer : SettingsRoute()
@@ -224,6 +228,9 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<AdvancedSettingsFragment, Advanced> {
                 label = ctx.getString(R.string.advanced)
+            }
+            fragment<PrivacyAiSettingsFragment, PrivacyAi> {
+                label = ctx.getString(R.string.privacy_ai)
             }
             fragment<DeveloperFragment, Developer> {
                 label = ctx.getString(R.string.developer)
