@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `KO-03A 자동 스니펫 확장`
+현재 활성 구현 마일스톤: `KO-BASE-08 숫자·기호 전환 상태 복구`의 Z Fold6 설치 검증
 
 ## 2. 상태 표기
 
@@ -71,6 +71,7 @@
 | `KO-BASE-05` | 스페이스바 길게 눌러 한글 표면 전환 | `DONE` | 두 기기 왕복·설정 유지 |
 | `KO-BASE-06` | 한지 Light·단청 Dark 등 한국 테마 | `DONE` | serialization 테스트와 실기기 렌더 |
 | `KO-BASE-07` | 앱 및 plugin 한국어 번역 확대 | `DONE` | build와 두 기기 설치 |
+| `KO-BASE-08` | 숫자·기호 전환 상태 복구 | `IN_PROGRESS` | 레거시 상태 migration 테스트와 A35 반복 왕복 통과, Fold6 설치 검증 대기 |
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | 5 JVM 테스트와 A35 Discord 교체·실행 취소 |
 | `KO-02` | 초성 통합 검색 | `DONE` | 6 JVM 테스트와 A35 `ㄱㅅ` 검색·1회 삽입 |
 | `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 7 JVM 테스트와 A35 날짜·profile·clipboard 미리보기·1회 삽입 |
@@ -81,6 +82,24 @@
 원칙적으로 새 기능은 현재 milestone의 공통 게이트와 두 기기 설치를 마친 뒤 다음 항목으로 넘어간다.
 다만 `KO-03`은 Z Fold6 연결만 외부 gate로 남은 상태에서 사용자가 자동완성을 우선 지시했으므로,
 코드 기준선을 보존한 채 `KO-09` 구현을 병행한다. 둘 다 두 기기 검증 전에는 `DONE`으로 올리지 않는다.
+
+#### KO-BASE-08 숫자·기호 전환 회귀 계약과 증거 (2026-07-26)
+
+1. `?123`의 기본 목적지는 숫자판 `Number`다. 사용자가 명시적으로 기호 picker를 선택한 경우에만
+   `Symbol` 목적지를 보존한다.
+2. 과거 버전이 저장한 `Text`, `Hangul`, `MobileHangul:*` 또는 알 수 없는 목적지는 유효한 숫자·기호
+   목적지가 아니다. 첫 `?123` 동작에서 `Number`로 교정하고 저장소도 즉시 갱신한다.
+3. 숫자판에서 `ABC`로 돌아갈 때 현재 한글 표면을 복원하되, 그 text surface를 다음 `?123` 목적지로
+   다시 저장하지 않는다.
+
+| 항목 | 상태 | 증거 |
+| --- | --- | --- |
+| migration 단위 테스트 | `PASS` | `KeyboardLayoutMemoryTest` 4개가 Number 기억, text surface 비기억, 모든 mobile Hangul 레거시 값 교정, 유효한 Number·Symbol 보존을 검증 |
+| 전체 자동 테스트·빌드 | `PASS` | app 23 suites·85 tests·failure/error/skipped 0, arm64 app과 Hangul plugin assemble 성공 |
+| A35 레거시 재현 | `PASS` | 저장값을 `MobileHangul:Cheonjiin`으로 강제한 뒤 `?123` 한 번에 숫자판이 열리고 저장값이 `Number`로 자가 복구됨 |
+| A35 반복 왕복 | `PASS` | 한글 `?123 → Number → ABC → 한글 → ?123 → Number` 반복 통과 |
+| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, app/plugin `0.1.2-92-g0c3b30cf` 설치 및 debug Fcitx IME 재선택 |
+| Z Fold6 전달·설치 | `GATE` | 동일 app/plugin APK를 Taildrop으로 전달 완료; 기기에서 설치 후 한글·천지인 왕복 확인 필요 |
 
 ## 5. 변경 불가 제품 원칙
 
@@ -154,14 +173,15 @@ A35와 Z Fold6의 일반 editor 및 buffered 호환 editor 실기기 검증이�
 |---|---|---|
 | 사전 출처·재현성 | `PASS` | 국립국어원 원본 SHA-256을 고정하고 생성 결과 5,250개·91,467 bytes·SHA-256 `1778F7ACCBE3190A3ECDDFC9991B2511F466425B48185004072C22558BBBA2C1` 재현 |
 | native parser·후보 테스트 | `PASS` | Android arm64-v8a `testcompletiondictionary`를 A35 `/data/local/tmp`에서 실행해 순위·limit·중복·CRLF·접미부 계산 검증 |
-| 전체 자동 테스트·빌드 | `PASS` | `:app:testDebugUnitTest :app:assembleDebug :plugin:hangul:assembleDebug -PbuildABI=arm64-v8a`, 20 suites·71 tests·실패 0 |
+| 전체 자동 테스트·빌드 | `PASS` | `:app:testDebugUnitTest :app:assembleDebug :plugin:hangul:assembleDebug -PbuildABI=arm64-v8a`, 현재 기준 23 suites·85 tests·실패 0 |
 | plugin 패키징 | `PASS` | plugin APK에 `completion.txt`, `completion-NOTICE.md`, 한국어 번역, `libhangul.so` 포함 및 AboutLibraries에 KOGL 제1유형 표시 확인 |
 | A35 후보 UX | `PASS` | Discord에서 `안녕` 입력 시 `안녕 / 안녕하세요 / 안녕하십니까` 순서로 표시 |
 | A35 명시적 선택 | `PASS` | `안녕하세요` 후보 tap 뒤 editor hierarchy의 compose text가 `안녕하세요` 정확히 한 번임을 확인; 메시지는 전송하지 않고 draft 삭제 |
 | A35 미선택 space | `PASS` | 후보를 누르지 않고 space 입력 뒤 compose text가 `안녕 `으로 유지되고 자동완성 후보로 치환되지 않음을 확인 |
+| 한글 후보 언어 경계 | `PASS` | 자동완성 사전은 현대 한글 음절만 적재·노출하고, 자동완성 중 지속 Hanja 후보가 후보창을 선점하지 않도록 분리; 한자는 명시적 1회 변환 action으로 유지 |
 | 민감 editor 차단 | `CODE` | `Password`, `Sensitive`, `NoSpellCheck` capability 중 하나라도 있으면 사전 조회 전에 fail-closed |
-| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, `0.1.2-86-g08f4e443` app/plugin 재설치 및 debug Fcitx IME 재선택; app `09:47:14`, plugin `09:47:17` |
-| 최종 Z Fold6 설치 | `BLOCK` | `192.168.0.89:35933` mDNS 광고는 간헐적으로 보이지만 TCP 연결이 거부되고 `adb devices`에는 A35만 보여 무선 디버깅 재연결 대기 |
+| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, 최신 app/plugin `0.1.2-92-g0c3b30cf` 설치 및 debug Fcitx IME 재선택 |
+| 최종 Z Fold6 설치 | `GATE` | 최신 APK 2개 Taildrop 전달 완료; Android 무선 디버깅 endpoint 인증이 없어 기기 설치·후보 UX 확인 대기 |
 
 #### KO-02 상세 계약
 
@@ -230,6 +250,17 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 완료 게이트는 기본 별칭·사용자 override·중복·경계 오탐·space/Enter 정책·일반/buffered 분할 trigger
 계획 테스트, email profile 하위 호환 테스트, 전체 JVM/build, A35와 Z Fold6에서 `:주소1`·`:이메일`
 확장 및 private editor 비활성 검증이다.
+
+#### KO-03A 구현·검증 증거 (2026-07-26)
+
+| 범위 | 결과 | 증거 |
+| --- | --- | --- |
+| 스니펫 catalog | `PASS` | 기본 `:주소1`·`:이메일`, 사용자 override, URL/어절 내부 오탐 방지, 분할 입력, 후행 문자열 거부를 6개 JVM 테스트로 검증 |
+| A35 space 확장 | `PASS` | `:주소1 `과 `:이메일 `이 암호화 profile 값으로 정확히 한 번 교체됨 |
+| A35 Enter 확장 | `PASS` | trigger 뒤 Enter가 먼저 스니펫을 확장하고 경계 동작을 한 번만 적용함 |
+| private editor | `PASS` | private editor에서 자동 스니펫을 비활성화하고 literal 입력을 보존함 |
+| 전체 회귀 | `PASS` | 현재 기준 app 23 suites·85 tests·failure/error/skipped 0, arm64 app/plugin build 성공 |
+| Z Fold6 | `GATE` | 최신 APK 전달 완료; `:주소1`·`:이메일`과 private editor 실기기 확인 필요 |
 
 #### KO-03 구현·검증 증거 (2026-07-26)
 
