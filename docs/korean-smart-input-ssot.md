@@ -122,7 +122,7 @@
 
 | ID | 기능 | 상태 | 가치 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `GIF-01` | Commons GIF 검색·링크·첨부 MVP | `DONE` | 키보드 이탈 없이 반응 GIF 사용 | L |
+| `GIF-01` | 공개 라이선스 GIF 검색·링크·첨부 MVP | `DONE` | 키보드 이탈 없이 반응 GIF 사용 | L |
 
 `GIF-01`의 상세 계약은 7절에 있다.
 
@@ -335,14 +335,16 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 ### 7.1 핵심 UX
 
 1. 키보드 toolbar의 GIF 버튼으로 `GifSearchWindow`를 연다.
-2. 첫 화면은 Commons의 검증된 기본 결과를, 검색 뒤에는 한국어 query 결과를 grid로 표시한다.
-3. thumbnail을 탭하면 해당 카드 자체 위에 반투명 selection overlay를 표시한다.
-4. overlay에는 `링크 넣기`와 `GIF 첨부`를 동시에 표시한다.
-5. 선택된 카드를 다시 탭하거나 바깥을 탭하면 overlay를 닫는다.
-6. 다른 카드를 탭하면 overlay가 그 카드로 이동한다.
-7. `링크 넣기`는 provider의 canonical page URL을 `commitText()`로 정확히 한 번 삽입한다.
-8. `GIF 첨부`는 실제 animated `image/gif` 파일을 Android Commit Content API로 전달한다.
-9. 성공 뒤 일반 keyboard로 돌아간다. 실패 뒤에는 현재 결과와 선택을 보존하고 retry를 제공한다.
+2. 첫 화면은 Animated Noto Emoji의 검증된 기본 결과를, 검색 뒤에는 한국어 query 결과를 grid로 표시한다.
+3. 검색창은 IME가 자기 자신을 다시 호출하는 `AlertDialog/EditText`가 아니라 GIF surface 안의
+   독립 한글·영문 인라인 자판을 사용한다. query는 대상 editor의 `InputConnection`에 쓰지 않는다.
+4. thumbnail을 탭하면 해당 카드 자체 위에 반투명 selection overlay를 표시한다.
+5. overlay에는 `링크 넣기`와 `GIF 첨부`를 동시에 표시한다.
+6. 선택된 카드를 다시 탭하거나 바깥을 탭하면 overlay를 닫는다.
+7. 다른 카드를 탭하면 overlay가 그 카드로 이동한다.
+8. `링크 넣기`는 provider의 canonical page URL을 `commitText()`로 정확히 한 번 삽입한다.
+9. `GIF 첨부`는 실제 animated `image/gif` 파일을 Android Commit Content API로 전달한다.
+10. 성공 뒤 일반 keyboard로 돌아간다. 실패 뒤에는 현재 결과와 선택을 보존하고 retry를 제공한다.
 
 버튼 표기는 `URL`/`이미지`보다 `링크 넣기`/`GIF 첨부`를 우선한다.
 
@@ -350,7 +352,8 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 | 상태 | 표시 | 허용 동작 |
 | --- | --- | --- |
-| `Initial` | 검색창과 기본 결과 | 검색, 결과 선택, 닫기 |
+| `Initial` | 검색창과 기본 결과 | 검색 편집 진입, 결과 선택, 닫기 |
+| `EditingQuery` | 독립 두벌식·QWERTY 검색 자판 | 한/영, shift, 삭제, 지우기, 검색 |
 | `Loading` | 진행 표시 | 취소 또는 query 교체 |
 | `Results` | 결과 grid | 선택, 새 검색 |
 | `Selected` | 카드 overlay와 attribution | 링크, 첨부, 선택 해제 |
@@ -362,7 +365,7 @@ stale search response가 최신 query 결과를 덮지 않도록 request generat
 
 ### 7.3 링크 삽입 계약
 
-- media CDN URL이 아니라 사람이 attribution을 확인할 수 있는 canonical Commons page URL을 삽입한다.
+- media CDN URL이 아니라 사람이 attribution을 확인할 수 있는 provider canonical page URL을 삽입한다.
 - `currentInputConnection.commitText(url, 1)` 호출은 사용자 action당 최대 한 번이다.
 - 실패 또는 invalid connection 뒤 clipboard paste나 다른 transport를 자동 실행하지 않는다.
 - buffered Hangul prefix와 composing text를 먼저 안전하게 정리한다.
@@ -400,7 +403,7 @@ stale search response가 최신 query 결과를 덮지 않도록 request generat
 | `mediaUrl` | 실제 원본 GIF 다운로드 URL |
 | `thumbnailUrl` | grid thumbnail URL |
 | `mimeType` | 반드시 `image/gif` |
-| `width`, `height`, `byteSize` | download 및 layout 검증 |
+| `width`, `height`, `byteSize` | download 및 layout 검증. metadata에 크기가 없으면 `0`이고 실제 응답을 제한한다. |
 | `author` | 저작자 또는 제공자 표기 |
 | `licenseName`, `licenseUrl` | 라이선스 표기와 상세 링크 |
 | `attribution` | 카드와 상세 overlay에 표시할 문구 |
@@ -408,33 +411,50 @@ stale search response가 최신 query 결과를 덮지 않도록 request generat
 
 canonical page URL과 downloadable media URL을 혼동하지 않는다.
 
-### 7.7 Wikimedia Commons 기본 공급자
+### 7.7 Animated Noto Emoji 기본 공급자
 
-- MediaWiki API의 file namespace 검색과 `imageinfo/extmetadata`를 사용한다.
-- query는 UTF-8 한국어를 그대로 지원하며 safe search는 항상 켠 상태로 취급한다.
-- MIME이 정확히 `image/gif`인 파일만 허용한다.
-- MVP는 CC0, Public Domain, CC BY, CC BY-SA처럼 앱이 attribution 의무를 명확히
-  표시할 수 있는 allowlist만 노출한다. GFDL처럼 배포 시 라이선스 사본 등 추가 의무가 생기는
-  형식은 해당 의무 UI를 구현하기 전까지 제외한다.
-- license, author 또는 canonical source를 확인할 수 없는 결과는 제외한다.
-- `do not use`, copyright violation, fair use, non-free, all rights reserved, permission missing,
-  deletion candidate 신호가 있는 결과는 제외한다.
-- card 또는 overlay에 provider, author, license를 표시하며 canonical page로 이동할 수 있게 한다.
-- Commons와 다른 provider 결과를 같은 grid에 섞지 않는다.
+- Google의 [Animated Noto Emoji](https://googlefonts.github.io/noto-emoji-animation/) 공식 catalog를
+  사용한다. 2026-07-26 라이브 확인 기준 881개 항목이며 media는 실제 `512.gif`다.
+- catalog metadata만 한 번 내려받고 한국어 query와 영어 tag의 매칭은 전부 기기 안에서 수행한다.
+  검색어 자체는 provider로 전송하지 않는다.
+- 한국어 감정·반응어를 공식 영어 tag로 확장하고, 자주 쓰는 축하·웃음·박수·사랑·감사 결과를
+  기본 grid에 우선 배치한다.
+- grid thumbnail은 animated WebP를 `ImageDecoder`로 재생하고 Android 8 이하에서는 정적 첫 프레임으로
+  안전하게 fallback한다. 첨부 원본은 별도 `image/gif` URL을 사용한다.
+- author는 Google, license는 CC BY 4.0으로 카드에 항상 표시하며 canonical page와 media URL을 분리한다.
+- catalog 장애 때도 동일한 공개 자산의 검증된 curated subset을 사용한다.
 
-### 7.8 선택적 GIPHY 공급자
+### 7.8 Wikimedia Commons 보조 공급자와 공급자 평가
 
-GIPHY는 `GIF-01` 완료 조건이 아니며 별도 backlog로 둔다.
+Commons provider와 license parser는 보존하지만 기본 반응 GIF 화면에서는 제외한다. Commons 검색은
+공개 라이선스 출처로는 적합하지만, 한국어 반응 검색 결과가 비거나 정적 자료 중심이라 일상적인
+키보드 반응 GIF의 기본 소스로는 품질이 부족했다. 향후 `공개 미디어` 별도 tab으로 제공한다.
+
+| 후보 | 결정 | 근거 |
+| --- | --- | --- |
+| Animated Noto Emoji | 기본 provider | key 불필요, CC BY 4.0, 881개 실제 animated asset, 로컬 한국어 검색 |
+| Wikimedia Commons | 별도 tab backlog | license metadata는 우수하지만 반응 GIF recall·품질이 낮음 |
+| Openverse | 기본 제외 | 라이브 GIF 검색이 사실상 Wikimedia 결과에 집중되고 한국어 recall 개선이 없음 |
+| GifCities | 제외 | GeoCities archive 자산으로 현대 반응 품질과 개별 저작권 상태가 불명확 |
+| GIPHY·KLIPY | 선택적 provider backlog | API key·attribution·저장/캐시 제한을 별도 transport로 구현해야 함 |
+
+Commons tab을 구현할 때는 기존 MediaWiki MIME·license allowlist·restriction 필터를 그대로 유지하고,
+다른 provider 결과와 같은 grid에 섞지 않는다.
+
+### 7.9 선택적 상용 catalog 공급자
+
+GIPHY 또는 KLIPY는 `GIF-01` 완료 조건이 아니며 별도 backlog로 둔다.
 
 - 별도 provider/tab과 별도 API key 설정을 사용한다.
-- `Powered by GIPHY`, attribution, API 정책을 UI에 표시한다.
-- Commons 결과와 혼합하거나 Commons인 것처럼 cache하지 않는다.
-- GIPHY의 proxy/cache/rendition 제한을 구현 전에 최신 공식 계약으로 다시 확인한다.
+- provider attribution과 최신 API 정책을 UI에 표시한다.
+- 공개 라이선스 결과와 혼합하거나 동일한 disk cache 경로로 저장하지 않는다.
+- 장기 disk cache를 금지하는 약관과 `Commit Content` 수신 앱의 지연 read를 동시에 만족시키기 위해,
+  구현 전 streaming `ContentProvider` 또는 공급자 승인 경로를 확정한다.
 
 Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 사용하지 않는다. 공급자 상태는
 구현 시점에 공식 문서로 다시 검증한다.
 
-### 7.9 cache와 cleanup
+### 7.10 cache와 cleanup
 
 - thumbnail memory cache와 original GIF disk cache를 분리한다.
 - original GIF는 app `cacheDir/gif-share` 아래에만 저장한다.
@@ -445,7 +465,7 @@ Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 �
 - window 시작, 새 download 시작, 앱 시작 중 안전한 지점에서 expired file을 정리한다.
 - cache file과 query는 사용자 ZIP export와 Android backup 대상이 아니다.
 
-### 7.10 접근성·오류·표시
+### 7.11 접근성·오류·표시
 
 - thumbnail, author, license, 두 action에 `contentDescription`을 제공한다.
 - loading, disabled attach 이유, retryable error를 색상만으로 표현하지 않는다.
@@ -453,7 +473,7 @@ Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 �
   content rejection을 서로 구분한다.
 - attribution은 thumbnail loading 실패와 관계없이 텍스트로 접근 가능해야 한다.
 
-### 7.11 완료 게이트
+### 7.12 완료 게이트
 
 `GIF-01`은 다음 항목이 모두 확인돼야 `DONE`이다.
 
@@ -472,23 +492,26 @@ Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 �
 13. password/private editor에서 검색 request가 0회임.
 14. attach 실패에서 link 자동 삽입이 0회임.
 
-### 7.12 구현·검증 증거 (2026-07-26)
+### 7.13 구현·검증 증거 (2026-07-26)
 
 | 범위 | 결과 | 증거 |
 | --- | --- | --- |
-| GIF unit/state test | `PASS` | GIF 11개, failure/error 0. provider parsing, license, animated signature/frame, MIME, overlay state, private request 0 포함 |
-| app 전체 JVM test | `PASS` | 64개, failure/error/skipped 0 |
+| GIF unit/state test | `PASS` | GIF 19개, failure/error 0. Noto catalog·한국어 query·인라인 조합·size policy와 기존 parser/license/MIME/private gate 포함 |
+| app 전체 JVM test | `PASS` | 25 suites, 93개, failure/error/skipped 0 |
 | arm64 app/plugin build | `PASS` | `:app:assembleDebug`, `:plugin:hangul:assembleDebug` |
-| A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, app과 Hangul plugin 최종 APK 재설치, app update `2026-07-26 08:21:07` |
-| 일반 text editor | `PASS` | Settings 검색창은 `contentMimeTypes=null`; 첨부 disabled 설명 표시, Commons canonical URL 1회만 입력됨 |
-| GIF 지원 editor | `PASS` | Discord `contentMimeTypes=[image/*]`; 14,925-byte animated GIF를 `commitContent`로 전달해 전송 전 compose preview가 실제 표시됨 |
+| A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, `b7e7c394` 포함 app과 Hangul plugin 최종 APK 재설치 |
+| 기본 source live probe | `PASS` | catalog 881개, party WebP·GIF 모두 HTTP 200, GIF MIME과 957,983-byte 응답 확인 |
+| 검색 입력·preview | `PASS` | A35에서 검색창 탭 즉시 독립 자판 표시, `cnrgk→축하`, 결과 grid 표시. 0.7초 간격 화면의 GIF 영역 256,605 pixel 변화 확인 |
+| 일반 text editor | `PASS` | Chrome은 `contentMimeTypes`에 GIF 미지원; 첨부 disabled 설명 표시, Noto canonical URL을 focused editor에 정확히 1회 입력 |
+| GIF 지원 editor | `PASS` | Discord `contentMimeTypes=[image/*]`; 1,176,505-byte animated GIF를 `commitContent`로 전달해 전송 전 compose preview가 실제 표시됨 |
 | attach 실패 fallback | `PASS` | attach 경로에는 URL commit이 없고 실패는 상태 표시만 수행 |
 | private editor network | `PASS` | `GifSearchGateTest.privateEditorMakesZeroProviderRequests`가 provider 호출 0을 검증 |
-| Z Fold6 설치 | `PASS` | `SM-F956N / 192.168.0.94:36675`, app과 Hangul plugin 재설치, Fcitx 입력기 서비스 등록 및 최신 패키지 기본 입력기 전환 확인 |
+| Z Fold6 설치 | `PASS` | `SM-F956N`, wireless ADB로 `b7e7c394` 포함 app과 Hangul plugin 재설치, Fcitx 입력기 서비스 등록 및 기본 입력기 전환 확인 |
 
-`GIF-01`의 코드, 자동 테스트, A35 기능 검증, A35·Z Fold6 설치 게이트가 모두 통과했다.
-Discord 검증 중에는 compose preview까지만 확인했고 메시지는 전송하지 않았으며, 검증 뒤 draft
-attachment를 제거했다.
+`GIF-01`의 코드, 자동 테스트, A35 기능 검증, A35·Z Fold6 설치 게이트가 모두 통과했다. 2026-07-26
+사용자 피드백으로 기존 `AlertDialog/EditText` 검색과 Commons 기본 결과의 실사용 실패를 재현한 뒤
+`b7e7c394`에서 인라인 검색 자판과 Animated Noto Emoji 기본 provider로 교체했다. Discord 검증 중에는
+compose preview까지만 확인했고 메시지는 전송하지 않았으며, 검증 뒤 draft attachment를 제거했다.
 
 ## 8. AI·음성 아키텍처 계약
 
@@ -540,7 +563,7 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 
 ### 단계 1 — GIF-01 완료
 
-1. Commons provider와 license policy pure model·test.
+1. Animated Noto 기본 provider, Commons 보조 provider와 license policy pure model·test.
 2. repository, search generation, thumbnail loader.
 3. toolbar, grid, selection overlay.
 4. canonical link exactly-once path.
@@ -615,6 +638,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | 제품 방향을 한국어 파워유저용 오픈형 스마트 키보드로 확정 |
 | 2026-07-26 | AI·로컬·음성·GIF 기능을 이 문서의 통합 backlog로 관리 |
 | 2026-07-26 | GIF MVP 기본 provider는 Wikimedia Commons, GIPHY는 별도 optional provider |
+| 2026-07-26 | 실사용 실패를 근거로 GIF 검색을 인라인 한글·영문 자판으로 교체하고 기본 provider를 Animated Noto Emoji로 변경. Commons는 별도 공개 미디어 tab backlog로 이동 |
 | 2026-07-26 | GIF attach 실패 뒤 link 자동 삽입 금지 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
 | 2026-07-26 | 동적 빠른 문구는 기존 `.mb` 형식을 유지하고, 명시적 미리보기 뒤 정확히 한 번 삽입 |
