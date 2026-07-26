@@ -8,4 +8,10 @@ package org.fcitx.fcitx5.android.input.keyboard
 internal object KeyboardLayoutMemory {
     fun shouldRememberAsSymbolLayout(target: String): Boolean =
         target == NumberKeyboard.Name
+
+    fun sanitizeStoredTarget(target: String, symbolPickerName: String): String =
+        when (target) {
+            NumberKeyboard.Name, symbolPickerName -> target
+            else -> NumberKeyboard.Name
+        }
 }

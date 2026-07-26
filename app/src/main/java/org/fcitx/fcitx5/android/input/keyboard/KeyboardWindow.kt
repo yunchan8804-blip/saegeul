@@ -200,8 +200,19 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             target
         }
 
+    private fun rememberedSymbolTarget(): String {
+        val sanitized = KeyboardLayoutMemory.sanitizeStoredTarget(
+            lastSymbolType,
+            PickerWindow.Key.Symbol.name
+        )
+        if (sanitized != lastSymbolType) {
+            lastSymbolType = sanitized
+        }
+        return sanitized
+    }
+
     fun switchLayout(to: String, remember: Boolean = true) {
-        val target = resolveTextLayout(to.ifEmpty { lastSymbolType })
+        val target = resolveTextLayout(to.ifEmpty { rememberedSymbolTarget() })
         ContextCompat.getMainExecutor(service).execute {
             if (keyboards.containsKey(target)) {
                 if (remember && KeyboardLayoutMemory.shouldRememberAsSymbolLayout(target)) {

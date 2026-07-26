@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrie
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
+import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSymbolDirection
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -31,7 +32,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
     inner class Internal : ManagedPreferenceInternal(sharedPreferences) {
         val firstRun = bool("first_run", true)
-        val lastSymbolLayout = string("last_symbol_layout", PickerWindow.Key.Symbol.name)
+        val lastSymbolLayout = string("last_symbol_layout", NumberKeyboard.Name)
         val lastPickerType = string("last_picker_type", PickerWindow.Key.Emoji.name)
         val verboseLog = bool("verbose_log", false)
         val pid = int("pid", 0)
