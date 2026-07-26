@@ -370,7 +370,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | --- | --- | --- | --- | --- |
 | `UX-01` | Smart clipboard action | `IN_PROGRESS` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹 구현, 기기 검증 남음 | M |
 | `UX-02` | Fold·tablet 분할 키보드 | `IN_PROGRESS` | compact/expanded·세로/가로 profile과 중앙 non-touch gap 구현, unfolded 검증 gate | L |
-| `UX-03` | 폭 적응형 기능 툴바 | `IN_PROGRESS` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환하고 모든 제어를 최소 48dp로 유지 | M |
+| `UX-03` | 폭 적응형 기능 툴바 | `DONE` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환하고 모든 제어를 최소 48dp로 유지 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
 | `SEC-03` | 완전 offline mode | `IN_PROGRESS` | AI·GIF toolbar와 network gate 통합, 실제 기기 zero-request gate 남음 | S |
@@ -446,7 +446,7 @@ backup, 일반 log에 저장하지 않으며 Bitmap은 작업 종료 시 지우�
 
 | ID | 구현 계약 | 자동 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `UX-03` | 별도 중첩 메뉴를 추가하지 않는다. 기존 툴바 열기 상태에서 실제 가용 폭이 `12 × 48dp`보다 좁으면 6×2행·96dp, 충분하면 12×1행·48dp로 즉시 전환한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 항상 1행이며 action의 순서·위치·활성 정책을 유지한다. | `ToolbarLayoutPolicyTest`, Flexbox shrink 금지, 높이 상태 전환과 arm64 build, A35·Z Fold6 cover 6×2와 두 기기 `?123` PASS | Fold unfolded 12×1 자동 복귀 |
+| `UX-03` | 별도 중첩 메뉴를 추가하지 않는다. 기존 툴바 열기 상태에서 실제 가용 폭이 `12 × 48dp`보다 좁으면 6×2행·96dp, 충분하면 12×1행·48dp로 즉시 전환한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 항상 1행이며 action의 순서·위치·활성 정책을 유지한다. | `ToolbarLayoutPolicyTest`, Flexbox shrink 금지, 높이 상태 전환과 arm64 build, A35·Z Fold6 cover 6×2, Z Fold6 unfolded 12×1, 두 기기 `?123` PASS | 없음 |
 | `AI-08` | AI 글쓰기·정밀 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 버튼은 `SettingsRoute.PrivacyAi`로 직접 이동한다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, A35·Z Fold6 미연결 안내와 `개인정보·AI` 직행 PASS | 없음 |
 
 실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
@@ -456,6 +456,8 @@ HoneyBoard가 활성인 화면을 이 앱의 숫자판이나 툴바 증거로 �
 설치하고 매 캡처 전 debug Fcitx `mCurId`를 확인했다. 두 cover 폭에서 툴바 12개 action이 6×2로
 렌더됐고, 두 기기의 `?123`은 Number로 전환됐다. 두 기기 모두 AI 글쓰기에서 일반 사용자용 미연결
 안내와 `설정하기` 버튼이 표시됐으며 버튼은 `개인정보·AI` route와 미연결 summary로 직접 이동했다.
+Z Fold6를 펼친 뒤 내부 화면 `1856×2160`, override density 360에서 같은 toolbar가 12×1 한 줄로
+자동 복귀하고 keyboard 본체와 `?123`이 함께 정상 렌더되는 것을 무선 ADB 캡처로 확인했다.
 
 ## 7. GIF-01 상세 계약
 
@@ -922,7 +924,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 코드·테스트 완료, Fold6 펼침·회전 gate)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
 6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`IN_PROGRESS`: 코드·자동 테스트 완료, 두 기기 UX·정확도와 OCR native 배포 gate)
-7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`IN_PROGRESS`: A35·Fold cover 6×2와 숫자판 통과, unfolded 12×1 gate)
+7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)
 
 ## 10. 공통 검증 게이트
 
