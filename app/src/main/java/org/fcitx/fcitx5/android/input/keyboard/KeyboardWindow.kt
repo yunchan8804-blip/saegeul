@@ -204,7 +204,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         val target = resolveTextLayout(to.ifEmpty { lastSymbolType })
         ContextCompat.getMainExecutor(service).execute {
             if (keyboards.containsKey(target)) {
-                if (remember && target != TextKeyboard.Name) {
+                if (remember && KeyboardLayoutMemory.shouldRememberAsSymbolLayout(target)) {
                     lastSymbolType = target
                 }
                 if (target == currentKeyboardName) return@execute
