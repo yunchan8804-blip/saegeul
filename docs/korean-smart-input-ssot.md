@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 마일스톤: `KO-03 동적 빠른 문구`
+현재 활성 구현 마일스톤: `KO-09 한글 어절 자동완성`
 
 ## 2. 상태 표기
 
@@ -74,9 +74,12 @@
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | 5 JVM 테스트와 A35 Discord 교체·실행 취소 |
 | `KO-02` | 초성 통합 검색 | `DONE` | 6 JVM 테스트와 A35 `ㄱㅅ` 검색·1회 삽입 |
 | `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 7 JVM 테스트와 A35 날짜·profile·clipboard 미리보기·1회 삽입 |
+| `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 로컬 빈도 사전, 명시적 후보 선택, buffered 입력 호환 구현 중 |
 
 한국어 기준선과 GIF·KO-01·KO-02는 각각 검증 가능한 checkpoint commit으로 고정돼 있다.
-새 기능은 현재 milestone의 공통 게이트와 두 기기 설치를 마친 뒤 다음 항목으로 넘어간다.
+원칙적으로 새 기능은 현재 milestone의 공통 게이트와 두 기기 설치를 마친 뒤 다음 항목으로 넘어간다.
+다만 `KO-03`은 Z Fold6 연결만 외부 gate로 남은 상태에서 사용자가 자동완성을 우선 지시했으므로,
+코드 기준선을 보존한 채 `KO-09` 구현을 병행한다. 둘 다 두 기기 검증 전에는 `DONE`으로 올리지 않는다.
 
 ## 5. 변경 불가 제품 원칙
 
@@ -115,6 +118,47 @@
 | `KO-06` | 개인 단어장 | `BACKLOG` | 이름·회사명·전문용어를 opt-in으로 로컬 우선 후보에 반영 | L |
 | `KO-07` | 한국어 조사·문맥 후보 | `BACKLOG` | 조사와 다음 어절 추천, 자동 확정은 기본 off | L |
 | `KO-08` | 한국식 감정표현 추천 | `BACKLOG` | emoji·kaomoji·ㅋㅋ/ㅎㅎ 후보, provider와 분리 | M |
+| `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 두 음절부터 로컬 접두어 후보, 선택한 후보만 정확히 한 번 확정 | M |
+
+#### KO-09 상세 계약
+
+1. 두벌식·세벌식·모바일 한글 표면에서 현재 조합 중인 어절이 완성형 한글 두 음절 이상이면
+   영어 단어 힌트와 같은 가로 후보 영역에 현재 입력과 접두어 완성 후보를 표시한다.
+2. 후보는 기기 안의 정적 사전만 사용한다. MVP에서는 입력 원문·선택 이력·앱 package를 저장하거나
+   네트워크로 보내지 않으며 개인 학습은 `KO-06`으로 분리한다.
+3. 기본 어휘는 국립국어원의 `한국어 학습용 어휘 목록` 5,965개에서 완성형 한글 표제어를 추출하고,
+   일상 대화에서 필요한 활용형·인사말은 프로젝트 보강 목록으로 앞에 둔다. 원본 checksum, 출처,
+   공공누리 제1유형 표시와 생성 스크립트를 함께 보존한다.
+4. 정렬은 현재 입력 자체, 일상 표현 보강 순위, 국립국어원 빈도 순위 순이다. 같은 문자열은 한 번만
+   표시하고 한 페이지 크기를 넘는 결과는 기존 확장 후보 UI에서 탐색한다.
+5. 후보는 자동 적용하지 않는다. 카드 tap, 숫자 키 또는 사용자가 Tab으로 후보를 명시적으로 고른 뒤
+   Enter를 누른 경우에만 적용한다. 후보가 미선택인 Enter·space·문장부호는 현재 어절을 그대로 확정한다.
+6. 선택 시 아직 조합 중인 부분을 초기화하고, 이미 editor 또는 buffered transport로 빠진 접두어 뒤의
+   접미부만 `commitString`으로 정확히 한 번 보낸다. 실패 뒤 다른 삽입 방식을 자동 시도하지 않는다.
+7. backspace, cursor 이동, focus 변경, input method 변경, reset 뒤에는 추적 접두어와 후보를 함께
+   정리해 이전 editor의 후보를 재사용하지 않는다.
+8. password, sensitive, `NoSpellCheck` editor와 한자 모드에서는 후보를 만들지 않는다. 사전이 없거나
+   손상됐을 때는 입력 자체를 막지 않고 자동완성만 fail-closed한다.
+9. 한글 addon 설정에 `한글 어절 자동완성` toggle을 제공하며 기본값은 켬이다. 설정 변경은 현재
+   조합을 손상시키지 않고 다음 후보 갱신부터 반영한다.
+
+완료 게이트는 사전 parser·순위·중복·limit 테스트, `안녕→안녕하세요` 접두어 테스트, 미선택 Enter와
+space 비치환 테스트, backspace/reset·민감 editor·buffered 접미부 1회 확정 검증, 전체 app/plugin build,
+A35와 Z Fold6의 일반 editor 및 buffered 호환 editor 실기기 검증이다.
+
+#### KO-09 구현·검증 증거 (2026-07-26)
+
+| 항목 | 상태 | 증거 |
+|---|---|---|
+| 사전 출처·재현성 | `PASS` | 국립국어원 원본 SHA-256을 고정하고 생성 결과 5,250개·91,467 bytes·SHA-256 `1778F7ACCBE3190A3ECDDFC9991B2511F466425B48185004072C22558BBBA2C1` 재현 |
+| native parser·후보 테스트 | `PASS` | Android arm64-v8a `testcompletiondictionary`를 A35 `/data/local/tmp`에서 실행해 순위·limit·중복·CRLF·접미부 계산 검증 |
+| 전체 자동 테스트·빌드 | `PASS` | `:app:testDebugUnitTest :app:assembleDebug :plugin:hangul:assembleDebug -PbuildABI=arm64-v8a`, 20 suites·71 tests·실패 0 |
+| plugin 패키징 | `PASS` | plugin APK에 `completion.txt`, `completion-NOTICE.md`, 한국어 번역, `libhangul.so` 포함 및 AboutLibraries에 KOGL 제1유형 표시 확인 |
+| A35 후보 UX | `PASS` | Discord에서 `안녕` 입력 시 `안녕 / 안녕하세요 / 안녕하십니까` 순서로 표시 |
+| A35 명시적 선택 | `PASS` | `안녕하세요` 후보 tap 뒤 editor hierarchy의 compose text가 `안녕하세요` 정확히 한 번임을 확인; 메시지는 전송하지 않고 draft 삭제 |
+| A35 미선택 space | `PASS` | 후보를 누르지 않고 space 입력 뒤 compose text가 `안녕 `으로 유지되고 자동완성 후보로 치환되지 않음을 확인 |
+| 민감 editor 차단 | `CODE` | `Password`, `Sensitive`, `NoSpellCheck` capability 중 하나라도 있으면 사전 조회 전에 fail-closed |
+| 최종 Z Fold6 설치 | `BLOCK` | 현재 ADB/mDNS에 A35만 보여 무선 디버깅 재연결 대기 |
 
 #### KO-02 상세 계약
 
@@ -450,7 +494,8 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 1. `KO-01` 한/영 오타 복구. (`DONE`)
 2. `KO-02` 초성 통합 검색. (`DONE`)
 3. `KO-03` 동적 빠른 문구. (`IN_PROGRESS`: Z Fold6 최종 설치 gate만 남음)
-4. `KO-04` 앱별 profile과 network policy. (`NEXT`)
+4. `KO-09` 한글 어절 자동완성. (`IN_PROGRESS`: 사용자 우선순위로 병행)
+5. `KO-04` 앱별 profile과 network policy. (`NEXT`)
 
 ### 단계 3 — AI 기반과 text 기능
 
