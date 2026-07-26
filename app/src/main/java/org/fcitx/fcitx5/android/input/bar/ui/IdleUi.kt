@@ -28,12 +28,12 @@ import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
-import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
+import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
@@ -117,16 +117,16 @@ class IdleUi(
         val size = dp(KawaiiBarComponent.HEIGHT)
         add(menuButton, lParams(size, size) {
             startOfParent()
-            centerVertically()
+            topOfParent()
         })
         add(hideKeyboardButton, lParams(size, size) {
             endOfParent()
-            centerVertically()
+            topOfParent()
         })
         add(animator, lParams(matchConstraints, matchParent) {
             after(menuButton)
             before(hideKeyboardButton)
-            centerVertically()
+            topOfParent()
         })
     }
 

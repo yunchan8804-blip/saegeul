@@ -52,6 +52,7 @@ class AiAssistantUi(
     var onUndo: (() -> Unit)? = null
     var onRetry: (() -> Unit)? = null
     var onClipboardSourceRequested: (() -> Unit)? = null
+    var onSetupRequested: (() -> Unit)? = null
 
     private val actionButtons = mutableMapOf<AiAction, Button>()
     private var selectedAction: AiAction? = null
@@ -165,12 +166,17 @@ class AiAssistantUi(
         visibility = View.GONE
         setOnClickListener { onRetry?.invoke() }
     }
+    private val setupButton = compactButton(R.string.ai_setup_action, active = true).apply {
+        visibility = View.GONE
+        setOnClickListener { onSetupRequested?.invoke() }
+    }
     private val undoButton = compactButton(R.string.ai_undo, active = false).apply {
         visibility = View.GONE
         setOnClickListener { onUndo?.invoke() }
     }
     private val footer = LinearLayout(context).apply {
         gravity = Gravity.END
+        addView(setupButton, LinearLayout.LayoutParams(0, dp(42), 1f))
         addView(retryButton, LinearLayout.LayoutParams(0, dp(42), 1f))
         addView(undoButton, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
             marginStart = dp(6)
@@ -225,6 +231,7 @@ class AiAssistantUi(
             visibility = View.VISIBLE
         }
         retryButton.visibility = View.GONE
+        setupButton.visibility = View.GONE
         setIntakeInteractionEnabled(true)
         updateFooterVisibility()
     }
@@ -242,6 +249,7 @@ class AiAssistantUi(
         status.visibility = View.GONE
         progress.visibility = View.VISIBLE
         retryButton.visibility = View.GONE
+        setupButton.visibility = View.GONE
         setIntakeInteractionEnabled(false)
         updateFooterVisibility()
         root.announceForAccessibility(context.getString(R.string.ai_loading))
@@ -263,6 +271,7 @@ class AiAssistantUi(
         progress.visibility = View.GONE
         status.visibility = View.GONE
         retryButton.visibility = View.GONE
+        setupButton.visibility = View.GONE
         results.removeAllViews()
         suggestions.asSequence()
             .filter { it.isNotBlank() }
@@ -297,7 +306,29 @@ class AiAssistantUi(
             visibility = View.VISIBLE
         }
         retryButton.visibility = if (canRetry) View.VISIBLE else View.GONE
+        setupButton.visibility = View.GONE
         setIntakeInteractionEnabled(true)
+        updateFooterVisibility()
+        status.sendAccessibilityEvent(AccessibilityEvent.TYPE_ANNOUNCEMENT)
+    }
+
+    fun showSetupRequired(message: String) {
+        setProvider(null)
+        sourceText.visibility = View.GONE
+        sourceSection.visibility = View.GONE
+        actionSection.visibility = View.GONE
+        updateActionButtons(enabled = false)
+        results.removeAllViews()
+        resultsScroll.visibility = View.GONE
+        progress.visibility = View.GONE
+        status.apply {
+            text = message
+            setTextColor(theme.keyTextColor)
+            visibility = View.VISIBLE
+        }
+        retryButton.visibility = View.GONE
+        setupButton.visibility = View.VISIBLE
+        setIntakeAvailable(false)
         updateFooterVisibility()
         status.sendAccessibilityEvent(AccessibilityEvent.TYPE_ANNOUNCEMENT)
     }
@@ -493,7 +524,9 @@ class AiAssistantUi(
 
     private fun updateFooterVisibility() {
         footer.visibility = if (
-            retryButton.visibility == View.VISIBLE || undoButton.visibility == View.VISIBLE
+            setupButton.visibility == View.VISIBLE ||
+            retryButton.visibility == View.VISIBLE ||
+            undoButton.visibility == View.VISIBLE
         ) View.VISIBLE else View.GONE
     }
 

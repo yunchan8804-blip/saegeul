@@ -27,6 +27,7 @@ class MeetingTranscriptionUi(
     var onClose: (() -> Unit)? = null
     var onInsert: (() -> Unit)? = null
     var onSelectionChanged: ((Set<String>) -> Boolean)? = null
+    var onSetupRequested: (() -> Unit)? = null
 
     private val selectedIds = linkedSetOf<String>()
     private val provider = TextView(context).apply {
@@ -171,6 +172,22 @@ class MeetingTranscriptionUi(
             isEnabled = canRetry
             text = local("다시 선택", "Choose again")
             setOnClickListener(if (canRetry) View.OnClickListener { onPickFile?.invoke() } else null)
+        }
+        secondary.apply {
+            isEnabled = true
+            setText(R.string.ai_back)
+            setOnClickListener { onClose?.invoke() }
+        }
+    }
+
+    fun showSetupRequired(message: String) {
+        provider.text = ""
+        status.text = message
+        clearSegments()
+        primary.apply {
+            isEnabled = true
+            setText(R.string.ai_setup_action)
+            setOnClickListener { onSetupRequested?.invoke() }
         }
         secondary.apply {
             isEnabled = true

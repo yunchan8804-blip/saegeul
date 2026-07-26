@@ -516,7 +516,9 @@
     <string name="ai_action_translate_korean" tools:ignore="MissingTranslation">Korean</string>
     <string name="ai_action_translate_japanese" tools:ignore="MissingTranslation">Japanese</string>
     <string name="ai_action_translate_chinese" tools:ignore="MissingTranslation">Chinese</string>
-    <string name="ai_not_configured" tools:ignore="MissingTranslation">Configure an AI provider and authentication in Privacy &amp; AI settings</string>
+    <string name="ai_not_configured" tools:ignore="MissingTranslation">AI features are not connected yet</string>
+    <string name="ai_setup_required" tools:ignore="MissingTranslation">AI features aren’t connected yet. Complete setup once to use AI writing and transcription.</string>
+    <string name="ai_setup_action" tools:ignore="MissingTranslation">Set up</string>
     <string name="ai_private_disabled" tools:ignore="MissingTranslation">AI is disabled in password and private fields</string>
     <string name="ai_offline_disabled" tools:ignore="MissingTranslation">Turn off completely offline mode to use AI</string>
     <string name="ai_no_source" tools:ignore="MissingTranslation">Select text or type an instruction immediately before the cursor</string>
@@ -562,7 +564,7 @@
     <string name="ai_oauth_profile_changed" tools:ignore="MissingTranslation">The OAuth provider changed during sign-in. Start again with the current profile.</string>
     <string name="ai_oauth_token_failed" tools:ignore="MissingTranslation">Could not exchange the authorization code for a token</string>
     <string name="ai_oauth_connected" tools:ignore="MissingTranslation">OAuth account connected</string>
-    <string name="ai_oauth_reauth_required" tools:ignore="MissingTranslation">The OAuth session expired. Sign in again in Privacy &amp; AI settings.</string>
+    <string name="ai_oauth_reauth_required" tools:ignore="MissingTranslation">Your AI connection has expired. Sign in again to keep using AI features.</string>
     <string name="ai_provider_removed" tools:ignore="MissingTranslation">AI provider and local credentials removed</string>
     <string name="ai_oauth_revocation_failed" tools:ignore="MissingTranslation">Local tokens were removed, but the remote server did not confirm revocation</string>
     <string name="privacy_local_data" tools:ignore="MissingTranslation">Local data</string>

@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `한국어 다음 단어·GIF 밈 품질·로컬 OCR·원격 AI OAuth 통합 checkpoint`
+현재 활성 구현 마일스톤: `반응형 2행 툴바·일반 사용자 AI 설정 CTA·원격 AI OAuth 통합 checkpoint`
 
 ## 2. 상태 표기
 
@@ -71,7 +71,7 @@
 | `KO-BASE-05` | 스페이스바 길게 눌러 한글 표면 전환 | `DONE` | 두 기기 왕복·설정 유지 |
 | `KO-BASE-06` | 한지 Light·단청 Dark 등 한국 테마 | `DONE` | serialization 테스트와 실기기 렌더 |
 | `KO-BASE-07` | 앱 및 plugin 한국어 번역 확대 | `DONE` | build와 두 기기 설치 |
-| `KO-BASE-08` | 숫자·기호 전환 상태 복구 | `IN_PROGRESS` | 레거시 상태 migration 테스트와 A35 반복 왕복 통과, Fold6 설치 검증 대기 |
+| `KO-BASE-08` | 숫자·기호 전환 상태 복구 | `DONE` | 레거시 상태 migration 테스트와 A35·Fold6 실제 Fcitx `?123` 숫자판 전환 통과 |
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | 5 JVM 테스트와 A35 Discord 교체·실행 취소 |
 | `KO-02` | 초성 통합 검색 | `DONE` | 6 JVM 테스트와 A35 `ㄱㅅ` 검색·1회 삽입 |
 | `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 7 JVM 테스트와 A35 날짜·profile·clipboard 미리보기·1회 삽입 |
@@ -100,8 +100,8 @@
 | 전체 자동 테스트·빌드 | `PASS` | app 23 suites·85 tests·failure/error/skipped 0, arm64 app과 Hangul plugin assemble 성공 |
 | A35 레거시 재현 | `PASS` | 저장값을 `MobileHangul:Cheonjiin`으로 강제한 뒤 `?123` 한 번에 숫자판이 열리고 저장값이 `Number`로 자가 복구됨 |
 | A35 반복 왕복 | `PASS` | 한글 `?123 → Number → ABC → 한글 → ?123 → Number` 반복 통과 |
-| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, app/plugin `0.1.2-92-g0c3b30cf` 설치 및 debug Fcitx IME 재선택 |
-| Z Fold6 전달·설치 | `GATE` | 동일 app/plugin APK를 Taildrop으로 전달 완료; 기기에서 설치 후 한글·천지인 왕복 확인 필요 |
+| 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, 최신 arm64 app/plugin 설치, debug Fcitx IME 재선택 후 `?123 → Number` 확인 |
+| Z Fold6 설치 | `PASS` | `SM-F956N`, 최신 arm64 app/plugin 설치, debug Fcitx IME 재선택 후 cover 화면에서 `?123 → Number` 확인 |
 
 ## 5. 변경 불가 제품 원칙
 
@@ -353,6 +353,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `AI-05` | 키보드 번역 | `IN_PROGRESS` | 한↔영·일·중 action과 preview 구현, 언어별 실기기 matrix 남음 | M |
 | `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
 | `AI-07` | 원격 호환 endpoint OAuth | `IN_PROGRESS` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인 구현; 실제 IdP·두 기기 gate | L |
+| `AI-08` | 일반 사용자 AI 연결 안내 | `DONE` | 미연결·OAuth 만료 상태에 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
 
 ### 6.4 음성·멀티모달 기능
 
@@ -369,6 +370,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | --- | --- | --- | --- | --- |
 | `UX-01` | Smart clipboard action | `IN_PROGRESS` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹 구현, 기기 검증 남음 | M |
 | `UX-02` | Fold·tablet 분할 키보드 | `IN_PROGRESS` | compact/expanded·세로/가로 profile과 중앙 non-touch gap 구현, unfolded 검증 gate | L |
+| `UX-03` | 폭 적응형 기능 툴바 | `IN_PROGRESS` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환하고 모든 제어를 최소 48dp로 유지 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
 | `SEC-03` | 완전 offline mode | `IN_PROGRESS` | AI·GIF toolbar와 network gate 통합, 실제 기기 zero-request gate 남음 | S |
@@ -439,6 +441,21 @@ OCR engine과 `tessdata_fast` 한국어 모델은 Apache-2.0 계열의 공개 �
 `noBackupFilesDir/ocr/tesseract`에 둔다. 선택한 원본 이미지·content URI·인식 결과는 prefs, cache,
 backup, 일반 log에 저장하지 않으며 Bitmap은 작업 종료 시 지우고 recycle한다. 모델 설치 뒤 OCR은
 완전 offline mode에서도 동작하지만 password·sensitive·`NoSpellCheck` editor에서는 picker 전 차단한다.
+
+### 6.9 반응형 툴바·AI 설정 CTA checkpoint 계약
+
+| ID | 구현 계약 | 자동 증거 | 남은 완료 게이트 |
+| --- | --- | --- | --- |
+| `UX-03` | 별도 중첩 메뉴를 추가하지 않는다. 기존 툴바 열기 상태에서 실제 가용 폭이 `12 × 48dp`보다 좁으면 6×2행·96dp, 충분하면 12×1행·48dp로 즉시 전환한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 항상 1행이며 action의 순서·위치·활성 정책을 유지한다. | `ToolbarLayoutPolicyTest`, Flexbox shrink 금지, 높이 상태 전환과 arm64 build, A35·Z Fold6 cover 6×2와 두 기기 `?123` PASS | Fold unfolded 12×1 자동 복귀 |
+| `AI-08` | AI 글쓰기·정밀 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 버튼은 `SettingsRoute.PrivacyAi`로 직접 이동한다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, A35·Z Fold6 미연결 안내와 `개인정보·AI` 직행 PASS | 없음 |
+
+실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
+HoneyBoard가 활성인 화면을 이 앱의 숫자판이나 툴바 증거로 사용하지 않는다.
+
+2026-07-26 checkpoint에서 A35 `SM-A356N`과 Z Fold6 `SM-F956N`에 동일 arm64 app/plugin을
+설치하고 매 캡처 전 debug Fcitx `mCurId`를 확인했다. 두 cover 폭에서 툴바 12개 action이 6×2로
+렌더됐고, 두 기기의 `?123`은 Number로 전환됐다. 두 기기 모두 AI 글쓰기에서 일반 사용자용 미연결
+안내와 `설정하기` 버튼이 표시됐으며 버튼은 `개인정보·AI` route와 미연결 summary로 직접 이동했다.
 
 ## 7. GIF-01 상세 계약
 
@@ -882,12 +899,13 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 
 1. `AI-00`, `AI-06`, `SEC-02` 공급자·Keystore·privacy/usage 기반. (`DONE`)
 2. `AI-07` endpoint OAuth public-client flow와 token lifecycle. (`IN_PROGRESS`: 코드 완료, 실제 IdP·두 기기 gate)
-3. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
-4. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
-5. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
-6. `AI-03` 문장 생성. (`IN_PROGRESS`: A35 live 통과, 3후보 보장)
-7. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
-8. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
+3. `AI-08` 일반 사용자용 AI 연결·재로그인 CTA. (`DONE`: 코드·테스트·두 기기 미연결 안내와 설정 직행 통과)
+4. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
+5. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
+6. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
+7. `AI-03` 문장 생성. (`IN_PROGRESS`: A35 live 통과, 3후보 보장)
+8. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
+9. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
 
 ### 단계 4 — 음성
 
@@ -904,6 +922,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 코드·테스트 완료, Fold6 펼침·회전 gate)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
 6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`IN_PROGRESS`: 코드·자동 테스트 완료, 두 기기 UX·정확도와 OCR native 배포 gate)
+7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`IN_PROGRESS`: A35·Fold cover 6×2와 숫자판 통과, unfolded 12×1 gate)
 
 ## 10. 공통 검증 게이트
 
@@ -953,6 +972,8 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | GIPHY는 production review key와 별도 provider 선택이 있을 때만 활성화하며 media-copy 승인 전에는 link-only로 제한 |
 | 2026-07-26 | 회의 화자 분리는 system picker의 명시 선택 audio만 stream하고 segment review 없이 자동 입력하거나 요약하지 않음 |
 | 2026-07-26 | 한국어 다음 단어는 실제 공백 경계 뒤의 project-curated 로컬 후보만 기본 미선택으로 표시하고 사용자 입력을 학습·저장하지 않음 |
+| 2026-07-26 | 툴바는 별도 중첩 메뉴 없이 실제 가용 폭으로 1행·2행을 자동 결정하고 모든 도구 위치와 48dp 터치 영역을 유지 |
+| 2026-07-26 | 일반 사용자용 AI 미연결·재로그인 상태에만 `설정하기`를 제공하며 private/offline/policy 차단은 CTA 없이 fail-closed |
 | 2026-07-26 | GIPHY exact query 계약은 보존하고 한국 밈 query fallback은 성공한 empty KLIPY 첫 page와 로컬 Noto에만 적용 |
 | 2026-07-26 | OCR은 proprietary ML SDK 대신 Apache-2.0 Tesseract 계열과 pinned 한국어 fast model을 사용하며 원본·결과를 저장하지 않음 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |

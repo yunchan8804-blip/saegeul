@@ -1,31 +1,65 @@
 /*
  * SPDX-License-Identifier: LGPL-2.1-or-later
- * SPDX-FileCopyrightText: Copyright 2021-2023 Fcitx5 for Android Contributors
+ * SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
  */
 package org.fcitx.fcitx5.android.input.bar.ui.idle
 
 import android.content.Context
 import androidx.annotation.DrawableRes
 import com.google.android.flexbox.AlignItems
+import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.flexbox.JustifyContent
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.ToolbarLayoutPolicy
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import splitties.dimensions.dp
 import splitties.views.dsl.core.Ui
-import splitties.views.dsl.core.view
 
 class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
-    override val root = view(::FlexboxLayout) {
+    private class ResponsiveToolbarLayout(context: Context) : FlexboxLayout(context) {
+        var onNeedsSecondRowChanged: ((Boolean) -> Unit)? = null
+
+        private var lastNeedsSecondRow: Boolean? = null
+
+        override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+            super.onSizeChanged(width, height, oldWidth, oldHeight)
+            if (width <= 0) return
+            val needsSecondRow = ToolbarLayoutPolicy.needsSecondRow(
+                availableWidth = width,
+                itemSize = context.dp(ToolbarLayoutPolicy.TOUCH_TARGET_DP),
+                itemCount = childCount
+            )
+            if (lastNeedsSecondRow == needsSecondRow) return
+            lastNeedsSecondRow = needsSecondRow
+            onNeedsSecondRowChanged?.invoke(needsSecondRow)
+        }
+    }
+
+    private val responsiveRoot = ResponsiveToolbarLayout(ctx).apply {
         alignItems = AlignItems.CENTER
+        flexWrap = FlexWrap.WRAP
         justifyContent = JustifyContent.SPACE_AROUND
     }
 
+    override val root: FlexboxLayout
+        get() = responsiveRoot
+
+    var onNeedsSecondRowChanged: ((Boolean) -> Unit)?
+        get() = responsiveRoot.onNeedsSecondRowChanged
+        set(value) {
+            responsiveRoot.onNeedsSecondRowChanged = value
+        }
+
     private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
-        val size = ctx.dp(40)
-        root.addView(it, FlexboxLayout.LayoutParams(size, size))
+        val size = ctx.dp(ToolbarLayoutPolicy.TOUCH_TARGET_DP)
+        root.addView(it, FlexboxLayout.LayoutParams(size, size).apply {
+            // Wrapping, not shrinking, is the responsive behavior. Keeping this at zero also
+            // makes the 48 dp touch-target contract measurable on compact screens.
+            flexShrink = 0f
+        })
     }
 
     val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
@@ -75,5 +109,4 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
     val moreButton = toolButton(R.drawable.ic_baseline_more_horiz_24).apply {
         contentDescription = ctx.getString(R.string.status_area)
     }
-
 }

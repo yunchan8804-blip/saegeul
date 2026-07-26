@@ -123,6 +123,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var isKeyboardLayoutNumber: Boolean = false
     private var isToolbarManuallyToggled: Boolean = false
     private var expandToolbarForEditor: Boolean = expandToolbarByDefault
+    private var activeBarState: KawaiiBarStateMachine.State = KawaiiBarStateMachine.State.Idle
+    private var toolbarNeedsSecondRow: Boolean = false
 
     private enum class NumberRowState { Auto, ForceShow, ForceHide }
 
@@ -199,8 +201,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             expandToolbarForEditor == isToolbarManuallyToggled -> IdleUi.State.Empty
             else -> IdleUi.State.Toolbar
         }
-        if (newState == idleUi.currentState) return
-        idleUi.updateState(newState, fromUser)
+        if (newState != idleUi.currentState) {
+            idleUi.updateState(newState, fromUser)
+        }
+        updateBarHeight()
     }
 
     private val hideKeyboardCallback = View.OnClickListener {
@@ -301,6 +305,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 onGestureListener = swipeHideKeyboardCallback
             }
             buttonsUi.apply {
+                onNeedsSecondRowChanged = {
+                    toolbarNeedsSecondRow = it
+                    updateBarHeight()
+                }
                 undoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
                 }
@@ -444,6 +452,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private fun switchUiByState(state: KawaiiBarStateMachine.State) {
+        activeBarState = state
+        updateBarHeight()
         val index = state.ordinal
         if (view.displayedChild == index) return
         val new = view.getChildAt(index)
@@ -614,7 +624,21 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     companion object {
-        const val HEIGHT = 40
+        const val HEIGHT = ToolbarLayoutPolicy.TOUCH_TARGET_DP
+        const val EXPANDED_HEIGHT =
+            ToolbarLayoutPolicy.TOUCH_TARGET_DP * ToolbarLayoutPolicy.EXPANDED_ROWS
+    }
+
+    private fun updateBarHeight() {
+        val secondRowVisible =
+            activeBarState == KawaiiBarStateMachine.State.Idle &&
+                idleUi.currentState == IdleUi.State.Toolbar &&
+                toolbarNeedsSecondRow
+        val targetHeight = context.dp(ToolbarLayoutPolicy.heightDp(secondRowVisible))
+        val params = view.layoutParams ?: return
+        if (params.height == targetHeight) return
+        params.height = targetHeight
+        view.layoutParams = params
     }
 
     fun onKeyboardLayoutSwitched(isNumber: Boolean) {

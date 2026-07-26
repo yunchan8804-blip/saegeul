@@ -10,10 +10,13 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
 import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
 import org.fcitx.fcitx5.android.input.ai.AiReauthenticationRequiredException
+import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -53,37 +56,45 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 selectedIds = selected
                 MeetingTranscriptSelection.format(segments, selected, speakerPrefix()) != null
             }
+            onSetupRequested = { AiSettingsNavigator.open(context) }
         }
         return ui.root
     }
 
     override fun onAttached() {
         attached = true
-        val resolved = AiProviderResolver.resolve(context).profile
+        val allowsTextInspection = service.allowsTextInspectionFeatures()
+        val allowsAiInput = service.allowsAiInputFeatures()
+        val resolved = if (allowsTextInspection && allowsAiInput) {
+            AiProviderResolver.resolve(context).profile
+        } else null
         profile = resolved
-        when {
-            !service.allowsTextInspectionFeatures() -> showBlocked(
+        when (AiFeatureEntryGate.evaluate(
+            allowsTextInspection = allowsTextInspection,
+            allowsAiInput = allowsAiInput,
+            hasConfiguredProfile = resolved != null
+        )) {
+            AiFeatureEntryGate.PrivateEditor -> showBlocked(
                 local(
                     "민감하거나 비공개인 입력란에서는 음성 파일을 읽지 않아.",
                     "Audio files are disabled in sensitive or private editors."
                 )
             )
-            !service.allowsAiInputFeatures() -> showBlocked(
+            AiFeatureEntryGate.NetworkPolicyBlocked -> showBlocked(
                 local(
                     "오프라인 모드 또는 이 앱의 AI 차단 설정 때문에 사용할 수 없어.",
                     "Offline mode or this app's AI policy blocks transcription."
                 )
             )
-            resolved == null -> showBlocked(
-                local("먼저 AI 제공자와 API 키를 설정해.", "Configure an AI provider and API key first.")
-            )
-            !MeetingDiarizationCapability.supports(resolved) -> showBlocked(
+            AiFeatureEntryGate.SetupRequired -> showSetupRequired()
+            AiFeatureEntryGate.Ready -> if (
+                resolved != null && !MeetingDiarizationCapability.supports(resolved)
+            ) showBlocked(
                 local(
-                    "화자 분리는 현재 OpenAI 표준 API 프로필에서만 지원해. 호환 제공자는 capability 확인 전까지 차단돼.",
-                    "Speaker diarization currently requires a standard OpenAI API profile. Compatible providers stay blocked until capability verification."
+                    "현재 연결된 AI에서는 화자 분리를 사용할 수 없어. AI 연결 설정에서 지원 모델을 확인해줘.",
+                    "Speaker transcription isn’t available with the current AI connection. Check the supported model in AI settings."
                 )
-            )
-            else -> ui.showReady(resolved.displayName)
+            ) else if (resolved != null) ui.showReady(resolved.displayName)
         }
     }
 
@@ -152,12 +163,12 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 throw exception
             } catch (exception: Exception) {
                 if (attached) {
-                    val message = if (exception is AiReauthenticationRequiredException) {
-                        local(
-                            "OAuth 연결이 만료됐어. AI 설정에서 다시 로그인해.",
-                            "The OAuth session expired. Sign in again in AI settings."
-                        )
-                    } else if (exception is MeetingAudioException) {
+                    if (exception is AiReauthenticationRequiredException) {
+                        clearReviewState(keepTarget = true)
+                        ui.showSetupRequired(context.getString(R.string.ai_oauth_reauth_required))
+                        return@launch
+                    }
+                    val message = if (exception is MeetingAudioException) {
                         local(
                             "지원되는 60분·24MB 이하 음성 파일을 골라줘.",
                             "Choose a supported audio file up to 60 minutes and 24 MB."
@@ -211,38 +222,43 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
     }
 
     private fun validatePolicy(configured: AiProviderProfile?): Boolean {
-        val message = when {
-            !service.allowsTextInspectionFeatures() -> local(
+        when (AiFeatureEntryGate.evaluate(
+            allowsTextInspection = service.allowsTextInspectionFeatures(),
+            allowsAiInput = service.allowsAiInputFeatures(),
+            hasConfiguredProfile = configured != null
+        )) {
+            AiFeatureEntryGate.PrivateEditor -> showBlocked(local(
                 "민감하거나 비공개인 입력란에서는 사용할 수 없어.",
                 "This is disabled in sensitive or private editors."
-            )
-            !service.allowsAiInputFeatures() -> local(
+            ))
+            AiFeatureEntryGate.NetworkPolicyBlocked -> showBlocked(local(
                 "오프라인 모드 또는 앱 정책이 AI 전사를 차단하고 있어.",
                 "Offline mode or app policy blocks AI transcription."
-            )
-            configured == null -> local(
-                "먼저 AI 제공자와 API 키를 설정해.",
-                "Configure an AI provider and API key first."
-            )
-            !MeetingDiarizationCapability.supports(configured) -> local(
-                "이 제공자는 화자 분리 capability가 확인되지 않았어.",
-                "This provider has no verified diarization capability."
-            )
-            else -> return true
+            ))
+            AiFeatureEntryGate.SetupRequired -> showSetupRequired()
+            AiFeatureEntryGate.Ready -> {
+                if (configured != null && MeetingDiarizationCapability.supports(configured)) {
+                    return true
+                }
+                showBlocked(local(
+                    "현재 연결된 AI에서는 화자 분리를 사용할 수 없어. AI 연결 설정에서 지원 모델을 확인해줘.",
+                    "Speaker transcription isn’t available with the current AI connection. Check the supported model in AI settings."
+                ))
+            }
         }
-        showBlocked(message)
         return false
     }
 
     private fun validateTarget(boundTarget: VoiceEditorTarget, showError: Boolean): Boolean {
-        val valid = validatePolicy(profile) && service.matchesCurrentEditor(
+        if (!validatePolicy(profile)) return false
+        val valid = service.matchesCurrentEditor(
             boundTarget.packageName,
             boundTarget.fieldId,
             boundTarget.inputType,
             boundTarget.cursor,
             boundTarget.cursor
         )
-        if (!valid && showError && attached && service.allowsAiInputFeatures()) {
+        if (!valid && showError && attached) {
             showBlocked(
                 local(
                     "입력 앱이나 커서가 바뀌었어. 새 입력란에서 다시 시작해.",
@@ -277,6 +293,11 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
     private fun showBlocked(message: String) {
         clearReviewState()
         ui.showError(message, canRetry = false)
+    }
+
+    private fun showSetupRequired() {
+        clearReviewState()
+        ui.showSetupRequired(context.getString(R.string.ai_setup_required))
     }
 
     private fun returnToKeyboard() {

@@ -48,27 +48,39 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             onUndo = ::undo
             onRetry = { lastAction?.let(::generate) }
             onClipboardSourceRequested = ::showClipboardSourcePicker
+            onSetupRequested = { AiSettingsNavigator.open(context) }
         }
         return ui.root
     }
 
     override fun onAttached() {
-        when {
-            !service.allowsTextInspectionFeatures() -> {
+        val allowsTextInspection = service.allowsTextInspectionFeatures()
+        val allowsAiInput = service.allowsAiInputFeatures()
+        // Do not even open the local credential store in an editor that is already denied by
+        // privacy or network policy.
+        val resolved = if (allowsTextInspection && allowsAiInput) {
+            AiProviderResolver.resolve(context).profile
+        } else null
+        when (AiFeatureEntryGate.evaluate(
+            allowsTextInspection = allowsTextInspection,
+            allowsAiInput = allowsAiInput,
+            hasConfiguredProfile = resolved != null
+        )) {
+            AiFeatureEntryGate.PrivateEditor -> {
                 ui.showError(context.getString(R.string.ai_private_disabled), canRetry = false)
                 return
             }
-            !service.allowsAiInputFeatures() -> {
+            AiFeatureEntryGate.NetworkPolicyBlocked -> {
                 ui.showError(context.getString(R.string.ai_network_policy_disabled), canRetry = false)
                 return
             }
+            AiFeatureEntryGate.SetupRequired -> {
+                ui.showSetupRequired(context.getString(R.string.ai_setup_required))
+                return
+            }
+            AiFeatureEntryGate.Ready -> Unit
         }
-        val effective = AiProviderResolver.resolve(context)
-        val resolved = effective.profile
-        if (resolved == null) {
-            ui.showError(context.getString(R.string.ai_not_configured), canRetry = false)
-            return
-        }
+        resolved ?: return
         profile = resolved
         ui.setIntakeAvailable(true)
         // Reuse the established capture boundary to finish any composing span before binding an
@@ -134,15 +146,15 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                     provider.model(action.tier),
                     source.source.length
                 )
-                ui.showError(
-                    if (exception is AiReauthenticationRequiredException) {
-                        context.getString(R.string.ai_oauth_reauth_required)
-                    } else {
-                        exception.message ?: context.getString(R.string.ai_apply_failed)
-                    },
-                    provider.displayName,
-                    canRetry = true
-                )
+                if (exception is AiReauthenticationRequiredException) {
+                    ui.showSetupRequired(context.getString(R.string.ai_oauth_reauth_required))
+                } else {
+                    ui.showError(
+                        exception.message ?: context.getString(R.string.ai_apply_failed),
+                        provider.displayName,
+                        canRetry = true
+                    )
+                }
             }
         }
     }

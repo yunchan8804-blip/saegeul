@@ -15,9 +15,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
 import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
 import org.fcitx.fcitx5.android.input.ai.AiReauthenticationRequiredException
+import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -55,27 +57,38 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
             onPermission = ::requestMicrophonePermission
             onMeeting = { windowManager.attachWindow(MeetingTranscriptionWindow()) }
             onClose = ::returnToKeyboard
+            onSetupRequested = { AiSettingsNavigator.open(context) }
         }
         return ui.root
     }
 
     override fun onAttached() {
         attached = true
-        when {
-            !service.allowsTextInspectionFeatures() -> {
+        val allowsTextInspection = service.allowsTextInspectionFeatures()
+        val allowsAiInput = service.allowsAiInputFeatures()
+        val resolved = if (allowsTextInspection && allowsAiInput) {
+            AiProviderResolver.resolve(context).profile
+        } else null
+        when (AiFeatureEntryGate.evaluate(
+            allowsTextInspection = allowsTextInspection,
+            allowsAiInput = allowsAiInput,
+            hasConfiguredProfile = resolved != null
+        )) {
+            AiFeatureEntryGate.PrivateEditor -> {
                 ui.showError(context.getString(R.string.voice_private_disabled), canRetry = false)
                 return
             }
-            !service.allowsAiInputFeatures() -> {
+            AiFeatureEntryGate.NetworkPolicyBlocked -> {
                 ui.showError(context.getString(R.string.voice_policy_disabled), canRetry = false)
                 return
             }
+            AiFeatureEntryGate.SetupRequired -> {
+                ui.showSetupRequired(context.getString(R.string.ai_setup_required))
+                return
+            }
+            AiFeatureEntryGate.Ready -> Unit
         }
-        val resolved = AiProviderResolver.resolve(context).profile
-        if (resolved == null) {
-            ui.showError(context.getString(R.string.ai_not_configured), canRetry = false)
-            return
-        }
+        resolved ?: return
         profile = resolved
         ui.showReady(resolved.displayName)
     }
@@ -157,18 +170,20 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
                 throw exception
             } catch (exception: Exception) {
                 if (attached) {
-                    ui.showError(
-                        if (exception is AiReauthenticationRequiredException) {
-                            context.getString(R.string.ai_oauth_reauth_required)
-                        } else context.getString(
+                    if (exception is AiReauthenticationRequiredException) {
+                        ui.showSetupRequired(context.getString(R.string.ai_oauth_reauth_required))
+                    } else {
+                        ui.showError(
+                            context.getString(
                             when (exception) {
                                 is VoiceRecordingException -> R.string.voice_record_failed
                                 is VoiceTranscriptionException -> R.string.voice_transcription_failed
                                 else -> R.string.voice_transcription_failed
                             }
-                        ),
-                        canRetry = true
-                    )
+                            ),
+                            canRetry = true
+                        )
+                    }
                 }
             } finally {
                 if (recorder === activeRecorder) recorder = null
@@ -230,25 +245,37 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
     }
 
     private fun validatePolicy(): Boolean {
-        val message = when {
-            !service.allowsTextInspectionFeatures() -> R.string.voice_private_disabled
-            !service.allowsAiInputFeatures() -> R.string.voice_policy_disabled
-            profile == null -> R.string.ai_not_configured
-            else -> return true
+        return when (AiFeatureEntryGate.evaluate(
+            allowsTextInspection = service.allowsTextInspectionFeatures(),
+            allowsAiInput = service.allowsAiInputFeatures(),
+            hasConfiguredProfile = profile != null
+        )) {
+            AiFeatureEntryGate.Ready -> true
+            AiFeatureEntryGate.PrivateEditor -> {
+                ui.showError(context.getString(R.string.voice_private_disabled), canRetry = false)
+                false
+            }
+            AiFeatureEntryGate.NetworkPolicyBlocked -> {
+                ui.showError(context.getString(R.string.voice_policy_disabled), canRetry = false)
+                false
+            }
+            AiFeatureEntryGate.SetupRequired -> {
+                ui.showSetupRequired(context.getString(R.string.ai_setup_required))
+                false
+            }
         }
-        ui.showError(context.getString(message), canRetry = false)
-        return false
     }
 
     private fun validateTarget(boundTarget: VoiceEditorTarget, showError: Boolean): Boolean {
-        val valid = validatePolicy() && service.matchesCurrentEditor(
+        if (!validatePolicy()) return false
+        val valid = service.matchesCurrentEditor(
             boundTarget.packageName,
             boundTarget.fieldId,
             boundTarget.inputType,
             boundTarget.cursor,
             boundTarget.cursor
         )
-        if (!valid && showError && attached && service.allowsAiInputFeatures()) {
+        if (!valid && showError && attached) {
             ui.showError(context.getString(R.string.voice_editor_changed), canRetry = false)
         }
         return valid

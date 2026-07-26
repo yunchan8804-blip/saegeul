@@ -28,6 +28,7 @@ class VoiceTranscriptionUi(
     var onPermission: (() -> Unit)? = null
     var onMeeting: (() -> Unit)? = null
     var onClose: (() -> Unit)? = null
+    var onSetupRequested: (() -> Unit)? = null
 
     private val title = TextView(context).apply {
         setText(R.string.voice_precision_title)
@@ -195,6 +196,23 @@ class VoiceTranscriptionUi(
             isEnabled = canRetry
             setText(R.string.voice_retry_record)
             setOnClickListener(if (canRetry) View.OnClickListener { onStart?.invoke() } else null)
+        }
+        secondary.apply {
+            isEnabled = true
+            setText(R.string.ai_back)
+            setOnClickListener { onClose?.invoke() }
+        }
+    }
+
+    fun showSetupRequired(message: String) {
+        provider.text = ""
+        status.text = message
+        transcriptScroller.visibility = View.GONE
+        hideMeeting()
+        primary.apply {
+            isEnabled = true
+            setText(R.string.ai_setup_action)
+            setOnClickListener { onSetupRequested?.invoke() }
         }
         secondary.apply {
             isEnabled = true

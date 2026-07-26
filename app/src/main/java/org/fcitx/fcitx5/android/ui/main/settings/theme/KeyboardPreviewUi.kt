@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
 import splitties.dimensions.dp
@@ -95,7 +96,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         add(bkg, lParams {
             centerInParent()
         })
-        add(fakeKawaiiBar, lParams(height = dp(40)) {
+        add(fakeKawaiiBar, lParams(height = dp(KawaiiBarComponent.HEIGHT)) {
             centerHorizontally()
         })
     }
