@@ -153,6 +153,12 @@
             android:taskAffinity=""
             android:theme="@style/Theme.DialogTheme" />
 
+        <!-- Local-network discovery is only a hint; trusted configuration is fetched over HTTPS. -->
+        <activity
+            android:name=".input.ai.AiProviderSetupActivity"
+            android:exported="false"
+            android:label="@string/ai_setup_wizard_title" />
+
         <!--
           External Sharesheet targets must be exported. This no-display boundary accepts only
           ACTION_SEND text/plain, keeps the bounded payload in process memory, and finishes.

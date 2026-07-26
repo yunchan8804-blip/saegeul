@@ -542,9 +542,11 @@
     <string name="ai_quality_model_hint" tools:ignore="MissingTranslation">Quality model</string>
     <string name="ai_provider_security_note" tools:ignore="MissingTranslation">The key is encrypted with Android Keystore in no-backup storage. It is excluded from app backups, exports, logs, and the clipboard.</string>
     <string name="ai_provider_invalid" tools:ignore="MissingTranslation">Check the key, HTTPS URL, and model names</string>
-    <string name="ai_auth_mode_title" tools:ignore="MissingTranslation">Authentication method</string>
+    <string name="ai_auth_mode_title" tools:ignore="MissingTranslation">Connect AI</string>
+    <string name="ai_auth_mode_auto_discovery" tools:ignore="MissingTranslation">Find my computer automatically (recommended)</string>
     <string name="ai_auth_mode_api_key" tools:ignore="MissingTranslation">Direct API key</string>
     <string name="ai_auth_mode_oauth" tools:ignore="MissingTranslation">OAuth 2.0 login (PKCE)</string>
+    <string name="ai_auth_mode_oauth_advanced" tools:ignore="MissingTranslation">Advanced OAuth settings</string>
     <string name="ai_auth_api_key" tools:ignore="MissingTranslation">API key</string>
     <string name="ai_auth_oauth_connected" tools:ignore="MissingTranslation">OAuth connected</string>
     <string name="ai_auth_oauth_reauth" tools:ignore="MissingTranslation">OAuth sign-in required</string>
@@ -567,6 +569,35 @@
     <string name="ai_oauth_reauth_required" tools:ignore="MissingTranslation">Your AI connection has expired. Sign in again to keep using AI features.</string>
     <string name="ai_provider_removed" tools:ignore="MissingTranslation">AI provider and local credentials removed</string>
     <string name="ai_oauth_revocation_failed" tools:ignore="MissingTranslation">Local tokens were removed, but the remote server did not confirm revocation</string>
+    <string name="ai_setup_wizard_title" tools:ignore="MissingTranslation">Connect AI from your computer</string>
+    <string name="ai_setup_wizard_summary" tools:ignore="MissingTranslation">Looking for a computer with AI connection enabled on the same Wi-Fi. Tap its name to connect.</string>
+    <string name="ai_setup_security_summary" tools:ignore="MissingTranslation">API keys and client secrets are never copied to this phone. Only a verified HTTPS setup is accepted.</string>
+    <string name="ai_setup_scanning" tools:ignore="MissingTranslation">Looking for computers…</string>
+    <string name="ai_setup_choose_computer" tools:ignore="MissingTranslation">Choose a computer to continue</string>
+    <string name="ai_setup_no_computers" tools:ignore="MissingTranslation">No computer was found. Check that both devices use the same Wi-Fi and the computer connection helper is running.</string>
+    <string name="ai_setup_only_untrusted_computers" tools:ignore="MissingTranslation">A computer was found, but it did not provide a trusted HTTPS setup.</string>
+    <string name="ai_setup_discovery_failed" tools:ignore="MissingTranslation">Could not search this network. Check Wi-Fi and try again.</string>
+    <string name="ai_setup_scan_again" tools:ignore="MissingTranslation">Search again</string>
+    <string name="ai_setup_enter_address" tools:ignore="MissingTranslation">Enter computer address</string>
+    <string name="ai_setup_enter_address_summary" tools:ignore="MissingTranslation">If automatic search is unavailable, enter the HTTPS address shown by the computer helper.</string>
+    <string name="ai_setup_manifest_url_hint" tools:ignore="MissingTranslation">https://my-computer.example</string>
+    <string name="ai_setup_check_address" tools:ignore="MissingTranslation">Check address</string>
+    <string name="ai_setup_address_invalid" tools:ignore="MissingTranslation">Enter a valid HTTPS computer address</string>
+    <string name="ai_setup_manual_computer" tools:ignore="MissingTranslation">Computer entered manually</string>
+    <string name="ai_setup_checking_connection" tools:ignore="MissingTranslation">Checking the secure connection…</string>
+    <string name="ai_setup_connection_failed" tools:ignore="MissingTranslation">Could not verify this computer. Check its HTTPS certificate and connection helper.</string>
+    <string name="ai_setup_confirm_title" tools:ignore="MissingTranslation">Connect to this computer?</string>
+    <string name="ai_setup_confirm_message" tools:ignore="MissingTranslation">Computer: %1$s\nAI service: %2$s\nSecure address: %3$s\n\nNo API key or client secret will be saved on this phone. Continue in the browser to sign in.</string>
+    <string name="ai_setup_connect" tools:ignore="MissingTranslation">Connect</string>
+    <string name="ai_setup_saving" tools:ignore="MissingTranslation">Preparing secure sign-in…</string>
+    <string name="ai_setup_save_failed" tools:ignore="MissingTranslation">Could not save this connection</string>
+    <string name="ai_setup_login_not_finished" tools:ignore="MissingTranslation">Sign-in was not completed. Select the computer to try again.</string>
+    <string name="ai_setup_connected" tools:ignore="MissingTranslation">AI is connected</string>
+    <string name="ai_setup_computer_description" tools:ignore="MissingTranslation">%1$s, secure address %2$s</string>
+    <plurals name="ai_setup_computers_found" tools:ignore="MissingTranslation">
+        <item quantity="one">%1$d computer found</item>
+        <item quantity="other">%1$d computers found</item>
+    </plurals>
     <string name="privacy_local_data" tools:ignore="MissingTranslation">Local data</string>
     <string name="ai_usage_title" tools:ignore="MissingTranslation">AI usage summary</string>
     <string name="ai_usage_summary" tools:ignore="MissingTranslation">Requests %1$d · success %2$d · failure %3$d · sent characters %4$d</string>

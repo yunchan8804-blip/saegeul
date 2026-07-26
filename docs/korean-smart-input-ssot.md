@@ -813,6 +813,62 @@ permission dialog와 focus 복귀는 별도 gate다.
   [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve),
   [Tailscale OAuth Apps](https://tailscale.com/docs/features/oauth-apps).
 
+#### 8.2.3 `AI-09` 컴퓨터 자동 발견·연결 마법사
+
+일반 사용자의 기본 진입은 OAuth endpoint 직접 입력이 아니다. `AI 공급자 > 내 컴퓨터 자동으로 찾기
+(추천)`에서 다음 순서를 한 화면으로 수행한다.
+
+1. 같은 local network에서 DNS-SD/mDNS service type `_fcitx-ai._tcp.`를 검색한다.
+2. service TXT의 `manifest` 값만 읽는다. 이 값은 반드시
+   `https://<trusted-host>/.well-known/fcitx-ai-provider`여야 한다.
+3. mDNS 이름·IP·TXT 자체는 신뢰하지 않는다. Android system trust store로 HTTPS certificate를 검증하고,
+   redirect를 따르지 않으며, 최대 128 KiB JSON만 읽는다.
+4. manifest version, provider ID, Responses capability, model mapping, OAuth endpoint, public client ID,
+   scope와 현재 build의 고정 redirect URI를 검증한다. `api_key`, `client_secret`, access/refresh token이
+   어느 depth에든 있으면 전체 manifest를 거부한다.
+5. 사용자에게 컴퓨터 이름, AI service 이름, certificate host를 한 번 보여 주고 명시적으로 `연결하기`를
+   누르게 한다. 이후 검증된 profile을 암호화 저장하고 기존 AppAuth PKCE browser login을 자동 시작한다.
+6. OAuth login 실패 시 API key fallback이나 이전 credential 자동 재사용을 하지 않는다. 사용자가 같은
+   컴퓨터를 다시 선택해 재시도한다.
+
+manifest v1 contract는 다음과 같다. `redirect_uri`는 설치 variant에 따라 release
+`org.fcitx.fcitx5.android.oauth:/callback` 또는 debug
+`org.fcitx.fcitx5.android.debug.oauth:/callback`을 endpoint가 사전에 public-client redirect로 등록한
+값과 정확히 맞춰 제공해야 한다.
+
+```json
+{
+  "protocol_version": 1,
+  "provider_id": "home-ai",
+  "display_name": "Home AI",
+  "base_url": "https://computer.example/v1",
+  "oauth": {
+    "authorization_endpoint": "https://computer.example/oauth/authorize",
+    "token_endpoint": "https://computer.example/oauth/token",
+    "revocation_endpoint": "https://computer.example/oauth/revoke",
+    "client_id": "fcitx-android-public",
+    "scopes": ["openid", "offline_access", "ai.invoke"],
+    "redirect_uri": "org.fcitx.fcitx5.android.oauth:/callback"
+  },
+  "models": {
+    "fast": "fast-model",
+    "balanced": "balanced-model",
+    "quality": "quality-model"
+  },
+  "capabilities": ["responses", "transcription"]
+}
+```
+
+컴퓨터 쪽 `scripts/ai-provider-companion.py`는 provider manifest를 표준 TLS로 먼저 검증한 뒤 dependency
+없이 mDNS로 광고한다. `--manifest-url`을 생략하면 `FCITX_AI_MANIFEST_URL`, Tailscale self DNS name,
+local FQDN 순서로 well-known URL을 찾는다. 이 helper는 API key를 읽거나 요청을 proxy하지 않는다.
+실제 AI gateway가 OAuth/OIDC와 manifest를 제공하는 것이 선행 조건이다.
+
+현재 targetSdk 36에서는 기존 local-network NSD 경로를 쓴다. targetSdk 37 전환 시 Android local
+network protection을 별도 milestone로 올리고, broad `ACCESS_LOCAL_NETWORK` 요청보다 system service
+picker의 scoped grant를 먼저 적용한다. 사용자가 직접 입력하는 fallback도 OAuth 필드가 아니라 동일한
+HTTPS computer origin 하나만 받는다.
+
 ### 8.3 text 읽기와 교체
 
 - IME가 임의의 chat bubble이나 화면 전체를 읽을 수 있다고 가정하지 않는다.
@@ -857,6 +913,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
 | OAuth 통합 build/test | `PASS` | `:app:testDebugUnitTest` 56 suites·240 tests failure/error/skipped 0, `:app:assembleDebug -PbuildABI=arm64-v8a`, debug merged manifest redirect scheme 일치 |
 | OAuth live provider | `GATE` | 실제 compatible endpoint의 client 등록·redirect·scope와 A35·Z Fold6 login/refresh/revoke를 검증해야 함 |
+| 컴퓨터 자동 연결 마법사 | `PASS` | 59 suites·252 tests 0 failure; A35·Z Fold6 cover에서 같은 LAN의 `alpaca-home test`를 각각 1대로 발견하고 Tailscale HTTPS manifest 검증·확인창 통과; 502 응답에서는 profile/token 파일 없이 fail-closed; 발견 행 crash와 navigation-bar inset 회귀 수정 |
 | Responses client | `PASS` | `/responses`, `store=false`, JSON suggestion parse, redirect 금지, prompt/result 비로그와 sanitized error 구현 |
 | text/action test | `PASS` | AI 5 suites·12 tests, failure 0. action prompt, provider validation, selection/문단 source, 응답 parse, usage 원문 비저장을 검증 |
 | Privacy dashboard | `PASS` | A35에서 현재 provider, 전송 원칙, 기능별 집계 usage, usage 삭제와 GIF cache 삭제 UI 렌더 확인 |
@@ -907,12 +964,13 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 1. `AI-00`, `AI-06`, `SEC-02` 공급자·Keystore·privacy/usage 기반. (`DONE`)
 2. `AI-07` endpoint OAuth public-client flow와 token lifecycle. (`IN_PROGRESS`: 코드 완료, 실제 IdP·두 기기 gate)
 3. `AI-08` 일반 사용자용 AI 연결·재로그인 CTA. (`DONE`: 코드·테스트·두 기기 미연결 안내와 설정 직행 통과)
-4. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
-5. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
-6. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
-7. `AI-03` 문장 생성. (`IN_PROGRESS`: A35 live 통과, 3후보 보장)
-8. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
-9. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
+4. `AI-09` 컴퓨터 자동 발견·검증·연결 마법사. (`IN_PROGRESS`: 코드 완료, 두 기기 mDNS·실제 IdP gate)
+5. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
+6. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
+7. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
+8. `AI-03` 문장 생성. (`IN_PROGRESS`: A35 live 통과, 3후보 보장)
+9. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
+10. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
 
 ### 단계 4 — 음성
 

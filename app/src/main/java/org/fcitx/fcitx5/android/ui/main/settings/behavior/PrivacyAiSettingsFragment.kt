@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.input.ai.AiAuthMode
 import org.fcitx.fcitx5.android.input.ai.AiOAuthLoginActivity
 import org.fcitx.fcitx5.android.input.ai.AiOAuthSessionManager
 import org.fcitx.fcitx5.android.input.ai.AiOAuthSessionStore
+import org.fcitx.fcitx5.android.input.ai.AiProviderSetupActivity
 import org.fcitx.fcitx5.android.input.ai.AiUsageStore
 import org.fcitx.fcitx5.android.input.gif.GifCache
 import org.fcitx.fcitx5.android.input.gif.GifProviderCredentialState
@@ -227,11 +228,16 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .setTitle(R.string.ai_auth_mode_title)
             .setItems(
                 arrayOf(
+                    getString(R.string.ai_auth_mode_auto_discovery),
                     getString(R.string.ai_auth_mode_api_key),
-                    getString(R.string.ai_auth_mode_oauth)
+                    getString(R.string.ai_auth_mode_oauth_advanced)
                 )
             ) { _, which ->
-                if (which == 0) showProviderDialog() else showOAuthProviderDialog()
+                when (which) {
+                    0 -> startActivity(AiProviderSetupActivity.createIntent(requireContext()))
+                    1 -> showProviderDialog()
+                    else -> showOAuthProviderDialog()
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
