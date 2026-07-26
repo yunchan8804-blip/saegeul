@@ -103,6 +103,7 @@ class DynamicPhraseProfileStore(context: Context) {
         .put("name", profile.name)
         .put("phone", profile.phone)
         .put("address", profile.address)
+        .put("email", profile.email)
         .toString()
         .toByteArray(Charsets.UTF_8)
 
@@ -111,7 +112,8 @@ class DynamicPhraseProfileStore(context: Context) {
         return DynamicPhraseProfile(
             name = json.optString("name"),
             phone = json.optString("phone"),
-            address = json.optString("address")
+            address = json.optString("address"),
+            email = json.optString("email")
         )
     }
 

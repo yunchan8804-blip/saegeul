@@ -41,6 +41,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
         val ignoreSystemCursor = switch(R.string.ignore_sys_cursor, "ignore_system_cursor", false)
+        val autoSnippetExpansion = switch(
+            R.string.auto_snippet_expansion,
+            "auto_snippet_expansion",
+            true,
+            R.string.auto_snippet_expansion_summary
+        )
         val bufferedHangulInput = switch(
             R.string.buffered_hangul_input,
             "buffered_hangul_input",

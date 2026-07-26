@@ -13,6 +13,7 @@ enum class DynamicPhraseVariable(val tokens: Set<String>) {
     Time(setOf("{시간}", "{time}")),
     Name(setOf("{이름}", "{name}")),
     Phone(setOf("{전화번호}", "{phone}")),
+    Email(setOf("{이메일}", "{email}")),
     Address(setOf("{주소}", "{address}")),
     Clipboard(setOf("{클립보드}", "{clipboard}"))
 }
@@ -20,16 +21,18 @@ enum class DynamicPhraseVariable(val tokens: Set<String>) {
 data class DynamicPhraseProfile(
     val name: String = "",
     val phone: String = "",
-    val address: String = ""
+    val address: String = "",
+    val email: String = ""
 ) {
     fun normalized() = copy(
         name = name.trim(),
         phone = phone.trim(),
-        address = address.trim()
+        address = address.trim(),
+        email = email.trim()
     )
 
     val isEmpty: Boolean
-        get() = name.isBlank() && phone.isBlank() && address.isBlank()
+        get() = name.isBlank() && phone.isBlank() && address.isBlank() && email.isBlank()
 }
 
 data class DynamicPhraseValues(
@@ -108,6 +111,7 @@ object DynamicPhraseTemplate {
         DynamicPhraseVariable.Time -> Replacement(values.now.format(timeFormatter))
         DynamicPhraseVariable.Name -> personalValue(profile.name, values.privateEditor)
         DynamicPhraseVariable.Phone -> personalValue(profile.phone, values.privateEditor)
+        DynamicPhraseVariable.Email -> personalValue(profile.email, values.privateEditor)
         DynamicPhraseVariable.Address -> personalValue(profile.address, values.privateEditor)
         DynamicPhraseVariable.Clipboard -> when {
             values.privateEditor -> Replacement(issue = DynamicPhraseIssueReason.PrivateEditor)

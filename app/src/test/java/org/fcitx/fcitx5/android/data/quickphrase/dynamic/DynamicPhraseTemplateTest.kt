@@ -17,16 +17,16 @@ class DynamicPhraseTemplateTest {
     @Test
     fun expandsEveryKoreanVariableWithFrozenValues() {
         val result = DynamicPhraseTemplate.expand(
-            "{이름}님, {날짜} {시간}\n{전화번호}\n{주소}\n{클립보드}",
+            "{이름}님, {날짜} {시간}\n{전화번호}\n{이메일}\n{주소}\n{클립보드}",
             DynamicPhraseValues(
                 now = now,
-                profile = DynamicPhraseProfile("윤찬", "010-1234-5678", "서울"),
+                profile = DynamicPhraseProfile("윤찬", "010-1234-5678", "서울", "yun@example.com"),
                 clipboardText = "확인했습니다"
             )
         )
 
         assertEquals(
-            "윤찬님, 2026년 7월 26일 09:05\n010-1234-5678\n서울\n확인했습니다",
+            "윤찬님, 2026년 7월 26일 09:05\n010-1234-5678\nyun@example.com\n서울\n확인했습니다",
             result.text
         )
         assertTrue(result.canInsert)
@@ -36,15 +36,15 @@ class DynamicPhraseTemplateTest {
     @Test
     fun expandsEnglishAliasesCaseInsensitively() {
         val result = DynamicPhraseTemplate.expand(
-            "{NAME} {phone} {ADDRESS} {DATE} {TIME} {CLIPBOARD}",
+            "{NAME} {phone} {EMAIL} {ADDRESS} {DATE} {TIME} {CLIPBOARD}",
             DynamicPhraseValues(
                 now = now,
-                profile = DynamicPhraseProfile("Yun", "010", "Seoul"),
+                profile = DynamicPhraseProfile("Yun", "010", "Seoul", "yun@example.com"),
                 clipboardText = "ok"
             )
         )
 
-        assertEquals("Yun 010 Seoul 2026년 7월 26일 09:05 ok", result.text)
+        assertEquals("Yun 010 yun@example.com Seoul 2026년 7월 26일 09:05 ok", result.text)
         assertTrue(result.canInsert)
     }
 
@@ -109,6 +109,7 @@ class DynamicPhraseTemplateTest {
     fun detectsOnlySupportedTokens() {
         assertTrue(DynamicPhraseTemplate.containsSupportedToken("오늘 {날짜}"))
         assertTrue(DynamicPhraseTemplate.containsSupportedToken("Call {PHONE}"))
+        assertTrue(DynamicPhraseTemplate.containsSupportedToken("Mail {이메일}"))
         assertFalse(DynamicPhraseTemplate.containsSupportedToken("{회사}"))
         assertFalse(DynamicPhraseTemplate.containsSupportedToken("일반 문구"))
     }

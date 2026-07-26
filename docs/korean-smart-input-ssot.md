@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `KO-09 한글 어절 자동완성`
+현재 활성 구현 마일스톤: `KO-03A 자동 스니펫 확장`
 
 ## 2. 상태 표기
 
@@ -74,6 +74,7 @@
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | 5 JVM 테스트와 A35 Discord 교체·실행 취소 |
 | `KO-02` | 초성 통합 검색 | `DONE` | 6 JVM 테스트와 A35 `ㄱㅅ` 검색·1회 삽입 |
 | `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 7 JVM 테스트와 A35 날짜·profile·clipboard 미리보기·1회 삽입 |
+| `KO-03A` | 자동 스니펫 확장 | `IN_PROGRESS` | `:주소1`·`:이메일` 별칭과 사용자 `:` 상용구의 경계키 확장 구현 중 |
 | `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 로컬 빈도 사전, 명시적 후보 선택, buffered 입력 호환 구현 중 |
 
 한국어 기준선과 GIF·KO-01·KO-02는 각각 검증 가능한 checkpoint commit으로 고정돼 있다.
@@ -112,7 +113,8 @@
 | --- | --- | --- | --- | --- |
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | `dkssud→안녕`, `ㅗ디ㅣㅐ→hello`, preview 후 교체 | S |
 | `KO-02` | 초성 통합 검색 | `DONE` | 빠른 문구·clipboard·emoji를 `ㄱㅅ` 등으로 검색 | M |
-| `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 날짜·시간·이름·전화·주소·clipboard 변수, preview | M |
+| `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 날짜·시간·이름·전화·이메일·주소·clipboard 변수, preview | M |
+| `KO-03A` | 자동 스니펫 확장 | `IN_PROGRESS` | `:` trigger 뒤 space·Enter로 암호화 profile 또는 사용자 상용구 확장 | M |
 | `KO-04` | 앱별 키보드 profile | `NEXT` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자·국어사전 후보 | `BACKLOG` | 한글 단어의 한자, 음훈, 동음이의어를 로컬 후보로 표시 | M |
 | `KO-06` | 개인 단어장 | `BACKLOG` | 이름·회사명·전문용어를 opt-in으로 로컬 우선 후보에 반영 | L |
@@ -184,13 +186,13 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 1. 기존 `.mb` 빠른 문구 파일 형식과 Fcitx quickphrase addon은 변경하지 않는다. 문구 값에
    지원 토큰이 포함된 경우에만 Android 입력 계층에서 동적 미리보기를 연다.
-2. MVP 토큰은 `{날짜}`, `{시간}`, `{이름}`, `{전화번호}`, `{주소}`, `{클립보드}`이며 영문
-   호환 alias `{date}`, `{time}`, `{name}`, `{phone}`, `{address}`, `{clipboard}`도 허용한다.
+2. MVP 토큰은 `{날짜}`, `{시간}`, `{이름}`, `{전화번호}`, `{이메일}`, `{주소}`, `{클립보드}`이며 영문
+   호환 alias `{date}`, `{time}`, `{name}`, `{phone}`, `{email}`, `{address}`, `{clipboard}`도 허용한다.
 3. `{날짜}`는 `yyyy년 M월 d일`, `{시간}`은 기기 시간대의 `HH:mm`으로 확장한다. 미리보기가
    열린 시점의 값을 고정해 확인한 문자열과 실제 삽입 문자열이 달라지지 않게 한다.
 4. 지원하지 않는 `{토큰}`은 원문 그대로 보존한다. 지원 토큰의 값이 비어 있거나 정책상
    차단되면 삽입 버튼을 비활성화하고 누락 이유를 변수별로 표시한다.
-5. `{이름}`, `{전화번호}`, `{주소}` profile은 Android Keystore AES-GCM으로 암호화하고
+5. `{이름}`, `{전화번호}`, `{이메일}`, `{주소}` profile은 Android Keystore AES-GCM으로 암호화하고
    `noBackupFilesDir`에 저장한다. SharedPreferences, 사용자 ZIP export, clipboard, log에는
    평문을 남기지 않는다.
 6. `{클립보드}`는 Fcitx clipboard의 최신 non-sensitive text만 사용한다. sensitive 항목,
@@ -203,6 +205,31 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
    원본 토큰 문구를 자동 삽입하지 않는다.
 10. 빠른 문구 편집 화면에 지원 토큰 안내를, 빠른 문구 목록의 추가 메뉴에 암호화 profile
     설정 진입점을 제공한다.
+
+#### KO-03A 자동 스니펫 상세 계약
+
+1. 기본 별칭은 `:이름`, `:전화`, `:전화번호`, `:이메일`, `:메일`, `:주소`, `:주소1`, `:날짜`,
+   `:시간`과 영문 `:name`, `:phone`, `:email`, `:address`, `:address1`, `:date`, `:time`이며 각각
+   KO-03 동적 변수로 해석한다. 값은 별칭이나 상용구 파일에 복제하지 않는다.
+2. 활성 상용구의 키워드가 `:`로 시작하고 공백이 없으면 사용자 스니펫으로 등록한다. 구문은 일반
+   문자열과 KO-03 동적 토큰을 모두 허용한다. 같은 키워드가 서로 다른 구문에 중복되면 자동 선택하지
+   않고 literal 입력을 보존한다.
+3. trigger는 문장 시작 또는 공백 뒤에서 시작해 cursor 바로 앞에서 정확히 끝나야 한다. URL·시간·emoji
+   shortcode의 일부처럼 앞 문자가 붙은 `:` 문자열은 확장하지 않는다.
+4. space 경계는 trigger를 확장 결과로 교체하고 공백 하나를 유지한다. Enter 경계는 채팅 전송 사고를
+   막기 위해 확장만 하고 해당 Enter를 소비하며, 사용자가 다시 Enter를 눌러야 전송 또는 줄바꿈된다.
+5. 일반 composing과 한글 buffered compatibility 경로 모두 trigger를 정확히 한 번 삭제하고 결과를
+   정확히 한 번 삽입한다. buffered 경로는 trigger 앞의 보류 중인 일반 텍스트를 보존한다.
+6. 자동 스니펫은 기본 켬 toggle을 제공한다. password, sensitive, no-personalized-learning editor에서는
+   상용구와 주변 텍스트를 읽지 않고 완전히 비활성화한다.
+7. 개인 profile은 기존 Keystore·`noBackupFilesDir` 정책을 그대로 사용한다. 값이 비었거나 복호화에
+   실패하거나 editor/selection이 바뀐 경우 literal trigger와 경계키를 보존하고 자동 대체하지 않는다.
+8. 카탈로그는 입력 시작 시 background에서 갱신하며 키 입력마다 전체 상용구 파일이나 Keystore를 읽지
+   않는다. 실제 trigger가 일치한 경우에만 필요한 profile을 복호화한다.
+
+완료 게이트는 기본 별칭·사용자 override·중복·경계 오탐·space/Enter 정책·일반/buffered 분할 trigger
+계획 테스트, email profile 하위 호환 테스트, 전체 JVM/build, A35와 Z Fold6에서 `:주소1`·`:이메일`
+확장 및 private editor 비활성 검증이다.
 
 #### KO-03 구현·검증 증거 (2026-07-26)
 
@@ -495,8 +522,9 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 1. `KO-01` 한/영 오타 복구. (`DONE`)
 2. `KO-02` 초성 통합 검색. (`DONE`)
 3. `KO-03` 동적 빠른 문구. (`IN_PROGRESS`: Z Fold6 최종 설치 gate만 남음)
-4. `KO-09` 한글 어절 자동완성. (`IN_PROGRESS`: 사용자 우선순위로 병행)
-5. `KO-04` 앱별 profile과 network policy. (`NEXT`)
+4. `KO-03A` 자동 스니펫 확장. (`IN_PROGRESS`: 사용자 우선순위로 구현)
+5. `KO-09` 한글 어절 자동완성. (`IN_PROGRESS`: Z Fold6 최종 설치 gate만 남음)
+6. `KO-04` 앱별 profile과 network policy. (`NEXT`)
 
 ### 단계 3 — AI 기반과 text 기능
 

@@ -214,6 +214,9 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
         val (phoneLayout, phoneField) = ctx.materialTextInput {
             setHint(R.string.dynamic_phrase_variable_phone)
         }
+        val (emailLayout, emailField) = ctx.materialTextInput {
+            setHint(R.string.dynamic_phrase_variable_email)
+        }
         val (addressLayout, addressField) = ctx.materialTextInput {
             setHint(R.string.dynamic_phrase_variable_address)
         }
@@ -221,6 +224,10 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
         phoneField.apply {
             inputType = InputType.TYPE_CLASS_PHONE
             setText(profile.phone)
+        }
+        emailField.apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            setText(profile.email)
         }
         addressField.apply {
             minLines = 2
@@ -231,6 +238,7 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
             setPaddingDp(20, 10, 20, 0)
             add(nameLayout, lParams(matchParent))
             add(phoneLayout, lParams(matchParent))
+            add(emailLayout, lParams(matchParent))
             add(addressLayout, lParams(matchParent))
         }
         AlertDialog.Builder(ctx)
@@ -246,7 +254,8 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
                         DynamicPhraseProfile(
                             name = nameField.str,
                             phone = phoneField.str,
-                            address = addressField.str
+                            address = addressField.str,
+                            email = emailField.str
                         )
                     )
                 }.fold(

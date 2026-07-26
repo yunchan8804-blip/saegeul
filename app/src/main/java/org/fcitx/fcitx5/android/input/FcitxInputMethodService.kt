@@ -33,6 +33,7 @@ import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
+import android.widget.Toast
 import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
@@ -44,6 +45,7 @@ import androidx.autofill.inline.v1.InlineSuggestionUi
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
@@ -65,11 +67,16 @@ import org.fcitx.fcitx5.android.core.TextFormatFlag
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.TRANSIENT_BUFFERED_PASTE_LABEL
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
+import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseProfileStore
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseTemplate
+import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseValues
+import org.fcitx.fcitx5.android.data.quickphrase.snippet.SnippetCatalog
+import org.fcitx.fcitx5.android.data.quickphrase.snippet.SnippetRepository
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
@@ -91,6 +98,7 @@ import splitties.bitflags.hasFlag
 import splitties.dimensions.dp
 import splitties.resources.styledColor
 import timber.log.Timber
+import java.time.ZonedDateTime
 import kotlin.math.max
 
 class FcitxInputMethodService : LifecycleInputMethodService() {
@@ -153,6 +161,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val prefs = AppPrefs.getInstance()
     private val inlineSuggestions by prefs.keyboard.inlineSuggestions
     private val ignoreSystemCursor by prefs.advanced.ignoreSystemCursor
+    private val autoSnippetExpansion by prefs.advanced.autoSnippetExpansion
     private val bufferedHangulInputPref = prefs.advanced.bufferedHangulInput
     private val bufferedHangulTransport by prefs.advanced.bufferedHangulTransport
 
@@ -160,7 +169,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var bufferedHangulSessionActive = false
     @Volatile
     private var bufferedHangulEngineResetPending = false
-    private val bufferedPhysicalKeysDown = mutableSetOf<Int>()
+    private val consumedPhysicalKeysDown = mutableSetOf<Int>()
+
+    @Volatile
+    private var snippetCatalog = SnippetCatalog.builtIns()
+    private var snippetRefreshJob: Job? = null
 
     val bufferedHangulPrefix: String
         get() = if (bufferedHangulSessionActive) bufferedHangul.prefix else ""
@@ -284,12 +297,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         decorView = window.window!!.decorView
         contentView = decorView.findViewById(android.R.id.content)
         lastKnownConfig = resources.configuration
+        refreshSnippetCatalog()
     }
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
-                if (beginDynamicPhrasePreview(event.data.text)) {
+                val snippetBoundary = boundaryForText(event.data.text)
+                if (snippetBoundary != null && tryExpandSnippet(snippetBoundary)) {
+                    // The boundary is part of the atomic snippet replacement.
+                } else if (beginDynamicPhrasePreview(event.data.text)) {
                     // Dynamic templates are committed only from their explicit preview action.
                 } else if (bufferedHangulSessionActive) {
                     bufferedHangul.capture(event.data.text)
@@ -303,11 +320,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     // KeyEvent from virtual keyboard
                     when (it.sym.sym) {
                         FcitxKeyMapping.FcitxKey_BackSpace -> handleBackspaceKey()
-                        FcitxKeyMapping.FcitxKey_Return -> handleReturnKey()
+                        FcitxKeyMapping.FcitxKey_Return -> {
+                            if (!tryExpandSnippet(SnippetBoundary.Enter)) handleReturnKey()
+                        }
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(KeyEvent.KEYCODE_DPAD_LEFT)
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(KeyEvent.KEYCODE_DPAD_RIGHT)
                         else -> if (it.unicode > 0) {
-                            commitText(Character.toString(it.unicode))
+                            val text = Character.toString(it.unicode)
+                            val boundary = boundaryForText(text)
+                            if (boundary == null || !tryExpandSnippet(boundary)) {
+                                commitText(text)
+                            }
                         } else {
                             Timber.w("Unhandled Virtual KeyEvent: $it")
                         }
@@ -331,6 +354,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                             )
                             return@event
                         }
+                        val physicalBoundary = if (keyEvent.action == KeyEvent.ACTION_DOWN &&
+                            !keyEvent.isCtrlPressed && !keyEvent.isAltPressed &&
+                            !keyEvent.isMetaPressed
+                        ) {
+                            when (keyEvent.keyCode) {
+                                KeyEvent.KEYCODE_SPACE -> SnippetBoundary.Space
+                                KeyEvent.KEYCODE_ENTER -> SnippetBoundary.Enter
+                                else -> null
+                            }
+                        } else {
+                            null
+                        }
+                        if (physicalBoundary != null && tryExpandSnippet(physicalBoundary)) {
+                            consumedPhysicalKeysDown.add(it.sym.sym)
+                            return@event
+                        }
                         currentInputConnection?.sendKeyEvent(keyEvent)
                         if (KeyEvent.isModifierKey(keyEvent.keyCode)) {
                             when (keyEvent.action) {
@@ -350,6 +389,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     // simulate key event
                     val keyCode = it.sym.keyCode
                     if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
+                        val simulatedBoundary = if (!it.up) {
+                            when (keyCode) {
+                                KeyEvent.KEYCODE_SPACE -> SnippetBoundary.Space
+                                KeyEvent.KEYCODE_ENTER -> SnippetBoundary.Enter
+                                else -> null
+                            }
+                        } else {
+                            null
+                        }
+                        if (simulatedBoundary != null && tryExpandSnippet(simulatedBoundary)) {
+                            if (!it.states.virtual) consumedPhysicalKeysDown.add(it.sym.sym)
+                            return@event
+                        }
                         // recognized keyCode
                         val eventTime = SystemClock.uptimeMillis()
                         if (it.up) {
@@ -493,6 +545,133 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             else -> return
         }
         currentInputConnection.setSelection(target, target)
+    }
+
+    private enum class SnippetBoundary(val suffix: String, val consumeOnFailure: Boolean) {
+        Space(" ", false),
+        // A recognized snippet must never be sent to a chat accidentally because its personal
+        // profile value is missing. The first Enter expands (or reports the issue); a second one
+        // performs the editor action.
+        Enter("", true)
+    }
+
+    private fun boundaryForText(text: String): SnippetBoundary? = when (text) {
+        " " -> SnippetBoundary.Space
+        "\n", "\r" -> SnippetBoundary.Enter
+        else -> null
+    }
+
+    private fun refreshSnippetCatalog() {
+        snippetRefreshJob?.cancel()
+        snippetRefreshJob = lifecycleScope.launch(Dispatchers.IO) {
+            snippetCatalog = runCatching { SnippetRepository.load() }
+                .onFailure { Timber.w(it, "Unable to refresh snippet catalog") }
+                .getOrElse { SnippetCatalog.builtIns() }
+        }
+    }
+
+    private fun resolveSnippetTemplate(template: String): String? {
+        val clipboard = ClipboardManager.lastEntry
+        val result = DynamicPhraseTemplate.expand(
+            template,
+            DynamicPhraseValues(
+                now = ZonedDateTime.now(),
+                profile = DynamicPhraseProfileStore(this).load(),
+                clipboardText = clipboard?.takeUnless { it.sensitive }?.text,
+                clipboardSensitive = clipboard?.sensitive == true,
+                privateEditor = false
+            )
+        )
+        if (!result.canInsert) {
+            Toast.makeText(this, R.string.snippet_missing_value, Toast.LENGTH_SHORT).show()
+            return null
+        }
+        return result.text
+    }
+
+    private fun tryExpandSnippet(boundary: SnippetBoundary): Boolean {
+        if (!autoSnippetExpansion || !allowsTextInspectionFeatures() ||
+            currentInputSelection.isNotEmpty()
+        ) return false
+        return if (bufferedHangulSessionActive) {
+            tryExpandBufferedSnippet(boundary)
+        } else {
+            tryExpandEditorSnippet(boundary)
+        }
+    }
+
+    private fun tryExpandEditorSnippet(boundary: SnippetBoundary): Boolean {
+        val ic = currentInputConnection ?: return false
+        val before = ic.getTextBeforeCursor(SNIPPET_CONTEXT_CHARS, 0)?.toString() ?: return false
+        val initialPlan = snippetCatalog.plan(before) ?: return false
+        val expanded = resolveSnippetTemplate(initialPlan.template)
+            ?: return boundary.consumeOnFailure
+        if (!finishCompositionForDirectAction()) return boundary.consumeOnFailure
+
+        // Finishing a composing span can change what the editor exposes. Match again and only
+        // mutate when the same trigger/template still ends exactly at the cursor.
+        val verifiedBefore = ic.getTextBeforeCursor(SNIPPET_CONTEXT_CHARS, 0)?.toString()
+            ?: return boundary.consumeOnFailure
+        val plan = snippetCatalog.plan(verifiedBefore)
+            ?.takeIf { it.trigger == initialPlan.trigger && it.template == initialPlan.template }
+            ?: return boundary.consumeOnFailure
+        val originalStart = selection.latest.start
+        val originalEnd = selection.latest.end
+        val selectionStart = originalStart - plan.deleteBeforeCursor
+        if (selectionStart < 0 || !ic.setSelection(selectionStart, originalEnd)) {
+            return boundary.consumeOnFailure
+        }
+        selection.resetTo(selectionStart, originalEnd)
+        val replacement = plan.replacement(expanded, boundary.suffix)
+        val dispatched = ic.commitText(replacement, 1)
+        if (dispatched) {
+            selection.resetTo(selectionStart + replacement.length)
+            return true
+        }
+
+        // setSelection is non-destructive. Restore the cursor so a failed commit leaves the
+        // literal trigger available for editing instead of silently deleting it.
+        ic.setSelection(originalStart, originalEnd)
+        selection.resetTo(originalStart, originalEnd)
+        Toast.makeText(this, R.string.snippet_insert_failed, Toast.LENGTH_SHORT).show()
+        return boundary.consumeOnFailure
+    }
+
+    private fun tryExpandBufferedSnippet(boundary: SnippetBoundary): Boolean {
+        val ic = currentInputConnection ?: return false
+        val originalStart = selection.latest.start
+        val originalEnd = selection.latest.end
+        if (originalStart != originalEnd) return false
+        val editorBefore = ic.getTextBeforeCursor(SNIPPET_CONTEXT_CHARS, 0)?.toString()
+            ?: return false
+        val currentPreedit = if (bufferedHangulEngineResetPending) {
+            ""
+        } else {
+            fcitx.runImmediately { inputPanelCached.preedit.toString() }
+        }
+        val pending = bufferedHangul.snapshot(currentPreedit)
+        val plan = snippetCatalog.plan(editorBefore, pending) ?: return false
+        val expanded = resolveSnippetTemplate(plan.template)
+            ?: return boundary.consumeOnFailure
+        val selectionStart = originalStart - plan.deleteBeforeCursor
+        if (selectionStart < 0 || !ic.setSelection(selectionStart, originalEnd)) {
+            return boundary.consumeOnFailure
+        }
+        selection.resetTo(selectionStart, originalEnd)
+        val replacement = plan.replacement(expanded, boundary.suffix)
+        val dispatched = dispatchBufferedText(replacement)
+        if (dispatched) {
+            bufferedHangul.clear()
+            queueBufferedHangulEngineReset()
+            inputView?.refreshBufferedHangulPreedit()
+            selection.resetTo(selectionStart + replacement.length)
+            return true
+        }
+
+        ic.setSelection(originalStart, originalEnd)
+        selection.resetTo(originalStart, originalEnd)
+        Toast.makeText(this, R.string.snippet_insert_failed, Toast.LENGTH_SHORT).show()
+        return boundary.consumeOnFailure
     }
 
     fun commitText(text: String, cursor: Int = -1): Boolean {
@@ -668,7 +847,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleBufferedHangulForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
-        if (!data.states.virtual && data.up && bufferedPhysicalKeysDown.remove(data.sym.sym)) {
+        if (!data.states.virtual && data.up && consumedPhysicalKeysDown.remove(data.sym.sym)) {
             cachedKeyEvents.remove(data.timestamp)
             return true
         }
@@ -691,6 +870,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             if (data.up) sendUpKeyEvent(eventTime, keyCode, data.states.metaState)
             else sendDownKeyEvent(eventTime, keyCode, data.states.metaState)
             return true
+        }
+        if (!data.up) {
+            val boundary = when (data.sym.sym) {
+                FcitxKeyMapping.FcitxKey_space -> SnippetBoundary.Space
+                FcitxKeyMapping.FcitxKey_Return -> SnippetBoundary.Enter
+                else -> null
+            }
+            if (boundary != null && tryExpandBufferedSnippet(boundary)) {
+                if (!data.states.virtual) {
+                    cachedKeyEvents.remove(data.timestamp)
+                    consumedPhysicalKeysDown.add(data.sym.sym)
+                }
+                return true
+            }
         }
         val bufferedKey = when (data.sym.sym) {
             FcitxKeyMapping.FcitxKey_BackSpace,
@@ -737,7 +930,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (handled && !data.states.virtual) {
             cachedKeyEvents.remove(data.timestamp)
-            bufferedPhysicalKeysDown.add(data.sym.sym)
+            consumedPhysicalKeysDown.add(data.sym.sym)
         }
         return handled
     }
@@ -1145,6 +1338,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        refreshSnippetCatalog()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         val restartTransport = if (
             BufferedHangulMode.mustAvoidClipboard(capabilityFlags) ||
@@ -1156,7 +1350,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         val preserveFailedRestart = bufferedHangulSessionActive && restarting &&
             !submitBufferedHangul(restartTransport)
-        bufferedPhysicalKeysDown.clear()
+        consumedPhysicalKeysDown.clear()
         val nextBufferedHangulSessionActive = bufferedHangulModeActive(
             fcitx.runImmediately { inputMethodEntryCached }
         )
@@ -1521,7 +1715,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (finishingInput) {
             bufferedHangulSessionActive = false
             bufferedHangul.clear()
-            bufferedPhysicalKeysDown.clear()
+            consumedPhysicalKeysDown.clear()
         }
         currentInputConnection?.apply {
             finishComposingText()
@@ -1554,7 +1748,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onUnbindInput() {
         bufferedHangulSessionActive = false
         bufferedHangul.clear()
-        bufferedPhysicalKeysDown.clear()
+        consumedPhysicalKeysDown.clear()
         cachedKeyEvents.evictAll()
         cachedKeyEventIndex = 0
         cursorUpdateIndex = 0
@@ -1602,5 +1796,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @Suppress("ConstPropertyName")
     companion object {
         const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
+        private const val SNIPPET_CONTEXT_CHARS = 128
     }
 }

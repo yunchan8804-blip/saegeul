@@ -97,6 +97,7 @@ class DynamicPhraseWindow(
                 DynamicPhraseVariable.Time -> R.string.dynamic_phrase_variable_time
                 DynamicPhraseVariable.Name -> R.string.dynamic_phrase_variable_name
                 DynamicPhraseVariable.Phone -> R.string.dynamic_phrase_variable_phone
+                DynamicPhraseVariable.Email -> R.string.dynamic_phrase_variable_email
                 DynamicPhraseVariable.Address -> R.string.dynamic_phrase_variable_address
                 DynamicPhraseVariable.Clipboard -> R.string.dynamic_phrase_variable_clipboard
             }

@@ -153,6 +153,8 @@
     <string name="keep_keyboard_letters_uppercase">Keep keyboard letters uppercase</string>
     <string name="buffered_hangul_input" tools:ignore="MissingTranslation">Buffered Hangul compatibility mode</string>
     <string name="buffered_hangul_input_summary" tools:ignore="MissingTranslation">Keep Hangul composition inside Fcitx and send each completed segment as one unit. Experimental; verify behavior in the target app.</string>
+    <string name="auto_snippet_expansion" tools:ignore="MissingTranslation">Automatic snippet expansion</string>
+    <string name="auto_snippet_expansion_summary" tools:ignore="MissingTranslation">Expand built-in aliases such as :address1 and enabled quick-phrase keywords beginning with : when Space or Enter is pressed</string>
     <string name="mobile_hangul_layout" tools:ignore="MissingTranslation">Korean keyboard surface</string>
     <string name="mobile_hangul_physical" tools:ignore="MissingTranslation">Physical layout</string>
     <string name="mobile_hangul_chunjiin" tools:ignore="MissingTranslation">Chunjiin</string>
@@ -408,11 +410,14 @@
     <string name="dynamic_phrase_variable_time" tools:ignore="MissingTranslation">Time</string>
     <string name="dynamic_phrase_variable_name" tools:ignore="MissingTranslation">Name</string>
     <string name="dynamic_phrase_variable_phone" tools:ignore="MissingTranslation">Phone number</string>
+    <string name="dynamic_phrase_variable_email" tools:ignore="MissingTranslation">Email</string>
     <string name="dynamic_phrase_variable_address" tools:ignore="MissingTranslation">Address</string>
     <string name="dynamic_phrase_variable_clipboard" tools:ignore="MissingTranslation">Clipboard</string>
     <string name="dynamic_phrase_profile" tools:ignore="MissingTranslation">Dynamic phrase profile</string>
-    <string name="dynamic_phrase_profile_security" tools:ignore="MissingTranslation">Name, phone number, and address are encrypted with Android Keystore and excluded from backups.</string>
+    <string name="dynamic_phrase_profile_security" tools:ignore="MissingTranslation">Name, phone number, email, and address are encrypted with Android Keystore and excluded from backups.</string>
     <string name="dynamic_phrase_profile_save_failed" tools:ignore="MissingTranslation">Could not securely save the profile</string>
-    <string name="dynamic_phrase_template_help" tools:ignore="MissingTranslation">Variables: {date}, {time}, {name}, {phone}, {address}, {clipboard} · Korean aliases are also supported</string>
+    <string name="dynamic_phrase_template_help" tools:ignore="MissingTranslation">Variables: {date}, {time}, {name}, {phone}, {email}, {address}, {clipboard} · A keyword beginning with : expands automatically on Space or Enter</string>
+    <string name="snippet_missing_value" tools:ignore="MissingTranslation">This snippet needs a value in the encrypted profile</string>
+    <string name="snippet_insert_failed" tools:ignore="MissingTranslation">Could not expand the snippet; the trigger was preserved</string>
     <string name="quickphrase" tools:ignore="MissingTranslation">Quick phrase</string>
 </resources>
