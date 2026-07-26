@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.behavior
 import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -22,6 +23,10 @@ import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
 import org.fcitx.fcitx5.android.input.ai.AiUsageStore
 import org.fcitx.fcitx5.android.input.gif.GifCache
+import org.fcitx.fcitx5.android.input.gif.GifProviderCredentialState
+import org.fcitx.fcitx5.android.input.gif.GifProviderCredentialStore
+import org.fcitx.fcitx5.android.input.gif.GifProviderKind
+import org.fcitx.fcitx5.android.input.gif.GifProviderResolver
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
@@ -31,6 +36,8 @@ import splitties.dimensions.dp
 class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     private lateinit var providerPreference: Preference
     private lateinit var usagePreference: Preference
+    private lateinit var gifProviderPreference: Preference
+    private lateinit var clearGifProviderPreference: Preference
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
@@ -63,6 +70,24 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     AiProviderCredentialStore(ctx).clear()
                     refreshSummaries()
                 })
+            }
+            addCategory(R.string.gif_provider_settings) {
+                gifProviderPreference = Preference(ctx).apply {
+                    setTitle(R.string.gif_provider_settings)
+                    setOnPreferenceClickListener {
+                        showGifProviderDialog()
+                        true
+                    }
+                }
+                addPreference(gifProviderPreference)
+                clearGifProviderPreference = Preference(ctx).apply {
+                    setTitle(R.string.gif_provider_key_remove)
+                    setOnPreferenceClickListener {
+                        showRemoveGifProviderDialog()
+                        true
+                    }
+                }
+                addPreference(clearGifProviderPreference)
             }
             addCategory(R.string.privacy_local_data) {
                 usagePreference = Preference(ctx).apply {
@@ -118,6 +143,18 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             usage.failedRequests,
             usage.inputCharacters
         )
+        val gifProvider = GifProviderResolver.resolve(ctx)
+        gifProviderPreference.summary = when {
+            gifProvider.credentialState == GifProviderCredentialState.Unreadable -> {
+                getString(R.string.gif_provider_status_unreadable)
+            }
+            gifProvider.kind == GifProviderKind.Klipy -> {
+                getString(R.string.gif_provider_status_klipy)
+            }
+            else -> getString(R.string.gif_provider_status_noto)
+        }
+        clearGifProviderPreference.isEnabled =
+            gifProvider.credentialState != GifProviderCredentialState.Missing
     }
 
     private fun showProviderDialog() {
@@ -203,5 +240,83 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             }
         }
         dialog.show()
+    }
+
+    private fun showGifProviderDialog() {
+        val ctx = requireContext()
+        val store = GifProviderCredentialStore(ctx)
+        val configured = store.state() == GifProviderCredentialState.Configured
+        val apiKey = EditText(ctx).apply {
+            setHint(
+                if (configured) {
+                    R.string.gif_provider_key_unchanged_hint
+                } else {
+                    R.string.gif_provider_key_hint
+                }
+            )
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+            maxLines = 1
+            isSaveEnabled = false
+        }
+        val horizontal = ctx.dp(20)
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            addView(
+                apiKey,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle(R.string.gif_provider_settings)
+            .setMessage(R.string.gif_provider_security_note)
+            .setView(container)
+            .setPositiveButton(R.string.save, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val key = apiKey.text.toString().trim()
+                if (key.isEmpty()) {
+                    if (configured) {
+                        dialog.dismiss()
+                    } else {
+                        apiKey.error = getString(R.string.gif_provider_key_required)
+                    }
+                    return@setOnClickListener
+                }
+                runCatching { store.saveKey(key) }
+                    .onSuccess {
+                        apiKey.text?.clear()
+                        dialog.dismiss()
+                        refreshSummaries()
+                        Toast.makeText(ctx, R.string.gif_provider_key_saved, Toast.LENGTH_SHORT)
+                            .show()
+                    }
+                    .onFailure {
+                        apiKey.error = getString(R.string.gif_provider_key_invalid)
+                    }
+            }
+        }
+        dialog.setOnDismissListener { apiKey.text?.clear() }
+        dialog.show()
+    }
+
+    private fun showRemoveGifProviderDialog() {
+        val ctx = requireContext()
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.gif_provider_key_remove)
+            .setMessage(R.string.gif_provider_key_remove_confirm)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                GifProviderCredentialStore(ctx).clear()
+                refreshSummaries()
+                Toast.makeText(ctx, R.string.gif_provider_key_removed, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 }

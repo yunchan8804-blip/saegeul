@@ -242,6 +242,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             appLib: String,
             extData: String,
             extCache: String,
+            noBackupData: String,
             extDomains: Array<String>
         )
 
@@ -453,6 +454,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
                     nativeLibDir.toString(),
                     (getExternalFilesDir(null) ?: filesDir).absolutePath,
                     (externalCacheDir ?: cacheDir).absolutePath,
+                    noBackupFilesDir.absolutePath,
                     extDomains.toTypedArray()
                 )
             }

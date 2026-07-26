@@ -70,6 +70,17 @@ class KoreanUnifiedSearchTest {
     }
 
     @Test
+    fun emotionAndLegacyEmojiCandidatesDeduplicateByCommittedExpression() {
+        val results = KoreanUnifiedSearch.search("감사", listOf(
+            entry("emotion", KoreanSearchSource.Emotion, "🙏", listOf("감사")),
+            entry("emoji", KoreanSearchSource.Emoji, "🙏", listOf("감사")),
+            entry("other", KoreanSearchSource.Emoji, "🫶", listOf("감사"))
+        ))
+
+        assertEquals(listOf("emotion", "other"), results.map { it.entry.id })
+    }
+
+    @Test
     fun blankQueryAndLimitAreFailClosed() {
         val entries = (1..5).map {
             entry("$it", KoreanSearchSource.QuickPhrase, "감사 $it")

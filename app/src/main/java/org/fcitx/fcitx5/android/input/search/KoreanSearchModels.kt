@@ -7,7 +7,8 @@ package org.fcitx.fcitx5.android.input.search
 enum class KoreanSearchSource(val rank: Int) {
     QuickPhrase(0),
     Clipboard(1),
-    Emoji(2)
+    Emotion(2),
+    Emoji(3)
 }
 
 data class KoreanSearchEntry(

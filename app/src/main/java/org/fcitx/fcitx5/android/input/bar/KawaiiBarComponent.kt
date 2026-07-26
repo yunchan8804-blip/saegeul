@@ -60,6 +60,8 @@ import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
+import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseWindow
 import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
@@ -69,6 +71,7 @@ import org.fcitx.fcitx5.android.input.search.KoreanSearchWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryWindow
+import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -108,7 +111,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandedCandidateStyle by prefs.keyboard.expandedCandidateStyle
     private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
-    private val offlineMode by prefs.advanced.offlineMode
     private val showVoiceInputButton by prefs.keyboard.showVoiceInputButton
     private val preferredVoiceInput by prefs.keyboard.preferredVoiceInput
 
@@ -119,6 +121,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var isCapabilityFlagsPassword: Boolean = false
     private var isKeyboardLayoutNumber: Boolean = false
     private var isToolbarManuallyToggled: Boolean = false
+    private var expandToolbarForEditor: Boolean = expandToolbarByDefault
 
     private enum class NumberRowState { Auto, ForceShow, ForceHide }
 
@@ -192,7 +195,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
              * isToolbarManuallyToggled |  true |   Empty | Toolbar
              *                          | false | Toolbar |   Empty
              */
-            expandToolbarByDefault == isToolbarManuallyToggled -> IdleUi.State.Empty
+            expandToolbarForEditor == isToolbarManuallyToggled -> IdleUi.State.Empty
             else -> IdleUi.State.Toolbar
         }
         if (newState == idleUi.currentState) return
@@ -272,15 +275,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             menuButton.setOnClickListener {
                 when (idleUi.currentState) {
                     IdleUi.State.Empty -> {
-                        isToolbarManuallyToggled = !expandToolbarByDefault
+                        isToolbarManuallyToggled = !expandToolbarForEditor
                         evalIdleUiState(fromUser = true)
                     }
                     IdleUi.State.Toolbar -> {
-                        isToolbarManuallyToggled = expandToolbarByDefault
+                        isToolbarManuallyToggled = expandToolbarForEditor
                         evalIdleUiState(fromUser = true)
                     }
                     else -> {
-                        isToolbarManuallyToggled = !expandToolbarByDefault
+                        isToolbarManuallyToggled = !expandToolbarForEditor
                         idleUi.updateState(IdleUi.State.Toolbar, fromUser = true)
                     }
                 }
@@ -315,6 +318,20 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                         triggerQuickPhrase()
                     }
                 }
+                quickPhraseButton.setOnLongClickListener {
+                    val info = service.currentInputEditorInfo
+                    val selection = service.currentInputSelection
+                    windowManager.attachWindow(SensitivePhraseWindow(
+                        DynamicPhraseEditorTarget(
+                            packageName = info.packageName,
+                            fieldId = info.fieldId,
+                            inputType = info.inputType,
+                            selectionStart = selection.start,
+                            selectionEnd = selection.end
+                        )
+                    ))
+                    true
+                }
                 koreanSearchButton.setOnClickListener {
                     windowManager.attachWindow(KoreanSearchWindow())
                 }
@@ -323,6 +340,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 }
                 aiAssistantButton.setOnClickListener {
                     windowManager.attachWindow(AiAssistantWindow())
+                }
+                precisionDictationButton.setOnClickListener {
+                    windowManager.attachWindow(VoiceTranscriptionWindow())
                 }
                 gifButton.setOnClickListener {
                     windowManager.attachWindow(GifSearchWindow())
@@ -461,7 +481,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
         val allowsTextInspection = !EditorPrivacyPolicy.forbidsTextInspection(info, capFlags)
-        val allowsNetwork = allowsTextInspection && !offlineMode
+        val allowsNetwork = service.allowsNetworkInputFeatures()
+        val allowsAi = service.allowsAiInputFeatures()
+        expandToolbarForEditor = service.effectiveToolbarExpanded(expandToolbarByDefault)
+        isToolbarManuallyToggled = false
         idleUi.buttonsUi.typoRecoveryButton.apply {
             isEnabled = allowsTextInspection
             alpha = if (isEnabled) 1f else 0.35f
@@ -475,7 +498,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             alpha = if (isEnabled) 1f else 0.35f
         }
         idleUi.buttonsUi.aiAssistantButton.apply {
-            isEnabled = allowsNetwork
+            isEnabled = allowsAi
+            alpha = if (isEnabled) 1f else 0.35f
+        }
+        idleUi.buttonsUi.precisionDictationButton.apply {
+            isEnabled = allowsAi
             alpha = if (isEnabled) 1f else 0.35f
         }
         isInlineSuggestionPresent = false

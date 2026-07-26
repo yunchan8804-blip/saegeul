@@ -15,7 +15,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.emotion.EmotionCommitGate
+import org.fcitx.fcitx5.android.input.emotion.EmotionCommitResult
+import org.fcitx.fcitx5.android.input.emotion.ExplicitEmotionSearch
+import org.fcitx.fcitx5.android.input.emotion.ExplicitEmotionSearchOutcome
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.context.KoreanParticleWindow
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -36,6 +41,8 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
     private var cachedEntries: List<KoreanSearchEntry>? = null
     private var searchJob: Job? = null
     private var actionLocked = false
+    private var emotionMode = false
+    private val emotionCommitGate = EmotionCommitGate()
 
     override val title: String by lazy { context.getString(R.string.korean_search) }
 
@@ -46,6 +53,8 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
         ui.recyclerView.adapter = adapter
         ui.recyclerView.addItemDecoration(KoreanSearchItemSpacing(context))
         ui.onQueryClick = ::showQueryDialog
+        ui.onParticleSuggestions = { windowManager.attachWindow(KoreanParticleWindow()) }
+        ui.onEmotionQuery = ::searchEmotion
         ui.onInitial = { initial -> search(currentQuery + initial) }
         ui.onBackspace = {
             if (currentQuery.isNotEmpty()) search(currentQuery.dropLast(1))
@@ -55,6 +64,7 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
     }
 
     override fun onAttached() {
+        emotionCommitGate.reset()
         val info = service.currentInputEditorInfo
         val selection = service.currentInputSelection
         target = KoreanSearchEditorTarget(
@@ -68,7 +78,11 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
             ui.showMessage(context.getString(R.string.korean_search_private_disabled))
             return
         }
-        if (currentQuery.isBlank()) ui.showPrompt() else search(currentQuery)
+        when {
+            currentQuery.isBlank() -> ui.showPrompt()
+            emotionMode -> searchEmotion(currentQuery)
+            else -> search(currentQuery)
+        }
     }
 
     override fun onDetached() {
@@ -98,7 +112,9 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
     }
 
     private fun search(query: String) {
+        emotionMode = false
         currentQuery = query.trim()
+        ui.setEmotionMode(false)
         ui.setQuery(currentQuery)
         adapter.submit(emptyList())
         if (currentQuery.isBlank()) {
@@ -126,17 +142,59 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
         }
     }
 
+    private fun searchEmotion(explicitQuery: String) {
+        searchJob?.cancel()
+        emotionMode = true
+        currentQuery = explicitQuery.trim()
+        ui.setEmotionMode(true)
+        ui.setQuery(currentQuery)
+        adapter.submit(emptyList())
+        when (val outcome = ExplicitEmotionSearch.search(
+            allowed = service.allowsTextInspectionFeatures(),
+            explicitQuery = currentQuery
+        )) {
+            ExplicitEmotionSearchOutcome.Blocked ->
+                ui.showMessage(context.getString(R.string.korean_search_private_disabled))
+            is ExplicitEmotionSearchOutcome.Results -> {
+                adapter.submit(outcome.items)
+                ui.showResults(outcome.items.isNotEmpty())
+            }
+        }
+    }
+
     private fun insert(result: KoreanSearchResult) {
         if (actionLocked) return
         actionLocked = true
         adapter.setActionLocked(true)
-        val sameEditor = service.allowsTextInspectionFeatures() && service.matchesCurrentEditor(
+        val allowed = service.allowsTextInspectionFeatures()
+        val sameEditor = allowed && service.matchesCurrentEditor(
             target.packageName,
             target.fieldId,
             target.inputType,
             target.selectionStart,
             target.selectionEnd
         )
+        if (result.entry.source == KoreanSearchSource.Emotion) {
+            val outcome = emotionCommitGate.commit(allowed, sameEditor) {
+                service.commitText(result.entry.commitText)
+            }
+            actionLocked = false
+            adapter.setActionLocked(false)
+            when (outcome) {
+                EmotionCommitResult.Success -> windowManager.attachWindow(KeyboardWindow)
+                EmotionCommitResult.Blocked -> ui.showActionStatus(
+                    context.getString(R.string.korean_search_private_disabled), true
+                )
+                EmotionCommitResult.StaleEditor -> ui.showActionStatus(
+                    context.getString(R.string.korean_search_editor_changed), true
+                )
+                EmotionCommitResult.AlreadyCommitted,
+                EmotionCommitResult.Failed -> ui.showActionStatus(
+                    context.getString(R.string.korean_search_insert_failed), true
+                )
+            }
+            return
+        }
         if (!sameEditor) {
             actionLocked = false
             adapter.setActionLocked(false)

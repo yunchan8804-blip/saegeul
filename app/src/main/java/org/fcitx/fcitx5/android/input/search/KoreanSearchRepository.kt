@@ -8,11 +8,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
+import org.fcitx.fcitx5.android.input.emotion.KoreanEmotionLexicon
 
 class KoreanSearchRepository {
     suspend fun loadEntries(clipboardLimit: Int = 200): List<KoreanSearchEntry> =
         withContext(Dispatchers.IO) {
-            loadQuickPhrases() + loadClipboard(clipboardLimit) + KoreanEmojiKeywords.entries
+            val emotionEntries = KoreanEmotionLexicon.entries
+            val emotionCommitTexts = emotionEntries.map(KoreanSearchEntry::commitText).toHashSet()
+            loadQuickPhrases() + loadClipboard(clipboardLimit) + emotionEntries +
+                KoreanEmojiKeywords.entries.filterNot { it.commitText in emotionCommitTexts }
         }
 
     private fun loadQuickPhrases(): List<KoreanSearchEntry> = runCatching {

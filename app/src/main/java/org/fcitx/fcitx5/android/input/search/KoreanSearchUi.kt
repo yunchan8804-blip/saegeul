@@ -11,6 +11,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -19,6 +20,7 @@ import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.emotion.KoreanEmotionLexicon
 
 class KoreanSearchUi(private val context: Context, private val theme: Theme) {
     val root = FrameLayout(context).apply { setBackgroundColor(theme.barColor) }
@@ -48,6 +50,14 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
         setTextColor(theme.altKeyTextColor)
         textSize = 10f
         gravity = Gravity.CENTER
+    }
+    private val emotionRow = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(context.dp(6), 0, context.dp(6), context.dp(2))
+    }
+    private val emotionScroller = HorizontalScrollView(context).apply {
+        isHorizontalScrollBarEnabled = false
+        addView(emotionRow)
     }
     private val initialPad = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -85,11 +95,40 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
     }
 
     var onQueryClick: (() -> Unit)? = null
+    var onParticleSuggestions: (() -> Unit)? = null
+    var onEmotionQuery: ((String) -> Unit)? = null
     var onInitial: ((String) -> Unit)? = null
     var onBackspace: (() -> Unit)? = null
     var onClear: (() -> Unit)? = null
 
     init {
+        emotionRow.addView(TextView(context).apply {
+            setText(R.string.korean_particle_chip)
+            gravity = Gravity.CENTER
+            setTextColor(theme.genericActiveForegroundColor)
+            textSize = 12f
+            background = rounded(theme.genericActiveBackgroundColor, context.dp(14).toFloat())
+            setPadding(context.dp(12), 0, context.dp(12), 0)
+            setOnClickListener { onParticleSuggestions?.invoke() }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            context.dp(30)
+        ).apply { marginEnd = context.dp(5) })
+        KoreanEmotionLexicon.quickQueries.forEach { query ->
+            emotionRow.addView(TextView(context).apply {
+                text = query
+                gravity = Gravity.CENTER
+                setTextColor(theme.altKeyTextColor)
+                textSize = 12f
+                background = rounded(theme.altKeyBackgroundColor, context.dp(14).toFloat())
+                contentDescription = query
+                setPadding(context.dp(12), 0, context.dp(12), 0)
+                setOnClickListener { onEmotionQuery?.invoke(query) }
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                context.dp(30)
+            ).apply { marginEnd = context.dp(5) })
+        }
         listOf(
             listOf("ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ"),
             listOf("ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ"),
@@ -149,6 +188,10 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 context.dp(22)
             ))
+            addView(emotionScroller, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                context.dp(34)
+            ))
             addView(initialPad, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 context.dp(115)
@@ -168,6 +211,10 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
 
     fun setQuery(query: String) {
         queryText.text = query.ifBlank { context.getString(R.string.korean_search_query_hint) }
+    }
+
+    fun setEmotionMode(enabled: Boolean) {
+        initialPad.visibility = if (enabled) View.GONE else View.VISIBLE
     }
 
     fun showPrompt() = showMessage(context.getString(R.string.korean_search_prompt))

@@ -28,7 +28,7 @@ import kotlinx.serialization.json.longOrNull
 class KlipyGifProvider(
     apiKey: String,
     private val json: Json = Json { ignoreUnknownKeys = true }
-) : GifProvider {
+) : PagedGifProvider {
 
     private val encodedApiKey: String = apiKey.trim().also {
         require(it.isNotEmpty()) { "A KLIPY API key is required" }
@@ -37,10 +37,13 @@ class KlipyGifProvider(
     /** Existing GIF cards surface this value alongside each provider's result set. */
     override val displayName: String = POWERED_BY_KLIPY
 
-    override suspend fun search(query: String, limit: Int): List<GifResult> {
+    override suspend fun searchPage(query: String, page: Int, limit: Int): GifSearchPage {
         val safeLimit = limit.coerceIn(0, MAX_RESULTS)
-        if (safeLimit == 0) return emptyList()
-        val url = buildApiUrl(query, safeLimit)
+        if (safeLimit == 0 || !GifSafeSearchPolicy.isAllowedQuery(query)) {
+            return GifSearchPage(emptyList(), hasNext = false)
+        }
+        val safePage = page.coerceIn(1, MAX_PAGE)
+        val url = buildApiUrl(query, safeLimit, safePage)
         return withContext(Dispatchers.IO) {
             val connection = try {
                 URI(url).toURL().openConnection() as HttpURLConnection
@@ -68,18 +71,22 @@ class KlipyGifProvider(
                 } catch (_: Exception) {
                     throw GifNetworkException("KLIPY response could not be read")
                 }
-                parseResponse(body, safeLimit)
+                parsePageResponse(body, safeLimit)
             } finally {
                 connection.disconnect()
             }
         }
     }
 
-    internal fun buildApiUrl(query: String, limit: Int = MAX_RESULTS): String {
+    internal fun buildApiUrl(
+        query: String,
+        limit: Int = MAX_RESULTS,
+        page: Int = 1
+    ): String {
         val normalizedQuery = query.trim().take(MAX_QUERY_LENGTH)
         val endpoint = if (normalizedQuery.isEmpty()) "trending" else "search"
         val parameters = linkedMapOf(
-            "page" to "1",
+            "page" to page.coerceIn(1, MAX_PAGE).toString(),
             "per_page" to limit.coerceIn(1, MAX_RESULTS).toString(),
             "locale" to KOREAN_LOCALE
         )
@@ -90,7 +97,10 @@ class KlipyGifProvider(
         return "$API_ROOT/$encodedApiKey/gifs/$endpoint?$queryString"
     }
 
-    internal fun parseResponse(body: String, limit: Int = MAX_RESULTS): List<GifResult> {
+    internal fun parseResponse(body: String, limit: Int = MAX_RESULTS): List<GifResult> =
+        parsePageResponse(body, limit).items
+
+    internal fun parsePageResponse(body: String, limit: Int = MAX_RESULTS): GifSearchPage {
         val root = try {
             json.parseToJsonElement(body) as? JsonObject
                 ?: throw IllegalArgumentException("Root is not an object")
@@ -100,12 +110,20 @@ class KlipyGifProvider(
         if (root.boolean("result") != true) {
             throw GifNetworkException("KLIPY API rejected the request")
         }
-        val items = root.objectValue("data")?.arrayValue("data")
+        val data = root.objectValue("data")
             ?: throw GifNetworkException("KLIPY response is missing result data")
-        return items.asSequence()
+        val items = data.arrayValue("data")
+            ?: throw GifNetworkException("KLIPY response is missing result data")
+        val results = items.asSequence()
             .mapNotNull(::parseGif)
+            .filter { GifSafeSearchPolicy.isAllowedResult(it.title, it.canonicalUrl) }
+            .distinctBy { it.mediaUrl }
             .take(limit.coerceIn(0, MAX_RESULTS))
             .toList()
+        return GifSearchPage(
+            items = results,
+            hasNext = data.boolean("has_next") == true && results.isNotEmpty()
+        )
     }
 
     private fun parseGif(element: kotlinx.serialization.json.JsonElement): GifResult? {
@@ -196,6 +214,7 @@ class KlipyGifProvider(
 
     private companion object {
         const val MAX_RESULTS = 24
+        const val MAX_PAGE = 100
         const val MAX_QUERY_LENGTH = 80
         const val CONNECT_TIMEOUT_MILLIS = 10_000
         const val READ_TIMEOUT_MILLIS = 20_000

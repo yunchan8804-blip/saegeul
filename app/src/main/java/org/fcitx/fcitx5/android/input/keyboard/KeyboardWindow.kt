@@ -103,13 +103,16 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private fun showMobileHangulLayoutPicker() {
         val entries = MobileHangulLayout.entries
         val labels = entries.map { context.getString(it.stringRes) }.toTypedArray()
+        val effectiveLayout = service.effectiveMobileHangulLayout(mobileHangulLayout)
         lateinit var dialog: AlertDialog
         dialog = AlertDialog.Builder(context)
             .setTitle(R.string.mobile_hangul_layout)
-            .setSingleChoiceItems(labels, entries.indexOf(mobileHangulLayout)) { _, which ->
+            .setSingleChoiceItems(labels, entries.indexOf(effectiveLayout)) { _, which ->
                 val selected = entries.getOrNull(which) ?: return@setSingleChoiceItems
                 dialog.dismiss()
-                mobileHangulLayout = selected
+                if (!service.updateCurrentAppMobileHangulLayout(selected)) {
+                    mobileHangulLayout = selected
+                }
                 switchLayout(MobileHangulSurfaceSwitcher.target(selected), remember = false)
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -187,9 +190,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private fun resolveHangulLayout(layout: String?): String = when {
         layout in HangulKeyLegends.fullSurfaceLayouts -> HangulKeyboard.Name
-        mobileHangulLayout != MobileHangulLayout.Physical &&
+        service.effectiveMobileHangulLayout(mobileHangulLayout) != MobileHangulLayout.Physical &&
             (layout == "Dubeolsik" || layout == "0") ->
-            MobileHangulKeyboard.name(mobileHangulLayout)
+            MobileHangulKeyboard.name(service.effectiveMobileHangulLayout(mobileHangulLayout))
         else -> TextKeyboard.Name
     }
 

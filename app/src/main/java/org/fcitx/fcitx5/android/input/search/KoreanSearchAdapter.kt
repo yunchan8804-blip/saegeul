@@ -95,10 +95,14 @@ class KoreanSearchAdapter(
             source.text = root.context.getString(when (entry.source) {
                 KoreanSearchSource.QuickPhrase -> R.string.korean_search_source_quick_phrase
                 KoreanSearchSource.Clipboard -> R.string.korean_search_source_clipboard
+                KoreanSearchSource.Emotion -> R.string.korean_search_source_emotion
                 KoreanSearchSource.Emoji -> R.string.korean_search_source_emoji
             })
             primary.text = entry.primaryText
-            primary.textSize = if (entry.source == KoreanSearchSource.Emoji) 27f else 16f
+            primary.textSize = if (
+                entry.source == KoreanSearchSource.Emoji ||
+                entry.source == KoreanSearchSource.Emotion
+            ) 27f else 16f
             secondary.text = entry.secondaryText.orEmpty()
             secondary.visibility = if (entry.secondaryText.isNullOrBlank()) TextView.GONE else TextView.VISIBLE
             root.contentDescription = listOfNotNull(

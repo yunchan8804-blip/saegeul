@@ -60,6 +60,10 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         contentDescription = ctx.getString(R.string.ai_assistant_title)
     }
 
+    val precisionDictationButton = toolButton(R.drawable.ic_precision_dictation_24).apply {
+        contentDescription = ctx.getString(R.string.voice_precision_title)
+    }
+
     val gifButton = toolButton(R.drawable.ic_baseline_image_24).apply {
         contentDescription = ctx.getString(R.string.gif_search)
     }

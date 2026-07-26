@@ -15,10 +15,10 @@ class KlipyGifProviderTest {
 
     @Test
     fun koreanSearchUrlUsesUtf8LocaleAndCapsPageSize() {
-        val url = provider.buildApiUrl("축하 짤", 99)
+        val url = provider.buildApiUrl("축하 짤", 99, page = 2)
 
         assertTrue(url.startsWith("https://api.klipy.com/api/v1/unit-test-key/gifs/search?"))
-        assertTrue(url.contains("page=1"))
+        assertTrue(url.contains("page=2"))
         assertTrue(url.contains("per_page=24"))
         assertTrue(url.contains("locale=ko"))
         assertTrue(url.contains("q=%EC%B6%95%ED%95%98%20%EC%A7%A4"))
@@ -32,6 +32,22 @@ class KlipyGifProviderTest {
         assertTrue(url.contains("per_page=12"))
         assertTrue(url.contains("locale=ko"))
         assertFalse(url.contains("q="))
+    }
+
+    @Test
+    fun parsesProviderPaginationWithoutMixingSources() {
+        val page = provider.parsePageResponse(MIXED_RESPONSE)
+
+        assertTrue(page.hasNext)
+        assertEquals(1, page.items.size)
+        assertTrue(page.items.all { it.providerId == "klipy" })
+    }
+
+    @Test
+    fun filtersUnsafeMetadataAndDuplicateMedia() {
+        val page = provider.parsePageResponse(UNSAFE_DUPLICATE_RESPONSE)
+
+        assertEquals(listOf("safe-one"), page.items.map { it.title })
     }
 
     @Test
@@ -99,6 +115,7 @@ class KlipyGifProviderTest {
             {
               "result": true,
               "data": {
+                "has_next": true,
                 "data": [
                   {
                     "slug": "funny-reaction-42",
@@ -143,6 +160,20 @@ class KlipyGifProviderTest {
                 "md":{"gif":{"url":"http://cdn.klipy.test/insecure.gif","width":100,"height":100,"size":100}}
               }
             }]}}
+        """.trimIndent()
+
+        private val UNSAFE_DUPLICATE_RESPONSE = """
+            {"result":true,"data":{"has_next":true,"data":[
+              {"slug":"safe-1","title":"safe-one","type":"gif","file":{
+                "md":{"gif":{"url":"https://cdn.klipy.test/safe.gif","width":100,"height":100}}
+              }},
+              {"slug":"duplicate","title":"safe-two","type":"gif","file":{
+                "md":{"gif":{"url":"https://cdn.klipy.test/safe.gif","width":100,"height":100}}
+              }},
+              {"slug":"adult-only-scene","title":"GIF","type":"gif","file":{
+                "md":{"gif":{"url":"https://cdn.klipy.test/blocked.gif","width":100,"height":100}}
+              }}
+            ]}}
         """.trimIndent()
     }
 }

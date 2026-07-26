@@ -163,26 +163,32 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
 
     init {
         val keywords = listOf(
-            R.string.gif_keyword_celebrate,
-            R.string.gif_keyword_laugh,
-            R.string.gif_keyword_love,
-            R.string.gif_keyword_applause,
-            R.string.gif_keyword_thanks,
-            R.string.gif_keyword_surprise,
-            R.string.gif_keyword_angry,
-            R.string.gif_keyword_sad
+            R.string.gif_keyword_trending to "",
+            R.string.gif_keyword_meme to context.getString(R.string.gif_keyword_meme),
+            R.string.gif_keyword_leave_work to context.getString(R.string.gif_keyword_leave_work),
+            R.string.gif_keyword_monday to context.getString(R.string.gif_keyword_monday),
+            R.string.gif_keyword_laugh to context.getString(R.string.gif_keyword_laugh),
+            R.string.gif_keyword_awkward to context.getString(R.string.gif_keyword_awkward),
+            R.string.gif_keyword_agree to context.getString(R.string.gif_keyword_agree),
+            R.string.gif_keyword_wow to context.getString(R.string.gif_keyword_wow),
+            R.string.gif_keyword_celebrate to context.getString(R.string.gif_keyword_celebrate),
+            R.string.gif_keyword_fighting to context.getString(R.string.gif_keyword_fighting),
+            R.string.gif_keyword_love to context.getString(R.string.gif_keyword_love),
+            R.string.gif_keyword_thanks to context.getString(R.string.gif_keyword_thanks),
+            R.string.gif_keyword_angry to context.getString(R.string.gif_keyword_angry),
+            R.string.gif_keyword_sad to context.getString(R.string.gif_keyword_sad)
         )
-        keywords.forEach { stringRes ->
-            val value = context.getString(stringRes)
+        keywords.forEach { (stringRes, query) ->
+            val label = context.getString(stringRes)
             keywordRow.addView(TextView(context).apply {
-                text = value
+                text = label
                 gravity = Gravity.CENTER
                 setTextColor(theme.altKeyTextColor)
                 textSize = 12f
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(context.dp(12), 0, context.dp(12), 0)
                 background = rounded(theme.altKeyBackgroundColor, context.dp(14).toFloat())
-                setOnClickListener { onKeyword?.invoke(value) }
+                setOnClickListener { onKeyword?.invoke(query) }
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 context.dp(30)

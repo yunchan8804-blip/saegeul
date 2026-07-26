@@ -9,10 +9,15 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.BackgroundColorSpan
+import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -43,11 +48,15 @@ class AiAssistantUi(
     var onActionSelected: ((AiAction) -> Unit)? = null
     var onSuggestionReplace: ((String) -> Unit)? = null
     var onSuggestionAppend: ((String) -> Unit)? = null
+    var onSelectedChangesApply: ((AiTextPatch, Set<Int>) -> Unit)? = null
     var onUndo: (() -> Unit)? = null
     var onRetry: (() -> Unit)? = null
+    var onClipboardSourceRequested: (() -> Unit)? = null
 
     private val actionButtons = mutableMapOf<AiAction, Button>()
     private var selectedAction: AiAction? = null
+    private var intakeAvailable = false
+    private var replySourceOrigin: AiReplySourceOrigin? = null
 
     private val provider = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
@@ -72,6 +81,23 @@ class AiAssistantUi(
             addView(provider, LinearLayout.LayoutParams(0, dp(28), 1f))
         }, matchWrap())
         addView(sourceText, matchWrap().apply { topMargin = dp(2) })
+    }
+    private val clipboardSourceButton = compactButton(
+        R.string.ai_clipboard_source_select,
+        active = false
+    ).apply {
+        setOnClickListener { onClipboardSourceRequested?.invoke() }
+    }
+    private val intakeSection = LinearLayout(context).apply {
+        gravity = Gravity.END
+        addView(
+            clipboardSourceButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(38)
+            )
+        )
+        visibility = View.GONE
     }
 
     private val actionSection = LinearLayout(context).apply {
@@ -154,6 +180,7 @@ class AiAssistantUi(
 
     init {
         root.addView(sourceSection, matchWrap().apply { topMargin = dp(2) })
+        root.addView(intakeSection, matchWrap().apply { topMargin = dp(3) })
         root.addView(actionSection, matchWrap().apply { topMargin = dp(4) })
         root.addView(statusArea, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -169,7 +196,19 @@ class AiAssistantUi(
     }
 
     /** Shows the exact editor text that will be sent, before any network request begins. */
-    fun showSourcePreview(source: String, providerLabel: String? = null) {
+    fun showSourcePreview(
+        source: String,
+        providerLabel: String? = null,
+        origin: AiReplySourceOrigin? = null
+    ) {
+        replySourceOrigin = origin
+        sourceLabel.setText(
+            when (origin) {
+                AiReplySourceOrigin.Shared -> R.string.ai_reply_source_shared
+                AiReplySourceOrigin.Clipboard -> R.string.ai_reply_source_clipboard
+                null -> R.string.ai_source_label
+            }
+        )
         sourceText.text = source
         sourceText.visibility = View.VISIBLE
         sourceSection.visibility = View.VISIBLE
@@ -186,6 +225,7 @@ class AiAssistantUi(
             visibility = View.VISIBLE
         }
         retryButton.visibility = View.GONE
+        setIntakeInteractionEnabled(true)
         updateFooterVisibility()
     }
 
@@ -202,12 +242,18 @@ class AiAssistantUi(
         status.visibility = View.GONE
         progress.visibility = View.VISIBLE
         retryButton.visibility = View.GONE
+        setIntakeInteractionEnabled(false)
         updateFooterVisibility()
         root.announceForAccessibility(context.getString(R.string.ai_loading))
     }
 
     /** Renders at most three suggestions, each with explicit Replace and Append actions. */
-    fun showResults(action: AiAction, providerLabel: String, suggestions: List<String>) {
+    fun showResults(
+        action: AiAction,
+        providerLabel: String,
+        source: String,
+        suggestions: List<String>
+    ) {
         selectedAction = action
         setProvider(providerLabel)
         sourceText.visibility = View.GONE
@@ -222,7 +268,7 @@ class AiAssistantUi(
             .filter { it.isNotBlank() }
             .take(action.maxSuggestions.coerceIn(1, 3))
             .forEachIndexed { index, suggestion ->
-                results.addView(resultCard(index, suggestion), matchWrap().apply {
+                results.addView(resultCard(action, index, source, suggestion), matchWrap().apply {
                     bottomMargin = dp(6)
                 })
             }
@@ -231,6 +277,7 @@ class AiAssistantUi(
             return
         }
         resultsScroll.visibility = View.VISIBLE
+        setIntakeInteractionEnabled(true)
         updateFooterVisibility()
         resultsScroll.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
     }
@@ -250,6 +297,7 @@ class AiAssistantUi(
             visibility = View.VISIBLE
         }
         retryButton.visibility = if (canRetry) View.VISIBLE else View.GONE
+        setIntakeInteractionEnabled(true)
         updateFooterVisibility()
         status.sendAccessibilityEvent(AccessibilityEvent.TYPE_ANNOUNCEMENT)
     }
@@ -259,11 +307,30 @@ class AiAssistantUi(
         updateFooterVisibility()
     }
 
-    private fun resultCard(index: Int, suggestion: String): View =
+    fun setIntakeAvailable(available: Boolean) {
+        intakeAvailable = available
+        intakeSection.visibility = if (available) View.VISIBLE else View.GONE
+        clipboardSourceButton.isEnabled = available
+        clipboardSourceButton.alpha = if (available) 1f else 0.45f
+    }
+
+    fun setIntakeInteractionEnabled(enabled: Boolean) {
+        clipboardSourceButton.isEnabled = intakeAvailable && enabled
+        clipboardSourceButton.alpha = if (clipboardSourceButton.isEnabled) 1f else 0.45f
+    }
+
+    private fun resultCard(
+        action: AiAction,
+        index: Int,
+        source: String,
+        suggestion: String
+    ): View =
         LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(9), dp(7), dp(9), dp(7))
             background = rounded(theme.altKeyBackgroundColor, dp(10))
+
+            val patch = AiTextDiff.compute(source, suggestion)
 
             addView(TextView(context).apply {
                 text = context.getString(R.string.ai_result_number, index + 1)
@@ -273,24 +340,106 @@ class AiAssistantUi(
             }, matchWrap())
 
             addView(TextView(context).apply {
-                text = suggestion
+                text = if (action == AiAction.Proofread) highlightedSuggestion(patch) else suggestion
                 setTextColor(theme.keyTextColor)
                 textSize = 15f
                 setPadding(0, dp(4), 0, dp(5))
             }, matchWrap())
 
+            if (action == AiAction.Proofread) {
+                addView(partialChanges(patch), matchWrap().apply { bottomMargin = dp(5) })
+            }
+
             addView(LinearLayout(context).apply {
                 gravity = Gravity.END
-                addView(compactButton(R.string.ai_replace, active = true).apply {
-                    setOnClickListener { onSuggestionReplace?.invoke(suggestion) }
-                }, LinearLayout.LayoutParams(0, dp(42), 1f))
-                addView(compactButton(R.string.ai_append, active = false).apply {
-                    setOnClickListener { onSuggestionAppend?.invoke(suggestion) }
-                }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-                    marginStart = dp(6)
-                })
+                if (replySourceOrigin != null) {
+                    addView(compactButton(R.string.ai_insert_reply, active = true).apply {
+                        setOnClickListener { onSuggestionReplace?.invoke(suggestion) }
+                    }, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(42)
+                    ))
+                } else {
+                    addView(compactButton(R.string.ai_replace, active = true).apply {
+                        setOnClickListener { onSuggestionReplace?.invoke(suggestion) }
+                    }, LinearLayout.LayoutParams(0, dp(42), 1f))
+                    addView(compactButton(R.string.ai_append, active = false).apply {
+                        setOnClickListener { onSuggestionAppend?.invoke(suggestion) }
+                    }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+                        marginStart = dp(6)
+                    })
+                }
             }, matchWrap())
         }
+
+    private fun partialChanges(patch: AiTextPatch): View = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        if (patch.changes.isEmpty()) {
+            addView(TextView(context).apply {
+                setText(R.string.ai_diff_no_changes)
+                setTextColor(theme.altKeyTextColor)
+                textSize = 12f
+            }, matchWrap())
+            return@apply
+        }
+
+        addView(sectionLabel(R.string.ai_diff_changes), matchWrap())
+        val selected = linkedSetOf<Int>()
+        val applyButton = compactButton(R.string.ai_diff_apply_selected, active = true).apply {
+            isEnabled = false
+            alpha = 0.45f
+            setOnClickListener {
+                if (selected.isEmpty()) return@setOnClickListener
+                isEnabled = false
+                alpha = 0.45f
+                onSelectedChangesApply?.invoke(patch, selected.toSet())
+            }
+        }
+        patch.changes.forEachIndexed { index, change ->
+            addView(CheckBox(context).apply {
+                text = context.getString(
+                    R.string.ai_diff_change,
+                    index + 1,
+                    change.original.visibleDiffText(),
+                    change.replacement.visibleDiffText()
+                )
+                setTextColor(theme.keyTextColor)
+                textSize = 12f
+                minHeight = dp(38)
+                setPadding(dp(2), 0, dp(2), 0)
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) selected += change.id else selected -= change.id
+                    applyButton.isEnabled = selected.isNotEmpty()
+                    applyButton.alpha = if (selected.isNotEmpty()) 1f else 0.45f
+                }
+            }, matchWrap())
+        }
+        addView(applyButton, matchWrap().apply { topMargin = dp(3) })
+    }
+
+    private fun highlightedSuggestion(patch: AiTextPatch): CharSequence =
+        SpannableString(patch.target).apply {
+            patch.changes.forEach { change ->
+                if (change.targetStart == change.targetEnd) return@forEach
+                setSpan(
+                    BackgroundColorSpan(theme.genericActiveBackgroundColor),
+                    change.targetStart,
+                    change.targetEnd,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                setSpan(
+                    ForegroundColorSpan(theme.genericActiveForegroundColor),
+                    change.targetStart,
+                    change.targetEnd,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+        }
+
+    private fun String.visibleDiffText(): String = when {
+        isEmpty() -> context.getString(R.string.ai_diff_empty)
+        else -> replace(" ", "␠").replace("\n", "↵").replace("\t", "⇥")
+    }
 
     private fun LinearLayout.addActionGroup(@StringRes labelRes: Int, actions: List<AiAction>) {
         val row = LinearLayout(context).apply {

@@ -83,12 +83,23 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
+import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseSession
 import org.fcitx.fcitx5.android.input.ai.AiAppliedEdit
 import org.fcitx.fcitx5.android.input.ai.AiApplyMode
 import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
 import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
 import org.fcitx.fcitx5.android.input.ai.AiSourceKind
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
+import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
+import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
+import org.fcitx.fcitx5.android.input.context.KoreanParticleSuggester
+import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
+import org.fcitx.fcitx5.android.input.profile.AppFeaturePolicy
+import org.fcitx.fcitx5.android.input.profile.AppKeyboardGlobalDefaults
+import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileResolver
+import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileStore
+import org.fcitx.fcitx5.android.input.profile.AppToolbarVisibility
+import org.fcitx.fcitx5.android.input.profile.EffectiveAppKeyboardProfile
 import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
 import org.fcitx.fcitx5.android.input.typo.TypoRecoverySnapshot
@@ -172,6 +183,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val autoSnippetExpansion by prefs.advanced.autoSnippetExpansion
     private val bufferedHangulInputPref = prefs.advanced.bufferedHangulInput
     private val bufferedHangulTransport by prefs.advanced.bufferedHangulTransport
+    private val appProfileStore by lazy { AppKeyboardProfileStore(this) }
+    @Volatile
+    private var effectiveAppProfile: EffectiveAppKeyboardProfile? = null
+    private var appliedInputThemeName: String? = null
 
     private val bufferedHangul = BufferedInputController()
     private var bufferedHangulSessionActive = false
@@ -195,6 +210,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.advanced.ignoreSystemWindowInsets,
     )
 
+    private fun effectiveInputTheme(globalTheme: Theme = ThemeManager.activeTheme): Theme =
+        effectiveAppProfile?.source?.themeName?.let { name ->
+            ThemeManager.getAllThemes().firstOrNull { it.name == name }
+        } ?: globalTheme
+
     private fun replaceInputView(theme: Theme): InputView {
         val newInputView = InputView(this, fcitx, theme)
         setInputView(newInputView)
@@ -215,6 +235,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun replaceInputViews(theme: Theme) {
+        appliedInputThemeName = theme.name
         navbarMgr.evaluate(window.window!!, inputDeviceMgr.isVirtualKeyboard)
         replaceInputView(theme)
         replaceCandidateView(theme)
@@ -222,17 +243,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Keep
     private val recreateInputViewListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
-        replaceInputView(ThemeManager.activeTheme)
+        replaceInputView(effectiveInputTheme())
     }
 
     @Keep
     private val recreateCandidatesViewListener = ManagedPreferenceProvider.OnChangeListener {
-        replaceCandidateView(ThemeManager.activeTheme)
+        replaceCandidateView(effectiveInputTheme())
     }
 
     @Keep
     private val onThemeChangeListener = ThemeManager.OnThemeChangeListener {
-        replaceInputViews(it)
+        replaceInputViews(effectiveInputTheme(it))
     }
 
     private fun bufferedHangulModeActive(ime: InputMethodEntry): Boolean =
@@ -744,11 +765,64 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         !EditorPrivacyPolicy.forbidsTextInspection(currentInputEditorInfo, capabilityFlags)
 
     /** Network-backed input features must never inspect or contact a server for private editors. */
-    fun allowsNetworkInputFeatures(): Boolean = allowsTextInspectionFeatures() && !offlineMode
+    fun allowsNetworkInputFeatures(): Boolean =
+        allowsTextInspectionFeatures() && !offlineMode &&
+            effectiveAppProfile?.source?.networkPolicy != AppFeaturePolicy.Block
+
+    /** AI has its own app policy, but still depends on the stricter network/privacy decision. */
+    fun allowsAiInputFeatures(): Boolean =
+        allowsNetworkInputFeatures() &&
+            effectiveAppProfile?.source?.aiPolicy != AppFeaturePolicy.Block
+
+    fun effectiveMobileHangulLayout(global: MobileHangulLayout): MobileHangulLayout =
+        effectiveAppProfile?.source?.mobileHangulLayout ?: global
+
+    fun effectiveToolbarExpanded(global: Boolean): Boolean = when (
+        effectiveAppProfile?.source?.toolbarVisibility
+    ) {
+        AppToolbarVisibility.Expanded -> true
+        AppToolbarVisibility.Collapsed -> false
+        else -> global
+    }
+
+    fun updateCurrentAppMobileHangulLayout(layout: MobileHangulLayout): Boolean {
+        val effective = effectiveAppProfile ?: return false
+        val source = effective.source ?: return false
+        return runCatching {
+            val updated = source.copy(mobileHangulLayout = layout)
+            appProfileStore.upsert(updated)
+            effectiveAppProfile = effective.copy(source = updated, mobileHangulLayout = layout)
+        }.isSuccess
+    }
+
+    private fun effectiveBufferedInputTransport(): BufferedInputTransport =
+        effectiveAppProfile?.source?.bufferedInputTransport ?: bufferedHangulTransport
+
+    private fun resolveAndApplyAppKeyboardProfile(info: EditorInfo, flags: CapabilityFlags) {
+        val globalTheme = ThemeManager.activeTheme
+        val resolved = AppKeyboardProfileResolver.resolve(
+            packageName = info.packageName,
+            profiles = appProfileStore.profiles(),
+            defaults = AppKeyboardGlobalDefaults(
+                mobileHangulLayout = prefs.keyboard.mobileHangulLayout.getValue(),
+                themeName = globalTheme.name,
+                toolbarExpanded = prefs.keyboard.expandToolbarByDefault.getValue(),
+                bufferedInputTransport = prefs.advanced.bufferedHangulTransport.getValue(),
+                offlineMode = prefs.advanced.offlineMode.getValue()
+            ),
+            privateEditor = EditorPrivacyPolicy.forbidsTextInspection(info, flags)
+        )
+        val targetTheme = ThemeManager.getAllThemes().firstOrNull { it.name == resolved.themeName }
+            ?: globalTheme
+        effectiveAppProfile = resolved.copy(themeName = targetTheme.name)
+        if (::contentView.isInitialized && inputView != null && appliedInputThemeName != targetTheme.name) {
+            replaceInputViews(targetTheme)
+        }
+    }
 
     /** Captures only an explicit selection or the current paragraph before the cursor. No network runs here. */
     fun captureAiInputSnapshot(): AiInputSnapshot? {
-        if (!allowsNetworkInputFeatures()) return null
+        if (!allowsAiInputFeatures()) return null
         if (!finishCompositionForDirectAction()) return null
         val info = currentInputEditorInfo
         val range = currentInputSelection
@@ -779,7 +853,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         suggestion: String,
         mode: AiApplyMode
     ): AiAppliedEdit? {
-        if (!allowsNetworkInputFeatures() || suggestion.isBlank()) return null
+        if (!allowsAiInputFeatures() || suggestion.isBlank()) return null
         if (!matchesCurrentEditor(snapshot.editor)) return null
         if (!finishCompositionForDirectAction()) return null
         val connection = currentInputConnection ?: return null
@@ -845,7 +919,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun undoAiEdit(edit: AiAppliedEdit): Boolean {
-        if (!allowsNetworkInputFeatures() || !matchesCurrentEditor(edit.editor)) return false
+        if (!allowsAiInputFeatures() || !matchesCurrentEditor(edit.editor)) return false
         if (!finishCompositionForDirectAction()) return false
         val connection = currentInputConnection ?: return false
         if (connection.getTextBeforeCursor(edit.inserted.length, 0)?.toString() != edit.inserted) {
@@ -888,6 +962,51 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun prepareRichContentCommit(): Boolean {
         if (!allowsNetworkInputFeatures()) return false
         return finishCompositionForDirectAction()
+    }
+
+    /** Captures a bounded local context only after the user explicitly opens particle suggestions. */
+    fun captureKoreanParticleSnapshot(): KoreanParticleSnapshot? {
+        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return null
+        if (!finishCompositionForDirectAction()) return null
+        val info = currentInputEditorInfo
+        val cursor = currentInputSelection.start
+        if (cursor < 0) return null
+        val tail = currentInputConnection?.getTextBeforeCursor(
+            KOREAN_PARTICLE_CONTEXT_CHARACTERS,
+            0
+        )?.toString() ?: return null
+        val suggestions = KoreanParticleSuggester.suggest(tail)
+        if (suggestions.isEmpty()) return null
+        return KoreanParticleSnapshot(
+            editor = KoreanParticleEditorTarget(
+                packageName = info.packageName,
+                fieldId = info.fieldId,
+                inputType = info.inputType,
+                cursor = cursor
+            ),
+            contextTail = tail,
+            suggestions = suggestions
+        )
+    }
+
+    /** Inserts one explicitly selected particle. A stale editor/context fails without fallback. */
+    fun commitKoreanParticle(snapshot: KoreanParticleSnapshot, text: String): Boolean {
+        if (!allowsTextInspectionFeatures() ||
+            snapshot.suggestions.none { it.text == text } ||
+            !matchesCurrentEditor(
+                snapshot.editor.packageName,
+                snapshot.editor.fieldId,
+                snapshot.editor.inputType,
+                snapshot.editor.cursor,
+                snapshot.editor.cursor
+            ) ||
+            !finishCompositionForDirectAction()
+        ) return false
+        val connection = currentInputConnection ?: return false
+        if (connection.getTextBeforeCursor(KOREAN_PARTICLE_CONTEXT_CHARACTERS, 0)?.toString() !=
+            snapshot.contextTail
+        ) return false
+        return commitTextToEditor(text, 1)
     }
 
     fun captureTypoRecoverySnapshot(): TypoRecoverySnapshot? {
@@ -1130,7 +1249,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val transport = if (BufferedHangulMode.mustAvoidClipboard(capabilityFlags)) {
             BufferedInputTransport.DirectCommit
         } else {
-            forcedTransport ?: bufferedHangulTransport
+            forcedTransport ?: effectiveBufferedInputTransport()
         }
         return when (transport) {
             BufferedInputTransport.DirectCommit -> {
@@ -1312,7 +1431,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onCreateInputView(): View? {
-        replaceInputViews(ThemeManager.activeTheme)
+        replaceInputViews(effectiveInputTheme())
         // We will call `setInputView` by ourselves. This is fine.
         return null
     }
@@ -1469,6 +1588,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        SensitivePhraseSession.onEditorPackageChanged(attribute.packageName)
         refreshSnippetCatalog()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         val restartTransport = if (
@@ -1497,6 +1617,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         selection.resetTo(attribute.initialSelStart, attribute.initialSelEnd)
         resetComposingState()
         capabilityFlags = flags
+        resolveAndApplyAppKeyboardProfile(attribute, flags)
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
@@ -1521,6 +1642,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
+        SensitivePhraseSession.onEditorPackageChanged(info.packageName)
+        // Browsers may replace EditorInfo between onStartInput and onStartInputView.
+        resolveAndApplyAppKeyboardProfile(info, CapabilityFlags.fromEditorInfo(info))
         postFcitxJob {
             focus(true)
         }
@@ -1863,6 +1987,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         Timber.d("onFinishInput")
+        SensitivePhraseSession.lock()
         val wasBufferedHangul = bufferedHangulSessionActive
         if (wasBufferedHangul) {
             submitBufferedHangul()
@@ -1877,6 +2002,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUnbindInput() {
+        SensitivePhraseSession.lock()
         bufferedHangulSessionActive = false
         bufferedHangul.clear()
         consumedPhysicalKeysDown.clear()
@@ -1892,6 +2018,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onDestroy() {
+        SensitivePhraseSession.lock()
         recreateInputViewPrefs.forEach {
             it.unregisterOnChangeListener(recreateInputViewListener)
         }
@@ -1926,6 +2053,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Suppress("ConstPropertyName")
     companion object {
+        private const val KOREAN_PARTICLE_CONTEXT_CHARACTERS = 64
         const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
         private const val SNIPPET_CONTEXT_CHARS = 128
     }

@@ -82,6 +82,8 @@ abstract class ClipboardAdapter(
     }
 
     private var popupMenu: PopupMenu? = null
+    private var smartSelectionEnabled = false
+    private var smartSelectedIds: Set<Int> = emptySet()
 
     class ViewHolder(val entryUi: ClipboardEntryUi) : RecyclerView.ViewHolder(entryUi.root)
 
@@ -92,10 +94,15 @@ abstract class ClipboardAdapter(
         val entry = getItem(position) ?: return
         with(holder.entryUi) {
             setEntry(excerptText(entry.text, entry.sensitive && maskSensitive), entry.pinned)
+            setSmartSelected(entry.id in smartSelectedIds)
             root.setOnClickListener {
-                onPaste(entry)
+                if (smartSelectionEnabled) onSmartSelection(entry) else onPaste(entry)
             }
             root.setOnLongClickListener {
+                if (smartSelectionEnabled) {
+                    onSmartSelection(entry)
+                    return@setOnLongClickListener true
+                }
                 val popup = PopupMenu(ctx, root)
                 val menu = popup.menu
                 val iconTint = ctx.styledColor(android.R.attr.colorControlNormal)
@@ -133,12 +140,20 @@ abstract class ClipboardAdapter(
 
     fun getEntryAt(position: Int) = getItem(position)
 
+    fun setSmartSelection(enabled: Boolean, selectedIds: Set<Int> = emptySet()) {
+        smartSelectionEnabled = enabled
+        smartSelectedIds = selectedIds
+        notifyItemRangeChanged(0, itemCount)
+    }
+
     fun onDetached() {
         popupMenu?.dismiss()
         popupMenu = null
     }
 
     abstract fun onPaste(entry: ClipboardEntry)
+
+    abstract fun onSmartSelection(entry: ClipboardEntry)
 
     abstract fun onPin(id: Int)
 

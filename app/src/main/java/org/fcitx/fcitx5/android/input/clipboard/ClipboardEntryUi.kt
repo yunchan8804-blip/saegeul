@@ -33,6 +33,11 @@ import splitties.views.setPaddingDp
 
 class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, radius: Float) : Ui {
 
+    private val backgroundShape = GradientDrawable().apply {
+        cornerRadius = radius
+        setColor(theme.clipboardEntryColor)
+    }
+
     val textView = textView {
         minLines = 1
         maxLines = 4
@@ -69,15 +74,20 @@ class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, radi
                 setColor(Color.WHITE)
             }
         )
-        background = GradientDrawable().apply {
-            cornerRadius = radius
-            setColor(theme.clipboardEntryColor)
-        }
+        background = backgroundShape
         add(layout, lParams(matchParent, matchParent))
     }
 
     fun setEntry(text: String, pinned: Boolean) {
         textView.text = text
         pin.visibility = if (pinned) View.VISIBLE else View.GONE
+    }
+
+    fun setSmartSelected(selected: Boolean) {
+        root.isSelected = selected
+        backgroundShape.setStroke(
+            if (selected) ctx.dp(2) else 0,
+            if (selected) theme.genericActiveBackgroundColor else Color.TRANSPARENT
+        )
     }
 }

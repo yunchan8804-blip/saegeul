@@ -29,6 +29,8 @@ import timber.log.Timber
 
 class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
+    private var smartSurfaceShown = false
+
     val recyclerView = recyclerView {
         addItemDecoration(SpacesItemDecoration(dp(4)))
     }
@@ -37,10 +39,13 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     val emptyUi = ClipboardInstructionUi.Empty(ctx, theme)
 
+    val smartUi = SmartClipboardUi(ctx, theme)
+
     val viewAnimator =  view(::ViewAnimator) {
         add(recyclerView, lParams(matchParent, matchParent))
         add(emptyUi.root, lParams(matchParent, matchParent))
         add(enableUi.root, lParams(matchParent, matchParent))
+        add(smartUi.root, lParams(matchParent, matchParent))
     }
 
     private val keyBorder by ThemeManager.prefs.keyBorder
@@ -57,7 +62,12 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
         contentDescription = ctx.getString(R.string.delete_all)
     }
 
+    val smartButton = ToolButton(ctx, R.drawable.ic_baseline_auto_awesome_24, theme).apply {
+        contentDescription = ctx.getString(R.string.smart_clipboard)
+    }
+
     val extension = horizontalLayout {
+        add(smartButton, lParams(dp(40), dp(40)))
         add(deleteAllButton, lParams(dp(40), dp(40)))
     }
 
@@ -65,22 +75,68 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
         deleteAllButton.visibility = if (enabled) View.VISIBLE else View.INVISIBLE
     }
 
+    private fun setSmartButtonShown(enabled: Boolean) {
+        smartButton.visibility = if (enabled) View.VISIBLE else View.INVISIBLE
+    }
+
+    fun setSmartSelectionMode(enabled: Boolean) {
+        smartButton.isSelected = enabled
+        smartButton.contentDescription = ctx.getString(
+            if (enabled) R.string.smart_clipboard_choose_action else R.string.smart_clipboard
+        )
+        setDeleteButtonShown(!enabled)
+    }
+
+    fun showSmartPreview(preview: SmartClipboardPreview) {
+        smartSurfaceShown = true
+        smartUi.showPreview(preview)
+        viewAnimator.displayedChild = 3
+        smartButton.visibility = View.INVISIBLE
+        deleteAllButton.visibility = View.INVISIBLE
+    }
+
+    fun showSmartMessage(message: String, allowBack: Boolean = false) {
+        smartSurfaceShown = true
+        smartUi.showMessage(message, allowBack)
+        viewAnimator.displayedChild = 3
+        smartButton.visibility = View.INVISIBLE
+        deleteAllButton.visibility = View.INVISIBLE
+    }
+
+    fun hideSmartSurface() {
+        smartSurfaceShown = false
+        viewAnimator.displayedChild = 0
+        smartButton.visibility = View.VISIBLE
+        setSmartSelectionMode(true)
+    }
+
+    fun resetSmartMode() {
+        smartSurfaceShown = false
+        viewAnimator.displayedChild = 0
+        smartButton.visibility = View.VISIBLE
+        setSmartSelectionMode(false)
+    }
+
     fun switchUiByState(state: ClipboardStateMachine.State) {
         Timber.d("Switch clipboard to $state")
+        if (smartSurfaceShown) return
         if (!disableAnimation)
             TransitionManager.beginDelayedTransition(root, Fade().apply { duration = 100L })
         when (state) {
             ClipboardStateMachine.State.Normal -> {
                 viewAnimator.displayedChild = 0
                 setDeleteButtonShown(true)
+                setSmartButtonShown(true)
             }
             ClipboardStateMachine.State.AddMore -> {
                 viewAnimator.displayedChild = 1
                 setDeleteButtonShown(false)
+                setSmartButtonShown(false)
             }
             ClipboardStateMachine.State.EnableListening -> {
                 viewAnimator.displayedChild = 2
                 setDeleteButtonShown(false)
+                setSmartButtonShown(false)
             }
         }
     }

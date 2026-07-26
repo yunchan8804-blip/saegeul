@@ -328,6 +328,32 @@
     <string name="move_cursor_to_end">Move cursor to end</string>
     <string name="open_input_method_settings">Open input method settings</string>
     <string name="delete_all">Delete all</string>
+    <string name="smart_clipboard" tools:ignore="MissingTranslation">Smart clipboard</string>
+    <string name="smart_clipboard_choose_action" tools:ignore="MissingTranslation">Choose smart clipboard action</string>
+    <string name="smart_clipboard_select_prompt" tools:ignore="MissingTranslation">Select up to 10 items, then tap the smart clipboard button again</string>
+    <string name="smart_clipboard_selection_count" tools:ignore="MissingTranslation">%1$d selected</string>
+    <string name="smart_clipboard_selection_limit" tools:ignore="MissingTranslation">You can combine up to 10 clipboard items</string>
+    <string name="smart_clipboard_plain_text" tools:ignore="MissingTranslation">Paste without formatting</string>
+    <string name="smart_clipboard_combine" tools:ignore="MissingTranslation">Combine selected items</string>
+    <string name="smart_clipboard_phone" tools:ignore="MissingTranslation">Format as Korean phone number</string>
+    <string name="smart_clipboard_account" tools:ignore="MissingTranslation">Account digits (groups of 4)</string>
+    <string name="smart_clipboard_mask" tools:ignore="MissingTranslation">Mask personal data</string>
+    <string name="smart_clipboard_cancel_selection" tools:ignore="MissingTranslation">Cancel selection</string>
+    <string name="smart_clipboard_local_notice" tools:ignore="MissingTranslation">Previewed and transformed only on this device. Nothing is sent over the network.</string>
+    <string name="smart_clipboard_mask_count" tools:ignore="MissingTranslation">%1$d personal-data candidates masked</string>
+    <string name="smart_clipboard_source_count" tools:ignore="MissingTranslation">Created from %1$d selected item(s)</string>
+    <string name="smart_clipboard_insert" tools:ignore="MissingTranslation">Insert preview</string>
+    <string name="smart_clipboard_back" tools:ignore="MissingTranslation">Back to selection</string>
+    <string name="smart_clipboard_private_disabled" tools:ignore="MissingTranslation">Clipboard history and smart actions are unavailable in private or no-personalized-learning fields</string>
+    <string name="smart_clipboard_editor_changed" tools:ignore="MissingTranslation">The input field or cursor changed. Nothing was inserted.</string>
+    <string name="smart_clipboard_insert_failed" tools:ignore="MissingTranslation">Could not insert the preview. No fallback was attempted.</string>
+    <string name="smart_clipboard_error_no_selection" tools:ignore="MissingTranslation">Select a clipboard item first</string>
+    <string name="smart_clipboard_error_one_item" tools:ignore="MissingTranslation">This action needs exactly one selected item</string>
+    <string name="smart_clipboard_error_multiple_items" tools:ignore="MissingTranslation">Select at least two items to combine</string>
+    <string name="smart_clipboard_error_invalid_phone" tools:ignore="MissingTranslation">This is not a supported 8–11 digit Korean phone number</string>
+    <string name="smart_clipboard_error_invalid_account" tools:ignore="MissingTranslation">Account grouping accepts 8–20 digits</string>
+    <string name="smart_clipboard_error_no_personal_data" tools:ignore="MissingTranslation">No email, phone, or account-number candidate was found</string>
+    <string name="smart_clipboard_error_too_long" tools:ignore="MissingTranslation">The transformed text exceeds 8,000 characters</string>
     <string name="share">Share</string>
     <string name="emoji_and_symbols">Emoji &amp; Symbols</string>
     <string name="default_emoji_skin_tone">Default emoji skin tone modifier</string>
@@ -349,11 +375,12 @@
     <string name="gif_attachment_unsupported" tools:ignore="MissingTranslation">This app does not support GIF attachments</string>
     <string name="gif_source_license" tools:ignore="MissingTranslation">%1$s · %2$s</string>
     <string name="gif_powered_by_commons" tools:ignore="MissingTranslation">Open-license results from Wikimedia Commons</string>
-    <string name="gif_powered_by_noto" tools:ignore="MissingTranslation">Animated Noto Emoji · CC BY 4.0</string>
+    <string name="gif_powered_by_noto" tools:ignore="MissingTranslation">Small curated fallback · Animated Noto Emoji · CC BY 4.0</string>
     <string name="gif_loading" tools:ignore="MissingTranslation">Searching GIFs…</string>
     <string name="gif_downloading" tools:ignore="MissingTranslation">Downloading and verifying GIF…</string>
-    <string name="gif_no_results" tools:ignore="MissingTranslation">No open-license animated GIFs found</string>
+    <string name="gif_no_results" tools:ignore="MissingTranslation">No GIF results found</string>
     <string name="gif_search_failed" tools:ignore="MissingTranslation">GIF search failed</string>
+    <string name="gif_safe_search_blocked" tools:ignore="MissingTranslation">Safe search blocked this query</string>
     <string name="gif_retry" tools:ignore="MissingTranslation">Retry</string>
     <string name="gif_attach_failed" tools:ignore="MissingTranslation">Could not attach the GIF. The link was not inserted.</string>
     <string name="gif_attached" tools:ignore="MissingTranslation">GIF attached</string>
@@ -363,6 +390,14 @@
     <string name="gif_query_inline_hint" tools:ignore="MissingTranslation">Type a GIF search</string>
     <string name="gif_query_clear" tools:ignore="MissingTranslation">Clear</string>
     <string name="gif_search_action" tools:ignore="MissingTranslation">Search</string>
+    <string name="gif_keyword_trending" tools:ignore="MissingTranslation">Trending</string>
+    <string name="gif_keyword_meme" tools:ignore="MissingTranslation">Memes</string>
+    <string name="gif_keyword_leave_work" tools:ignore="MissingTranslation">Leaving work</string>
+    <string name="gif_keyword_monday" tools:ignore="MissingTranslation">Monday</string>
+    <string name="gif_keyword_awkward" tools:ignore="MissingTranslation">Awkward</string>
+    <string name="gif_keyword_agree" tools:ignore="MissingTranslation">Exactly</string>
+    <string name="gif_keyword_wow" tools:ignore="MissingTranslation">Wow</string>
+    <string name="gif_keyword_fighting" tools:ignore="MissingTranslation">You got this</string>
     <string name="gif_keyword_celebrate" tools:ignore="MissingTranslation">Celebrate</string>
     <string name="gif_keyword_laugh" tools:ignore="MissingTranslation">Laugh</string>
     <string name="gif_keyword_love" tools:ignore="MissingTranslation">Love</string>
@@ -396,10 +431,16 @@
     <string name="korean_search_insert_failed" tools:ignore="MissingTranslation">Could not insert this result</string>
     <string name="korean_search_source_quick_phrase" tools:ignore="MissingTranslation">QUICK PHRASE</string>
     <string name="korean_search_source_clipboard" tools:ignore="MissingTranslation">CLIPBOARD</string>
+    <string name="korean_search_source_emotion" tools:ignore="MissingTranslation">KOREAN REACTION</string>
     <string name="korean_search_source_emoji" tools:ignore="MissingTranslation">EMOJI</string>
     <string name="korean_search_clear" tools:ignore="MissingTranslation">Clear</string>
     <string name="korean_search_backspace" tools:ignore="MissingTranslation">Delete the last initial</string>
     <string name="korean_search_initial_key" tools:ignore="MissingTranslation">Initial %1$s</string>
+    <string name="korean_particle_chip" tools:ignore="MissingTranslation">Particles</string>
+    <string name="korean_particle_title" tools:ignore="MissingTranslation">Korean particle suggestions</string>
+    <string name="korean_particle_prompt" tools:ignore="MissingTranslation">Choose a particle for the word before the cursor</string>
+    <string name="korean_particle_unavailable" tools:ignore="MissingTranslation">Place the cursor immediately after a Korean word</string>
+    <string name="korean_particle_editor_changed" tools:ignore="MissingTranslation">The input field, cursor, or preceding text changed. Nothing was inserted.</string>
     <string name="dynamic_phrase" tools:ignore="MissingTranslation">Dynamic phrase</string>
     <string name="dynamic_phrase_template" tools:ignore="MissingTranslation">Template</string>
     <string name="dynamic_phrase_preview" tools:ignore="MissingTranslation">Preview</string>
@@ -439,6 +480,23 @@
     <string name="ai_result_number" tools:ignore="MissingTranslation">Suggestion %1$d</string>
     <string name="ai_replace" tools:ignore="MissingTranslation">Replace</string>
     <string name="ai_append" tools:ignore="MissingTranslation">Append</string>
+    <string name="ai_diff_changes" tools:ignore="MissingTranslation">Choose corrections to apply</string>
+    <string name="ai_diff_apply_selected" tools:ignore="MissingTranslation">Apply selected</string>
+    <string name="ai_diff_no_changes" tools:ignore="MissingTranslation">No changes found</string>
+    <string name="ai_diff_change" tools:ignore="MissingTranslation">%1$d. %2$s → %3$s</string>
+    <string name="ai_diff_empty" tools:ignore="MissingTranslation">∅</string>
+    <string name="ai_share_target" tools:ignore="MissingTranslation">Use as AI reply context</string>
+    <string name="ai_share_received" tools:ignore="MissingTranslation">Reply context is ready. Open AI writing from the keyboard in the reply field.</string>
+    <string name="ai_share_rejected" tools:ignore="MissingTranslation">Only non-empty plain text can be used as reply context</string>
+    <string name="ai_clipboard_source_select" tools:ignore="MissingTranslation">Choose clipboard text</string>
+    <string name="ai_clipboard_source_title" tools:ignore="MissingTranslation">Choose reply context</string>
+    <string name="ai_clipboard_source_empty" tools:ignore="MissingTranslation">No non-sensitive clipboard text is available</string>
+    <string name="ai_clipboard_source_failed" tools:ignore="MissingTranslation">Could not read clipboard history</string>
+    <string name="ai_reply_source_shared" tools:ignore="MissingTranslation">Shared reply context</string>
+    <string name="ai_reply_source_clipboard" tools:ignore="MissingTranslation">Clipboard reply context</string>
+    <string name="ai_reply_cursor_required" tools:ignore="MissingTranslation">Place a single cursor in the reply field before choosing external context</string>
+    <string name="ai_insert_reply" tools:ignore="MissingTranslation">Insert reply</string>
+    <string name="ai_network_policy_disabled" tools:ignore="MissingTranslation">AI is blocked by offline mode or this app’s AI policy</string>
     <string name="ai_action_proofread" tools:ignore="MissingTranslation">Proofread</string>
     <string name="ai_action_polite" tools:ignore="MissingTranslation">Polite</string>
     <string name="ai_action_casual" tools:ignore="MissingTranslation">Chat</string>
@@ -480,8 +538,118 @@
     <string name="ai_usage_title" tools:ignore="MissingTranslation">AI usage summary</string>
     <string name="ai_usage_summary" tools:ignore="MissingTranslation">Requests %1$d · success %2$d · failure %3$d · sent characters %4$d</string>
     <string name="ai_usage_clear" tools:ignore="MissingTranslation">Clear AI usage summary</string>
+    <string name="gif_provider_settings" tools:ignore="MissingTranslation">GIF provider</string>
+    <string name="gif_provider_status_klipy" tools:ignore="MissingTranslation">Powered by KLIPY · encrypted key configured · production partner approval remains an external gate</string>
+    <string name="gif_provider_status_noto" tools:ignore="MissingTranslation">Animated Noto Emoji fallback · add an approved KLIPY key for broad GIF and meme search</string>
+    <string name="gif_provider_status_unreadable" tools:ignore="MissingTranslation">KLIPY key cannot be decrypted · using Animated Noto Emoji until it is replaced or removed</string>
+    <string name="gif_provider_key_hint" tools:ignore="MissingTranslation">Approved KLIPY API key</string>
+    <string name="gif_provider_key_unchanged_hint" tools:ignore="MissingTranslation">KLIPY API key (leave blank to keep it)</string>
+    <string name="gif_provider_security_note" tools:ignore="MissingTranslation">The key is encrypted with Android Keystore in no-backup storage and never added to preferences, backups, exports, logs, or the clipboard. Production partner approval and a valid production key remain an external gate.</string>
+    <string name="gif_provider_key_required" tools:ignore="MissingTranslation">Enter a KLIPY API key</string>
+    <string name="gif_provider_key_invalid" tools:ignore="MissingTranslation">Could not securely store this key</string>
+    <string name="gif_provider_key_saved" tools:ignore="MissingTranslation">KLIPY key stored securely</string>
+    <string name="gif_provider_key_remove" tools:ignore="MissingTranslation">Remove KLIPY key</string>
+    <string name="gif_provider_key_remove_confirm" tools:ignore="MissingTranslation">Remove the encrypted KLIPY key and switch GIF search back to Animated Noto Emoji?</string>
+    <string name="gif_provider_key_removed" tools:ignore="MissingTranslation">KLIPY key removed · using Animated Noto Emoji</string>
     <string name="gif_cache_clear" tools:ignore="MissingTranslation">Clear downloaded GIF cache</string>
     <string name="gif_cache_cleared" tools:ignore="MissingTranslation">GIF cache cleared</string>
     <string name="privacy_guarantees" tools:ignore="MissingTranslation">Privacy guarantees</string>
     <string name="privacy_guarantees_summary" tools:ignore="MissingTranslation">Password and private fields disable text inspection and network features. AI sends only the previewed selection or current paragraph after an explicit action. Requests use store=false. Usage stores counters only, never text, keys, or URLs.</string>
+    <string name="app_profiles">App-specific keyboard profiles</string>
+    <string name="app_profiles_summary">Override the Korean layout, theme, toolbar, transport, and network features by app</string>
+    <string name="app_profile_add">Add app profile</string>
+    <string name="app_profile_edit">Edit app profile</string>
+    <string name="app_profile_privacy">Profile privacy</string>
+    <string name="app_profile_privacy_summary">Profiles are stored outside Android backup because package names can reveal app usage. Password and private fields, plus global offline mode, always block AI and network access even when a profile allows them.</string>
+    <string name="app_profile_package_hint">Android package name, e.g. com.kakao.talk</string>
+    <string name="app_profile_layout">Korean layout</string>
+    <string name="app_profile_theme">Theme</string>
+    <string name="app_profile_toolbar">Toolbar</string>
+    <string name="app_profile_transport">Buffered input transport</string>
+    <string name="app_profile_network">Network input features</string>
+    <string name="app_profile_ai">AI writing</string>
+    <string name="app_profile_inherit">Use global setting</string>
+    <string name="app_profile_allow">Allow</string>
+    <string name="app_profile_block">Block</string>
+    <string name="app_profile_toolbar_expanded">Expanded by default</string>
+    <string name="app_profile_toolbar_collapsed">Collapsed by default</string>
+    <string name="app_profile_dialog_summary">Only selected values override global settings. Saving a profile with no overrides removes it.</string>
+    <string name="app_profile_invalid_package">Enter a valid Android package name</string>
+    <string name="app_profile_uses_global">Uses all global settings</string>
+    <string name="app_profile_summary_layout">Layout: %1$s</string>
+    <string name="app_profile_summary_theme">Theme: %1$s</string>
+    <string name="app_profile_summary_toolbar">Toolbar: %1$s</string>
+    <string name="app_profile_summary_transport">Transport: %1$s</string>
+    <string name="app_profile_summary_network">Network: %1$s</string>
+    <string name="app_profile_summary_ai">AI: %1$s</string>
+    <string name="personal_dictionary">Personal Korean dictionary</string>
+    <string name="personal_dictionary_enabled">Use personal candidates</string>
+    <string name="personal_dictionary_enabled_summary">Opt in to show only words you explicitly add before the built-in Korean dictionary</string>
+    <string name="personal_dictionary_add">Add personal word</string>
+    <string name="personal_dictionary_count">%1$d saved words</string>
+    <string name="personal_dictionary_category">Category</string>
+    <string name="personal_dictionary_category_name">Name</string>
+    <string name="personal_dictionary_category_company">Company</string>
+    <string name="personal_dictionary_category_term">Technical term</string>
+    <string name="personal_dictionary_word_hint">2-32 complete Hangul syllables</string>
+    <string name="personal_dictionary_add_summary">Words are stored only after you explicitly save them. Saving a word does not enable personal candidates.</string>
+    <string name="personal_dictionary_invalid_word">Enter 2-32 complete Hangul syllables</string>
+    <string name="personal_dictionary_delete">Delete personal word</string>
+    <string name="personal_dictionary_delete_confirm">Delete “%1$s”?</string>
+    <string name="personal_dictionary_privacy">Personal dictionary privacy</string>
+    <string name="personal_dictionary_privacy_summary">Stored in app-owned no-backup storage and excluded from user-data export. The keyboard never learns input automatically or stores source text, selection history, or app package names. Personal candidates are disabled in password, private, no-spellcheck, and no-personalized-learning editors.</string>
+    <string name="voice_precision_title">AI precision dictation</string>
+    <string name="voice_precision_ready">Records up to 30 seconds in memory. Audio is sent only after you stop recording, and text is inserted only after review.</string>
+    <string name="voice_record_start">Start recording</string>
+    <string name="voice_record_stop">Stop recording</string>
+    <string name="voice_recording">Recording %1$d / %2$d sec</string>
+    <string name="voice_transcribing_segment">Recording stopped · creating an accurate Korean transcript…</string>
+    <string name="voice_transcribing_button">Transcribing…</string>
+    <string name="voice_preview_instruction">Review the final transcript before inserting it</string>
+    <string name="voice_insert">Insert transcript</string>
+    <string name="voice_inserted">Transcript inserted</string>
+    <string name="voice_retry_record">Record again</string>
+    <string name="voice_permission_required">Microphone permission is required. The keyboard opens a private system permission screen because an IME service cannot request it directly.</string>
+    <string name="voice_permission_denied">Microphone permission was not granted. No audio was recorded or sent.</string>
+    <string name="voice_permission_allow">Allow microphone</string>
+    <string name="voice_private_disabled">AI dictation is disabled in password, sensitive, and no-personalized-learning fields</string>
+    <string name="voice_policy_disabled">AI dictation is blocked by offline mode or this app’s network/AI policy</string>
+    <string name="voice_cursor_required">Place a single cursor in the target input field before recording</string>
+    <string name="voice_editor_changed">The target app, field, or cursor changed. The transcript was not inserted.</string>
+    <string name="voice_record_failed">Could not record usable audio. No audio was retained.</string>
+    <string name="voice_transcription_failed">Could not transcribe this recording. No text was inserted.</string>
+    <string name="voice_commit_failed">Could not insert the transcript. No second attempt was made.</string>
+    <string name="secret_vault_title" tools:ignore="MissingTranslation">Sensitive phrase vault</string>
+    <string name="secret_vault_unlock" tools:ignore="MissingTranslation">Unlock vault</string>
+    <string name="secret_vault_unlock_summary" tools:ignore="MissingTranslation">Authenticate to show phrases allowed in this app for 60 seconds</string>
+    <string name="secret_vault_unlock_settings_summary" tools:ignore="MissingTranslation">Authenticate to manage encrypted sensitive phrases</string>
+    <string name="secret_vault_locked" tools:ignore="MissingTranslation">The vault is locked. Long-pressing Quick Phrase always starts here.</string>
+    <string name="secret_vault_auth_unavailable" tools:ignore="MissingTranslation">A registered strong biometric or secure device credential on Android 11 or newer is required</string>
+    <string name="secret_vault_auth_failed" tools:ignore="MissingTranslation">The vault remains locked because authentication did not complete</string>
+    <string name="secret_vault_decrypt_failed" tools:ignore="MissingTranslation">The encrypted vault could not be opened</string>
+    <string name="secret_vault_private_blocked" tools:ignore="MissingTranslation">The vault is unavailable in password, private, and no-personalized-learning editors</string>
+    <string name="secret_vault_editor_changed" tools:ignore="MissingTranslation">The editor, app, or cursor changed. Nothing was inserted.</string>
+    <string name="secret_vault_no_allowed_items" tools:ignore="MissingTranslation">No vault phrases are allowed in this app</string>
+    <string name="secret_vault_choose_item" tools:ignore="MissingTranslation">Choose a phrase to preview</string>
+    <string name="secret_vault_preview_label" tools:ignore="MissingTranslation">Preview · %1$s</string>
+    <string name="secret_vault_insert" tools:ignore="MissingTranslation">Insert once</string>
+    <string name="secret_vault_insert_failed" tools:ignore="MissingTranslation">Insertion failed. No fallback was attempted.</string>
+    <string name="secret_vault_settings_empty" tools:ignore="MissingTranslation">The encrypted vault is empty. Add an item and select its allowed Android packages.</string>
+    <string name="secret_vault_settings_summary" tools:ignore="MissingTranslation">Values remain encrypted and are shown only after authentication</string>
+    <string name="secret_vault_add" tools:ignore="MissingTranslation">Add sensitive phrase</string>
+    <string name="secret_vault_edit" tools:ignore="MissingTranslation">Edit sensitive phrase</string>
+    <string name="secret_vault_kind" tools:ignore="MissingTranslation">Kind</string>
+    <string name="secret_vault_kind_account" tools:ignore="MissingTranslation">Account</string>
+    <string name="secret_vault_kind_address" tools:ignore="MissingTranslation">Address</string>
+    <string name="secret_vault_kind_contact" tools:ignore="MissingTranslation">Contact</string>
+    <string name="secret_vault_kind_other" tools:ignore="MissingTranslation">Other</string>
+    <string name="secret_vault_label_hint" tools:ignore="MissingTranslation">Label shown after unlock</string>
+    <string name="secret_vault_value_hint" tools:ignore="MissingTranslation">Sensitive phrase value</string>
+    <string name="secret_vault_packages_hint" tools:ignore="MissingTranslation">Allowed package names, one per line\nExample: com.kakao.talk</string>
+    <string name="secret_vault_item_security" tools:ignore="MissingTranslation">The value is encrypted with an authentication-bound Android Keystore key. At least one valid package is required.</string>
+    <string name="secret_vault_invalid_item" tools:ignore="MissingTranslation">Enter a label, value, and at least one valid Android package name</string>
+    <string name="secret_vault_confirm_change" tools:ignore="MissingTranslation">Confirm vault change</string>
+    <string name="secret_vault_confirm_change_summary" tools:ignore="MissingTranslation">Authenticate this encryption operation before saving</string>
+    <string name="secret_vault_saved" tools:ignore="MissingTranslation">Encrypted vault saved</string>
+    <string name="secret_vault_save_failed" tools:ignore="MissingTranslation">The vault was not changed</string>
 </resources>

@@ -33,3 +33,16 @@ interface GifProvider {
 
     suspend fun search(query: String, limit: Int = 24): List<GifResult>
 }
+
+data class GifSearchPage(
+    val items: List<GifResult>,
+    val hasNext: Boolean
+)
+
+/** Provider capability used by the GIF grid to request another provider-owned result page. */
+interface PagedGifProvider : GifProvider {
+    suspend fun searchPage(query: String, page: Int, limit: Int = 24): GifSearchPage
+
+    override suspend fun search(query: String, limit: Int): List<GifResult> =
+        searchPage(query, page = 1, limit = limit).items
+}

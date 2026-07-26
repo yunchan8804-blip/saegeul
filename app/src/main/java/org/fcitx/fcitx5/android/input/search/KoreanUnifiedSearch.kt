@@ -25,7 +25,16 @@ object KoreanUnifiedSearch {
                     ?: return@mapIndexedNotNull null
                 IndexedResult(KoreanSearchResult(entry, score), index)
             }
-            .distinctBy { "${it.result.entry.source}:${it.result.entry.commitText}" }
+            .distinctBy {
+                val entry = it.result.entry
+                if (entry.source == KoreanSearchSource.Emotion ||
+                    entry.source == KoreanSearchSource.Emoji
+                ) {
+                    "expression:${entry.commitText}"
+                } else {
+                    "${entry.source}:${entry.commitText}"
+                }
+            }
             .sortedWith(
                 compareBy<IndexedResult> { it.result.score }
                     .thenBy { it.result.entry.source.rank }

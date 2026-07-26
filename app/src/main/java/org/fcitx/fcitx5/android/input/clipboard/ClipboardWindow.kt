@@ -81,6 +81,13 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private val clipboardEntryRadius by ThemeManager.prefs.clipboardEntryRadius
 
+    private val smartSelection = SmartClipboardSelectionState()
+    private var smartSelectionMode = false
+    private var smartPreview: SmartClipboardPreview? = null
+    private var editorTarget: SmartClipboardEditorTarget? = null
+    private var actionLocked = false
+    private var clipboardActive = false
+
     private val clipboardEntriesPager by lazy {
         Pager(PagingConfig(pageSize = 16)) { ClipboardManager.allEntries() }
     }
@@ -123,8 +130,11 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             }
 
             override fun onPaste(entry: ClipboardEntry) {
-                service.commitText(entry.text)
-                if (clipboardReturnAfterPaste) windowManager.attachWindow(KeyboardWindow)
+                commitExactlyOnce(entry.text, smartAction = false)
+            }
+
+            override fun onSmartSelection(entry: ClipboardEntry) {
+                selectSmartEntry(entry)
             }
         }
     }
@@ -140,6 +150,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                     recyclerView: RecyclerView,
                     viewHolder: RecyclerView.ViewHolder
                 ): Int {
+                    if (smartSelectionMode) return makeMovementFlags(0, 0)
                     return makeMovementFlags(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT)
                 }
 
@@ -167,12 +178,192 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                     promptDeleteAll(ClipboardManager.haveUnpinned())
                 }
             }
+            smartButton.setOnClickListener { onSmartButtonClick() }
+            smartUi.onInsert = { insertSmartPreview() }
+            smartUi.onBack = { backToSmartSelection() }
         }
     }
 
     override fun onCreateView(): View = ui.root
 
     private var promptMenu: PopupMenu? = null
+    private var smartMenu: PopupMenu? = null
+
+    private fun onSmartButtonClick() {
+        if (!editorStillAllowed()) {
+            ui.showSmartMessage(context.getString(R.string.smart_clipboard_private_disabled))
+            return
+        }
+        if (!smartSelectionMode) {
+            smartSelectionMode = true
+            smartSelection.clear()
+            adapter.setSmartSelection(true)
+            ui.setSmartSelectionMode(true)
+            showStatus(R.string.smart_clipboard_select_prompt)
+            return
+        }
+        showSmartActionMenu()
+    }
+
+    private fun selectSmartEntry(entry: ClipboardEntry) {
+        if (!smartSelectionMode || !editorStillAllowed()) {
+            ui.showSmartMessage(context.getString(R.string.smart_clipboard_private_disabled))
+            return
+        }
+        when (smartSelection.toggle(SmartClipboardItem(entry.id, entry.text))) {
+            SmartClipboardSelectionResult.LimitReached ->
+                showStatus(R.string.smart_clipboard_selection_limit)
+            SmartClipboardSelectionResult.Added,
+            SmartClipboardSelectionResult.Removed -> {
+                adapter.setSmartSelection(true, smartSelection.ids)
+            }
+        }
+    }
+
+    private fun showSmartActionMenu() {
+        smartMenu?.dismiss()
+        val count = smartSelection.items.size
+        smartMenu = PopupMenu(context, ui.smartButton).apply {
+            menu.add(context.getString(R.string.smart_clipboard_selection_count, count)).isEnabled = false
+            menu.item(R.string.smart_clipboard_plain_text) {
+                previewSmartAction(SmartClipboardAction.PlainText)
+            }.isEnabled = count == 1
+            menu.item(R.string.smart_clipboard_combine) {
+                previewSmartAction(SmartClipboardAction.Combine)
+            }.isEnabled = count >= 2
+            menu.item(R.string.smart_clipboard_phone) {
+                previewSmartAction(SmartClipboardAction.PhoneNumber)
+            }.isEnabled = count == 1
+            menu.item(R.string.smart_clipboard_account) {
+                previewSmartAction(SmartClipboardAction.AccountNumber)
+            }.isEnabled = count == 1
+            menu.item(R.string.smart_clipboard_mask) {
+                previewSmartAction(SmartClipboardAction.MaskPersonalData)
+            }.isEnabled = count >= 1
+            menu.item(R.string.smart_clipboard_cancel_selection) {
+                cancelSmartSelection()
+            }
+            setOnDismissListener {
+                if (it === smartMenu) smartMenu = null
+            }
+            show()
+        }
+    }
+
+    private fun previewSmartAction(action: SmartClipboardAction) {
+        if (!editorStillAllowed()) {
+            ui.showSmartMessage(context.getString(R.string.smart_clipboard_private_disabled))
+            return
+        }
+        when (val result = SmartClipboardTransformer.preview(action, smartSelection.items)) {
+            is SmartClipboardTransformResult.Success -> {
+                smartPreview = result.preview
+                ui.showSmartPreview(result.preview)
+            }
+            is SmartClipboardTransformResult.Failure -> showStatus(errorMessage(result.reason))
+        }
+    }
+
+    private fun insertSmartPreview() {
+        val preview = smartPreview ?: return
+        commitExactlyOnce(preview.output, smartAction = true)
+    }
+
+    private fun backToSmartSelection() {
+        smartPreview = null
+        actionLocked = false
+        ui.hideSmartSurface()
+        adapter.setSmartSelection(true, smartSelection.ids)
+    }
+
+    private fun cancelSmartSelection() {
+        smartMenu?.dismiss()
+        smartSelection.clear()
+        smartSelectionMode = false
+        smartPreview = null
+        adapter.setSmartSelection(false)
+        ui.setSmartSelectionMode(false)
+    }
+
+    private fun commitExactlyOnce(text: String, smartAction: Boolean) {
+        if (actionLocked || text.isBlank()) return
+        actionLocked = true
+        if (!editorStillAllowed()) {
+            actionLocked = false
+            showCommitError(
+                context.getString(R.string.smart_clipboard_editor_changed),
+                smartAction
+            )
+            return
+        }
+        val committed = service.commitText(text, 1)
+        if (!committed) {
+            actionLocked = false
+            showCommitError(
+                context.getString(R.string.smart_clipboard_insert_failed),
+                smartAction
+            )
+            return
+        }
+        if (smartAction || clipboardReturnAfterPaste) {
+            windowManager.attachWindow(KeyboardWindow)
+        } else {
+            actionLocked = false
+            editorTarget = captureEditorTarget()
+        }
+    }
+
+    private fun showCommitError(message: String, smartAction: Boolean) {
+        if (smartAction) ui.smartUi.showError(message) else showStatus(message)
+    }
+
+    private fun editorStillAllowed(): Boolean {
+        val target = editorTarget ?: return false
+        return service.allowsTextInspectionFeatures() && service.matchesCurrentEditor(
+            target.packageName,
+            target.fieldId,
+            target.inputType,
+            target.selectionStart,
+            target.selectionEnd
+        )
+    }
+
+    private fun captureEditorTarget(): SmartClipboardEditorTarget {
+        val info = service.currentInputEditorInfo
+        val selection = service.currentInputSelection
+        return SmartClipboardEditorTarget(
+            info.packageName,
+            info.fieldId,
+            info.inputType,
+            selection.start,
+            selection.end
+        )
+    }
+
+    private fun errorMessage(reason: SmartClipboardTransformError): Int = when (reason) {
+        SmartClipboardTransformError.NoSelection -> R.string.smart_clipboard_error_no_selection
+        SmartClipboardTransformError.PlainTextNeedsOneItem,
+        SmartClipboardTransformError.NumberNeedsOneItem -> R.string.smart_clipboard_error_one_item
+        SmartClipboardTransformError.CombineNeedsMultipleItems ->
+            R.string.smart_clipboard_error_multiple_items
+        SmartClipboardTransformError.InvalidPhoneNumber ->
+            R.string.smart_clipboard_error_invalid_phone
+        SmartClipboardTransformError.InvalidAccountNumber ->
+            R.string.smart_clipboard_error_invalid_account
+        SmartClipboardTransformError.NoPersonalData ->
+            R.string.smart_clipboard_error_no_personal_data
+        SmartClipboardTransformError.OutputTooLong -> R.string.smart_clipboard_error_too_long
+    }
+
+    private fun showStatus(message: Int) = showStatus(context.getString(message))
+
+    private fun showStatus(message: String) {
+        snackbarInstance?.dismiss()
+        snackbarInstance = Snackbar.make(snackbarCtx, ui.root, message, Snackbar.LENGTH_SHORT)
+            .setBackgroundTint(theme.popupBackgroundColor)
+            .setTextColor(theme.popupTextColor)
+            .apply { show() }
+    }
 
     private fun promptDeleteAll(skipPinned: Boolean) {
         promptMenu?.dismiss()
@@ -251,6 +442,17 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     override fun onAttached() {
+        smartSelectionMode = false
+        smartSelection.clear()
+        smartPreview = null
+        adapter.setSmartSelection(false)
+        ui.resetSmartMode()
+        editorTarget = captureEditorTarget()
+        actionLocked = false
+        if (!service.allowsTextInspectionFeatures()) {
+            ui.showSmartMessage(context.getString(R.string.smart_clipboard_private_disabled))
+            return
+        }
         val isEmpty = ClipboardManager.itemCount == 0
         val isListening = clipboardEnabledPref.getValue()
         val initialState = when {
@@ -273,14 +475,23 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             }
         }
         clipboardEnabledPref.registerOnChangeListener(clipboardEnabledListener)
+        clipboardActive = true
     }
 
     override fun onDetached() {
-        clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
+        if (clipboardActive) {
+            clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
+            clipboardActive = false
+        }
         adapter.onDetached()
         adapterSubmitJob?.cancel()
         promptMenu?.dismiss()
+        smartMenu?.dismiss()
         snackbarInstance?.dismiss()
+        smartSelection.clear()
+        smartSelectionMode = false
+        smartPreview = null
+        actionLocked = false
     }
 
     override val title: String by lazy {

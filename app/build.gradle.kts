@@ -16,7 +16,6 @@ val debugAiProviderName = providers.gradleProperty("AI_PROVIDER_NAME").orElse("O
 val debugAiProviderBaseUrl = providers.gradleProperty("AI_PROVIDER_BASE_URL")
     .orElse("https://api.openai.com/v1")
 val debugAiProviderApiKey = providers.gradleProperty("AI_PROVIDER_API_KEY").orElse("")
-val debugKlipyApiKey = providers.gradleProperty("KLIPY_API_KEY").orElse("")
 
 android {
     namespace = "org.fcitx.fcitx5.android"
@@ -34,7 +33,6 @@ android {
         buildConfigField("String", "AI_FAST_MODEL", "gpt-5.6-luna".asBuildConfigString())
         buildConfigField("String", "AI_BALANCED_MODEL", "gpt-5.6-terra".asBuildConfigString())
         buildConfigField("String", "AI_QUALITY_MODEL", "gpt-5.6-sol".asBuildConfigString())
-        buildConfigField("String", "KLIPY_API_KEY", "".asBuildConfigString())
 
         @Suppress("UnstableApiUsage")
         externalNativeBuild {
@@ -84,11 +82,6 @@ android {
                 "String",
                 "AI_PROVIDER_API_KEY",
                 debugAiProviderApiKey.get().asBuildConfigString()
-            )
-            buildConfigField(
-                "String",
-                "KLIPY_API_KEY",
-                debugKlipyApiKey.get().asBuildConfigString()
             )
         }
     }

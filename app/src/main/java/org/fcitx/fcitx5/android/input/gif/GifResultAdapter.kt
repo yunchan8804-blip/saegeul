@@ -64,6 +64,17 @@ class GifResultAdapter(
         if (results.isNotEmpty()) notifyItemRangeInserted(0, results.size)
     }
 
+    fun append(results: List<GifResult>): Int {
+        if (results.isEmpty()) return 0
+        val existing = items.asSequence().map { it.providerId to it.id }.toHashSet()
+        val additions = results.filter { existing.add(it.providerId to it.id) }
+        if (additions.isEmpty()) return 0
+        val start = items.size
+        items.addAll(additions)
+        notifyItemRangeInserted(start, additions.size)
+        return additions.size
+    }
+
     fun setAttachSupported(supported: Boolean) {
         if (attachSupported == supported) return
         attachSupported = supported

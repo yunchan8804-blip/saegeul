@@ -19,6 +19,30 @@ class GifSearchGateTest {
         assertEquals(0, provider.requests)
     }
 
+    @Test
+    fun unsafeQueryMakesZeroProviderRequests() = runBlocking {
+        val provider = CountingProvider()
+        val outcome = GifSearchGate(provider).search(allowed = true, query = "nsfw")
+
+        assertSame(GifSearchOutcome.SafeSearchBlocked, outcome)
+        assertEquals(0, provider.requests)
+    }
+
+    @Test
+    fun pageNumberIsForwardedOnlyToPagedProvider() = runBlocking {
+        val provider = CountingPagedProvider()
+        val outcome = GifSearchGate(provider).search(
+            allowed = true,
+            query = "퇴근",
+            page = 3,
+            limit = 12
+        ) as GifSearchOutcome.Results
+
+        assertEquals(3, provider.page)
+        assertEquals(12, provider.limit)
+        assertEquals(true, outcome.hasNext)
+    }
+
     private class CountingProvider : GifProvider {
         override val displayName = "test"
         var requests = 0
@@ -26,6 +50,18 @@ class GifSearchGateTest {
         override suspend fun search(query: String, limit: Int): List<GifResult> {
             requests++
             return emptyList()
+        }
+    }
+
+    private class CountingPagedProvider : PagedGifProvider {
+        override val displayName = "paged"
+        var page = 0
+        var limit = 0
+
+        override suspend fun searchPage(query: String, page: Int, limit: Int): GifSearchPage {
+            this.page = page
+            this.limit = limit
+            return GifSearchPage(emptyList(), hasNext = true)
         }
     }
 }

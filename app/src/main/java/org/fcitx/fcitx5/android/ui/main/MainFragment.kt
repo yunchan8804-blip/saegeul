@@ -100,6 +100,16 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.drawable.ic_baseline_auto_awesome_24,
                     SettingsRoute.PrivacyAi
                 )
+                addDestinationPreference(
+                    R.string.app_profiles,
+                    R.drawable.ic_baseline_android_24,
+                    SettingsRoute.AppProfiles
+                )
+                addDestinationPreference(
+                    R.string.personal_dictionary,
+                    R.drawable.ic_baseline_library_books_24,
+                    SettingsRoute.PersonalDictionary
+                )
             }
         }
     }

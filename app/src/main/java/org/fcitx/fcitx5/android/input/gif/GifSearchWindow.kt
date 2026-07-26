@@ -15,7 +15,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -30,11 +29,9 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
-    private val provider: GifProvider = BuildConfig.KLIPY_API_KEY.trim()
-        .takeIf(String::isNotEmpty)
-        ?.let(::KlipyGifProvider)
-        ?: NotoAnimatedEmojiProvider()
-    private val searchGate = GifSearchGate(provider)
+    private val effectiveProvider: EffectiveGifProvider by lazy { GifProviderResolver.resolve(context) }
+    private val provider: GifProvider by lazy { effectiveProvider.provider }
+    private val searchGate by lazy { GifSearchGate(provider) }
     private val cache by lazy { GifCache(context) }
     private val committer by lazy { RichContentCommitter(service) }
     private lateinit var target: GifEditorTarget
@@ -43,6 +40,9 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private var searchJob: Job? = null
     private var actionJob: Job? = null
     private var retryAction: (() -> Unit)? = null
+    private var currentPage = 0
+    private var hasNextPage = false
+    private var searchGeneration = 0L
 
     private lateinit var adapter: GifResultAdapter
     private lateinit var ui: GifSearchUi
@@ -70,7 +70,22 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 return false
             }
         })
-        ui.setProviderLabel(provider.displayName)
+        ui.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (dy <= 0 || searchJob?.isActive == true || !hasNextPage) return
+                val layout = recyclerView.layoutManager as? GridLayoutManager ?: return
+                if (layout.findLastVisibleItemPosition() >= adapter.itemCount - LOAD_MORE_THRESHOLD) {
+                    loadNextPage()
+                }
+            }
+        })
+        ui.setProviderLabel(
+            when (effectiveProvider.kind) {
+                GifProviderKind.Klipy -> provider.displayName
+                GifProviderKind.AnimatedNoto ->
+                    context.getString(R.string.gif_powered_by_noto)
+            }
+        )
         ui.onQueryClick = ::beginQueryEditing
         ui.onKeyword = { query ->
             queryState = GifSearchQueryState(query)
@@ -123,6 +138,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     }
 
     override fun onDetached() {
+        searchGeneration++
         searchJob?.cancel()
         actionJob?.cancel()
         adapter.onDetached()
@@ -131,30 +147,73 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private fun search(query: String) {
         searchJob?.cancel()
         currentQuery = query.trim()
+        currentPage = 0
+        hasNextPage = false
+        val generation = ++searchGeneration
         queryState = GifSearchQueryState(currentQuery)
         ui.hideQueryEditor()
         ui.setQuery(currentQuery)
         val allowed = service.allowsNetworkInputFeatures()
         if (allowed) ui.showLoading()
         retryAction = { search(currentQuery) }
+        loadPage(page = 1, replace = true, generation = generation, allowed = allowed)
+    }
+
+    private fun loadNextPage() {
+        if (!hasNextPage || searchJob?.isActive == true) return
+        val page = currentPage + 1
+        val generation = searchGeneration
+        retryAction = { loadPage(page, replace = false, generation = generation) }
+        loadPage(page, replace = false, generation = generation)
+    }
+
+    private fun loadPage(
+        page: Int,
+        replace: Boolean,
+        generation: Long,
+        allowed: Boolean = service.allowsNetworkInputFeatures()
+    ) {
         searchJob = service.lifecycleScope.launch {
             try {
-                when (val outcome = searchGate.search(allowed, currentQuery)) {
+                when (val outcome = searchGate.search(allowed, currentQuery, page = page)) {
                     GifSearchOutcome.Blocked -> {
+                        if (generation != searchGeneration) return@launch
                         retryAction = null
+                        hasNextPage = false
                         ui.showBlockingMessage(context.getString(R.string.gif_private_disabled))
                     }
+                    GifSearchOutcome.SafeSearchBlocked -> {
+                        if (generation != searchGeneration) return@launch
+                        retryAction = null
+                        hasNextPage = false
+                        adapter.submit(emptyList())
+                        ui.showBlockingMessage(context.getString(R.string.gif_safe_search_blocked))
+                    }
                     is GifSearchOutcome.Results -> {
-                        adapter.submit(outcome.items)
+                        if (generation != searchGeneration) return@launch
+                        if (replace) {
+                            adapter.submit(outcome.items)
+                        } else {
+                            adapter.append(outcome.items)
+                            ui.clearActionStatus()
+                        }
+                        currentPage = page
+                        hasNextPage = outcome.hasNext
                         adapter.setAttachSupported(committer.supportsGif())
-                        ui.showResults(outcome.items.isNotEmpty())
+                        if (replace) ui.showResults(outcome.items.isNotEmpty())
+                        retryAction = if (hasNextPage) ({ loadNextPage() }) else null
                     }
                 }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
                 Timber.w(exception, "GIF search failed")
-                ui.showBlockingMessage(context.getString(R.string.gif_search_failed), retry = true)
+                if (generation != searchGeneration) return@launch
+                if (replace) {
+                    ui.showBlockingMessage(context.getString(R.string.gif_search_failed), retry = true)
+                } else {
+                    ui.showActionStatus(context.getString(R.string.gif_search_failed), isError = true)
+                }
             }
         }
     }
@@ -233,5 +292,9 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 adapter.setActionLocked(false)
             }
         }
+    }
+
+    private companion object {
+        const val LOAD_MORE_THRESHOLD = 6
     }
 }

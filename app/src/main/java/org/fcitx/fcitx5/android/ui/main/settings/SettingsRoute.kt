@@ -26,9 +26,11 @@ import org.fcitx.fcitx5.android.ui.main.PluginFragment
 import org.fcitx.fcitx5.android.ui.main.settings.addon.AddonConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.addon.AddonListFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.AdvancedSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.AppProfileSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.CandidatesSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeyboardSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.PersonalDictionaryFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.PrivacyAiSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.SymbolSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.global.GlobalConfigFragment
@@ -89,6 +91,12 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object PrivacyAi : SettingsRoute()
+
+    @Serializable
+    data object AppProfiles : SettingsRoute()
+
+    @Serializable
+    data object PersonalDictionary : SettingsRoute()
 
     @Serializable
     data object Developer : SettingsRoute()
@@ -231,6 +239,12 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<PrivacyAiSettingsFragment, PrivacyAi> {
                 label = ctx.getString(R.string.privacy_ai)
+            }
+            fragment<AppProfileSettingsFragment, AppProfiles> {
+                label = ctx.getString(R.string.app_profiles)
+            }
+            fragment<PersonalDictionaryFragment, PersonalDictionary> {
+                label = ctx.getString(R.string.personal_dictionary)
             }
             fragment<DeveloperFragment, Developer> {
                 label = ctx.getString(R.string.developer)

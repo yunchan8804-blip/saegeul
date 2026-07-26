@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!-- remove intent queries merged from library manifest (namely Android-Image-Cropper) -->
     <queries tools:node="removeAll" />
@@ -121,6 +123,39 @@
             android:taskAffinity=".ui.main.ClipboardEditActivity"
             android:theme="@style/Theme.DialogTheme"
             android:windowSoftInputMode="stateAlwaysVisible|adjustPan" />
+
+        <!--
+          InputMethodService cannot call requestPermissions. The current IME is an allowed
+          background-activity-start case, so a user tap opens this internal translucent boundary.
+          Do not use Theme.NoDisplay or noHistory: both can finish before the permission result.
+        -->
+        <activity
+            android:name=".input.voice.VoicePermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.VoicePermission" />
+
+        <!--
+          External Sharesheet targets must be exported. This no-display boundary accepts only
+          ACTION_SEND text/plain, keeps the bounded payload in process memory, and finishes.
+        -->
+        <activity
+            android:name=".input.ai.AiShareReceiverActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/ai_share_target"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".input.FcitxInputMethodService"

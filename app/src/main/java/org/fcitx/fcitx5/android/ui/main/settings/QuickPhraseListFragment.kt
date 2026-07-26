@@ -149,7 +149,8 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
                 val actions = arrayOf(
                     getString(R.string.import_from_file),
                     getString(R.string.create_new),
-                    getString(R.string.dynamic_phrase_profile)
+                    getString(R.string.dynamic_phrase_profile),
+                    getString(R.string.secret_vault_title)
                 )
                 AlertDialog.Builder(requireContext())
                     .setTitle(R.string.quickphrase_editor)
@@ -158,6 +159,9 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
                             0 -> launcher.launch("*/*")
                             1 -> showCreateQuickPhraseDialog()
                             2 -> showDynamicPhraseProfileDialog()
+                            3 -> SensitivePhraseVaultSettings(
+                                this@QuickPhraseListFragment
+                            ).open()
                         }
                     }
                     .setNegativeButton(android.R.string.cancel, null)

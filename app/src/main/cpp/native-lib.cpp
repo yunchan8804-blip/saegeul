@@ -514,6 +514,7 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         jstring appLib,
         jstring extData,
         jstring extCache,
+        jstring noBackupData,
         jobjectArray extDomains) {
     if (Fcitx::Instance().isRunning()) {
         FCITX_ERROR() << "Fcitx is already running!";
@@ -526,6 +527,7 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
     auto appLib_ = CString(env, appLib);
     auto extData_ = CString(env, extData);
     auto extCache_ = CString(env, extCache);
+    auto noBackupData_ = CString(env, noBackupData);
 
     const std::string lang_ = fcitx::stringutils::split(*locale_, ":")[0];
     const std::string config_home = fcitx::stringutils::joinPath(*extData_, "config");
@@ -576,6 +578,9 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
     setenv("XDG_CONFIG_HOME", config_home.c_str(), 1);
     // user StandardPath::Type::Runtime
     setenv("XDG_RUNTIME_DIR", extCache_, 1);
+    // App-owned storage excluded from Android backup and UserDataManager export.
+    // In-process addons may use this only for explicitly managed private data.
+    setenv("FCITX_ANDROID_NO_BACKUP", noBackupData_, 1);
     setenv("LUA_PATH", lua_path.c_str(), 1);
     setenv("LUA_CPATH", lua_cpath.c_str(), 1);
 
