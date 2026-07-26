@@ -12,16 +12,16 @@ import org.junit.Test
 
 class StatusAreaEntryTest {
     @Test
-    fun hanjaConversionUsesDescriptiveActionLabelInsteadOfAmbiguousModeLabel() {
+    fun hangulStatusUsesCurrentModeLabelInsteadOfHanjaActionLabel() {
         val entry = StatusAreaEntry.fromAction(
             action(
                 icon = "fcitx-hanja-inactive",
-                shortText = "한자",
-                longText = "한자로 변환"
+                shortText = "한글",
+                longText = "한글 사용"
             )
         )
 
-        assertEquals("한자로 변환", entry.label)
+        assertEquals("한글", entry.label)
         assertEquals(R.drawable.ic_status_hangul, entry.icon)
         assertFalse(entry.active)
     }

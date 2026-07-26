@@ -60,11 +60,7 @@ sealed class StatusAreaEntry(
 
         fun fromAction(it: Action): Fcitx {
             val active = it.icon.endsWith("-active") || it.isChecked
-            val label = when {
-                it.icon.startsWith("fcitx-hanja-") && it.longText.isNotBlank() -> it.longText
-                it.shortText.isNotBlank() -> it.shortText
-                else -> it.longText
-            }
+            val label = it.shortText.ifBlank { it.longText }
             return Fcitx(it, label, drawableFromIconName(it.icon), active)
         }
     }

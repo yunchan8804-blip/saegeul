@@ -187,7 +187,7 @@ A35와 Z Fold6의 일반 editor 및 buffered 호환 editor 실기기 검증이�
 | A35 명시적 선택 | `PASS` | `안녕하세요` 후보 tap 뒤 editor hierarchy의 compose text가 `안녕하세요` 정확히 한 번임을 확인; 메시지는 전송하지 않고 draft 삭제 |
 | A35 미선택 space | `PASS` | 후보를 누르지 않고 space 입력 뒤 compose text가 `안녕 `으로 유지되고 자동완성 후보로 치환되지 않음을 확인 |
 | 한글 후보 언어 경계 | `PASS` | 자동완성 사전은 현대 한글 음절만 적재·노출하고, 자동완성 중 지속 Hanja 후보가 후보창을 선점하지 않도록 분리; 한자는 명시적 1회 변환 action으로 유지 |
-| 한자 상태 표현 회귀 | `FIXED` | 자동완성이 켜진 기기의 과거 `HanjaMode=True`를 시작·설정 저장 시 `False`로 정규화하고 상태 영역의 모호한 `한자` 라벨을 `한자로 변환` 동작으로 표시 |
+| 한자 상태 표현 회귀 | `FIXED` | 자동완성이 켜진 기기의 과거 `HanjaMode=True`를 시작·설정 저장 시 `False`로 정규화하고, 상태 영역은 현재 모드를 `한글`로 표시한다. 한자 후보는 명시적으로 요청한 1회 변환에서만 연다. |
 | 민감 editor 차단 | `CODE` | `Password`, `Sensitive`, `NoSpellCheck` capability 중 하나라도 있으면 사전 조회 전에 fail-closed |
 | 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, 최신 app/plugin `0.1.2-92-g0c3b30cf` 설치 및 debug Fcitx IME 재선택 |
 | 최종 Z Fold6 설치 | `GATE` | 최신 APK 2개 Taildrop 전달 완료; Android 무선 디버깅 endpoint 인증이 없어 기기 설치·후보 UX 확인 대기 |
