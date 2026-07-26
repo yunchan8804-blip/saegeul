@@ -43,11 +43,14 @@ class GifResultAdapter(
     private val theme: Theme,
     private val onLink: (GifResult) -> Unit,
     private val onAttach: (GifResult) -> Unit,
-    private val onSelectionChanged: () -> Unit
+    private val onSelectionChanged: () -> Unit,
+    private val onVisible: (GifResult) -> Unit = {},
+    private val onCardTap: (GifResult) -> Unit = {}
 ) : RecyclerView.Adapter<GifResultAdapter.Holder>() {
 
     private val items = mutableListOf<GifResult>()
     private val selection = GifSelectionState()
+    private val viewed = mutableSetOf<Pair<String, Long>>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val thumbnailCache = object : LruCache<String, ByteArray>(MAX_THUMBNAIL_CACHE_BYTES) {
         override fun sizeOf(key: String, value: ByteArray): Int = value.size
@@ -58,6 +61,7 @@ class GifResultAdapter(
     fun submit(results: List<GifResult>) {
         val previousCount = items.size
         selection.clear()
+        viewed.clear()
         items.clear()
         if (previousCount > 0) notifyItemRangeRemoved(0, previousCount)
         items.addAll(results)
@@ -107,11 +111,19 @@ class GifResultAdapter(
         holder.bind(result, result.id == selection.selectedId, attachSupported, actionLocked)
     }
 
+    override fun onViewAttachedToWindow(holder: Holder) {
+        super.onViewAttachedToWindow(holder)
+        holder.boundResult?.let { result ->
+            if (viewed.add(result.providerId to result.id)) onVisible(result)
+        }
+    }
+
     override fun onViewRecycled(holder: Holder) {
         holder.thumbnailJob?.cancel()
         holder.thumbnailJob = null
         (holder.image.drawable as? Animatable)?.stop()
         holder.image.setImageDrawable(null)
+        holder.boundResult = null
     }
 
     fun onDetached() {
@@ -133,10 +145,15 @@ class GifResultAdapter(
         holder.image.setImageDrawable(null)
         holder.thumbnailJob = scope.launch {
             val drawable = withContext(Dispatchers.IO) {
-                val bytes = thumbnailCache[result.thumbnailUrl]
-                    ?: downloadBytes(result.thumbnailUrl)?.also {
-                        thumbnailCache.put(result.thumbnailUrl, it)
-                    }
+                val bytes = if (result.providerId == GiphyGifProvider.PROVIDER_ID) {
+                    // GIPHY standard integrations may not cache media copies without approval.
+                    downloadBytes(result.thumbnailUrl)
+                } else {
+                    thumbnailCache[result.thumbnailUrl]
+                        ?: downloadBytes(result.thumbnailUrl)?.also {
+                            thumbnailCache.put(result.thumbnailUrl, it)
+                        }
+                }
                 bytes?.let(::decodeDrawable)
             }
             if (holder.boundId != result.id || drawable == null) return@launch
@@ -247,6 +264,7 @@ class GifResultAdapter(
 
         var thumbnailJob: Job? = null
         var boundId: Long = -1L
+        var boundResult: GifResult? = null
 
         init {
             itemView.layoutParams = RecyclerView.LayoutParams(
@@ -277,6 +295,7 @@ class GifResultAdapter(
 
         fun bind(result: GifResult, selected: Boolean, supported: Boolean, locked: Boolean) {
             boundId = result.id
+            boundResult = result
             val credit = context.getString(
                 R.string.gif_source_license,
                 result.license.author,
@@ -285,15 +304,33 @@ class GifResultAdapter(
             attribution.text = credit
             itemView.contentDescription = "${result.title}. $credit"
             actions.visibility = if (selected) View.VISIBLE else View.GONE
-            unsupported.visibility = if (supported) View.GONE else View.VISIBLE
+            val attachmentEnabled = supported && result.attachmentDownloadAllowed
+            unsupported.text = context.getString(
+                if (!result.attachmentDownloadAllowed) {
+                    R.string.gif_giphy_attach_approval_required
+                } else {
+                    R.string.gif_attachment_unsupported
+                }
+            )
+            unsupported.visibility = if (attachmentEnabled) View.GONE else View.VISIBLE
             linkButton.isEnabled = !locked
-            attachButton.isEnabled = supported && !locked
+            attachButton.isEnabled = attachmentEnabled && !locked
             attachButton.alpha = if (attachButton.isEnabled) 1f else 0.45f
-            itemView.setOnClickListener { if (!locked) toggleSelection(result) }
-            actions.setOnClickListener { if (!locked) toggleSelection(result) }
+            itemView.setOnClickListener {
+                if (!locked) {
+                    onCardTap(result)
+                    toggleSelection(result)
+                }
+            }
+            actions.setOnClickListener {
+                if (!locked) {
+                    onCardTap(result)
+                    toggleSelection(result)
+                }
+            }
             linkButton.setOnClickListener { if (!locked) onLink(result) }
             attachButton.setOnClickListener {
-                if (supported && !locked) onAttach(result)
+                if (attachmentEnabled && !locked) onAttach(result)
             }
             loadThumbnail(this, result)
         }

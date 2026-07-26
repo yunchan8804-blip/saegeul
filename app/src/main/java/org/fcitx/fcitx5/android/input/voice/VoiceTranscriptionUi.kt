@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.os.ConfigurationCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 
@@ -25,6 +26,7 @@ class VoiceTranscriptionUi(
     var onCancel: (() -> Unit)? = null
     var onInsert: (() -> Unit)? = null
     var onPermission: (() -> Unit)? = null
+    var onMeeting: (() -> Unit)? = null
     var onClose: (() -> Unit)? = null
 
     private val title = TextView(context).apply {
@@ -57,6 +59,9 @@ class VoiceTranscriptionUi(
     }
     private val primary = actionButton(active = true)
     private val secondary = actionButton(active = false)
+    private val meeting = actionButton(active = false).apply {
+        visibility = View.GONE
+    }
 
     val root: View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -74,6 +79,10 @@ class VoiceTranscriptionUi(
             0,
             2f
         ))
+        addView(meeting, matchWrap().apply {
+            height = dp(40)
+            bottomMargin = dp(6)
+        })
         addView(LinearLayout(context).apply {
             gravity = Gravity.CENTER
             addView(primary, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
@@ -89,6 +98,12 @@ class VoiceTranscriptionUi(
         provider.text = context.getString(R.string.ai_provider, providerName)
         status.setText(R.string.voice_precision_ready)
         transcriptScroller.visibility = View.GONE
+        meeting.apply {
+            visibility = View.VISIBLE
+            isEnabled = true
+            text = local("회의·메모 음성 파일", "Meeting audio file")
+            setOnClickListener { onMeeting?.invoke() }
+        }
         primary.apply {
             isEnabled = true
             setText(R.string.voice_record_start)
@@ -106,6 +121,7 @@ class VoiceTranscriptionUi(
             if (denied) R.string.voice_permission_denied else R.string.voice_permission_required
         )
         transcriptScroller.visibility = View.GONE
+        hideMeeting()
         primary.apply {
             isEnabled = true
             setText(R.string.voice_permission_allow)
@@ -125,6 +141,7 @@ class VoiceTranscriptionUi(
             PcmMemoryRecorder.MAX_DURATION_SECONDS
         )
         transcriptScroller.visibility = View.GONE
+        hideMeeting()
         primary.apply {
             isEnabled = true
             setText(R.string.voice_record_stop)
@@ -140,6 +157,7 @@ class VoiceTranscriptionUi(
     fun showTranscribing() {
         status.setText(R.string.voice_transcribing_segment)
         transcriptScroller.visibility = View.GONE
+        hideMeeting()
         primary.apply {
             isEnabled = false
             setText(R.string.voice_transcribing_button)
@@ -156,6 +174,7 @@ class VoiceTranscriptionUi(
         status.setText(R.string.voice_preview_instruction)
         transcript.text = text
         transcriptScroller.visibility = View.VISIBLE
+        hideMeeting()
         primary.apply {
             isEnabled = true
             setText(R.string.voice_insert)
@@ -171,6 +190,7 @@ class VoiceTranscriptionUi(
     fun showError(message: String, canRetry: Boolean) {
         status.text = message
         transcriptScroller.visibility = View.GONE
+        hideMeeting()
         primary.apply {
             isEnabled = canRetry
             setText(R.string.voice_retry_record)
@@ -198,6 +218,18 @@ class VoiceTranscriptionUi(
         setColor(color)
         cornerRadius = radius.toFloat()
     }
+
+    private fun hideMeeting() {
+        meeting.visibility = View.GONE
+        meeting.setOnClickListener(null)
+    }
+
+    private fun local(korean: String, english: String): String =
+        if (ConfigurationCompat.getLocales(context.resources.configuration)[0]?.language == "ko") {
+            korean
+        } else {
+            english
+        }
 
     private fun matchWrap() = LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT,

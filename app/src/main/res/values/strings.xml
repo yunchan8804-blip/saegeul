@@ -62,6 +62,12 @@
     <string name="delete">Delete</string>
     <string name="clipboard">Clipboard</string>
     <string name="keyboard_height">Keyboard height</string>
+    <string name="split_keyboard_compact" tools:ignore="MissingTranslation">Split keyboard on phone/cover screen</string>
+    <string name="split_keyboard_compact_summary" tools:ignore="MissingTranslation">Use the saved compact-screen profile. Disabled by default to keep narrow layouts unchanged.</string>
+    <string name="split_keyboard_expanded" tools:ignore="MissingTranslation">Split keyboard on unfolded/tablet screen</string>
+    <string name="split_keyboard_expanded_summary" tools:ignore="MissingTranslation">Use the saved expanded-screen profile when both window dimensions are at least 600 dp.</string>
+    <string name="split_keyboard_compact_gap" tools:ignore="MissingTranslation">Phone/cover center gap</string>
+    <string name="split_keyboard_expanded_gap" tools:ignore="MissingTranslation">Unfolded/tablet center gap</string>
     <string name="virtual_keyboard">Virtual Keyboard</string>
     <string name="clipboard_suggestion_timeout">Clipboard suggestion timeout</string>
     <string name="version">Version</string>
@@ -539,6 +545,11 @@
     <string name="ai_usage_summary" tools:ignore="MissingTranslation">Requests %1$d · success %2$d · failure %3$d · sent characters %4$d</string>
     <string name="ai_usage_clear" tools:ignore="MissingTranslation">Clear AI usage summary</string>
     <string name="gif_provider_settings" tools:ignore="MissingTranslation">GIF provider</string>
+    <string name="gif_provider_selection_title" tools:ignore="MissingTranslation">GIF source</string>
+    <string name="gif_provider_selection_standard" tools:ignore="MissingTranslation">Standard · KLIPY when configured, otherwise Animated Noto Emoji</string>
+    <string name="gif_provider_selection_giphy" tools:ignore="MissingTranslation">GIPHY · separate provider grid</string>
+    <string name="gif_provider_selection_failed" tools:ignore="MissingTranslation">Could not save the GIF source</string>
+    <string name="gif_klipy_settings" tools:ignore="MissingTranslation">KLIPY API key</string>
     <string name="gif_provider_status_klipy" tools:ignore="MissingTranslation">Powered by KLIPY · encrypted key configured · production partner approval remains an external gate</string>
     <string name="gif_provider_status_noto" tools:ignore="MissingTranslation">Animated Noto Emoji fallback · add an approved KLIPY key for broad GIF and meme search</string>
     <string name="gif_provider_status_unreadable" tools:ignore="MissingTranslation">KLIPY key cannot be decrypted · using Animated Noto Emoji until it is replaced or removed</string>
@@ -553,6 +564,28 @@
     <string name="gif_provider_key_removed" tools:ignore="MissingTranslation">KLIPY key removed · using Animated Noto Emoji</string>
     <string name="gif_cache_clear" tools:ignore="MissingTranslation">Clear downloaded GIF cache</string>
     <string name="gif_cache_cleared" tools:ignore="MissingTranslation">GIF cache cleared</string>
+    <string name="gif_giphy_settings" tools:ignore="MissingTranslation">GIPHY API key and approvals</string>
+    <string name="gif_giphy_key_hint" tools:ignore="MissingTranslation">GIPHY production API key</string>
+    <string name="gif_giphy_key_unchanged_hint" tools:ignore="MissingTranslation">GIPHY API key (leave blank to keep it)</string>
+    <string name="gif_giphy_security_note" tools:ignore="MissingTranslation">The key is encrypted with Android Keystore in no-backup storage. Selecting these confirmations does not grant approval: enable them only after GIPHY grants the matching production review or written media-copy approval.</string>
+    <string name="gif_giphy_production_approval_confirmation" tools:ignore="MissingTranslation">GIPHY approved this exact key for production use</string>
+    <string name="gif_giphy_media_approval_confirmation" tools:ignore="MissingTranslation">GIPHY separately granted written approval to download and store media copies for attachment</string>
+    <string name="gif_giphy_media_requires_production" tools:ignore="MissingTranslation">Production approval must be confirmed first</string>
+    <string name="gif_giphy_key_required" tools:ignore="MissingTranslation">Enter a GIPHY API key</string>
+    <string name="gif_giphy_key_invalid" tools:ignore="MissingTranslation">Could not securely store this GIPHY configuration</string>
+    <string name="gif_giphy_key_saved" tools:ignore="MissingTranslation">GIPHY configuration stored securely</string>
+    <string name="gif_giphy_key_remove" tools:ignore="MissingTranslation">Remove GIPHY configuration</string>
+    <string name="gif_giphy_key_remove_confirm" tools:ignore="MissingTranslation">Remove the encrypted GIPHY key and its approval confirmations?</string>
+    <string name="gif_giphy_key_removed" tools:ignore="MissingTranslation">GIPHY configuration removed</string>
+    <string name="gif_giphy_status_missing" tools:ignore="MissingTranslation">No key · zero GIPHY network requests</string>
+    <string name="gif_giphy_status_key_only" tools:ignore="MissingTranslation">Key stored · production approval not confirmed · zero GIPHY network requests</string>
+    <string name="gif_giphy_status_unreadable" tools:ignore="MissingTranslation">Encrypted configuration cannot be read · zero GIPHY network requests</string>
+    <string name="gif_giphy_status_ready_link_only" tools:ignore="MissingTranslation">Powered by GIPHY · production key ready · links only; media-copy approval not confirmed</string>
+    <string name="gif_giphy_status_ready_attach" tools:ignore="MissingTranslation">Powered by GIPHY · production and media-copy approvals confirmed</string>
+    <string name="gif_giphy_unavailable_missing" tools:ignore="MissingTranslation">GIPHY is selected, but no API key is configured. Network access was not attempted.</string>
+    <string name="gif_giphy_unavailable_approval" tools:ignore="MissingTranslation">GIPHY is selected, but production approval is not confirmed. Network access was not attempted.</string>
+    <string name="gif_giphy_unavailable_unreadable" tools:ignore="MissingTranslation">The encrypted GIPHY configuration cannot be read. Network access was not attempted.</string>
+    <string name="gif_giphy_attach_approval_required" tools:ignore="MissingTranslation">GIF attachment requires separate written GIPHY media-copy approval</string>
     <string name="privacy_guarantees" tools:ignore="MissingTranslation">Privacy guarantees</string>
     <string name="privacy_guarantees_summary" tools:ignore="MissingTranslation">Password and private fields disable text inspection and network features. AI sends only the previewed selection or current paragraph after an explicit action. Requests use store=false. Usage stores counters only, never text, keys, or URLs.</string>
     <string name="app_profiles">App-specific keyboard profiles</string>

@@ -19,6 +19,9 @@ class GifCache(private val context: Context) {
 
     suspend fun getOrDownload(result: GifResult): File = withContext(Dispatchers.IO) {
         cleanupExpired()
+        check(result.attachmentDownloadAllowed) {
+            "Provider media-copy approval is required"
+        }
         check(isDeclaredSizeAllowed(result.byteSize)) {
             "GIF size is outside the allowed range"
         }

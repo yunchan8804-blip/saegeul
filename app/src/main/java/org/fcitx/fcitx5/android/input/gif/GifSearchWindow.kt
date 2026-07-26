@@ -34,6 +34,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private val searchGate by lazy { GifSearchGate(provider) }
     private val cache by lazy { GifCache(context) }
     private val committer by lazy { RichContentCommitter(service) }
+    private val giphyAnalytics by lazy { GiphyAnalyticsTracker(context) }
     private lateinit var target: GifEditorTarget
     private var currentQuery = ""
     private var queryState = GifSearchQueryState()
@@ -56,7 +57,9 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
             theme,
             onLink = ::insertLink,
             onAttach = ::attachGif,
-            onSelectionChanged = { ui.clearActionStatus() }
+            onSelectionChanged = { ui.clearActionStatus() },
+            onVisible = { result -> trackGiphyAction(result, GifAnalyticsEvent.Load) },
+            onCardTap = { result -> trackGiphyAction(result, GifAnalyticsEvent.Click) }
         )
         ui.recyclerView.layoutManager = GridLayoutManager(context, 2)
         ui.recyclerView.adapter = adapter
@@ -84,6 +87,8 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 GifProviderKind.Klipy -> provider.displayName
                 GifProviderKind.AnimatedNoto ->
                     context.getString(R.string.gif_powered_by_noto)
+                GifProviderKind.Giphy,
+                GifProviderKind.GiphyUnavailable -> GiphyGifProvider.POWERED_BY_GIPHY
             }
         )
         ui.onQueryClick = ::beginQueryEditing
@@ -133,6 +138,11 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
             ui.showBlockingMessage(context.getString(R.string.gif_private_disabled))
             return
         }
+        if (!effectiveProvider.networkReady) {
+            retryAction = null
+            ui.showBlockingMessage(giphyUnavailableMessage())
+            return
+        }
         adapter.setAttachSupported(committer.supportsGif(info))
         search(currentQuery)
     }
@@ -145,6 +155,11 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     }
 
     private fun search(query: String) {
+        if (!effectiveProvider.networkReady) {
+            retryAction = null
+            ui.showBlockingMessage(giphyUnavailableMessage())
+            return
+        }
         searchJob?.cancel()
         currentQuery = query.trim()
         currentPage = 0
@@ -223,6 +238,10 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
             ui.showBlockingMessage(context.getString(R.string.gif_private_disabled))
             return
         }
+        if (!effectiveProvider.networkReady) {
+            ui.showBlockingMessage(giphyUnavailableMessage())
+            return
+        }
         searchJob?.cancel()
         queryState = GifSearchQueryState(currentQuery)
         ui.showQueryEditor(queryState)
@@ -247,6 +266,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         val committed = service.commitText(result.canonicalUrl)
         adapter.setActionLocked(false)
         if (committed) {
+            trackGiphyAction(result, GifAnalyticsEvent.Send)
             windowManager.attachWindow(KeyboardWindow)
         } else {
             ui.showActionStatus(context.getString(R.string.gif_link_failed), isError = true)
@@ -255,6 +275,13 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
 
     private fun attachGif(result: GifResult) {
         if (actionJob?.isActive == true) return
+        if (!result.attachmentDownloadAllowed) {
+            ui.showActionStatus(
+                context.getString(R.string.gif_giphy_attach_approval_required),
+                isError = true
+            )
+            return
+        }
         if (!committer.supportsGif()) {
             ui.showActionStatus(context.getString(R.string.gif_attachment_unsupported), isError = true)
             return
@@ -267,6 +294,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 val file = cache.getOrDownload(result)
                 when (committer.commit(result, file, target)) {
                     GifCommitResult.Success -> {
+                        trackGiphyAction(result, GifAnalyticsEvent.Send)
                         Toast.makeText(context, R.string.gif_attached, Toast.LENGTH_SHORT).show()
                         windowManager.attachWindow(KeyboardWindow)
                     }
@@ -292,6 +320,27 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 adapter.setActionLocked(false)
             }
         }
+    }
+
+    private fun trackGiphyAction(result: GifResult, event: GifAnalyticsEvent) {
+        if (effectiveProvider.kind != GifProviderKind.Giphy ||
+            !service.allowsNetworkInputFeatures()
+        ) return
+        service.lifecycleScope.launch {
+            runCatching { giphyAnalytics.track(result, event) }
+                .onFailure { Timber.d(it, "GIPHY analytics event failed") }
+        }
+    }
+
+    private fun giphyUnavailableMessage(): String = when (effectiveProvider.giphyCredentialState) {
+        GiphyCredentialState.Missing ->
+            context.getString(R.string.gif_giphy_unavailable_missing)
+        GiphyCredentialState.KeyOnly ->
+            context.getString(R.string.gif_giphy_unavailable_approval)
+        GiphyCredentialState.Unreadable ->
+            context.getString(R.string.gif_giphy_unavailable_unreadable)
+        GiphyCredentialState.Ready ->
+            context.getString(R.string.gif_giphy_unavailable_approval)
     }
 
     private companion object {

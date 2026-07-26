@@ -151,6 +151,15 @@ class InputView(
         keyboardBottomPaddingLandscape,
     )
 
+    private val thumbSplitPrefs = listOf(
+        keyboardPrefs.splitKeyboardCompact,
+        keyboardPrefs.splitKeyboardExpanded,
+        keyboardPrefs.splitKeyboardCompactGapPortrait,
+        keyboardPrefs.splitKeyboardCompactGapLandscape,
+        keyboardPrefs.splitKeyboardExpandedGapPortrait,
+        keyboardPrefs.splitKeyboardExpandedGapLandscape,
+    )
+
     private val keyboardHeightPx: Int
         get() {
             val percent = when (resources.configuration.orientation) {
@@ -182,6 +191,9 @@ class InputView(
     private val onKeyboardSizeChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
         if (keyboardSizePrefs.any { it.key == key }) {
             updateKeyboardSize()
+        }
+        if (thumbSplitPrefs.any { it.key == key }) {
+            keyboardWindow.updateThumbSplitProfile()
         }
     }
 

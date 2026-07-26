@@ -270,6 +270,61 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             keyboardBottomPaddingLandscape = secondary
         }
 
+        val splitKeyboardCompact = switch(
+            R.string.split_keyboard_compact,
+            "split_keyboard_compact",
+            false,
+            R.string.split_keyboard_compact_summary
+        )
+        val splitKeyboardExpanded = switch(
+            R.string.split_keyboard_expanded,
+            "split_keyboard_expanded",
+            false,
+            R.string.split_keyboard_expanded_summary
+        )
+
+        val splitKeyboardCompactGapPortrait: ManagedPreference.PInt
+        val splitKeyboardCompactGapLandscape: ManagedPreference.PInt
+
+        init {
+            val (primary, secondary) = twinInt(
+                R.string.split_keyboard_compact_gap,
+                R.string.portrait,
+                "split_keyboard_compact_gap_portrait",
+                48,
+                R.string.landscape,
+                "split_keyboard_compact_gap_landscape",
+                72,
+                24,
+                180,
+                "dp",
+                4
+            ) { splitKeyboardCompact.getValue() }
+            splitKeyboardCompactGapPortrait = primary
+            splitKeyboardCompactGapLandscape = secondary
+        }
+
+        val splitKeyboardExpandedGapPortrait: ManagedPreference.PInt
+        val splitKeyboardExpandedGapLandscape: ManagedPreference.PInt
+
+        init {
+            val (primary, secondary) = twinInt(
+                R.string.split_keyboard_expanded_gap,
+                R.string.portrait,
+                "split_keyboard_expanded_gap_portrait",
+                96,
+                R.string.landscape,
+                "split_keyboard_expanded_gap_landscape",
+                128,
+                32,
+                240,
+                "dp",
+                4
+            ) { splitKeyboardExpanded.getValue() }
+            splitKeyboardExpandedGapPortrait = primary
+            splitKeyboardExpandedGapLandscape = secondary
+        }
+
         val horizontalCandidateStyle = enumList(
             R.string.horizontal_candidate_style,
             "horizontal_candidate_style",

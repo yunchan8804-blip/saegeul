@@ -13,7 +13,7 @@
 
 최종 갱신일: 2026-07-26
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `AI 답장 intake·개인 단어장·조사·감정·smart clipboard·민감 금고·정밀 받아쓰기 통합 checkpoint`
+현재 활성 구현 마일스톤: `Fold 분할 레이아웃·선택형 GIPHY·회의 화자 분리 통합 checkpoint`
 
 ## 2. 상태 표기
 
@@ -126,6 +126,7 @@
 | --- | --- | --- | --- | --- |
 | `GIF-01` | GIF 검색·링크·첨부 파이프라인 | `DONE` | 키보드 이탈 없이 GIF 검색·전달 | L |
 | `GIF-02` | 실사용 리액션 GIF 공급자 | `IN_PROGRESS` | KLIPY 한국어 검색·밈 catalog 구현 완료, production key·승인 gate 남음 | M |
+| `GIF-03` | 선택형 GIPHY 공급자 | `IN_PROGRESS` | 비혼합·branding·analytics·안전등급 구현, production/media-copy 승인 gate | M |
 
 `GIF-01`의 전송 파이프라인 계약과 `GIF-02`의 공급자 계약은 7절에 있다. 사용자 실사용 결과
 Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 리액션 GIF catalog로는 현저히
@@ -358,7 +359,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | --- | --- | --- | --- | --- |
 | `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | push-to-talk·권한·한국어 hint·최종 preview·exactly-once commit 구현, Realtime partial transcript GATE | L |
 | `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 30초 in-memory WAV 구간 전사 구현, 두 기기 정확도·취소 UX gate 남음 | L |
-| `VOICE-03` | 화자 분리 회의·메모 | `BACKLOG` | 파일 기반 diarization, 화자 label, 요약은 별도 action | L |
+| `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, OpenAI profile·실기기 gate | L |
 | `MM-01` | OCR·사진 속 한글 입력 | `BACKLOG` | 사용자가 고른 이미지에 한해 OCR, preview 후 삽입 | L |
 
 ### 6.5 편의·기기·보안 기능
@@ -366,7 +367,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
 | `UX-01` | Smart clipboard action | `IN_PROGRESS` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹 구현, 기기 검증 남음 | M |
-| `UX-02` | Fold·tablet 분할 키보드 | `BACKLOG` | cover/unfolded posture별 profile과 양손 thumb layout | L |
+| `UX-02` | Fold·tablet 분할 키보드 | `IN_PROGRESS` | compact/expanded·세로/가로 profile과 중앙 non-touch gap 구현, unfolded 검증 gate | L |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
 | `SEC-03` | 완전 offline mode | `IN_PROGRESS` | AI·GIF toolbar와 network gate 통합, 실제 기기 zero-request gate 남음 | S |
@@ -389,8 +390,27 @@ arm64 app·Hangul plugin assemble까지 통과했다. 상태를 `DONE`으로 올
 
 app lint에서 이번 checkpoint가 처음 만든 `USE_BIOMETRIC` 권한 2건과 Android 11 API guard 3건을
 발견해 수정했고 재실행에서 모두 사라졌다. 전체 lint는 기존 `fragment_setup.xml` AppCompat tint,
-`removed_n_items` format, 다국어 번역 누락을 포함한 선행 부채 286 errors·69 warnings 때문에 계속
+`removed_n_items` format, 다국어 번역 누락을 포함한 선행 부채 286 errors·67 warnings 때문에 계속
 실패한다. 이번 기능의 녹색 build/test와 저장소 전체 lint 부채를 같은 상태로 표시하지 않는다.
+
+첫 checkpoint `4a515bfa`는 A35 `SM-A356N`과 Z Fold6 `SM-F956N`에 app/plugin
+`0.1.2-97-g4a515bfa`를 모두 덮어 설치하고 debug Fcitx IME를 재선택했다. A35에서 Sharesheet 원문이
+AI 창에 표시되고 실제 답장 초안이 생성됐으며, `AI 정밀 받아쓰기` 화면에서 Android 마이크 permission
+dialog까지 정상 진입했다. 권한은 자동 승인하지 않았다. A35에서 한국어 GIF 밈 chip·KLIPY grid와
+`축하` 감정표현 후보를, Z Fold6 cover에서 GIF chip·2열 rich grid를 확인했다. 두 기기의 `?123`은
+각 기기에 저장된 Number 또는 Symbol 목적지로 정상 전환됐다.
+
+### 6.7 Fold·GIPHY·회의 전사 checkpoint 계약
+
+| ID | 구현 계약 | 자동 검증 | 남은 완료 게이트 |
+| --- | --- | --- | --- |
+| `UX-02` | compact와 expanded profile을 독립 저장하고 각각 세로/가로 중앙 간격을 둔다. 두 축이 모두 600dp 이상일 때만 expanded로 판정하며 size가 불명확하면 일반 layout을 유지한다. 숫자판은 split하지 않는다. | profile 경계·방향·독립 toggle·gap cap·fill key를 포함한 8 tests | Z Fold6 cover/펼침·회전·한글/영문/모바일 표면·중앙 무입력·`?123` 왕복 |
+| `GIF-03` | GIPHY는 사용자가 명시적으로 고르는 별도 provider다. production review 확인 key가 없으면 network 0회이며 KLIPY로 자동 fallback하지 않는다. rating `g`, 한국어·한국 locale, Powered by GIPHY, canonical/media 분리와 load/click/sent analytics를 적용한다. | provider parser·pagination·안전등급·credential·resolver·analytics tests | 실제 production key review; GIF 첨부는 별도 media-copy 서면 승인 필요 |
+| `VOICE-03` | `ACTION_OPEN_DOCUMENT`로 고른 content URI만 최대 60분·24MiB 범위에서 stream하고 화자·timestamp segment를 preview한다. 사용자가 체크한 segment만 16,000자 이하로 정확히 한 번 입력한다. | MIME/확장자·크기·시간·multipart·response parser·selection·commit tests | 표준 OpenAI profile과 실제 회의 음원 정확도·picker 복귀·취소·두 기기 UI |
+
+두 번째 checkpoint의 단독 통합 검증은 app JVM 51 suites·219 tests, failure/error/skipped 0과
+arm64 app·Hangul plugin assemble을 통과했다. GIPHY key·회의 음원·화자 전사 원문은 prefs, cache,
+backup, 일반 log에 저장하지 않는다.
 
 ## 7. GIF-01 상세 계약
 
@@ -502,7 +522,7 @@ Commons provider와 license parser는 보존하지만 기본 반응 GIF 화면�
 | Openverse | 기본 제외 | 라이브 GIF 검색이 사실상 Wikimedia 결과에 집중되고 한국어 recall 개선이 없음 |
 | GifCities | 제외 | GeoCities archive 자산으로 현대 반응 품질과 개별 저작권 상태가 불명확 |
 | KLIPY | `GIF-02` 우선 후보 | 1천만+ catalog, 한국어 검색·지역화, 키보드 사례가 있으나 API key·attribution·partner 승인이 필요 |
-| GIPHY | `GIF-02` 대안 | 충분한 catalog지만 API key·Powered by GIPHY·결과 비혼합 계약과 production 승인이 필요 |
+| GIPHY | optional provider `IN_PROGRESS` | 별도 provider·보안 key·branding·analytics 구현 완료, production/media-copy 승인 gate |
 
 Commons tab을 구현할 때는 기존 MediaWiki MIME·license allowlist·restriction 필터를 그대로 유지하고,
 다른 provider 결과와 같은 grid에 섞지 않는다.
@@ -534,9 +554,12 @@ chip과 직접 입력 query는 같은 safe-search gate를 거친다. 명시적 �
 클라이언트에서도 제외하고, partner filter를 최종 source of truth로 유지한다. Noto는 UI에서
 `작은 공개 fallback`이라고 표시해 리액션 catalog처럼 오인시키지 않는다.
 
-GIPHY를 후속 provider로 구현하려면 별도 API key·`Powered by GIPHY`·rating/lang·action tracking·
-production review를 한 묶음으로 완료해야 한다. KLIPY/Commons/Noto와 같은 grid나 cache namespace에
-혼합하지 않으며, 이 계약 전에는 단순 catalog 수만 이유로 활성화하지 않는다.
+GIPHY optional provider는 위 계약을 코드로 구현했다. 별도 Keystore/no-backup credential,
+명시적 provider 선택, `Powered by GIPHY`, `rating=g`, `lang=ko`, `country_code=KR`, pagination과
+공식 load/click/sent analytics URL을 사용한다. key와 사용자가 확인한 production review가 모두 없으면
+`GiphyUnavailable`로 network를 0회 유지하고 KLIPY로 자동 fallback하지 않는다. 별도 media-copy 서면
+승인이 없으면 link만 허용하고 원본 download·disk cache·GIF 첨부는 비활성화한다. KLIPY/Commons/Noto와
+같은 grid response나 cache namespace에는 혼합하지 않는다.
 
 Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 사용하지 않는다. 공급자 상태는
 구현 시점에 공식 문서로 다시 검증한다.
@@ -602,6 +625,7 @@ Tenor API는 2026-06-30 종료 계약 때문에 새로운 기본 공급자로 �
 | key 기반 provider 전환 | `PASS` | A35·Z Fold6 설정 화면에서 개인 key 저장 후 `Powered by KLIPY` 상태 확인, A35 keyboard에서 풍부한 trending grid 재확인 |
 | KLIPY production 승인 | `GATE` | source에 key를 넣지 않음. 공개 배포 전 전용 production key·partner 약관 승인 필요 |
 | pagination·밈 chip·safe gate | `PASS` | page/has-next, stale generation, media dedupe, next-page retry, 한국어 quick chip, query·metadata 차단을 단위 테스트로 검증 |
+| GIPHY optional provider | `PASS/GATE` | key·승인 부재 network 0, provider 비혼합, g rating, ko/KR, pagination, attribution, canonical/media, analytics tests 통과. 실제 production review와 media-copy 승인은 외부 gate |
 
 `GIF-01`의 코드, 자동 테스트, A35 기능 검증, A35·Z Fold6 설치 게이트가 모두 통과했다. 2026-07-26
 사용자 피드백으로 기존 `AlertDialog/EditText` 검색과 Commons 기본 결과의 실사용 실패를 재현한 뒤
@@ -680,6 +704,14 @@ editor identity 변경, 취소에서는 전송 또는 입력을 fail-closed한�
 ephemeral token 발급이 함께 준비될 때 별도로 구현한다. 장기 표준 API key를 실시간 client에 내장하는
 방식은 허용하지 않는다.
 
+`VOICE-03`은 Realtime과 분리된 명시적 파일 작업이다. Android system document picker에서 사용자가
+고른 `content://` audio만 허용하고, FLAC·MP3/MP4/M4A·MPEG/MPGA·OGG·WAV·WebM 중 metadata와
+확장자를 교차 검증한다. 선언 size가 없더라도 stream 도중 24MiB를 넘으면 즉시 중단하며 최대 duration은
+60분이다. 요청은 `gpt-4o-transcribe-diarize`, `response_format=diarized_json`,
+`chunking_strategy=auto`, `language=ko`로 제한한다. 표준 OpenAI profile이 아니면 capability를 추정하지
+않고 fail-closed한다. 결과는 화자·시작/종료 timestamp를 preview하고 사용자가 체크한 segment만
+exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는다.
+
 ### 8.5 AI text MVP 구현·검증 증거 (2026-07-26)
 
 | 범위 | 결과 | 증거 |
@@ -746,16 +778,16 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 1. push-to-talk audio capture와 permission UX. (`IN_PROGRESS`: 코드 완료, 두 기기 permission/focus gate)
 2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: in-memory WAV와 final preview 완료, live 품질 gate)
 3. `VOICE-01` realtime partial transcript. (`GATE`: Realtime WebSocket와 ephemeral token backend)
-4. `VOICE-03` diarization과 회의 UI.
+4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 코드·테스트 완료, 표준 OpenAI·실기기 gate)
 
 ### 단계 5 — 개인화·대화면·장기 기능
 
 1. `KO-05` 한자·사전과 `KO-06` 개인 단어장. (`IN_PROGRESS`: 개인 단어장 코드 완료, 두 기기 gate)
 2. `UX-01` smart clipboard action. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
-4. `UX-02` Fold·tablet 분할 layout.
+4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 코드·테스트 완료, Fold6 펼침·회전 gate)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
-6. `KO-07` 다음 어절, `MM-01`, `VOICE-03`을 explicit user action과 privacy 경계로 구현한다.
+6. `KO-07` 다음 어절과 `MM-01`을 explicit user action과 privacy 경계로 구현한다.
 
 ## 10. 공통 검증 게이트
 
@@ -801,6 +833,9 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | 답장 intake는 Sharesheet/명시적 clipboard만 허용하고 화면 임의 읽기와 영구 원문 저장을 금지 |
 | 2026-07-26 | 민감 문구는 매 작업 인증 결합 cipher, package allowlist, 60초 메모리 세션을 모두 만족할 때만 노출 |
 | 2026-07-26 | 구간 전사는 `AI 정밀 받아쓰기`로 명명하고 Realtime delta는 ephemeral-token backend가 준비될 때까지 별도 gate로 유지 |
+| 2026-07-26 | Fold split은 compact/expanded와 세로/가로 profile을 독립 저장하고 불명확한 posture에서는 일반 layout을 유지 |
+| 2026-07-26 | GIPHY는 production review key와 별도 provider 선택이 있을 때만 활성화하며 media-copy 승인 전에는 link-only로 제한 |
+| 2026-07-26 | 회의 화자 분리는 system picker의 명시 선택 audio만 stream하고 segment review 없이 자동 입력하거나 요약하지 않음 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
 | 2026-07-26 | AI text action은 선택/현재 문단 preview 후에만 network를 호출하고 결과 교체·추가·undo를 명시적 동작으로 제한 |
 | 2026-07-26 | 동적 빠른 문구는 기존 `.mb` 형식을 유지하고, 명시적 미리보기 뒤 정확히 한 번 삽입 |

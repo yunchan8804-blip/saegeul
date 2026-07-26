@@ -12,6 +12,14 @@ data class GifLicense(
     val attributionRequired: Boolean
 )
 
+data class GifAnalytics(
+    val onLoadUrl: String,
+    val onClickUrl: String,
+    val onSendUrl: String
+)
+
+enum class GifAnalyticsEvent { Load, Click, Send }
+
 data class GifResult(
     val providerId: String,
     val id: Long,
@@ -25,7 +33,10 @@ data class GifResult(
     val width: Int,
     val height: Int,
     val license: GifLicense,
-    val safe: Boolean
+    val safe: Boolean,
+    /** False when a provider has not granted the media-copy approval required by its terms. */
+    val attachmentDownloadAllowed: Boolean = true,
+    val analytics: GifAnalytics? = null
 )
 
 interface GifProvider {

@@ -35,6 +35,7 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.dimensions.dp
 
 class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), EssentialWindow,
     InputBroadcastReceiver {
@@ -85,6 +86,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private var activeHangulLayout: String? = null
     private var mobileHangulLayout by AppPrefs.getInstance().keyboard.mobileHangulLayout
     private var lastSymbolType: String by AppPrefs.getInstance().internal.lastSymbolLayout
+    private val keyboardPrefs = AppPrefs.getInstance().keyboard
 
     private val currentKeyboard: BaseKeyboard? get() = keyboards[currentKeyboardName]
 
@@ -147,6 +149,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.popupActionListener = popupActionListener
             keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
             it.onAttach()
+            updateThumbSplitProfile()
             it.onReturnDrawableUpdate(returnKeyDrawable.resourceId)
             updateInputMethod(fcitx.runImmediately { inputMethodEntryCached })
         }
@@ -234,6 +237,25 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 windowManager.attachWindow(PickerWindow.Key.Symbol)
             }
         }
+    }
+
+    fun updateThumbSplitProfile() {
+        val profile = FoldKeyboardProfileResolver.resolve(
+            KeyboardViewportReader.read(context),
+            ThumbSplitPreferences(
+                compactEnabled = keyboardPrefs.splitKeyboardCompact.getValue(),
+                expandedEnabled = keyboardPrefs.splitKeyboardExpanded.getValue(),
+                compactPortraitGapDp = keyboardPrefs.splitKeyboardCompactGapPortrait.getValue(),
+                compactLandscapeGapDp = keyboardPrefs.splitKeyboardCompactGapLandscape.getValue(),
+                expandedPortraitGapDp = keyboardPrefs.splitKeyboardExpandedGapPortrait.getValue(),
+                expandedLandscapeGapDp = keyboardPrefs.splitKeyboardExpandedGapLandscape.getValue()
+            )
+        )
+        val splitCurrentSurface = profile.enabled && currentKeyboardName != NumberKeyboard.Name
+        currentKeyboard?.updateThumbSplit(
+            enabled = splitCurrentSurface,
+            centerGapPx = if (splitCurrentSurface) context.dp(profile.centerGapDp) else 0
+        )
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {

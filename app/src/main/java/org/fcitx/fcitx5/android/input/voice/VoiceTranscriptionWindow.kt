@@ -50,6 +50,7 @@ class VoiceTranscriptionWindow : InputWindow.ExtendedInputWindow<VoiceTranscript
             onCancel = ::cancelSession
             onInsert = ::insertTranscript
             onPermission = ::requestMicrophonePermission
+            onMeeting = { windowManager.attachWindow(MeetingTranscriptionWindow()) }
             onClose = ::returnToKeyboard
         }
         return ui.root

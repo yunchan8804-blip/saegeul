@@ -79,6 +79,9 @@ abstract class BaseKeyboard(
 
     private val bounds = Rect()
     private val keyRows: List<ConstraintLayout>
+    private val originalRowPercentWidths: List<List<Float>>
+    private var thumbSplitEnabled = false
+    private var thumbSplitGapPx = 0
 
     /**
      * HashMap of [PointerId (Int)][MotionEvent.getPointerId] to [KeyView]
@@ -131,6 +134,11 @@ abstract class BaseKeyboard(
                     }
                 }
             }
+        }
+        originalRowPercentWidths = keyRows.map { row ->
+            row.children.map { child ->
+                (child.layoutParams as LayoutParams).matchConstraintPercentWidth
+            }.toList()
         }
         keyRows.forEachIndexed { index, row ->
             add(row, lParams {
@@ -364,6 +372,37 @@ abstract class BaseKeyboard(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         val (x, y) = intArrayOf(0, 0).also { getLocationInWindow(it) }
         bounds.set(x, y, x + width, y + height)
+        applyThumbSplitLayout(w)
+    }
+
+    /**
+     * Adds a real non-touchable center gap between the two key groups. The key actions and rows are
+     * unchanged, so switching back to number/symbol surfaces cannot lose or remap a key.
+     */
+    fun updateThumbSplit(enabled: Boolean, centerGapPx: Int) {
+        thumbSplitEnabled = enabled && centerGapPx > 0
+        thumbSplitGapPx = centerGapPx.coerceAtLeast(0)
+        if (width > 0) applyThumbSplitLayout(width)
+    }
+
+    private fun applyThumbSplitLayout(parentWidthPx: Int) {
+        keyRows.forEachIndexed { rowIndex, row ->
+            val originalWidths = originalRowPercentWidths[rowIndex]
+            val layout = ThumbSplitLayoutCalculator.calculate(
+                originalWidths,
+                parentWidthPx,
+                if (thumbSplitEnabled) thumbSplitGapPx else 0
+            )
+            val leftGap = layout.gapPx / 2
+            val rightGap = layout.gapPx - leftGap
+            row.children.forEachIndexed { index, child ->
+                child.updateLayoutParams<LayoutParams> {
+                    matchConstraintPercentWidth = layout.percentWidths[index]
+                    leftMargin = if (index == layout.boundaryIndex) rightGap else 0
+                    rightMargin = if (index == layout.boundaryIndex - 1) leftGap else 0
+                }
+            }
+        }
     }
 
     private fun findTargetChild(x: Float, y: Float): View? {
