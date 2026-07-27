@@ -29,7 +29,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
 import org.fcitx.fcitx5.android.core.FcitxEvent.CandidateListEvent
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
@@ -514,6 +513,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onScopeSetupFinished(scope: DynamicScope) {
+        if (service.isDirectBootInputMode) {
+            isClipboardFresh = false
+            return
+        }
         ClipboardManager.lastEntry?.let {
             val now = System.currentTimeMillis()
             val clipboardTimeout = clipboardItemTimeout.getValue() * 1000L
@@ -535,7 +538,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
-        val allowsTextInspection = !EditorPrivacyPolicy.forbidsTextInspection(info, capFlags)
+        val allowsTextInspection = service.allowsTextInspectionFeatures()
         val allowsNetwork = service.allowsNetworkInputFeatures()
         val allowsAi = service.allowsAiInputFeatures()
         val previouslyRequested = isToolbarRequested()
@@ -559,6 +562,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             isEnabled = allowsTextInspection
             alpha = if (isEnabled) 1f else 0.35f
         }
+        idleUi.buttonsUi.clipboardButton.apply {
+            isEnabled = allowsTextInspection
+            alpha = if (isEnabled) 1f else 0.35f
+        }
+        idleUi.buttonsUi.quickPhraseButton.apply {
+            isEnabled = allowsTextInspection
+            alpha = if (isEnabled) 1f else 0.35f
+        }
         idleUi.buttonsUi.koreanSearchButton.apply {
             isEnabled = allowsTextInspection
             alpha = if (isEnabled) 1f else 0.35f
@@ -572,10 +583,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             alpha = if (isEnabled) 1f else 0.35f
         }
         idleUi.buttonsUi.precisionDictationButton.apply {
-            val voiceMode = VoiceProviderModeStore(context).load()
-            isEnabled = allowsTextInspection && VoiceProviderPolicy.allowsSelectedMode(
-                voiceMode,
-                allowsNetwork
+            val voiceMode = if (allowsTextInspection) {
+                runCatching { VoiceProviderModeStore(context).load() }.getOrNull()
+            } else {
+                null
+            }
+            isEnabled = voiceMode != null && VoiceProviderPolicy.allowsSelectedMode(
+                mode = voiceMode,
+                allowsNetworkInput = allowsNetwork
             )
             alpha = if (isEnabled) 1f else 0.35f
         }

@@ -50,6 +50,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
@@ -123,6 +124,9 @@ import java.time.ZonedDateTime
 import kotlin.math.max
 
 class FcitxInputMethodService : LifecycleInputMethodService() {
+
+    val isDirectBootInputMode: Boolean
+        get() = FcitxApplication.getInstance().isDirectBootMode
 
     private lateinit var fcitx: FcitxConnection
 
@@ -638,6 +642,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun refreshSnippetCatalog() {
         snippetRefreshJob?.cancel()
+        if (!DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode)) {
+            snippetRefreshJob = null
+            snippetCatalog = SnippetCatalog.builtIns()
+            return
+        }
         snippetRefreshJob = lifecycleScope.launch(Dispatchers.IO) {
             snippetCatalog = runCatching { SnippetRepository.load() }
                 .onFailure { Timber.w(it, "Unable to refresh snippet catalog") }
@@ -849,6 +858,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * final: never insert the unresolved template as an implicit fallback.
      */
     private fun beginDynamicPhrasePreview(template: String): Boolean {
+        if (!DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode)) {
+            return false
+        }
         if (!DynamicPhraseTemplate.containsSupportedToken(template)) return false
         if (!prepareDynamicPhrasePreview()) return true
         val view = inputView
@@ -896,7 +908,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /** Text-inspection actions do not read password/private editors, even when fully offline. */
     fun allowsTextInspectionFeatures(): Boolean =
-        !EditorPrivacyPolicy.forbidsTextInspection(currentInputEditorInfo, capabilityFlags)
+        DirectBootInputPolicy.allowsTextInspection(
+            isDirectBootMode = isDirectBootInputMode,
+            editorAllowsTextInspection = !EditorPrivacyPolicy.forbidsTextInspection(
+                currentInputEditorInfo,
+                capabilityFlags
+            )
+        )
 
     /** Network-backed input features must never inspect or contact a server for private editors. */
     fun allowsNetworkInputFeatures(): Boolean =
@@ -933,6 +951,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         effectiveAppProfile?.source?.bufferedInputTransport ?: bufferedHangulTransport
 
     private fun resolveAndApplyAppKeyboardProfile(info: EditorInfo, flags: CapabilityFlags) {
+        if (!DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode)) {
+            effectiveAppProfile = null
+            return
+        }
         val globalTheme = ThemeManager.activeTheme
         val resolved = AppKeyboardProfileResolver.resolve(
             packageName = info.packageName,
