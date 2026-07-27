@@ -338,14 +338,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             buttonsUi.apply {
                 onNeedsSecondRowChanged = {
                     toolbarNeedsSecondRow = it
-                    toolbarHeightSession = toolbarHeightSession.onToolbarMeasurementChanged(
+                    toolbarHeightSession = toolbarHeightSession.onToolbarRowsChanged(
                         toolbarVisible = isToolbarRequested(),
-                        needsSecondRow = it
+                        expanded = it
                     )
-                    // onSizeChanged runs inside a layout pass. Resizing the ancestor bar there can
-                    // be dropped by ConstraintLayout, leaving the freshly wrapped second row
-                    // clipped on the first toolbar expansion. Defer the host resize to the next
-                    // frame, then re-evaluate the current state before applying it.
+                    // Row expansion originates from a child click. Defer the host resize to the
+                    // next frame so ConstraintLayout applies the new two-row child and ancestor
+                    // height in the same settled pass.
                     view.post { updateBarHeight() }
                 }
                 undoButton.setOnClickListener {
@@ -540,6 +539,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         val allowsNetwork = service.allowsNetworkInputFeatures()
         val allowsAi = service.allowsAiInputFeatures()
         val previouslyRequested = isToolbarRequested()
+        if (!restarting || !hasStartedInput) {
+            // Every new editor starts compact. A same-editor Android restart preserves the user's
+            // explicit two-row session, just like the toolbar visibility state below.
+            idleUi.buttonsUi.collapse()
+        }
         expandToolbarForEditor = service.effectiveToolbarExpanded(expandToolbarByDefault)
         isToolbarManuallyToggled = ToolbarInputRestartPolicy.manualToggleForStart(
             expandedForEditor = expandToolbarForEditor,
@@ -686,13 +690,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private fun updateBarHeight() {
-        // Re-evaluate from the measured toolbar on every state transition. Compact/Fold displays
-        // can finish measuring before the callback is installed, or while the idle state is still
-        // Empty, so a callback-only cache can leave the wrapped second row clipped.
+        // Re-evaluate the explicit row state on every surface transition. Overflow itself never
+        // changes IME height: the compact toolbar scrolls horizontally until the user expands it.
         toolbarNeedsSecondRow = idleUi.buttonsUi.needsSecondRow()
-        toolbarHeightSession = toolbarHeightSession.onToolbarMeasurementChanged(
+        toolbarHeightSession = toolbarHeightSession.onToolbarRowsChanged(
             toolbarVisible = isToolbarRequested(),
-            needsSecondRow = toolbarNeedsSecondRow
+            expanded = toolbarNeedsSecondRow
         )
         // Candidate/preedit and other transient bar states inherit the toolbar height selected for
         // this editor. This prevents the editor viewport from jumping 48 dp on every composition.

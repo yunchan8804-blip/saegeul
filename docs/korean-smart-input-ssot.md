@@ -129,12 +129,20 @@ posture처럼 emulator가 재현할 수 없는 항목만 실기기 gate로 유�
 | `GIF-01` | GIF 검색·링크·첨부 파이프라인 | `DONE` | 키보드 이탈 없이 GIF 검색·전달 | L |
 | `GIF-02` | 실사용 리액션 GIF 공급자 | `IN_PROGRESS` | KLIPY 한국어 검색·밈 catalog 구현 완료, production key·승인 gate 남음 | M |
 | `GIF-03` | 선택형 GIPHY 공급자 | `IN_PROGRESS` | 비혼합·branding·analytics·안전등급 구현, production/media-copy 승인 gate | M |
+| `VOICE-01` | GPT 실시간 받아쓰기 안정화 | `IN_PROGRESS` | timeout·서버 오류 즉시 복구 구현, 실제 STT key 한국어 품질 gate 남음 | L |
+| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | push-to-stop·preview 구현, 실제 STT key·Z Fold6 품질 gate 남음 | L |
+| `UX-03` | 흔들리지 않는 기능 툴바 | `DONE` | 기본 1행·명시적 2행, 입력 중 높이 변화 차단 | M |
+| `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 저장·세션 구현, 생체 실기기 gate 남음 | L |
 
 `GIF-01`의 전송 파이프라인 계약과 `GIF-02`의 공급자 계약은 7절에 있다. 사용자 실사용 결과
 Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 리액션 GIF catalog로는 현저히
 부족했다. KLIPY 공급자를 별도 source와 cache namespace로 구현하고 A35·Z Fold6에서 실사용 catalog를
 검증했다. 다만 저장소에 test key를 넣지 않으며 production key와 partner 승인이 끝날 때까지
 `GIF-02`의 배포 상태는 `IN_PROGRESS`로 유지한다.
+
+현재 코드 우선순위는 `VOICE-01/02` 실제 오류 복구와 `UX-03` 높이 안정성이다. emulator로 대체할 수
+없는 최종 gate는 A35 최신 APK 전체 matrix, Z Fold6 cover/unfold 전환, 실제 STT key의 한국어 품질,
+생체 인증, GIF production key·partner 승인이다. 이 gate를 코드 완료와 혼동해 `DONE`으로 올리지 않는다.
 
 ### 6.2 1차 한국어 로컬 기능
 
@@ -434,7 +442,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | 24 kHz PCM streaming·item별 partial/final 조정·한국어 hint·최종 preview·exactly-once commit 구현, 실제 key 한국어 품질 gate | L |
+| `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | 24 kHz PCM streaming·item별 partial/final 조정·한국어 hint·최종 preview·exactly-once commit과 연결/마무리 timeout·준비 후 서버 오류의 즉시 녹음 중단 구현, 실제 key 한국어 품질 gate | L |
 | `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, preview와 최초 권한 복귀 구현; 실제 STT key 품질·Z Fold6 gate 남음 | L |
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, 실시간·정밀 모드가 같은 독립 STT profile을 재사용한다. picker가 IME를 detach해도 같은 editor에 새 회의 window를 복원하고, STT 401은 `설정하기`로 복구; 실제 OpenAI key·음원 품질 gate | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
@@ -448,7 +456,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | --- | --- | --- | --- | --- |
 | `UX-01` | Smart clipboard action | `DONE` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹, emulator 미리보기·1회 삽입·민감 editor 차단 통과 | M |
 | `UX-02` | Fold·tablet 분할 키보드 | `DONE` | compact/expanded·세로/가로 profile, 초기 복원, 중앙 non-touch gap, 두벌식 자음·모음 손 경계와 모바일 표면·숫자판 왕복을 API 34 phone/tablet emulator에서 검증 | L |
-| `UX-03` | 폭 적응형 기능 툴바 | `DONE` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환한다. compact 2행 세션에서는 한글 후보·일시적 bar도 같은 96dp envelope를 이어받아 입력 중 editor가 48dp씩 요동하지 않는다 | M |
+| `UX-03` | 안정형 기능 툴바 | `DONE` | 열린 툴바는 기본 1행 가로 스크롤이며 고정 펼침 버튼을 명시적으로 누를 때만 2행 6열이 된다. 자동 제안은 1행을 유지하고, 명시적으로 펼친 세션만 96dp envelope를 이어받아 입력 중 editor가 요동하지 않는다 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
 | `SEC-03` | 완전 offline mode | `DONE` | AI·OpenAI 전사·GIF toolbar를 fail-closed로 비활성화하고 API 34 emulator의 Fcitx UID BPF 통계로 3개 동작 전후 network 0 byte·0 packet 검증 | S |
@@ -606,8 +614,8 @@ SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OC
 
 | ID | 구현 계약 | 자동 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `UX-03` | 별도 중첩 메뉴를 추가하지 않는다. 기존 툴바 열기 상태에서 실제 가용 폭이 `12 × 48dp`보다 좁으면 6×2행·96dp, 충분하면 12×1행·48dp로 즉시 전환한다. compact 2행을 사용자가 연 editor 세션은 Candidate·Clipboard·NumberRow·InlineSuggestion·Title로 바뀌어도 96dp 높이를 유지하며, Candidate는 실제 48dp 후보를 최대 2행으로 배치한다. 명시적 접기·새 editor·실제 폭 변화만 48dp 전환을 허용한다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, Flexbox shrink 금지, Android `restarting=true` visible-state 보존, arm64 build, A35·Z Fold6 cover 6×2, Z Fold6 unfolded 12×1, 두 기기 `?123` PASS | 실제 한글 후보가 2행을 채우는 실기기 캡처는 다음 사용자 확인 gate |
-| `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동하고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, A35·Z Fold6 미연결 안내, API 34 x86_64 emulator의 STT dialog 직행 PASS | 없음 |
+| `UX-03` | 툴바를 열면 고정 48dp 펼침/접힘 control과 기존 12개 도구의 1행 가로 스크롤을 먼저 표시한다. 사용자가 control을 누른 경우에만 도구를 실제 2행 6열 grid·96dp로 배치한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 해당 editor의 명시적 펼침 envelope를 이어받되 자동 후보 내용은 1행 `NOWRAP`을 유지한다. 새 editor는 48dp로 시작하고 Android same-editor restart만 명시적 펼침을 보존한다. 폭 측정이나 타이핑 자체는 높이 변경 원인이 아니다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, 전체 68 suites·318 tests 실패 0, API 34 x86_64 emulator에서 IME frame `y=1405→1279`, 실제 1행→2행 6열→1행 후보 전환 중 `y=1279` 유지·접기 후 `y=1405`, OOM·GridLayout count 회귀 실동작 수정 | Z Fold6 cover/unfold 최신 APK와 A35 재연결 후 동일 전환 확인 |
+| `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동한 뒤 `내 컴퓨터 자동으로 찾기 / OpenAI API 키 사용 / 고급 연결 설정` chooser를 정확히 한 번 바로 열고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, API 34 x86_64 emulator의 글쓰기 chooser·STT dialog 직행 PASS | A35 최신 APK 재확인 |
 | `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
 
 실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
@@ -630,6 +638,13 @@ viewport가 매 입력마다 48dp씩 변하는 결함을 다시 재현했다. �
 `y=1532`가 전후 동일함을 픽셀 측정했다. Candidate adapter는 96dp가 실제 확보된 때만 `WRAP`,
 48dp session에서는 `NOWRAP`을 사용해 잘린 숨은 두 번째 행을 만들지 않는다. 전체 app JVM test,
 arm64 assemble과 `git diff --check`가 통과했고 동일 arm64 APK를 Z Fold6에 설치했다.
+
+위 자동 폭 전환은 같은 날 사용자 피드백으로 대체됐다. 현재 계약은 도구를 열어도 48dp 1행이 기본이고,
+고정 펼침 control을 직접 눌러야만 96dp 2행 6열이 된다. 후보 내용은 항상 1행이며, 사용자가 2행을
+명시적으로 연 세션에서만 빈 두 번째 envelope를 유지해 타이핑으로 editor가 움직이지 않게 한다.
+API 34 x86_64 emulator의 실제 입력 화면에서 1행 `y=1405`, 2행 `y=1279`, 후보 전환 뒤에도
+`y=1279`, 명시적 접기 뒤 `y=1405`를 확인했다. 최초 구현에서 발견된 lazy UI callback OOM과
+GridLayout 열 수 축소 crash도 실동작 재현 뒤 제거했다.
 
 2026-07-27 출근 이후 반복 검증 기준은 `Pixel_7_API_34` x86_64 emulator로 전환했다. 첫 toolbar
 확장 때 descendant layout pass 안에서 ancestor 높이를 바꾸면 두 번째 행이 잘리는 문제를 다음 frame으로
@@ -968,6 +983,10 @@ permission dialog와 focus 복귀는 별도 gate다.
 editor identity·exactly-once commit gate로 넘긴다. Android 앱의 현재 개인 BYOK 경로는 기존 STT 전용
 Keystore credential을 OkHttp WebSocket에 명시적으로 사용한다. 일반 배포 기본 구조는 모바일 표준 key 대신
 backend가 발급한 짧은 수명의 token과 WebRTC transport를 사용해야 하며 이 production hardening은 별도 gate다.
+연결·최종 전사 timeout은 `CancellationException`으로 사라지지 않고 사용자에게 보이는 전사 오류로 변환한다.
+세션 준비 뒤 공급자 오류나 socket close가 오면 최초 오류만 보존하고 `AudioRecord`를 즉시 한 번 중단하여
+사용자가 중지 버튼을 다시 눌러야 오류가 드러나는 정지 상태를 만들지 않는다. offline·차단 editor는 선택 모드를
+먼저 판정해 STT credential을 복호화하지 않는다.
 공식 기준은 [Realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription),
 [Realtime WebSocket](https://developers.openai.com/api/docs/guides/realtime-websocket),
 [Speech to text](https://developers.openai.com/api/docs/guides/speech-to-text)다.
@@ -1191,7 +1210,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
 | OAuth public client | `PASS` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현; AppCompat dialog theme와 Android 11+ browser query 회귀 수정 |
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
-| OAuth 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 66 suites·301 tests failure/error/skipped 0, companion Python 11 tests, `:app:assembleDebug -PbuildABI=x86_64`, debug merged manifest redirect scheme 일치 |
+| Android 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 68 suites·318 tests failure/error 0, companion Python 11 tests, `:app:assembleDebug -PbuildABI=x86_64`, debug merged manifest redirect scheme 일치 |
 | OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과. Pixel 7·QA tablet API 34 emulator도 임시 HTTPS `--public-origin`의 manifest 확인·browser 승인·token 교환·암호화 session 저장 뒤 우리 키보드로 직접 지시문을 입력해 후보 3개·정확히 1회 삽입·undo를 통과했다. 시험 session은 두 emulator에서 revoke·삭제했고 PC 재시작용 companion grant는 Windows DPAPI로 보존한다. |
 | public-origin startup | `PASS` | 새 Quick Tunnel의 route 전파 중 404·502 뒤 정상 manifest를 제한 재시도로 수용하고, 잘못된 manifest 계약은 sleep 없이 즉시 거부하는 Python test를 고정했다. companion Python 11 tests와 실제 Cloudflare tunnel OAuth 왕복을 통과했다. |
 | 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |
@@ -1288,7 +1307,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 4. `UX-02` Fold·tablet 분할 layout. (`DONE`: 펼친 Fold6 한글·영문 손 경계와 API 34 tablet emulator 초기 복원·회전·모바일·중앙 무입력·숫자판 왕복 통과)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`DONE`: emulator 조사 받침·ㄹ 예외, 감정 강·약 chip, 후보·1회 삽입 통과)
 6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`DONE`: emulator 공백 후보·선택·취소·1회 삽입, OCR picker 복원·정방향·90도 회전·저화질 인식·줄 선택·1회 삽입, 공개 native source build·라이선스 export 통과)
-7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)
+7. `UX-03` 기본 1행·명시적 2행 안정형 툴바. (`DONE/CODE+EMULATOR`: 1행 scroll·2행 6열·1행 후보 높이 유지 통과, Z Fold6·A35 최신 APK 확인 gate)
 
 ## 10. 공통 검증 게이트
 
@@ -1340,7 +1359,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | GIPHY는 production review key와 별도 provider 선택이 있을 때만 활성화하며 media-copy 승인 전에는 link-only로 제한 |
 | 2026-07-26 | 회의 화자 분리는 system picker의 명시 선택 audio만 stream하고 segment review 없이 자동 입력하거나 요약하지 않음 |
 | 2026-07-26 | 한국어 다음 단어는 실제 공백 경계 뒤의 project-curated 로컬 후보만 기본 미선택으로 표시하고 사용자 입력을 학습·저장하지 않음 |
-| 2026-07-26 | 툴바는 별도 중첩 메뉴 없이 실제 가용 폭으로 1행·2행을 자동 결정하고 모든 도구 위치와 48dp 터치 영역을 유지 |
+| 2026-07-27 | 툴바는 기본 1행 가로 스크롤, 고정 48dp control의 명시적 펼침만 2행 6열로 전환하며 자동 후보는 1행을 유지하고 editor 높이는 해당 세션 envelope로 고정 |
 | 2026-07-26 | 일반 사용자용 AI 미연결·재로그인 상태에만 `설정하기`를 제공하며 private/offline/policy 차단은 CTA 없이 fail-closed |
 | 2026-07-26 | GIPHY exact query 계약은 보존하고 한국 밈 query fallback은 성공한 empty KLIPY 첫 page와 로컬 Noto에만 적용 |
 | 2026-07-26 | OCR은 proprietary ML SDK 대신 Apache-2.0 Tesseract 계열과 pinned 한국어 best model을 사용하며 원본·결과를 저장하지 않음 |

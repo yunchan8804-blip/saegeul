@@ -216,10 +216,17 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         if (::providerPreference.isInitialized) refreshSummaries()
         val intent = requireActivity().intent
         val action = intent.getStringExtra(MainActivity.EXTRA_PRIVACY_AI_ACTION)
-        if (action != MainActivity.PRIVACY_AI_ACTION_VOICE_SETUP) return
+        if (action != MainActivity.PRIVACY_AI_ACTION_WRITING_SETUP &&
+            action != MainActivity.PRIVACY_AI_ACTION_VOICE_SETUP
+        ) return
         intent.removeExtra(MainActivity.EXTRA_PRIVACY_AI_ACTION)
         view?.post {
-            if (isAdded) showVoiceProviderDialog()
+            if (!isAdded) return@post
+            if (action == MainActivity.PRIVACY_AI_ACTION_WRITING_SETUP) {
+                showProviderModeDialog()
+            } else {
+                showVoiceProviderDialog()
+            }
         }
     }
 

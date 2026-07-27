@@ -8,8 +8,8 @@ package org.fcitx.fcitx5.android.input.bar
  * Keeps the IME's top bar at a stable height while transient content replaces the toolbar.
  *
  * Candidate, clipboard, inline-suggestion, and tool-title surfaces are transient. They must not
- * resize the editor merely because the compact toolbar they replaced needs two rows. Only an
- * explicit toolbar visibility change, a new editor, or a real width change may alter the height.
+ * resize the editor merely because the compact toolbar they replaced has overflow. Only an
+ * explicit toolbar visibility or row-expansion action, or a new editor, may alter the height.
  */
 internal data class ToolbarHeightSession(
     val visibleRows: Int
@@ -25,11 +25,11 @@ internal data class ToolbarHeightSession(
         needsSecondRow: Boolean
     ): ToolbarHeightSession = create(visible, needsSecondRow)
 
-    fun onToolbarMeasurementChanged(
+    fun onToolbarRowsChanged(
         toolbarVisible: Boolean,
-        needsSecondRow: Boolean
+        expanded: Boolean
     ): ToolbarHeightSession = if (toolbarVisible) {
-        create(visible = true, needsSecondRow)
+        create(visible = true, needsSecondRow = expanded)
     } else {
         this
     }

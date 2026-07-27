@@ -16,9 +16,16 @@ internal object ToolbarLayoutPolicy {
     fun heightDp(needsSecondRow: Boolean): Int =
         TOUCH_TARGET_DP * visibleRows(needsSecondRow)
 
-    fun needsSecondRow(availableWidth: Int, itemSize: Int, itemCount: Int): Boolean =
-        availableWidth < itemSize * itemCount
+    fun contentColumns(itemCount: Int, visibleRows: Int): Int {
+        require(itemCount >= 0)
+        require(visibleRows in COLLAPSED_ROWS..EXPANDED_ROWS)
+        return (itemCount + visibleRows - 1) / visibleRows
+    }
 
-    fun supportsSecondRow(measuredHeight: Int, rowHeight: Int): Boolean =
-        measuredHeight >= rowHeight * EXPANDED_ROWS
+    fun contentWidthDp(itemCount: Int, visibleRows: Int): Int =
+        TOUCH_TARGET_DP * contentColumns(itemCount, visibleRows)
+
+    fun totalWidthDp(toolItemCount: Int, visibleRows: Int): Int =
+        TOUCH_TARGET_DP + contentWidthDp(toolItemCount, visibleRows)
+
 }

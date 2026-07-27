@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -23,6 +24,7 @@ import java.io.Closeable
 import java.net.HttpURLConnection
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 enum class VoiceRealtimeDelay(val id: String) {
     Minimal("minimal"),
@@ -136,6 +138,19 @@ internal class RealtimeTranscriptAccumulator {
     }
 }
 
+/** Carries a socket failure across the WebSocket, UI, and AudioRecord threads exactly once. */
+internal class RealtimeTerminalFailure {
+    private val error = AtomicReference<Exception?>(null)
+
+    fun report(exception: Exception, stopCapture: () -> Unit) {
+        if (error.compareAndSet(null, exception)) stopCapture()
+    }
+
+    fun throwIfPresent() {
+        error.get()?.let { throw it }
+    }
+}
+
 internal data class VoiceRealtimeSocketRequest(
     val url: String,
     val authorization: String
@@ -171,13 +186,17 @@ internal class OpenAiRealtimeTranscriptionSession(
     profile: VoiceProviderProfile,
     private val delay: VoiceRealtimeDelay = VoiceRealtimeDelay.Low,
     private val connector: VoiceRealtimeConnector = OkHttpVoiceRealtimeConnector(),
-    private val onPartial: (String) -> Unit = {}
+    private val onPartial: (String) -> Unit = {},
+    private val onTerminalError: (Exception) -> Unit = {},
+    private val connectTimeoutMillis: Long = CONNECT_TIMEOUT_MILLIS,
+    private val transcriptionTimeoutMillis: Long = TRANSCRIPTION_TIMEOUT_MILLIS
 ) : Closeable {
     private val validated = profile.validate()
     private val ready = CompletableDeferred<Unit>()
     private val result = CompletableDeferred<VoiceTranscriptionResult>()
     private val accumulator = RealtimeTranscriptAccumulator()
     private val closed = AtomicBoolean(false)
+    private val terminal = AtomicBoolean(false)
     private var socket: VoiceRealtimeSocket? = null
 
     suspend fun connect() {
@@ -205,7 +224,7 @@ internal class OpenAiRealtimeTranscriptionSession(
                         val transcript = accumulator.apply(event)
                         if (transcript == null) {
                             fail(VoiceTranscriptionException("Realtime transcription returned no text"))
-                        } else {
+                        } else if (terminal.compareAndSet(false, true)) {
                             result.complete(
                                 VoiceTranscriptionResult(
                                     text = transcript,
@@ -249,7 +268,12 @@ internal class OpenAiRealtimeTranscriptionSession(
             listener
         )
         try {
-            withTimeout(CONNECT_TIMEOUT_MILLIS) { ready.await() }
+            withTimeout(connectTimeoutMillis) { ready.await() }
+        } catch (_: TimeoutCancellationException) {
+            val timeout = VoiceTranscriptionException("Realtime transcription connection timed out")
+            fail(timeout)
+            close()
+            throw timeout
         } catch (error: Throwable) {
             close()
             throw error
@@ -271,7 +295,13 @@ internal class OpenAiRealtimeTranscriptionSession(
             fail(error)
             throw error
         }
-        return withTimeout(TRANSCRIPTION_TIMEOUT_MILLIS) { result.await() }
+        return try {
+            withTimeout(transcriptionTimeoutMillis) { result.await() }
+        } catch (_: TimeoutCancellationException) {
+            val timeout = VoiceTranscriptionException("Realtime transcription finalization timed out")
+            fail(timeout)
+            throw timeout
+        }
     }
 
     override fun close() {
@@ -286,9 +316,11 @@ internal class OpenAiRealtimeTranscriptionSession(
         socket = null
     }
 
-    private fun fail(error: Throwable) {
+    private fun fail(error: Exception) {
+        if (!terminal.compareAndSet(false, true)) return
         ready.completeExceptionally(error)
         result.completeExceptionally(error)
+        onTerminalError(error)
     }
 
     private companion object {

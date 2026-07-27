@@ -63,7 +63,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             onUndo = ::undo
             onRetry = { lastAction?.let { generate(it, lastCustomInstruction) } }
             onClipboardSourceRequested = ::showClipboardSourcePicker
-            onSetupRequested = { AiSettingsNavigator.open(context) }
+            onSetupRequested = { AiSettingsNavigator.openWritingSetup(context) }
         }
         return ui.root
     }

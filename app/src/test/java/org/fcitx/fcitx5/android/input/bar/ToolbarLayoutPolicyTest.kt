@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.bar
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,15 +23,17 @@ class ToolbarLayoutPolicyTest {
     }
 
     @Test
-    fun narrowPhoneWrapsWhileUnfoldedWidthStaysOnOneRow() {
-        assertTrue(ToolbarLayoutPolicy.needsSecondRow(315, 48, 12))
-        assertTrue(ToolbarLayoutPolicy.needsSecondRow(334, 48, 12))
-        assertFalse(ToolbarLayoutPolicy.needsSecondRow(729, 48, 12))
+    fun collapsedToolsUseOneScrollableRowUntilExplicitlyExpanded() {
+        assertEquals(12, ToolbarLayoutPolicy.contentColumns(itemCount = 12, visibleRows = 1))
+        assertEquals(576, ToolbarLayoutPolicy.contentWidthDp(itemCount = 12, visibleRows = 1))
+        assertEquals(6, ToolbarLayoutPolicy.contentColumns(itemCount = 12, visibleRows = 2))
+        assertEquals(288, ToolbarLayoutPolicy.contentWidthDp(itemCount = 12, visibleRows = 2))
     }
 
     @Test
-    fun candidatesWrapOnlyWhenTwoCompleteRowsAreReserved() {
-        assertFalse(ToolbarLayoutPolicy.supportsSecondRow(95, 48))
-        assertTrue(ToolbarLayoutPolicy.supportsSecondRow(96, 48))
+    fun fixedExpansionControlPlusTwelveToolsUsesExactlyTwoRows() {
+        assertEquals(624, ToolbarLayoutPolicy.totalWidthDp(toolItemCount = 12, visibleRows = 1))
+        assertEquals(336, ToolbarLayoutPolicy.totalWidthDp(toolItemCount = 12, visibleRows = 2))
     }
+
 }

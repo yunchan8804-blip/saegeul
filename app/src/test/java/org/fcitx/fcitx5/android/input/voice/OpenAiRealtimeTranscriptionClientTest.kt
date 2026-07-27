@@ -143,6 +143,91 @@ class OpenAiRealtimeTranscriptionClientTest {
         assertTrue(connector.cancelled || connector.closed)
     }
 
+    @Test
+    fun `connection timeout becomes a visible transcription failure instead of cancellation`() =
+        runBlocking {
+            val connector = FakeRealtimeConnector()
+            val terminalErrors = mutableListOf<Exception>()
+            val session = OpenAiRealtimeTranscriptionSession(
+                profile = VoiceProviderProfile(apiKey = "secret"),
+                connector = connector,
+                onTerminalError = terminalErrors::add,
+                connectTimeoutMillis = 20,
+                transcriptionTimeoutMillis = 1_000
+            )
+
+            val error = runCatching { session.connect() }.exceptionOrNull()
+
+            assertTrue(error is VoiceTranscriptionException)
+            assertTrue(error?.message?.contains("timed out") == true)
+            assertEquals(error, terminalErrors.single())
+            assertTrue(connector.closed || connector.cancelled)
+        }
+
+    @Test
+    fun `finalization timeout becomes a visible transcription failure`() = runBlocking {
+        val connector = FakeRealtimeConnector()
+        val terminalErrors = mutableListOf<Exception>()
+        val session = OpenAiRealtimeTranscriptionSession(
+            profile = VoiceProviderProfile(apiKey = "secret"),
+            connector = connector,
+            onTerminalError = terminalErrors::add,
+            connectTimeoutMillis = 1_000,
+            transcriptionTimeoutMillis = 20
+        )
+        val connecting = async { session.connect() }
+        yield()
+        connector.open()
+        connector.text("""{"type":"session.updated"}""")
+        connecting.await()
+
+        val error = runCatching { session.finish() }.exceptionOrNull()
+
+        assertTrue(error is VoiceTranscriptionException)
+        assertTrue(error?.message?.contains("timed out") == true)
+        assertEquals(error, terminalErrors.single())
+        session.close()
+    }
+
+    @Test
+    fun `post-ready provider failure is delivered immediately and only once`() = runBlocking {
+        val connector = FakeRealtimeConnector()
+        val terminalErrors = mutableListOf<Exception>()
+        val session = OpenAiRealtimeTranscriptionSession(
+            profile = VoiceProviderProfile(apiKey = "rejected"),
+            connector = connector,
+            onTerminalError = terminalErrors::add
+        )
+        val connecting = async { session.connect() }
+        yield()
+        connector.open()
+        connector.text("""{"type":"session.updated"}""")
+        connecting.await()
+
+        connector.text(
+            """{"type":"error","error":{"message":"bad key","code":"invalid_api_key"}}"""
+        )
+        connector.failure(httpStatus = 401)
+
+        assertEquals(1, terminalErrors.size)
+        assertTrue(terminalErrors.single() is VoiceAuthenticationException)
+        session.close()
+    }
+
+    @Test
+    fun `terminal failure stops capture once and remains authoritative`() {
+        val terminalFailure = RealtimeTerminalFailure()
+        val first = VoiceAuthenticationException("first")
+        var stops = 0
+
+        terminalFailure.report(first) { stops += 1 }
+        terminalFailure.report(VoiceTranscriptionException("second")) { stops += 1 }
+        val thrown = runCatching { terminalFailure.throwIfPresent() }.exceptionOrNull()
+
+        assertEquals(1, stops)
+        assertEquals(first, thrown)
+    }
+
     private class FakeRealtimeConnector : VoiceRealtimeConnector {
         val sent = mutableListOf<String>()
         var closed = false

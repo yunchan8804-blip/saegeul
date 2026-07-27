@@ -213,6 +213,7 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_SETTINGS_ROUTE = "${BuildConfig.APPLICATION_ID}.EXTRA_SETTINGS_ROUTE"
         const val EXTRA_PRIVACY_AI_ACTION =
             "${BuildConfig.APPLICATION_ID}.EXTRA_PRIVACY_AI_ACTION"
+        const val PRIVACY_AI_ACTION_WRITING_SETUP = "writing_setup"
         const val PRIVACY_AI_ACTION_VOICE_SETUP = "voice_setup"
     }
 

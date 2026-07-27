@@ -45,6 +45,7 @@ class VoiceTranscriptionWindow(
     private var realtimePartial = ""
     private var realtimeElapsedSeconds = 0
     private var realtimeStopping = false
+    private var realtimeFailure = RealtimeTerminalFailure()
     private var sessionJob: Job? = null
     private var transcript: String? = null
     private var systemVoiceInput: Pair<String, InputMethodSubtype>? = null
@@ -72,13 +73,17 @@ class VoiceTranscriptionWindow(
     override fun onAttached() {
         attached = true
         val allowsTextInspection = service.allowsTextInspectionFeatures()
-        val resolved = VoiceProviderResolver.resolve(context, allowsTextInspection)
-        mode = resolved.mode
-        profile = resolved.profile
+        val selectedMode = VoiceProviderModeStore(context).load()
         val allowsSelectedVoice = VoiceProviderPolicy.allowsSelectedMode(
-            mode,
+            selectedMode,
             service.allowsNetworkInputFeatures()
         )
+        val resolved = VoiceProviderResolver.resolve(
+            context,
+            allowsCredentialAccess = allowsTextInspection && allowsSelectedVoice
+        )
+        mode = resolved.mode
+        profile = resolved.profile
         when (AiFeatureEntryGate.evaluate(
             allowsTextInspection = allowsTextInspection,
             allowsAiInput = allowsSelectedVoice,
@@ -263,26 +268,38 @@ class VoiceTranscriptionWindow(
         realtimePartial = ""
         realtimeElapsedSeconds = 0
         realtimeStopping = false
+        realtimeFailure = RealtimeTerminalFailure()
         commitGate.resetForNewTranscript()
         lateinit var activeSession: OpenAiRealtimeTranscriptionSession
-        activeSession = OpenAiRealtimeTranscriptionSession(configuredProfile) { partial ->
-            ui.root.post {
-                if (attached && realtimeSession === activeSession) {
-                    realtimePartial = partial
-                    if (realtimeStopping) {
-                        ui.showRealtimeFinalizing(partial)
-                    } else {
-                        ui.showRealtimeRecording(realtimeElapsedSeconds, partial)
+        activeSession = OpenAiRealtimeTranscriptionSession(
+            profile = configuredProfile,
+            onPartial = { partial ->
+                ui.root.post {
+                    if (attached && realtimeSession === activeSession) {
+                        realtimePartial = partial
+                        if (realtimeStopping) {
+                            ui.showRealtimeFinalizing(partial)
+                        } else {
+                            ui.showRealtimeRecording(realtimeElapsedSeconds, partial)
+                        }
+                    }
+                }
+            },
+            onTerminalError = { error ->
+                ui.root.post {
+                    if (attached && realtimeSession === activeSession) {
+                        realtimeFailure.report(error) { realtimeRecorder?.stop() }
                     }
                 }
             }
-        }
+        )
         realtimeSession = activeSession
         ui.showRealtimeConnecting()
         sessionJob = service.lifecycleScope.launch {
             var activeRecorder: PcmStreamRecorder? = null
             try {
                 activeSession.connect()
+                realtimeFailure.throwIfPresent()
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 val streamingRecorder = PcmStreamRecorder()
                 activeRecorder = streamingRecorder
@@ -305,6 +322,7 @@ class VoiceTranscriptionWindow(
                     }
                 )
                 if (realtimeRecorder === streamingRecorder) realtimeRecorder = null
+                realtimeFailure.throwIfPresent()
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 realtimeStopping = true
                 ui.showRealtimeFinalizing(realtimePartial)
@@ -359,6 +377,7 @@ class VoiceTranscriptionWindow(
         realtimePartial = ""
         realtimeElapsedSeconds = 0
         realtimeStopping = false
+        realtimeFailure = RealtimeTerminalFailure()
         commitGate.resetForNewTranscript()
         if (clearUi && attached) {
             renderReadyState()

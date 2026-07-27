@@ -22,7 +22,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
-import org.fcitx.fcitx5.android.input.bar.ToolbarLayoutPolicy
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.FlexboxVerticalDecoration
@@ -154,17 +153,10 @@ class HorizontalCandidateComponent :
         object : RecyclerView(context) {
             override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
                 super.onSizeChanged(w, h, oldw, oldh)
-                // Only wrap when the stable toolbar session actually reserves two full rows.
-                // A collapsed or wide one-row session must keep the legacy single-row layout.
-                this@HorizontalCandidateComponent.layoutManager.flexWrap =
-                    if (ToolbarLayoutPolicy.supportsSecondRow(
-                            measuredHeight = h,
-                            rowHeight = context.dp(KawaiiBarComponent.HEIGHT)
-                        )) {
-                        FlexWrap.WRAP
-                    } else {
-                        FlexWrap.NOWRAP
-                    }
+                // Automatic candidates remain one horizontally scrolling row. An explicitly
+                // expanded tool session may keep the host at 96 dp to avoid editor jitter, but it
+                // must not silently turn suggestions into a second row.
+                this@HorizontalCandidateComponent.layoutManager.flexWrap = FlexWrap.NOWRAP
                 if (fillStyle == AutoFillWidth) {
                     val maxSpanCount = maxSpanCountPref.getValue()
                     layoutMinWidth = w / maxSpanCount - dividerDrawable.intrinsicWidth

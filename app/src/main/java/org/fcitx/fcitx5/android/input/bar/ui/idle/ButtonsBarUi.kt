@@ -5,11 +5,11 @@
 package org.fcitx.fcitx5.android.input.bar.ui.idle
 
 import android.content.Context
+import android.view.View
+import android.widget.GridLayout
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
 import androidx.annotation.DrawableRes
-import com.google.android.flexbox.AlignItems
-import com.google.android.flexbox.FlexWrap
-import com.google.android.flexbox.FlexboxLayout
-import com.google.android.flexbox.JustifyContent
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.ToolbarLayoutPolicy
@@ -19,50 +19,101 @@ import splitties.views.dsl.core.Ui
 
 class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
-    private class ResponsiveToolbarLayout(context: Context) : FlexboxLayout(context) {
+    private class ResponsiveToolbarLayout(context: Context) : HorizontalScrollView(context) {
+        // Do not replay [expanded] from this setter. KawaiiBarComponent installs the callback
+        // while its lazy IdleUi is still being constructed; an immediate callback would ask for
+        // the parent view again and recursively rebuild the IME until it runs out of memory.
         var onNeedsSecondRowChanged: ((Boolean) -> Unit)? = null
-            set(value) {
-                field = value
-                // The toolbar can already be measured before KawaiiBarComponent installs this
-                // callback. Replay the current decision so the host is not left one row high
-                // with the wrapped AI/voice/OCR/GIF buttons clipped below it.
-                if (value != null && width > 0) {
-                    val needsSecondRow = calculateNeedsSecondRow(width)
-                    lastNeedsSecondRow = needsSecondRow
-                    value(needsSecondRow)
-                }
-            }
 
-        private var lastNeedsSecondRow: Boolean? = null
+        private val itemSize = context.dp(ToolbarLayoutPolicy.TOUCH_TARGET_DP)
+        private val content = GridLayout(context)
 
-        private fun calculateNeedsSecondRow(width: Int): Boolean =
-            ToolbarLayoutPolicy.needsSecondRow(
-                availableWidth = width,
-                itemSize = context.dp(ToolbarLayoutPolicy.TOUCH_TARGET_DP),
-                itemCount = childCount
-            )
+        var expanded: Boolean = false
+            private set
 
-        fun needsSecondRow(): Boolean =
-            if (width > 0) calculateNeedsSecondRow(width) else lastNeedsSecondRow ?: false
+        init {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            addView(content, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+        }
+
+        fun addTool(view: View) {
+            content.addView(view)
+            updateContentLayout()
+        }
+
+        fun setExpanded(value: Boolean) {
+            if (expanded == value) return
+            expanded = value
+            // A row change always returns to the primary tools. In particular, the user must not
+            // land at an arbitrary old horizontal offset after collapsing back to one row.
+            scrollTo(0, 0)
+            updateContentLayout()
+            post { scrollTo(0, 0) }
+            onNeedsSecondRowChanged?.invoke(value)
+        }
+
+        fun needsSecondRow(): Boolean = expanded
 
         override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
             super.onSizeChanged(width, height, oldWidth, oldHeight)
-            if (width <= 0) return
-            val needsSecondRow = calculateNeedsSecondRow(width)
-            if (lastNeedsSecondRow == needsSecondRow) return
-            lastNeedsSecondRow = needsSecondRow
-            onNeedsSecondRowChanged?.invoke(needsSecondRow)
+            updateContentLayout()
+        }
+
+        private fun updateContentLayout() {
+            val rows = ToolbarLayoutPolicy.visibleRows(expanded)
+            val columns = ToolbarLayoutPolicy.contentColumns(content.childCount, rows)
+            // GridLayout validates its declared counts against the *current* child specs. Grow to
+            // a safe envelope before rewriting specs, then shrink to the requested 1x12 or 2x6
+            // grid. Reversing that order crashes when a 12-column row becomes six columns.
+            content.rowCount = maxOf(
+                content.rowCount,
+                ToolbarLayoutPolicy.EXPANDED_ROWS
+            )
+            content.columnCount = maxOf(
+                content.columnCount,
+                content.childCount.coerceAtLeast(1)
+            )
+            for (index in 0 until content.childCount) {
+                val child = content.getChildAt(index)
+                child.layoutParams = GridLayout.LayoutParams(
+                    GridLayout.spec(index / columns),
+                    GridLayout.spec(index % columns)
+                ).apply {
+                    width = itemSize
+                    height = itemSize
+                }
+            }
+            content.rowCount = rows
+            content.columnCount = columns.coerceAtLeast(1)
+            val targetWidth = columns * itemSize
+            val targetHeight = rows * itemSize
+            val params = content.layoutParams ?: LayoutParams(targetWidth, targetHeight)
+            if (params.width != targetWidth || params.height != targetHeight) {
+                params.width = targetWidth
+                params.height = targetHeight
+                content.layoutParams = params
+            }
+            content.requestLayout()
         }
     }
 
-    private val responsiveRoot = ResponsiveToolbarLayout(ctx).apply {
-        alignItems = AlignItems.CENTER
-        flexWrap = FlexWrap.WRAP
-        justifyContent = JustifyContent.SPACE_AROUND
+    private val responsiveRoot = ResponsiveToolbarLayout(ctx)
+
+    val rowExpansionButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
+        contentDescription = ctx.getString(R.string.expand_toolbar)
+        setOnClickListener { toggleExpandedRows() }
     }
 
-    override val root: FlexboxLayout
-        get() = responsiveRoot
+    override val root: LinearLayout = LinearLayout(ctx).apply {
+        orientation = LinearLayout.HORIZONTAL
+        val size = ctx.dp(ToolbarLayoutPolicy.TOUCH_TARGET_DP)
+        addView(rowExpansionButton, LinearLayout.LayoutParams(size, size))
+        addView(
+            responsiveRoot,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+        )
+    }
 
     var onNeedsSecondRowChanged: ((Boolean) -> Unit)?
         get() = responsiveRoot.onNeedsSecondRowChanged
@@ -72,13 +123,26 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     fun needsSecondRow(): Boolean = responsiveRoot.needsSecondRow()
 
+    fun collapse() {
+        responsiveRoot.setExpanded(false)
+        rowExpansionButton.setIcon(R.drawable.ic_baseline_expand_more_24)
+        rowExpansionButton.contentDescription = ctx.getString(R.string.expand_toolbar)
+    }
+
+    private fun toggleExpandedRows() {
+        val expanded = !responsiveRoot.expanded
+        responsiveRoot.setExpanded(expanded)
+        rowExpansionButton.setIcon(
+            if (expanded) R.drawable.ic_baseline_expand_less_24
+            else R.drawable.ic_baseline_expand_more_24
+        )
+        rowExpansionButton.contentDescription = ctx.getString(
+            if (expanded) R.string.hide_toolbar else R.string.expand_toolbar
+        )
+    }
+
     private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
-        val size = ctx.dp(ToolbarLayoutPolicy.TOUCH_TARGET_DP)
-        root.addView(it, FlexboxLayout.LayoutParams(size, size).apply {
-            // Wrapping, not shrinking, is the responsive behavior. Keeping this at zero also
-            // makes the 48 dp touch-target contract measurable on compact screens.
-            flexShrink = 0f
-        })
+        responsiveRoot.addTool(it)
     }
 
     val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {

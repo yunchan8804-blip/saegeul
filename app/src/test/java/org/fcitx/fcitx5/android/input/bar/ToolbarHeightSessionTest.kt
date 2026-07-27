@@ -89,25 +89,25 @@ class ToolbarHeightSessionTest {
     }
 
     @Test
-    fun realWidthChangeUpdatesVisibleToolbarButNotHiddenToolbar() {
+    fun explicitRowActionUpdatesVisibleToolbarButNotHiddenToolbar() {
         val compact = ToolbarHeightSession.start(
             toolbarVisible = true,
             needsSecondRow = true
         )
-        val wide = compact.onToolbarMeasurementChanged(
+        val collapsed = compact.onToolbarRowsChanged(
             toolbarVisible = true,
-            needsSecondRow = false
+            expanded = false
         )
         val hidden = compact.onToolbarVisibilityChanged(
             visible = false,
             needsSecondRow = true
         )
-        val hiddenAfterMeasurement = hidden.onToolbarMeasurementChanged(
+        val hiddenAfterExpansion = hidden.onToolbarRowsChanged(
             toolbarVisible = false,
-            needsSecondRow = true
+            expanded = true
         )
 
-        assertEquals(48, wide.heightDp)
-        assertEquals(hidden, hiddenAfterMeasurement)
+        assertEquals(48, collapsed.heightDp)
+        assertEquals(hidden, hiddenAfterExpansion)
     }
 }
