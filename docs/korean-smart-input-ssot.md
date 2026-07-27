@@ -74,8 +74,8 @@
 | `KO-BASE-08` | 숫자·기호 전환 상태 복구 | `DONE` | 레거시 상태 migration 테스트와 A35·Fold6 실제 Fcitx `?123` 숫자판 전환 통과 |
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | 5 JVM 테스트와 A35 Discord 교체·실행 취소 |
 | `KO-02` | 초성 통합 검색 | `DONE` | 6 JVM 테스트와 A35 `ㄱㅅ` 검색·1회 삽입 |
-| `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 7 JVM 테스트와 A35 날짜·profile·clipboard 미리보기·1회 삽입 |
-| `KO-03A` | 자동 스니펫 확장 | `IN_PROGRESS` | `:주소1`·`:이메일` 별칭과 사용자 `:` 상용구의 경계키 확장 구현 중 |
+| `KO-03` | 동적 빠른 문구 | `DONE` | 7 JVM 테스트, 암호화 profile·날짜·clipboard 미리보기와 정확히 1회 삽입 검증 |
+| `KO-03A` | 자동 스니펫 확장 | `DONE` | API 34 emulator에서 `:주소1`·`:이메일`의 Space·Enter·buffered 분할·private 차단 통과 |
 | `KO-09` | 한글 어절 자동완성 | `DONE` | API 34 emulator에서 로컬 후보·명시 선택·미선택 Space·buffered 1회 확정·private 차단 통과 |
 | `KO-04` | 앱별 키보드 profile | `IN_PROGRESS` | package별 layout·theme·toolbar·transport·network·AI 정책 구현, 두 기기 matrix 진행 중 |
 | `KO-05` | 한자 후보 음훈 | `IN_PROGRESS` | bundled libhangul 음훈을 candidate comment로 전달, native test와 두 기기 UI gate 진행 중 |
@@ -142,8 +142,8 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | --- | --- | --- | --- | --- |
 | `KO-01` | 한/영 오타 즉시 복구 | `DONE` | `dkssud→안녕`, `ㅗ디ㅣㅐ→hello`, preview 후 교체 | S |
 | `KO-02` | 초성 통합 검색 | `DONE` | 빠른 문구·clipboard·emoji를 `ㄱㅅ` 등으로 검색 | M |
-| `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 날짜·시간·이름·전화·이메일·주소·clipboard 변수, preview | M |
-| `KO-03A` | 자동 스니펫 확장 | `IN_PROGRESS` | `:` trigger 뒤 space·Enter로 암호화 profile 또는 사용자 상용구 확장 | M |
+| `KO-03` | 동적 빠른 문구 | `DONE` | 날짜·시간·이름·전화·이메일·주소·clipboard 변수, preview | M |
+| `KO-03A` | 자동 스니펫 확장 | `DONE` | `:` trigger 뒤 space·Enter로 암호화 profile 또는 사용자 상용구 확장 | M |
 | `KO-04` | 앱별 키보드 profile | `IN_PROGRESS` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자·국어사전 후보 | `IN_PROGRESS` | bundled 한자·음훈 후보 구현, 국어사전 정의 source는 별도 gate | M |
 | `KO-06` | 개인 단어장 | `DONE` | opt-in·백업 제외 원자 저장, 개인 후보 우선순위·중복 제거·민감 editor 차단과 emulator 실제 후보 선택 통과 | L |
@@ -280,10 +280,11 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
    않는다. 실제 trigger가 일치한 경우에만 필요한 profile을 복호화한다.
 
 완료 게이트는 기본 별칭·사용자 override·중복·경계 오탐·space/Enter 정책·일반/buffered 분할 trigger
-계획 테스트, email profile 하위 호환 테스트, 전체 JVM/build, A35와 Z Fold6에서 `:주소1`·`:이메일`
-확장 및 private editor 비활성 검증이다.
+계획 테스트, email profile 하위 호환 테스트, 전체 JVM/build, API 34 emulator에서 `:주소1`·`:이메일`
+확장 및 private editor 비활성 검증이다. 이 기능은 자세·화면 크기·실물 센서에 의존하지 않으므로 Fold
+실기기 확인을 완료 조건으로 중복 요구하지 않는다.
 
-#### KO-03A 구현·검증 증거 (2026-07-26)
+#### KO-03A 구현·검증 증거 (2026-07-27)
 
 | 범위 | 결과 | 증거 |
 | --- | --- | --- |
@@ -291,8 +292,13 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | A35 space 확장 | `PASS` | `:주소1 `과 `:이메일 `이 암호화 profile 값으로 정확히 한 번 교체됨 |
 | A35 Enter 확장 | `PASS` | trigger 뒤 Enter가 먼저 스니펫을 확장하고 경계 동작을 한 번만 적용함 |
 | private editor | `PASS` | private editor에서 자동 스니펫을 비활성화하고 literal 입력을 보존함 |
-| 전체 회귀 | `PASS` | 현재 기준 app 23 suites·85 tests·failure/error/skipped 0, arm64 app/plugin build 성공 |
-| Z Fold6 | `GATE` | 최신 APK 전달 완료; `:주소1`·`:이메일`과 private editor 실기기 확인 필요 |
+| emulator 일반 입력 | `PASS` | API 34 `Pixel_7_API_34`에서 영문 `:address1 `→`TEST ADDRESS `, 한글 `:주소1 `→`TEST ADDRESS `, `:이메일 `→`test@example.com `을 각각 정확히 한 번 치환 |
+| emulator Enter | `PASS` | `:이메일` 뒤 첫 Enter가 `test@example.com`으로만 확장되고 Enter 자체는 소비됨 |
+| emulator buffered 분할 | `PASS` | `DirectCommit`에서 editor에는 `:`만 있고 IME buffer에 `이메일`이 남은 상태로 Space를 눌러 `test@example.com `을 정확히 한 번 확정 |
+| emulator private editor | `PASS` | `password=true` editor에서 `:email `이 7개 bullet의 literal로 유지되고 profile 값은 hierarchy에 나타나지 않음 |
+| 보안 정리 | `PASS` | 임시 profile은 `no_backup/dynamic-phrase/profile.bin`에만 암호문으로 생성한 뒤 삭제했고, 테스트 종료 시 buffer `끔`·`SystemPaste`로 복구 |
+| 전체 회귀 | `PASS` | app 64 suites·281 tests·failure/error/skipped 0, `x86_64` app/plugin build 성공 |
+| Z Fold6 | `SUPERSEDED` | 자세·화면 크기에 의존하지 않는 입력 계약이라 emulator gate로 완료; Fold 실기기 중복 확인은 요구하지 않음 |
 
 #### KO-03 구현·검증 증거 (2026-07-26)
 
@@ -306,7 +312,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | A35 clipboard | `PASS` | 최신 non-sensitive `KO03_CLIPBOARD`가 `받은 내용: KO03_CLIPBOARD`로 치환됨; 원문 quickphrase는 자동 삽입되지 않음 |
 | 민감 입력 | `PASS` | `privateEditorAllowsDateAndTimeButBlocksPersonalAndClipboard`, `sensitiveClipboardIsNeverExpanded`가 삽입 비활성 정책 검증 |
 | 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, `0.1.2-84-g9522b817` app/plugin 재설치 및 debug Fcitx IME 재선택; app `09:12:45`, plugin `09:12:47` |
-| 최종 Z Fold6 설치 | `BLOCK` | 무선 디버깅 endpoint가 mDNS에서 사라져 재연결 대기 |
+| 최종 Z Fold6 설치 | `SUPERSEDED` | 동적 문구는 자세·화면 크기에 의존하지 않아 기존 A35와 API 34 emulator 검증으로 완료 |
 
 #### KO-02 구현·검증 증거 (2026-07-26)
 
@@ -1104,8 +1110,8 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 
 1. `KO-01` 한/영 오타 복구. (`DONE`)
 2. `KO-02` 초성 통합 검색. (`DONE`)
-3. `KO-03` 동적 빠른 문구. (`IN_PROGRESS`: Z Fold6 최종 설치 gate만 남음)
-4. `KO-03A` 자동 스니펫 확장. (`IN_PROGRESS`: 사용자 우선순위로 구현)
+3. `KO-03` 동적 빠른 문구. (`DONE`: 암호화 profile·preview·정확히 1회 삽입 검증)
+4. `KO-03A` 자동 스니펫 확장. (`DONE`: emulator 일반·Enter·buffered 분할·private 차단 통과)
 5. `KO-09` 한글 어절 자동완성. (`DONE`: emulator 일반·buffered 후보 선택·미선택 Space·private 차단 통과)
 6. `KO-04` 앱별 profile과 network policy. (`NEXT`)
 
@@ -1211,3 +1217,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 한국식 감정표현은 휴대폰에서 ㅋㅋ·ㅎㅎ 강도를 직접 고를 수 있도록 강·약 quick chip을 모두 제공하고, API 34 emulator의 후보·1회 삽입·password editor 차단을 Android 완료 gate로 인정 |
 | 2026-07-27 | 한국어 조사·다음 어절은 posture·sensor·제조사 의존성이 없어 API 34 emulator의 받침·ㄹ 예외, 공백 후보, 선택·취소·정확히 1회 삽입을 Android 완료 gate로 인정 |
 | 2026-07-27 | 한글 어절 자동완성은 API 34 emulator의 일반·buffered editor 후보·명시 선택·미선택 Space·private 차단을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
+| 2026-07-27 | 동적 문구와 자동 스니펫은 API 34 emulator의 암호화 profile·Space·Enter·buffered 분할 trigger·private literal 보존을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
