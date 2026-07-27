@@ -184,6 +184,16 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
             }
             .create()
         dialog.setOnShowListener {
+            // The profile form has six selectors. Let the custom panel scroll inside a bounded
+            // viewport so the dialog buttons never fall below the visible display.
+            scroll.layoutParams = scroll.layoutParams.apply {
+                height = appProfileDialogViewportHeight(
+                    ctx.resources.displayMetrics.heightPixels,
+                    ctx.dp(420),
+                    ctx.dp(220)
+                )
+            }
+            scroll.isFillViewport = true
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val profile = AppKeyboardProfile(
                     packageName = packageField.text.toString(),
@@ -234,4 +244,14 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.WRAP_CONTENT
     )
+}
+
+internal fun appProfileDialogViewportHeight(
+    screenHeightPx: Int,
+    maximumHeightPx: Int,
+    minimumHeightPx: Int
+): Int {
+    require(screenHeightPx > 0 && maximumHeightPx > 0 && minimumHeightPx > 0)
+    val available = (screenHeightPx * 0.48f).toInt().coerceAtLeast(1)
+    return minOf(maximumHeightPx, available).coerceAtLeast(minOf(minimumHeightPx, available))
 }

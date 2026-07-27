@@ -77,7 +77,7 @@
 | `KO-03` | 동적 빠른 문구 | `DONE` | 7 JVM 테스트, 암호화 profile·날짜·clipboard 미리보기와 정확히 1회 삽입 검증 |
 | `KO-03A` | 자동 스니펫 확장 | `DONE` | API 34 emulator에서 `:주소1`·`:이메일`의 Space·Enter·buffered 분할·private 차단 통과 |
 | `KO-09` | 한글 어절 자동완성 | `DONE` | API 34 emulator에서 로컬 후보·명시 선택·미선택 Space·buffered 1회 확정·private 차단 통과 |
-| `KO-04` | 앱별 키보드 profile | `IN_PROGRESS` | package별 layout·theme·toolbar·transport·network·AI 정책 구현, 두 기기 matrix 진행 중 |
+| `KO-04` | 앱별 키보드 profile | `DONE` | API 34 emulator에서 exact package·전역 fallback·키보드 표면 저장·정책 차단·설정 dialog 검증 통과 |
 | `KO-05` | 한자 후보 음훈 | `IN_PROGRESS` | bundled libhangul 음훈을 candidate comment로 전달, native test와 두 기기 UI gate 진행 중 |
 
 한국어 기준선과 GIF·KO-01·KO-02는 각각 검증 가능한 checkpoint commit으로 고정돼 있다.
@@ -144,7 +144,7 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | `KO-02` | 초성 통합 검색 | `DONE` | 빠른 문구·clipboard·emoji를 `ㄱㅅ` 등으로 검색 | M |
 | `KO-03` | 동적 빠른 문구 | `DONE` | 날짜·시간·이름·전화·이메일·주소·clipboard 변수, preview | M |
 | `KO-03A` | 자동 스니펫 확장 | `DONE` | `:` trigger 뒤 space·Enter로 암호화 profile 또는 사용자 상용구 확장 | M |
-| `KO-04` | 앱별 키보드 profile | `IN_PROGRESS` | package별 layout, theme, transport, toolbar, AI 정책 | M |
+| `KO-04` | 앱별 키보드 profile | `DONE` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자·국어사전 후보 | `IN_PROGRESS` | bundled 한자·음훈 후보 구현, 국어사전 정의 source는 별도 gate | M |
 | `KO-06` | 개인 단어장 | `DONE` | opt-in·백업 제외 원자 저장, 개인 후보 우선순위·중복 제거·민감 editor 차단과 emulator 실제 후보 선택 통과 | L |
 | `KO-07` | 한국어 조사·문맥 후보 | `DONE` | 받침·ㄹ 예외 조사와 공백 경계 로컬 다음 어절 후보, emulator UI·선택·취소·정확히 1회 삽입 통과 | L |
@@ -326,7 +326,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | 전체 JVM/build | `PASS` | app 64개, failure/error/skipped 0; arm64 app과 Hangul plugin build 성공 |
 | 최종 A35 설치 | `PASS` | app/plugin 재설치 및 Fcitx IME 재선택, app `2026-07-26 08:21:07`, plugin `08:21:09` |
 
-#### KO-04 앱별 profile 계약·증거 (2026-07-26)
+#### KO-04 앱별 profile 계약·증거 (2026-07-27)
 
 1. profile key는 Android package name의 정확 일치다. profile이 없으면 기존 전역 layout·theme·toolbar·
    buffered transport를 그대로 사용한다.
@@ -339,10 +339,15 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | 범위 | 결과 | 증거 |
 | --- | --- | --- |
 | resolver·migration test | `PASS` | 8개 테스트가 전역 fallback, package exact match, private/offline hard deny, v0→v1, unknown enum inherit를 검증 |
-| app build | `PASS` | arm64 `:app:assembleDebug`와 전체 JVM test 통과 |
+| 설정 dialog viewport | `PASS` | 6개 selector가 있는 form을 화면 높이의 48%·최대 420dp viewport로 제한해 API 34 emulator에서 취소·저장 버튼이 항상 화면 안에 노출됨. 경계 테스트 2개 추가 |
+| app/plugin build | `PASS` | x86_64 app·Hangul plugin assemble과 app 65 suites·283 tests, failure/error/skipped 0 |
 | A35 설정 UI | `PASS` | `com.android.chrome` profile을 추가하고 `기본 펼침`을 저장한 뒤 목록 summary에서 재확인 |
 | A35 runtime | `PASS` | Chrome editor를 다시 열자 접혀 있던 toolbar가 profile에 따라 펼쳐지고 GIF 진입 버튼이 즉시 표시됨 |
-| Z Fold6 profile matrix | `GATE` | cover/unfolded 상태에서 layout·theme·toolbar 정책을 각각 재시작해 검증해야 함 |
+| emulator exact match | `PASS` | `com.android.chrome` profile 재시작 뒤 2행 toolbar·`천지인 플러스`·network/AI 차단이 즉시 적용됨 |
+| keyboard surface 저장 | `PASS` | Chrome에서 Space 길게 눌러 `단모음`으로 바꾸자 해당 package profile JSON만 `Danmoum`으로 원자 갱신되고 표면도 즉시 전환됨 |
+| exact fallback | `PASS` | `com.android.settings` profile은 실제 editor package `com.google.android.settings.intelligence`에 적용되지 않고 전역 Physical layout·접힌 toolbar로 복귀 |
+| 저장·정리 | `PASS` | profile은 `no_backup/app-profile/profiles.json`에만 존재했고 검증 후 임시 profile 파일을 제거해 기본 상태로 복구 |
+| Z Fold6 profile matrix | `SUPERSEDED` | package 정책 자체는 posture·sensor에 의존하지 않아 emulator를 Android 완료 gate로 인정. Fold 전용 cover/unfold layout은 `UX-02`에서만 별도 검증 |
 
 #### KO-05 한자 음훈과 국어사전 경계 (2026-07-26)
 
@@ -1113,7 +1118,8 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 3. `KO-03` 동적 빠른 문구. (`DONE`: 암호화 profile·preview·정확히 1회 삽입 검증)
 4. `KO-03A` 자동 스니펫 확장. (`DONE`: emulator 일반·Enter·buffered 분할·private 차단 통과)
 5. `KO-09` 한글 어절 자동완성. (`DONE`: emulator 일반·buffered 후보 선택·미선택 Space·private 차단 통과)
-6. `KO-04` 앱별 profile과 network policy. (`NEXT`)
+6. `KO-04` 앱별 profile과 network policy. (`DONE`: emulator exact match·fallback·표면 저장·정책 차단·dialog viewport 통과)
+7. `KO-05` 한자 음훈 candidate UI. (`NEXT`)
 
 ### 단계 3 — AI 기반과 text 기능
 
@@ -1218,3 +1224,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 한국어 조사·다음 어절은 posture·sensor·제조사 의존성이 없어 API 34 emulator의 받침·ㄹ 예외, 공백 후보, 선택·취소·정확히 1회 삽입을 Android 완료 gate로 인정 |
 | 2026-07-27 | 한글 어절 자동완성은 API 34 emulator의 일반·buffered editor 후보·명시 선택·미선택 Space·private 차단을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
 | 2026-07-27 | 동적 문구와 자동 스니펫은 API 34 emulator의 암호화 profile·Space·Enter·buffered 분할 trigger·private literal 보존을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
+| 2026-07-27 | 앱별 profile은 API 34 emulator의 exact package·전역 fallback·키보드 표면별 저장·network/AI 차단을 Android 완료 gate로 인정. Fold 자세별 표면은 `UX-02`에만 남김 |
