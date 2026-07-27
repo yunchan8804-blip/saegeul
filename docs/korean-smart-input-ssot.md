@@ -146,7 +146,7 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | `KO-03A` | 자동 스니펫 확장 | `IN_PROGRESS` | `:` trigger 뒤 space·Enter로 암호화 profile 또는 사용자 상용구 확장 | M |
 | `KO-04` | 앱별 키보드 profile | `IN_PROGRESS` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자·국어사전 후보 | `IN_PROGRESS` | bundled 한자·음훈 후보 구현, 국어사전 정의 source는 별도 gate | M |
-| `KO-06` | 개인 단어장 | `IN_PROGRESS` | opt-in 로컬 사전과 개인 후보 우선순위 구현, 두 기기 후보 검증 남음 | L |
+| `KO-06` | 개인 단어장 | `DONE` | opt-in·백업 제외 원자 저장, 개인 후보 우선순위·중복 제거·민감 editor 차단과 emulator 실제 후보 선택 통과 | L |
 | `KO-07` | 한국어 조사·문맥 후보 | `IN_PROGRESS` | 받침별 조사와 로컬 다음 어절 후보 구현, 두 기기 UX gate | L |
 | `KO-08` | 한국식 감정표현 추천 | `IN_PROGRESS` | 로컬 emoji·kaomoji·ㅋㅋ/ㅎㅎ 강도 후보 구현, 두 기기 검증 남음 | M |
 | `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 두 음절부터 로컬 접두어 후보, 선택한 후보만 정확히 한 번 확정 | M |
@@ -193,6 +193,15 @@ A35와 Z Fold6의 일반 editor 및 buffered 호환 editor 실기기 검증이�
 | 민감 editor 차단 | `CODE` | `Password`, `Sensitive`, `NoSpellCheck` capability 중 하나라도 있으면 사전 조회 전에 fail-closed |
 | 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, 최신 app/plugin `0.1.2-92-g0c3b30cf` 설치 및 debug Fcitx IME 재선택 |
 | 최종 Z Fold6 설치 | `GATE` | 최신 APK 2개 Taildrop 전달 완료; Android 무선 디버깅 endpoint 인증이 없어 기기 설치·후보 UX 확인 대기 |
+
+#### KO-06 구현·검증 증거 (2026-07-27)
+
+| 항목 | 상태 | 증거 |
+|---|---|---|
+| 저장·parser 정책 | `PASS` | `noBackupFilesDir/korean-personal-dictionary/words.txt` v1 형식, `AtomicFile`, 최대 500개·64 KiB·완성형 한글 2~32자, 중복 제거와 malformed UTF-8·header·category·행 수 fail-closed JVM/native 테스트 |
+| opt-in·privacy | `PASS` | 기본 off이며 직접 추가한 단어만 저장한다. Password·Sensitive·NoSpellCheck editor는 개인/기본 자동완성을 모두 조회 전 차단하고 입력 원문·선택 기록·package를 저장하지 않는다 |
+| emulator 실제 후보 | `PASS/EMULATOR` | API 34 x86_64에서 `챈파카`를 이름으로 추가하고 개인 후보를 켠 뒤 `챈파` 조합 시 `챈파 / 챈파카` 순서 확인. 개인 후보 tap 뒤 대상 editor가 `챈파카` 정확히 1회이며 crash 없음 |
+| cleanup | `PASS/EMULATOR` | 테스트 단어를 앱 UI로 삭제하고 개인 후보를 off로 복구. 최종 파일은 v1 header와 `enabled\t0`만 남아 사용자 테스트 데이터 없음 |
 
 #### KO-02 상세 계약
 
@@ -387,7 +396,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 | ID | 코드 계약 | 현재 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `KO-06` | `noBackupFilesDir` versioned·atomic 사전, 기본 off, 최대 500개, 개인 후보를 정적 후보보다 우선하고 중복 제거 | Kotlin store·policy test와 arm64 native completion test, 파일 mtime/size cache | A35·Z Fold6에서 등록·삭제·우선 후보·손상 fail-closed 확인 |
+| `KO-06` | `noBackupFilesDir` versioned·atomic 사전, 기본 off, 최대 500개, 개인 후보를 정적 후보보다 우선하고 중복 제거 | Kotlin store·policy test, native completion/cache test, API 34 emulator 등록·삭제·우선 후보·정확히 1회 선택 | 없음. 기기 posture·hardware 의존성이 없어 emulator를 canonical Android gate로 인정 |
 | `KO-07` | 사용자가 `조사` chip을 눌렀을 때만 은/는·이/가·을/를·과/와·으로/로·이에요/예요를 받침과 ㄹ 예외로 제안 | 순수 규칙·editor identity·exactly-once 테스트 | 두 기기 UI와 실제 어절 검증; 다음 어절 문맥 모델은 별도 구현 |
 | `KO-08` | editor·clipboard를 읽지 않는 명시적 감정 chip, 로컬 emoji/kaomoji, ㅋㅋ·ㅎㅎ 반복 강도 순위 | 강도·privacy·dedupe·exactly-once 테스트 | 두 기기 chip·후보·삽입 검증 |
 | `AI-04` | `ACTION_SEND text/plain` 또는 사용자가 누른 clipboard 행만 4,000자 이하로 process memory에 5분 보관 | action/MIME/TTL/private gate·editor identity·exactly-once 테스트 | Sharesheet→키보드 preview→답장 생성·삽입을 두 기기에서 확인 |
@@ -1092,7 +1101,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 
 ### 단계 5 — 개인화·대화면·장기 기능
 
-1. `KO-05` 한자·사전과 `KO-06` 개인 단어장. (`IN_PROGRESS`: 개인 단어장 코드 완료, 두 기기 gate)
+1. `KO-05` 한자·사전과 `KO-06` 개인 단어장. (`KO-06 DONE`: emulator 등록·삭제·우선 후보·1회 선택 통과, `KO-05` 국어사전 source gate)
 2. `UX-01` smart clipboard action. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 펼친 Fold6 한글·영문 손 경계 통과, 회전·모바일·중앙 무입력 gate)
@@ -1165,3 +1174,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 출근 이후 일반 Android 기능·회귀 검증의 기준 기기는 API 34 x86_64 emulator로 전환. A35 마이크 품질과 Z Fold cover/unfold posture처럼 emulator가 재현할 수 없는 하드웨어 게이트만 최종 실기기 확인으로 남김 |
 | 2026-07-27 | 문장 생성·답장·직접 지시는 Responses strict JSON Schema와 수신측 exact-count 검증을 함께 사용해 서로 다른 후보 3개가 아니면 부분 결과를 표시하지 않음 |
 | 2026-07-27 | 실시간 받아쓰기는 개인 고급 BYOK에서 공식 Realtime WebSocket을 허용하고 partial은 preview 전용, completed만 명시적 최종 입력 gate로 전달. 일반 배포는 backend 단기 token과 WebRTC를 production gate로 유지 |
+| 2026-07-27 | 개인 단어장은 posture·센서·제조사 의존성이 없어 API 34 emulator의 등록·삭제·후보 우선순위·1회 선택을 Android 완료 gate로 인정하고 실기기 중복 gate를 제거 |
