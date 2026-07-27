@@ -12,6 +12,56 @@ import org.junit.Test
 
 class VoiceProviderProfileTest {
     @Test
+    fun `online voice mode waits for the dedicated STT credential before persisting`() {
+        assertEquals(
+            VoiceModeChangePlan(VoiceProviderMode.DeviceDictation, null),
+            VoiceProviderModeSelectionPolicy.plan(
+                selectedMode = VoiceProviderMode.DeviceDictation,
+                hasCredential = false
+            )
+        )
+        assertEquals(
+            VoiceModeChangePlan(VoiceProviderMode.OpenAiRealtime, null),
+            VoiceProviderModeSelectionPolicy.plan(
+                selectedMode = VoiceProviderMode.OpenAiRealtime,
+                hasCredential = true
+            )
+        )
+        assertEquals(
+            VoiceModeChangePlan(null, VoiceProviderMode.OpenAiApi),
+            VoiceProviderModeSelectionPolicy.plan(
+                selectedMode = VoiceProviderMode.OpenAiApi,
+                hasCredential = false
+            )
+        )
+    }
+
+    @Test
+    fun `successful STT credential save activates only the intended online mode`() {
+        assertEquals(
+            VoiceProviderMode.OpenAiRealtime,
+            VoiceProviderModeSelectionPolicy.afterCredentialSaved(
+                currentMode = VoiceProviderMode.DeviceDictation,
+                requestedMode = VoiceProviderMode.OpenAiRealtime
+            )
+        )
+        assertEquals(
+            VoiceProviderMode.OpenAiApi,
+            VoiceProviderModeSelectionPolicy.afterCredentialSaved(
+                currentMode = VoiceProviderMode.DeviceDictation,
+                requestedMode = null
+            )
+        )
+        assertEquals(
+            VoiceProviderMode.OpenAiRealtime,
+            VoiceProviderModeSelectionPolicy.afterCredentialSaved(
+                currentMode = VoiceProviderMode.OpenAiRealtime,
+                requestedMode = null
+            )
+        )
+    }
+
+    @Test
     fun `voice profile accepts only the official OpenAI STT models`() {
         val accurate = VoiceProviderProfile(apiKey = " voice-secret ").validate()
         val efficient = VoiceProviderProfile(

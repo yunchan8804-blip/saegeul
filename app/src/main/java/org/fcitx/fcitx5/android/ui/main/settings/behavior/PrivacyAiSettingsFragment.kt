@@ -16,7 +16,9 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Toast
+import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
 import androidx.lifecycle.lifecycleScope
@@ -47,6 +49,7 @@ import org.fcitx.fcitx5.android.input.gif.GiphyProviderCredentialStore
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderCredentialStore
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderMode
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeStore
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeSelectionPolicy
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderProfile
 import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionModel
 import org.fcitx.fcitx5.android.ui.main.MainActivity
@@ -54,6 +57,7 @@ import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
 import splitties.dimensions.dp
+import splitties.resources.styledColor
 
 /** User-visible controls for network input, BYOK credentials, and local traces. */
 class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
@@ -72,6 +76,11 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
         val prefs = AppPrefs.getInstance()
+        val preferenceIconTint = ctx.styledColor(android.R.attr.colorControlNormal)
+        fun themedPreferenceIcon(@DrawableRes resource: Int) =
+            AppCompatResources.getDrawable(ctx, resource)?.mutate()?.apply {
+                setTint(preferenceIconTint)
+            }
         preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
             addCategory(R.string.privacy_network_controls) {
                 addPreference(SwitchPreferenceCompat(ctx).apply {
@@ -89,7 +98,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             addCategory(R.string.ai_provider_settings) {
                 providerPreference = Preference(ctx).apply {
                     setTitle(R.string.ai_provider_settings)
-                    setIcon(R.drawable.ic_baseline_auto_awesome_24)
+                    icon = themedPreferenceIcon(R.drawable.ic_baseline_auto_awesome_24)
                     setOnPreferenceClickListener {
                         showProviderModeDialog()
                         true
@@ -108,7 +117,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             addCategory(R.string.voice_provider_settings) {
                 voiceModePreference = Preference(ctx).apply {
                     setTitle(R.string.voice_provider_mode_title)
-                    setIcon(R.drawable.ic_baseline_keyboard_voice_24)
+                    icon = themedPreferenceIcon(R.drawable.ic_baseline_keyboard_voice_24)
                     setOnPreferenceClickListener {
                         showVoiceModeDialog()
                         true
@@ -336,13 +345,15 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .setSingleChoiceItems(labels, selected) { _, index -> selected = index }
             .setPositiveButton(R.string.save) { _, _ ->
                 val mode = values[selected]
-                runCatching { store.save(mode) }
+                val plan = VoiceProviderModeSelectionPolicy.plan(
+                    selectedMode = mode,
+                    hasCredential = VoiceProviderCredentialStore(ctx).load() != null
+                )
+                runCatching { plan.modeToPersist?.let(store::save) }
                     .onSuccess {
                         refreshSummaries()
-                        if (mode != VoiceProviderMode.DeviceDictation &&
-                            VoiceProviderCredentialStore(ctx).load() == null
-                        ) {
-                            view?.post { showVoiceProviderDialog() }
+                        plan.credentialMode?.let { pendingMode ->
+                            view?.post { showVoiceProviderDialog(pendingMode) }
                         }
                     }
                     .onFailure {
@@ -354,7 +365,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .show()
     }
 
-    private fun showVoiceProviderDialog() {
+    private fun showVoiceProviderDialog(pendingMode: VoiceProviderMode? = null) {
         val ctx = requireContext()
         val store = VoiceProviderCredentialStore(ctx)
         val configured = store.load()
@@ -423,9 +434,10 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     .getOrNull() ?: return@setOnClickListener
                 runCatching {
                     store.save(validated)
-                    val selectedMode = VoiceProviderModeStore(ctx).load()
-                        .takeIf { it != VoiceProviderMode.DeviceDictation }
-                        ?: VoiceProviderMode.OpenAiApi
+                    val selectedMode = VoiceProviderModeSelectionPolicy.afterCredentialSaved(
+                        currentMode = VoiceProviderModeStore(ctx).load(),
+                        requestedMode = pendingMode
+                    )
                     VoiceProviderModeStore(ctx).save(selectedMode)
                 }.onSuccess {
                     apiKey.text?.clear()

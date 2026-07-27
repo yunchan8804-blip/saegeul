@@ -408,7 +408,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, 실시간·정밀 모드가 같은 독립 STT profile을 재사용한다. picker가 IME를 detach해도 같은 editor에 새 회의 window를 복원하고, STT 401은 `설정하기`로 복구; 실제 OpenAI key·음원 품질 gate | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
 | `VOICE-05` | 휴대폰 받아쓰기 기본 모드 | `DONE` | 글쓰기 AI 연결 여부와 무관한 기본 음성 모드다. system voice IME가 있으면 즉시 전환하고, 없으면 Android 음성 입력 설정 안내를 제공한다 | S |
-| `VOICE-06` | 독립 STT 공급자·보안 저장소 | `DONE` | 글쓰기 AI/OAuth와 분리된 OpenAI STT key·모델 선택, 공식 endpoint allowlist, Keystore/no-backup 저장과 즉시 삭제 | M |
+| `VOICE-06` | 독립 STT 공급자·보안 저장소 | `DONE` | 글쓰기 AI/OAuth와 분리된 OpenAI STT key·모델 선택, 공식 endpoint allowlist, Keystore/no-backup 저장과 즉시 삭제. 온라인 모드는 전용 key 저장 성공과 함께만 확정하고 설정 취소 시 기존 휴대폰 받아쓰기를 보존 | M |
 | `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입과 picker 복귀 복원, `tessdata_best`·EXIF/픽셀 회전·저화질 emulator 정확도 matrix 구현; native 배포 gate만 남음 | L |
 
 ### 6.5 편의·기기·보안 기능
@@ -1128,7 +1128,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
 | OAuth public client | `PASS` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현; AppCompat dialog theme와 Android 11+ browser query 회귀 수정 |
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
-| OAuth 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 66 suites·299 tests failure/error/skipped 0, companion Python 11 tests, `:app:assembleDebug -PbuildABI=x86_64`, debug merged manifest redirect scheme 일치 |
+| OAuth 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 66 suites·301 tests failure/error/skipped 0, companion Python 11 tests, `:app:assembleDebug -PbuildABI=x86_64`, debug merged manifest redirect scheme 일치 |
 | OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과. Pixel 7·QA tablet API 34 emulator도 임시 HTTPS `--public-origin`의 manifest 확인·browser 승인·token 교환·암호화 session 저장 뒤 우리 키보드로 직접 지시문을 입력해 후보 3개·정확히 1회 삽입·undo를 통과했다. 시험 session은 두 emulator에서 revoke·삭제했고 PC 재시작용 companion grant는 Windows DPAPI로 보존한다. |
 | public-origin startup | `PASS` | 새 Quick Tunnel의 route 전파 중 404·502 뒤 정상 manifest를 제한 재시도로 수용하고, 잘못된 manifest 계약은 sleep 없이 즉시 거부하는 Python test를 고정했다. companion Python 11 tests와 실제 Cloudflare tunnel OAuth 왕복을 통과했다. |
 | 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |
@@ -1158,6 +1158,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | AI-05 번역 matrix | `PASS/EMULATOR` | OAuth companion으로 `안녕하세요 → Hello`, `Hello → 안녕하세요`, `Hello → こんにちは`, `Hello → 你好`를 각 action에서 실제 생성하고 preview card를 확인 |
 | AI-02 말투 matrix | `PASS/A35+EMULATOR` | A35의 Claude 존댓말, API 34 emulator OAuth companion의 카톡체·업무용·정중한 거절·사과·고객응대 action이 모두 실제 한국어 결과 card를 반환 |
 | 구간 녹음 버튼·권한·오류 | `PASS/EMULATOR` | 권한 미허용 상태의 `녹음 시작` 1회 탭으로 Android permission dialog 표시, 승인 뒤 같은 editor에서 `녹음 중 0초`·mic indicator·2초 경과를 확인하고, 중지 뒤 dummy key 401을 한국어 설명과 `설정하기`로 복구했다. 보고된 무반응 상태는 emulator가 input device를 물리 keyboard로 오인해 Fcitx input view 전체를 접은 수명주기 상태와 상관됐고 IME 재선택으로 복구됐다. 정상 input view에서 recorder 버튼 자체는 즉시 동작하므로 microphone 품질 gate와 분리한다. |
+| STT 모드 설정 원자성 | `PASS/EMULATOR` | 전용 key가 없는 Pixel 7·QA tablet에서 OpenAI 정밀 전사를 선택한 뒤 key dialog를 취소해도 `휴대폰 받아쓰기`가 유지됐다. Pixel 7에서 test key 저장 성공 뒤에만 정밀 모드가 활성화됐고 앱 UI의 `STT API 키 제거`로 key 삭제·휴대폰 모드 복귀·제거 행 소멸을 확인했다. test key는 남기지 않았다. 설정 아이콘은 별도 mutable drawable과 theme tint를 사용해 phone·tablet light theme에서 흰색 소실 없이 표시한다. |
 | 회의 파일 picker·인증 복구 | `PASS/EMULATOR` | Pixel 7과 QA tablet API 34에서 1초 WAV 선택 뒤 같은 editor의 새 회의 window로 one-shot 복귀. tablet landscape에서 streaming body 조기 종료의 HTTP 401을 회수해 일반 파일 오류 대신 STT 재연결 설명과 `설정하기`를 표시 |
 
 사용량 저장소는 action·성공/실패·입출력 문자 수·마지막 provider/model만 집계하며 prompt, 결과,
@@ -1303,3 +1304,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 회의 음성 `ACTION_OPEN_DOCUMENT` 결과는 detach된 window callback으로 전달하지 않고 원래 editor identity와 함께 process memory에서 1회 보관한 뒤 새 meeting window가 소비한다. STT 401은 파일 재선택이 아니라 음성 설정 CTA로 복구한다. |
 | 2026-07-27 | Tailscale private network를 사용할 수 없는 emulator 검증에는 strict HTTPS origin-only `--public-origin`을 허용하되 임시 tunnel을 production 기본값으로 승격하지 않음 |
 | 2026-07-27 | 새 `--public-origin` route의 일시적 404·502는 bounded backoff로만 재검증하고 manifest 계약 오류는 즉시 fail-closed. Pixel 7·QA tablet에서 OAuth·직접 지시·후보 3개·삽입·undo 뒤 시험 grant와 tunnel을 모두 정리 |
+| 2026-07-27 | 전용 STT credential이 없는 온라인 받아쓰기 선택은 mode를 선저장하지 않는다. key 저장 성공과 mode 변경을 같은 사용자 완료 경로로 묶고, key dialog 취소 시 기존 휴대폰 받아쓰기를 보존한다. |

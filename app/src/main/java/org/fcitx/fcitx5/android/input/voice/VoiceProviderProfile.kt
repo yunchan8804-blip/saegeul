@@ -13,6 +13,34 @@ enum class VoiceProviderMode {
     OpenAiApi
 }
 
+internal data class VoiceModeChangePlan(
+    val modeToPersist: VoiceProviderMode?,
+    val credentialMode: VoiceProviderMode?
+)
+
+internal object VoiceProviderModeSelectionPolicy {
+    /**
+     * An online mode is not active until its dedicated STT credential is available. This keeps a
+     * cancelled setup dialog from silently replacing working device dictation with a broken mode.
+     */
+    fun plan(selectedMode: VoiceProviderMode, hasCredential: Boolean): VoiceModeChangePlan =
+        when {
+            selectedMode == VoiceProviderMode.DeviceDictation || hasCredential -> {
+                VoiceModeChangePlan(modeToPersist = selectedMode, credentialMode = null)
+            }
+            else -> VoiceModeChangePlan(modeToPersist = null, credentialMode = selectedMode)
+        }
+
+    /** Resolve the mode atomically with a successful STT credential save. */
+    fun afterCredentialSaved(
+        currentMode: VoiceProviderMode,
+        requestedMode: VoiceProviderMode?
+    ): VoiceProviderMode = requestedMode
+        ?.takeIf { it != VoiceProviderMode.DeviceDictation }
+        ?: currentMode.takeIf { it != VoiceProviderMode.DeviceDictation }
+        ?: VoiceProviderMode.OpenAiApi
+}
+
 object VoiceProviderPolicy {
     fun allowsSelectedMode(mode: VoiceProviderMode, allowsNetworkInput: Boolean): Boolean =
         mode == VoiceProviderMode.DeviceDictation || allowsNetworkInput
