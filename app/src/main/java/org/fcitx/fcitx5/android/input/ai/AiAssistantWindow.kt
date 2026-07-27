@@ -49,6 +49,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     private var clipboardBarAvailable = false
     private var clipboardBarInteractionEnabled = true
     private var pendingCustomInstruction: String? = null
+    private val promptEntryPolicy = AiPromptEntryPolicy()
 
     override val title: String by lazy { context.getString(R.string.ai_assistant_title) }
     override val showTitle: Boolean = true
@@ -123,6 +124,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         val shared = AiReplyIntake.consumeSharedText(allowed = replyTarget != null)
         if (shared != null && replyTarget != null) {
             adoptReplySource(shared, replyTarget)
+            presentEntryPromptIfNeeded()
             return
         }
         replySourceOrigin = null
@@ -140,6 +142,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         }
         ui.showSourcePreview(captured.source, resolved.displayName)
         consumePendingCustomInstruction()
+        presentEntryPromptIfNeeded()
     }
 
     override fun onDetached() {
@@ -165,6 +168,22 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         )
         if (!started) {
             ui.showError(context.getString(R.string.ai_editor_changed), canRetry = false)
+        }
+    }
+
+    private fun presentEntryPromptIfNeeded() {
+        if (!promptEntryPolicy.consumeShouldOpen(
+                featureReady = profile != null && service.allowsAiInputFeatures(),
+                editorTargetBound = snapshot != null
+            )
+        ) return
+        // InputWindowManager assigns this window as current after onAttached returns. Defer the
+        // transition so the first AI surface becomes the canonical Fcitx prompt keyboard instead
+        // of leaving a keyboard-sized action panel on screen.
+        ui.root.post {
+            if (windowManager.isAttached(this) && service.allowsAiInputFeatures()) {
+                openPromptKeyboard("")
+            }
         }
     }
 

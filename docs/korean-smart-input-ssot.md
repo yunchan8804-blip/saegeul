@@ -1313,7 +1313,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | 교체 exactly-once·undo | `PASS` | Chrome URL editor에서 결과를 한 번 교체한 뒤 `실행 취소`로 원문이 정확히 복원됨 |
 | Z Fold6 UI | `PASS` | cover 화면에서 AI toolbar, 원문 preview와 전체 action group이 잘림 없이 표시됨 |
 | AI 결과 우선 UI | `PASS/EMULATOR` | 결과 상태에서 보이지 않는 `weight=1` status container와 가짜 지시문 행을 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 유지, 기본 action은 1행·말투/번역은 명시적 펼침으로 분리해 결과 card가 전체 가용 높이를 사용 |
-| AI 직접 지시문 | `PASS` | 기능별 두벌식 복제판 제거. 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme을 그대로 쓰되 output은 내부 최대 300자 buffer로 격리; A35에서 영문 입력·후보·숫자판·천지인 picker·picker restart prompt 보존과 target editor 무변경 통과, pure buffer Unicode·preedit·limit 회귀 테스트 통과 |
+| AI 직접 지시문 | `PASS/ZFOLD` | 기능별 두벌식 복제판 제거. `AI 글쓰기` 첫 진입 즉시 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme과 직접 지시문 strip을 열고, `취소`했을 때만 전체 action panel로 돌아간다. output은 내부 최대 300자 buffer로 격리; A35의 영문 입력·후보·숫자판·천지인 picker·target editor 무변경과 Z Fold6의 entry-time prompt keyboard 표시, pure buffer·entry exactly-once 회귀 테스트 통과 |
 | AI 직접 지시 터치 경계 | `PASS/EMULATOR` | prompt strip 상단을 IME content·visible·touchable inset으로 사용해 뒤 editor의 전송/검색 버튼 touch 관통을 차단. API 34 WindowManager region·target activity 유지와 실제 `실행` -> 401 설정 안내 전이를 검증 |
 | API key 거부 UX | `PASS/EMULATOR` | API key 401을 typed failure로 분리해 provider 영문 원문과 의미 없는 재시도를 숨기고 한국어 설명·`설정하기`를 표시; CTA의 `개인정보·AI` 직행과 test credential 삭제 확인 |
 | 완전 offline zero-request | `PASS/EMULATOR` | API 34 x86_64에서 offline mode와 `OpenAI API 정밀 전사`를 선택하고 확장 toolbar의 AI·전사·GIF를 각각 실제 tap. 모든 동작 뒤 host가 Settings `SearchActivity`로 유지됐고 Fcitx UID 10191 BPF 통계가 `rx=4,595,372 / tx=49,121 / rxPackets=3,157 / txPackets=1,078`로 동일해 delta가 모두 0. 종료 후 offline OFF·`휴대폰 받아쓰기 (추천)`으로 복구하고 `no_backup/voice`·AI credential 부재 확인 |
@@ -1486,3 +1486,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-28 | 빠른 받아쓰기 mode는 회의·메모 파일 전사의 STT profile 선택을 숨기지 않는다. 회의 버튼 렌더는 암호화 파일 존재만 보고 실제 credential 복호화는 privacy·network 허용 상태의 명시적 회의 진입 뒤에만 수행한다. |
 | 2026-07-28 | IME 소유 설정 Activity 왕복은 원 editor identity에 묶인 one-shot software-keyboard resume로 복구한다. 전역 virtual 강제는 금지하고 자체 설정 editor는 예약을 소비하지 않는다. |
 | 2026-07-28 | 재부팅 첫 잠금 해제 전에는 device-protected 기본 키보드만 허용한다. credential-encrypted app profile·snippet·dynamic phrase·clipboard suggestion·AI·GIF·OCR·voice는 읽거나 노출하지 않고, `ACTION_USER_UNLOCKED` 뒤 프로세스를 재기동해 일반 기능을 복원한다. |
+| 2026-07-28 | `AI 글쓰기`는 첫 진입 즉시 별도 복제 자판이 아닌 현재 Fcitx `KeyboardWindow`와 내부 직접 지시문 target을 정확히 한 번 연다. `취소`는 action panel로 복귀하며 같은 window session에서 prompt를 자동 재개하지 않는다. |
