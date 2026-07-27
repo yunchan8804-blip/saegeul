@@ -53,4 +53,42 @@ class KoreanParticleSuggesterTest {
         assertTrue(gate.claim())
         assertTrue(!gate.claim())
     }
+
+    @Test
+    fun `commit contract requires the same editor cursor context and suggestion`() {
+        val editor = KoreanParticleEditorTarget("chat.app", 7, 1, 2)
+        val snapshot = KoreanParticleSnapshot(
+            editor = editor,
+            contextTail = "사과",
+            suggestions = KoreanParticleSuggester.suggest("사과")
+        )
+
+        assertTrue(KoreanParticleCommitContract.canCommit(snapshot, editor, "사과", "는"))
+        assertTrue(!KoreanParticleCommitContract.canCommit(
+            snapshot,
+            editor.copy(packageName = "other.app"),
+            "사과",
+            "는"
+        ))
+        assertTrue(!KoreanParticleCommitContract.canCommit(
+            snapshot,
+            editor.copy(fieldId = 8),
+            "사과",
+            "는"
+        ))
+        assertTrue(!KoreanParticleCommitContract.canCommit(
+            snapshot,
+            editor.copy(inputType = 2),
+            "사과",
+            "는"
+        ))
+        assertTrue(!KoreanParticleCommitContract.canCommit(
+            snapshot,
+            editor.copy(cursor = 1),
+            "사과",
+            "는"
+        ))
+        assertTrue(!KoreanParticleCommitContract.canCommit(snapshot, editor, "사과들", "는"))
+        assertTrue(!KoreanParticleCommitContract.canCommit(snapshot, editor, "사과", "은"))
+    }
 }

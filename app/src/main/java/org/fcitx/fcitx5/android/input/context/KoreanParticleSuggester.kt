@@ -31,6 +31,22 @@ data class KoreanParticleSnapshot(
     val suggestions: List<KoreanParticleSuggestion>
 )
 
+/**
+ * Pure fail-closed contract for the short interval between showing and committing a particle.
+ * The editor, cursor context, and selected suggestion must all still match the captured snapshot.
+ */
+internal object KoreanParticleCommitContract {
+    fun canCommit(
+        snapshot: KoreanParticleSnapshot,
+        currentEditor: KoreanParticleEditorTarget,
+        currentContextTail: String,
+        text: String
+    ): Boolean =
+        snapshot.editor == currentEditor &&
+            snapshot.contextTail == currentContextTail &&
+            snapshot.suggestions.any { it.text == text }
+}
+
 internal class KoreanParticleCommitGate {
     private var consumed = false
 

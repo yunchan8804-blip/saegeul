@@ -147,7 +147,7 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | `KO-04` | 앱별 키보드 profile | `IN_PROGRESS` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자·국어사전 후보 | `IN_PROGRESS` | bundled 한자·음훈 후보 구현, 국어사전 정의 source는 별도 gate | M |
 | `KO-06` | 개인 단어장 | `DONE` | opt-in·백업 제외 원자 저장, 개인 후보 우선순위·중복 제거·민감 editor 차단과 emulator 실제 후보 선택 통과 | L |
-| `KO-07` | 한국어 조사·문맥 후보 | `IN_PROGRESS` | 받침별 조사와 로컬 다음 어절 후보 구현, 두 기기 UX gate | L |
+| `KO-07` | 한국어 조사·문맥 후보 | `DONE` | 받침·ㄹ 예외 조사와 공백 경계 로컬 다음 어절 후보, emulator UI·선택·취소·정확히 1회 삽입 통과 | L |
 | `KO-08` | 한국식 감정표현 추천 | `DONE` | 로컬 emoji·kaomoji·ㅋㅋ/ㅎㅎ 강·약 chip, emulator 후보·정확히 1회 삽입·민감 editor 차단 통과 | M |
 | `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 두 음절부터 로컬 접두어 후보, 선택한 후보만 정확히 한 번 확정 | M |
 
@@ -412,12 +412,22 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | private editor 차단 | `PASS/EMULATOR` | `password=true`인 OpenAI STT API 키 editor에서 clipboard·AI toolbar surface가 노출되지 않고 저장된 clipboard 원문에 접근할 수 없음을 확인 |
 | 자동·회귀 검증 | `PASS` | transformer의 plain text·합치기·한국 전화·계좌 grouping·PII mask와 선택 상태·private/editor identity·exactly-once 회귀 테스트 통과 |
 
+#### KO-07 구현·검증 증거 (2026-07-27)
+
+| 항목 | 상태 | 증거 |
+|---|---|---|
+| 조사 규칙 UI | `PASS/EMULATOR` | Pixel 7 API 34 x86_64의 실제 한글 입력에서 `사과`는 `는·가·를·와·로·예요`, `집`은 `은·이·을·과·으로·이에요`, `길`은 ㄹ 예외 `로`를 표시 |
+| 조사 정확히 1회 삽입 | `PASS/EMULATOR` | 명시 선택 뒤 editor XML이 각각 `사과는`, `집은`, `길로`이며 원 단어와 선택 조사가 각 1회임을 확인 |
+| 다음 어절 선택 | `PASS/EMULATOR` | `오늘 ` 공백 경계에서 `하루도·날씨가` 로컬 후보를 표시하고 `하루도` 선택 뒤 editor XML이 `오늘 하루도`, 두 어절이 각 1회임을 확인 |
+| 다음 어절 취소 | `PASS/EMULATOR` | `오늘 ` 뒤 후보가 표시된 상태에서 boundary space를 지우면 editor가 `오늘`로 복귀하고 다음 어절 후보가 사라짐을 확인 |
+| fail-closed 회귀 | `PASS` | 조사 받침·ㄹ 예외, next-word 64KiB·500행 parser와 mode policy, 조사 package·field·inputType·cursor·context·membership identity 및 exactly-once gate 테스트 통과 |
+
 ### 6.6 2026-07-26 병렬 구현 checkpoint 계약
 
 | ID | 코드 계약 | 현재 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
 | `KO-06` | `noBackupFilesDir` versioned·atomic 사전, 기본 off, 최대 500개, 개인 후보를 정적 후보보다 우선하고 중복 제거 | Kotlin store·policy test, native completion/cache test, API 34 emulator 등록·삭제·우선 후보·정확히 1회 선택 | 없음. 기기 posture·hardware 의존성이 없어 emulator를 canonical Android gate로 인정 |
-| `KO-07` | 사용자가 `조사` chip을 눌렀을 때만 은/는·이/가·을/를·과/와·으로/로·이에요/예요를 받침과 ㄹ 예외로 제안 | 순수 규칙·editor identity·exactly-once 테스트 | 두 기기 UI와 실제 어절 검증; 다음 어절 문맥 모델은 별도 구현 |
+| `KO-07` | 사용자가 `조사` chip을 눌렀을 때만 은/는·이/가·을/를·과/와·으로/로·이에요/예요를 받침과 ㄹ 예외로 제안 | 순수 규칙·editor identity·exactly-once 테스트와 API 34 emulator의 `사과·집·길` 후보·1회 삽입 | 없음. posture·sensor·제조사 의존성이 없어 emulator를 canonical Android gate로 인정 |
 | `KO-08` | editor·clipboard를 읽지 않는 명시적 감정 chip, 로컬 emoji/kaomoji, ㅋㅋ·ㅎㅎ 반복 강도 순위 | 강도·privacy·dedupe·exactly-once 테스트, API 34 emulator의 일반·강한 웃음 chip·후보·1회 삽입·password editor 차단 | 없음. posture·sensor·제조사 의존성이 없어 emulator를 canonical Android gate로 인정 |
 | `AI-04` | `ACTION_SEND text/plain` 또는 사용자가 누른 clipboard 행만 4,000자 이하로 process memory에 5분 보관 | action/MIME/TTL/private gate·editor identity·exactly-once 테스트 | Sharesheet→키보드 preview→답장 생성·삽입을 두 기기에서 확인 |
 | `UX-01` | 최대 10개 명시 선택, plain text·합치기·한국 전화·명시적 계좌 grouping·PII mask preview | transformer·선택 상태·private gate·exactly-once 테스트, API 34 emulator의 일반 editor mask·합치기·1회 삽입과 password editor 차단 | 없음. posture·sensor·제조사 의존성이 없어 emulator를 canonical Android gate로 인정 |
@@ -468,7 +478,7 @@ Z Fold6 내부 화면 `1856×2160`에서 기존 index 반분이 두벌식 둘째
 
 | ID | 구현 계약 | 현재 자동 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `KO-07` | 실제 공백 경계 뒤에만 project-curated 로컬 다음 어절을 미선택 후보로 표시한다. 기존 완성·개인 단어·한자 후보와 mode를 섞지 않고, 선택 시 현재 후보 membership을 다시 확인한 뒤 1회 확정한다. | 64KiB·500행 fail-closed parser, 중복·limit·민감 editor policy, A35·Z Fold6 arm64 native test | 두 기기에서 직접 입력·자동완성 선택 뒤 공백·후보 선택·취소·민감 editor UI 검증 |
+| `KO-07` | 실제 공백 경계 뒤에만 project-curated 로컬 다음 어절을 미선택 후보로 표시한다. 기존 완성·개인 단어·한자 후보와 mode를 섞지 않고, 선택 시 현재 후보 membership을 다시 확인한 뒤 1회 확정한다. | 64KiB·500행 fail-closed parser, 중복·limit·민감 editor policy, A35·Z Fold6 arm64 native test와 API 34 emulator의 `오늘 ` 노출·선택·취소·1회 삽입 | 없음. emulator를 canonical Android gate로 인정 |
 | `GIF-02` | KLIPY exact query의 성공한 첫 page가 비었을 때만 한국어 반응 intent를 최대 2개 시도한다. 원 결과와 합치지 않고 recovery page를 단일 page로 종료한다. Noto는 로컬 tag 가중치와 emoji family 다양성을 적용한다. GIPHY에는 query 보정·재정렬·필터를 적용하지 않는다. | GIF 17 suites·64 tests, provider isolation·stable dedupe·safe fallback·Noto family diversity | KLIPY production access·branding review, 실제 희소 query의 두 기기 grid 품질 matrix |
 | `MM-01` | JPEG·PNG·WebP content URI만 system document picker로 1회 받는다. 최대 15MiB·100MP source를 4MP 이하로 축소하고 Tesseract 한국어 모델로 기기 안에서 인식한다. 결과는 기본 미선택 줄별 preview 뒤 선택분만 1회 입력한다. | OCR contract·image bound·고정 commit/크기/SHA-256 model install tests 9개와 Kotlin compile | A35·Z Fold6 실제 한국어 인쇄물·회전 이미지 정확도, picker 취소·focus 이동, F-Droid용 native AAR 재현성 또는 source build 전환 |
 
@@ -1125,8 +1135,8 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 2. `UX-01` smart clipboard action. (`DONE`: emulator 명시 선택·mask·합치기·1회 삽입·private editor 차단 통과)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 펼친 Fold6 한글·영문 손 경계 통과, 회전·모바일·중앙 무입력 gate)
-5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`KO-08 DONE`: emulator 강·약 chip·후보·1회 삽입·private 차단 통과, `KO-07` UI gate)
-6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`IN_PROGRESS`: 코드·자동 테스트 완료, 두 기기 UX·정확도와 OCR native 배포 gate)
+5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`DONE`: emulator 조사 받침·ㄹ 예외, 감정 강·약 chip, 후보·1회 삽입 통과)
+6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`KO-07 DONE`: emulator 공백 후보·선택·취소·1회 삽입 통과, `MM-01` 실제 OCR 정확도와 native 배포 gate)
 7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)
 
 ## 10. 공통 검증 게이트
@@ -1197,3 +1207,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 개인 단어장은 posture·센서·제조사 의존성이 없어 API 34 emulator의 등록·삭제·후보 우선순위·1회 선택을 Android 완료 gate로 인정하고 실기기 중복 gate를 제거 |
 | 2026-07-27 | smart clipboard는 posture·센서·제조사 의존성이 없어 API 34 emulator의 명시 선택·mask·합치기·정확히 1회 삽입·password editor 차단을 Android 완료 gate로 인정 |
 | 2026-07-27 | 한국식 감정표현은 휴대폰에서 ㅋㅋ·ㅎㅎ 강도를 직접 고를 수 있도록 강·약 quick chip을 모두 제공하고, API 34 emulator의 후보·1회 삽입·password editor 차단을 Android 완료 gate로 인정 |
+| 2026-07-27 | 한국어 조사·다음 어절은 posture·sensor·제조사 의존성이 없어 API 34 emulator의 받침·ㄹ 예외, 공백 후보, 선택·취소·정확히 1회 삽입을 Android 완료 gate로 인정 |

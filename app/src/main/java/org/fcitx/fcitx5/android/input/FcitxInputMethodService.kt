@@ -91,6 +91,7 @@ import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
 import org.fcitx.fcitx5.android.input.ai.AiPromptCaptureSession
 import org.fcitx.fcitx5.android.input.ai.AiSourceKind
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
+import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSuggester
@@ -1129,21 +1130,26 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /** Inserts one explicitly selected particle. A stale editor/context fails without fallback. */
     fun commitKoreanParticle(snapshot: KoreanParticleSnapshot, text: String): Boolean {
-        if (!allowsTextInspectionFeatures() ||
-            snapshot.suggestions.none { it.text == text } ||
-            !matchesCurrentEditor(
-                snapshot.editor.packageName,
-                snapshot.editor.fieldId,
-                snapshot.editor.inputType,
-                snapshot.editor.cursor,
-                snapshot.editor.cursor
-            ) ||
-            !finishCompositionForDirectAction()
-        ) return false
+        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return false
+        val info = currentInputEditorInfo
+        val currentEditor = KoreanParticleEditorTarget(
+            packageName = info.packageName,
+            fieldId = info.fieldId,
+            inputType = info.inputType,
+            cursor = currentInputSelection.start
+        )
+        if (currentEditor != snapshot.editor || snapshot.suggestions.none { it.text == text }) {
+            return false
+        }
+        if (!finishCompositionForDirectAction()) return false
         val connection = currentInputConnection ?: return false
-        if (connection.getTextBeforeCursor(KOREAN_PARTICLE_CONTEXT_CHARACTERS, 0)?.toString() !=
-            snapshot.contextTail
-        ) return false
+        val currentTail = connection.getTextBeforeCursor(
+            KOREAN_PARTICLE_CONTEXT_CHARACTERS,
+            0
+        )?.toString() ?: return false
+        if (!KoreanParticleCommitContract.canCommit(snapshot, currentEditor, currentTail, text)) {
+            return false
+        }
         return commitTextToEditor(text, 1)
     }
 
