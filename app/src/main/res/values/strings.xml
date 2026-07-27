@@ -443,6 +443,16 @@
     <string name="korean_search_backspace" tools:ignore="MissingTranslation">Delete the last initial</string>
     <string name="korean_search_initial_key" tools:ignore="MissingTranslation">Initial %1$s</string>
     <string name="korean_particle_chip" tools:ignore="MissingTranslation">Particles</string>
+    <string name="korean_dictionary_chip" tools:ignore="MissingTranslation">Dictionary</string>
+    <string name="korean_dictionary_query_title" tools:ignore="MissingTranslation">Look up a Korean word</string>
+    <string name="korean_dictionary_notice" tools:ignore="MissingTranslation">Offline · Korean Wiktionary contributors · CC BY-SA 4.0</string>
+    <string name="korean_dictionary_prompt" tools:ignore="MissingTranslation">Type or select a Korean word, then open Dictionary. You can also tap the search field to enter a word.</string>
+    <string name="korean_dictionary_no_results" tools:ignore="MissingTranslation">No offline dictionary entry was found</string>
+    <string name="korean_dictionary_failed" tools:ignore="MissingTranslation">Could not load the offline Korean dictionary</string>
+    <string name="korean_dictionary_word_and_pos" tools:ignore="MissingTranslation">%1$s · %2$s</string>
+    <string name="korean_dictionary_source_action" tools:ignore="MissingTranslation">View source and contributors</string>
+    <string name="korean_dictionary_source_description" tools:ignore="MissingTranslation">View the source and contributors for %1$s</string>
+    <string name="korean_dictionary_source_failed" tools:ignore="MissingTranslation">Could not open the dictionary source</string>
     <string name="korean_particle_title" tools:ignore="MissingTranslation">Korean particle suggestions</string>
     <string name="korean_particle_prompt" tools:ignore="MissingTranslation">Choose a particle for the word before the cursor</string>
     <string name="korean_particle_unavailable" tools:ignore="MissingTranslation">Place the cursor immediately after a Korean word</string>

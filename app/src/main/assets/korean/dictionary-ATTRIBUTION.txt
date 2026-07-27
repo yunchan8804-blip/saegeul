@@ -1,0 +1,18 @@
+Korean Wiktionary offline dictionary extract
+
+Source: Korean Wiktionary contributors
+https://ko.wiktionary.org/
+
+Machine-readable extraction: Wiktextract / kaikki.org
+https://kaikki.org/kowiktionary/rawdata.html
+
+Source snapshot: Korean Wiktionary dump dated 2026-07-03, extracted 2026-07-24
+Wiktextract commits: d9fa233 and 9e92f4b
+
+License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Modifications: only Korean-language entries with modern-Hangul headwords are retained;
+whitespace is normalized; duplicate glosses are removed; at most four glosses are kept
+for each headword and part-of-speech pair. Each in-app result links to its source page,
+whose history identifies the contributors and any additional attribution information.

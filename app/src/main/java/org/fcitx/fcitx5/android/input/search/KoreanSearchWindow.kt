@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.input.search
 
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
 import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -34,26 +36,32 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
     private val repository = KoreanSearchRepository()
+    private val dictionaryRepository by lazy { KoreanDictionaryRepository(context) }
     private lateinit var target: KoreanSearchEditorTarget
     private lateinit var ui: KoreanSearchUi
     private lateinit var adapter: KoreanSearchAdapter
+    private lateinit var dictionaryAdapter: KoreanDictionaryAdapter
     private var currentQuery = ""
     private var cachedEntries: List<KoreanSearchEntry>? = null
     private var searchJob: Job? = null
     private var actionLocked = false
-    private var emotionMode = false
+    private var mode = Mode.Unified
     private val emotionCommitGate = EmotionCommitGate()
+
+    private enum class Mode { Unified, Emotion, Dictionary }
 
     override val title: String by lazy { context.getString(R.string.korean_search) }
 
     override fun onCreateView(): View {
         ui = KoreanSearchUi(context, theme)
         adapter = KoreanSearchAdapter(context, theme, ::insert)
+        dictionaryAdapter = KoreanDictionaryAdapter(context, theme, ::openDictionarySource)
         ui.recyclerView.layoutManager = LinearLayoutManager(context)
         ui.recyclerView.adapter = adapter
         ui.recyclerView.addItemDecoration(KoreanSearchItemSpacing(context))
         ui.onQueryClick = ::showQueryDialog
         ui.onParticleSuggestions = { windowManager.attachWindow(KoreanParticleWindow()) }
+        ui.onDictionary = ::activateDictionary
         ui.onEmotionQuery = ::searchEmotion
         ui.onInitial = { initial -> search(currentQuery + initial) }
         ui.onBackspace = {
@@ -78,10 +86,10 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
             ui.showMessage(context.getString(R.string.korean_search_private_disabled))
             return
         }
-        when {
-            currentQuery.isBlank() -> ui.showPrompt()
-            emotionMode -> searchEmotion(currentQuery)
-            else -> search(currentQuery)
+        when (mode) {
+            Mode.Unified -> if (currentQuery.isBlank()) ui.showPrompt() else search(currentQuery)
+            Mode.Emotion -> searchEmotion(currentQuery)
+            Mode.Dictionary -> searchDictionary(currentQuery)
         }
     }
 
@@ -101,10 +109,17 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
             isSingleLine = true
         }
         val dialog = AlertDialog.Builder(context)
-            .setTitle(R.string.korean_search_query_title)
+            .setTitle(
+                if (mode == Mode.Dictionary) R.string.korean_dictionary_query_title
+                else R.string.korean_search_query_title
+            )
             .setView(editText)
             .setPositiveButton(R.string.korean_search_action) { _, _ ->
-                search(editText.text.toString())
+                if (mode == Mode.Dictionary) {
+                    searchDictionary(editText.text.toString())
+                } else {
+                    search(editText.text.toString())
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .create()
@@ -112,10 +127,11 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
     }
 
     private fun search(query: String) {
-        emotionMode = false
+        mode = Mode.Unified
         currentQuery = query.trim()
-        ui.setEmotionMode(false)
+        ui.setContentMode()
         ui.setQuery(currentQuery)
+        ui.recyclerView.adapter = adapter
         adapter.submit(emptyList())
         if (currentQuery.isBlank()) {
             ui.showPrompt()
@@ -144,10 +160,11 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
 
     private fun searchEmotion(explicitQuery: String) {
         searchJob?.cancel()
-        emotionMode = true
+        mode = Mode.Emotion
         currentQuery = explicitQuery.trim()
-        ui.setEmotionMode(true)
+        ui.setContentMode(emotion = true)
         ui.setQuery(currentQuery)
+        ui.recyclerView.adapter = adapter
         adapter.submit(emptyList())
         when (val outcome = ExplicitEmotionSearch.search(
             allowed = service.allowsTextInspectionFeatures(),
@@ -160,6 +177,63 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
                 ui.showResults(outcome.items.isNotEmpty())
             }
         }
+    }
+
+    private fun activateDictionary() {
+        if (!service.allowsTextInspectionFeatures()) {
+            ui.showMessage(context.getString(R.string.korean_search_private_disabled))
+            return
+        }
+        searchDictionary(service.captureKoreanDictionaryQuery().orEmpty())
+    }
+
+    private fun searchDictionary(query: String) {
+        searchJob?.cancel()
+        mode = Mode.Dictionary
+        currentQuery = query.trim()
+        ui.setContentMode(dictionary = true)
+        ui.setQuery(currentQuery)
+        ui.recyclerView.adapter = dictionaryAdapter
+        dictionaryAdapter.submit(emptyList())
+        if (currentQuery.isBlank()) {
+            ui.showMessage(context.getString(R.string.korean_dictionary_prompt))
+            return
+        }
+        if (!service.allowsTextInspectionFeatures()) {
+            ui.showMessage(context.getString(R.string.korean_search_private_disabled))
+            return
+        }
+        ui.showLoading()
+        searchJob = service.lifecycleScope.launch {
+            try {
+                val entries = dictionaryRepository.lookup(currentQuery)
+                dictionaryAdapter.submit(entries)
+                if (entries.isEmpty()) {
+                    ui.showMessage(context.getString(R.string.korean_dictionary_no_results))
+                } else {
+                    ui.showResults(true)
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                Timber.w(exception, "Korean dictionary lookup failed")
+                ui.showMessage(context.getString(R.string.korean_dictionary_failed))
+            }
+        }
+    }
+
+    private fun openDictionarySource(entry: KoreanDictionaryEntry) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(entry.sourceUrl)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { context.startActivity(intent) }
+            .onFailure {
+                Timber.w(it, "Failed to open Korean dictionary source")
+                ui.showActionStatus(
+                    context.getString(R.string.korean_dictionary_source_failed),
+                    true
+                )
+            }
     }
 
     private fun insert(result: KoreanSearchResult) {

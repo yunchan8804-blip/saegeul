@@ -96,6 +96,7 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
 
     var onQueryClick: (() -> Unit)? = null
     var onParticleSuggestions: (() -> Unit)? = null
+    var onDictionary: (() -> Unit)? = null
     var onEmotionQuery: ((String) -> Unit)? = null
     var onInitial: ((String) -> Unit)? = null
     var onBackspace: (() -> Unit)? = null
@@ -110,6 +111,18 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
             background = rounded(theme.genericActiveBackgroundColor, context.dp(14).toFloat())
             setPadding(context.dp(12), 0, context.dp(12), 0)
             setOnClickListener { onParticleSuggestions?.invoke() }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            context.dp(30)
+        ).apply { marginEnd = context.dp(5) })
+        emotionRow.addView(TextView(context).apply {
+            setText(R.string.korean_dictionary_chip)
+            gravity = Gravity.CENTER
+            setTextColor(theme.genericActiveForegroundColor)
+            textSize = 12f
+            background = rounded(theme.genericActiveBackgroundColor, context.dp(14).toFloat())
+            setPadding(context.dp(12), 0, context.dp(12), 0)
+            setOnClickListener { onDictionary?.invoke() }
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             context.dp(30)
@@ -213,8 +226,12 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
         queryText.text = query.ifBlank { context.getString(R.string.korean_search_query_hint) }
     }
 
-    fun setEmotionMode(enabled: Boolean) {
-        initialPad.visibility = if (enabled) View.GONE else View.VISIBLE
+    fun setContentMode(emotion: Boolean = false, dictionary: Boolean = false) {
+        initialPad.visibility = if (emotion || dictionary) View.GONE else View.VISIBLE
+        localNotice.setText(
+            if (dictionary) R.string.korean_dictionary_notice
+            else R.string.korean_search_local_notice
+        )
     }
 
     fun showPrompt() = showMessage(context.getString(R.string.korean_search_prompt))

@@ -102,6 +102,7 @@ import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileResolver
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileStore
 import org.fcitx.fcitx5.android.input.profile.AppToolbarVisibility
 import org.fcitx.fcitx5.android.input.profile.EffectiveAppKeyboardProfile
+import org.fcitx.fcitx5.android.input.search.KoreanDictionaryQuery
 import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
 import org.fcitx.fcitx5.android.input.typo.TypoRecoverySnapshot
@@ -1101,6 +1102,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun prepareOcrCommit(): Boolean {
         if (!allowsTextInspectionFeatures()) return false
         return finishCompositionForDirectAction()
+    }
+
+    /** Captures only the explicitly selected or cursor-adjacent Korean headword for local lookup. */
+    fun captureKoreanDictionaryQuery(): String? {
+        if (!allowsTextInspectionFeatures()) return null
+        if (!finishCompositionForDirectAction()) return null
+        val connection = currentInputConnection ?: return null
+        return KoreanDictionaryQuery.extract(
+            selectedText = connection.getSelectedText(0)?.toString(),
+            beforeCursor = connection.getTextBeforeCursor(
+                KoreanDictionaryQuery.MAX_LENGTH * 2,
+                0
+            )?.toString()
+        )
     }
 
     /** Captures a bounded local context only after the user explicitly opens particle suggestions. */

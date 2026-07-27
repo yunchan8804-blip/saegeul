@@ -1,0 +1,11 @@
+{
+    "uniqueId": "wikimedia/korean-wiktionary-data",
+    "artifactVersion": "2026-07-03",
+    "description": "Offline Korean definition data extracted from Korean Wiktionary",
+    "name": "Korean Wiktionary dictionary data",
+    "website": "https://ko.wiktionary.org/",
+    "tag": "data",
+    "licenses": [
+        "CC-BY-SA-4.0"
+    ]
+}

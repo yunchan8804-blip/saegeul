@@ -442,6 +442,16 @@
     <string name="korean_search_backspace">마지막 초성 지우기</string>
     <string name="korean_search_initial_key">초성 %1$s</string>
     <string name="korean_particle_chip">조사</string>
+    <string name="korean_dictionary_chip">국어사전</string>
+    <string name="korean_dictionary_query_title">국어사전에서 찾기</string>
+    <string name="korean_dictionary_notice">오프라인 · 한국어 위키낱말사전 기여자 · CC BY-SA 4.0</string>
+    <string name="korean_dictionary_prompt">한글 단어를 입력하거나 선택한 뒤 국어사전을 열어봐. 검색칸을 눌러 직접 입력할 수도 있어.</string>
+    <string name="korean_dictionary_no_results">오프라인 국어사전에서 찾지 못했어</string>
+    <string name="korean_dictionary_failed">오프라인 국어사전을 불러오지 못했어</string>
+    <string name="korean_dictionary_word_and_pos">%1$s · %2$s</string>
+    <string name="korean_dictionary_source_action">출처와 기여자 보기</string>
+    <string name="korean_dictionary_source_description">%1$s의 출처와 기여자 보기</string>
+    <string name="korean_dictionary_source_failed">국어사전 출처를 열지 못했어</string>
     <string name="korean_particle_title">한국어 조사 추천</string>
     <string name="korean_particle_prompt">커서 앞 단어에 붙일 조사를 골라</string>
     <string name="korean_particle_unavailable">한글 단어 바로 뒤에 커서를 놓아줘</string>
