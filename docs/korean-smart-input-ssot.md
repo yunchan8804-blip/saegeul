@@ -416,7 +416,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
 | `UX-01` | Smart clipboard action | `DONE` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹, emulator 미리보기·1회 삽입·민감 editor 차단 통과 | M |
-| `UX-02` | Fold·tablet 분할 키보드 | `IN_PROGRESS` | compact/expanded·세로/가로 profile, 중앙 non-touch gap, 두벌식 자음·모음 손 경계 구현; 회전·중앙 무입력 검증 gate | L |
+| `UX-02` | Fold·tablet 분할 키보드 | `DONE` | compact/expanded·세로/가로 profile, 초기 복원, 중앙 non-touch gap, 두벌식 자음·모음 손 경계와 모바일 표면·숫자판 왕복을 API 34 phone/tablet emulator에서 검증 | L |
 | `UX-03` | 폭 적응형 기능 툴바 | `DONE` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환하고 모든 제어를 최소 48dp로 유지 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
@@ -474,7 +474,7 @@ dialog까지 정상 진입했다. 권한은 자동 승인하지 않았다. A35�
 
 | ID | 구현 계약 | 자동 검증 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `UX-02` | compact와 expanded profile을 독립 저장하고 각각 세로/가로 중앙 간격을 둔다. 두 축이 모두 600dp 이상일 때만 expanded로 판정하며 size가 불명확하면 일반 layout을 유지한다. Text surface는 물리 손 경계 `T/G/V`까지 왼쪽에 유지하고 숫자판은 split하지 않는다. | profile 경계·방향·독립 toggle·gap cap·fill key·두벌식 `ㅎ/ㅍ` 경계를 포함한 10 tests | Z Fold6 펼침 회전·모바일 표면·중앙 무입력·`?123` 왕복 |
+| `UX-02` | compact와 expanded profile을 독립 저장하고 각각 세로/가로 중앙 간격을 둔다. 두 축이 모두 600dp 이상일 때만 expanded로 판정하며 size가 불명확하면 일반 layout을 유지한다. Text surface는 물리 손 경계 `T/G/V`까지 왼쪽에 유지하고 숫자판은 split하지 않는다. | profile 경계·방향·독립 toggle·gap cap·fill key·두벌식 `ㅎ/ㅍ` 경계를 포함한 10 tests와 API 34 `QA_Tablet`의 첫 editor 복원·세로/가로·Moakey·중앙 무입력·`?123` 왕복 | 없음. hinge/posture 센서 자체는 실기기 전용 관찰 항목으로 분리 |
 | `GIF-03` | GIPHY는 사용자가 명시적으로 고르는 별도 provider다. production review 확인 key가 없으면 network 0회이며 KLIPY로 자동 fallback하지 않는다. rating `g`, 한국어·한국 locale, Powered by GIPHY, canonical/media 분리와 load/click/sent analytics를 적용한다. | provider parser·pagination·안전등급·credential·resolver·analytics tests | 실제 production key review; GIF 첨부는 별도 media-copy 서면 승인 필요 |
 | `VOICE-03` | `ACTION_OPEN_DOCUMENT`로 고른 content URI만 최대 60분·24MiB 범위에서 stream하고 화자·timestamp segment를 preview한다. 사용자가 체크한 segment만 16,000자 이하로 정확히 한 번 입력한다. | MIME/확장자·크기·시간·multipart·response parser·selection·commit tests | 표준 OpenAI profile과 실제 회의 음원 정확도·picker 복귀·취소·두 기기 UI |
 
@@ -487,12 +487,31 @@ backup, 일반 log에 저장하지 않는다.
 전환을 다시 확인했고, GIPHY key가 없는 상태가 `네트워크 요청 0회`로 표시되는 것을 확인했다.
 회의 파일 화면은 현재 TwentyOz 호환 profile에서 capability 확인 전 차단되며, 사용자 파일은 고르거나
 전송하지 않았다. Fold6 cover에서는 compact split을 끈 상태를 유지하고 expanded split만 켰다.
-실제 펼침 상태의 회전·모바일 표면·중앙 공백 입력 검증은 물리 자세 전환 gate로 남긴다.
+당시 남겼던 회전·모바일 표면·중앙 공백 입력 gate는 아래 API 34 tablet emulator 검증으로 닫았다.
+실제 hinge/posture 센서 이벤트만 실기기 전용 관찰 항목으로 분리한다.
 
 Z Fold6 내부 화면 `1856×2160`에서 기존 index 반분이 두벌식 둘째·셋째 행의 `ㅎ(G)`·`ㅍ(V)`을
 모음 쪽으로 넘기는 결함을 재현했다. Text surface에 물리 QWERTY 손 경계 `5/5/5/3`을 적용하고
 회귀 테스트를 추가한 뒤, 같은 펼친 화면에서 `ㅎ`과 `ㅍ`이 왼쪽 자음 그룹으로 복귀하고 영어
 `G/V`도 왼쪽에 유지되는 것을 무선 ADB 캡처로 확인했다.
+
+#### UX-02 emulator 완료 증거 (2026-07-27)
+
+실기기를 들고 있지 않은 작업 시간의 Android 기준 환경을 phone `Pixel_7_API_34`와 tablet
+`QA_Tablet`(API 34, 2560×1600, 320dpi) emulator로 고정했다. tablet의 expanded split을 켠 채
+APK를 덮어 설치해 IME 프로세스를 새로 시작했을 때, 첫 editor부터 저장된 가로 128dp 간격이
+적용됐다. 기존에는 첫 `onSizeChanged` 안에서 ConstraintLayout 자식 여백을 바꿔 같은 layout
+pass에 변경이 덮였고, 설정을 껐다 켜야만 분할이 보였다. 분할 지오메트리를 다음 main-loop
+turn에 다시 적용하도록 고쳐 초기 복원을 통과했다.
+
+가로 Text surface는 `T/G/V` 왼쪽 경계를 유지하면서 256px gap 탭이 입력 0회, 실제 `Q` 탭이
+`q` 1회였다. 세로 회전 후에는 저장된 96dp가 정확히 192px gap으로 바뀌었고 같은 중앙 무입력
+검증을 통과했다. `?123`은 split 없이 모든 키를 유지했고 `ABC` 왕복 뒤 Text split이 복원됐다.
+Hangul을 추가하고 `Moakey (two hand)` 표면으로 바꾼 뒤에도 세로·가로 gap 탭은 입력 0회,
+실제 `ㅃ` 키는 각각 1회 입력됐다. 따라서 기능 완료 gate는 emulator로 닫으며, 실제 Fold의
+hinge/posture 센서 이벤트는 코드 완료를 막지 않는 실기기 전용 관찰 항목으로 유지한다. 최종
+통합 회귀는 app JVM 65 suites·283 tests, failure/error/skipped 0과 x86_64 app·Hangul plugin
+assemble을 통과했다.
 
 ### 6.8 한국어 다음 단어·GIF 밈 품질·로컬 OCR checkpoint 계약
 
@@ -1165,7 +1184,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 1. `KO-05` 한자 음훈과 `KO-06` 개인 단어장. (`DONE`: 두 기능 모두 emulator 1회 선택 통과; 국어사전 정의는 `KO-05A` backlog로 분리)
 2. `UX-01` smart clipboard action. (`DONE`: emulator 명시 선택·mask·합치기·1회 삽입·private editor 차단 통과)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
-4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 펼친 Fold6 한글·영문 손 경계 통과, 회전·모바일·중앙 무입력 gate)
+4. `UX-02` Fold·tablet 분할 layout. (`DONE`: 펼친 Fold6 한글·영문 손 경계와 API 34 tablet emulator 초기 복원·회전·모바일·중앙 무입력·숫자판 왕복 통과)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`DONE`: emulator 조사 받침·ㄹ 예외, 감정 강·약 chip, 후보·1회 삽입 통과)
 6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`KO-07 DONE`: emulator 공백 후보·선택·취소·1회 삽입 통과, `MM-01` 실제 OCR 정확도와 native 배포 gate)
 7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)

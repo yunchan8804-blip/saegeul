@@ -372,7 +372,12 @@ abstract class BaseKeyboard(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         val (x, y) = intArrayOf(0, 0).also { getLocationInWindow(it) }
         bounds.set(x, y, x + width, y + height)
-        applyThumbSplitLayout(w)
+        // ConstraintLayout can consume child LayoutParams changes made from inside its current
+        // size/layout pass. Re-apply on the next main-loop turn so a persisted split profile is
+        // visible the first time this keyboard is measured, not only after a preference toggle.
+        post {
+            if (width > 0) applyThumbSplitLayout(width)
+        }
     }
 
     /**
