@@ -143,6 +143,42 @@ class VoiceProviderProfileTest {
     }
 
     @Test
+    fun `STT credential opens only for an allowed online voice transport`() {
+        assertFalse(VoiceProviderPolicy.requiresCredential(VoiceProviderMode.DeviceDictation))
+        assertTrue(VoiceProviderPolicy.requiresCredential(VoiceProviderMode.OpenAiRealtime))
+        assertTrue(VoiceProviderPolicy.requiresCredential(VoiceProviderMode.OpenAiApi))
+
+        assertFalse(
+            VoiceProviderPolicy.allowsCredentialAccess(
+                mode = VoiceProviderMode.DeviceDictation,
+                allowsTextInspection = true,
+                allowsNetworkInput = true
+            )
+        )
+        assertFalse(
+            VoiceProviderPolicy.allowsCredentialAccess(
+                mode = VoiceProviderMode.OpenAiApi,
+                allowsTextInspection = false,
+                allowsNetworkInput = true
+            )
+        )
+        assertFalse(
+            VoiceProviderPolicy.allowsCredentialAccess(
+                mode = VoiceProviderMode.OpenAiRealtime,
+                allowsTextInspection = true,
+                allowsNetworkInput = false
+            )
+        )
+        assertTrue(
+            VoiceProviderPolicy.allowsCredentialAccess(
+                mode = VoiceProviderMode.OpenAiApi,
+                allowsTextInspection = true,
+                allowsNetworkInput = true
+            )
+        )
+    }
+
+    @Test
     fun `private editor resolution never reads the STT credential`() {
         var credentialReads = 0
 

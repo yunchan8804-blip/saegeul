@@ -65,7 +65,15 @@ class MeetingTranscriptionWindow(
         attached = true
         val allowsTextInspection = service.allowsTextInspectionFeatures()
         val allowsOnlineVoice = service.allowsNetworkInputFeatures()
-        val effective = VoiceProviderResolver.resolve(context, allowsTextInspection)
+        val selectedMode = VoiceProviderModeStore(context).load()
+        val effective = VoiceProviderResolver.resolve(
+            context,
+            allowsCredentialAccess = VoiceProviderPolicy.allowsCredentialAccess(
+                mode = selectedMode,
+                allowsTextInspection = allowsTextInspection,
+                allowsNetworkInput = allowsOnlineVoice
+            )
+        )
         val resolved = MeetingVoiceProfilePolicy.resolve(effective)
         profile = resolved
         when (AiFeatureEntryGate.evaluate(

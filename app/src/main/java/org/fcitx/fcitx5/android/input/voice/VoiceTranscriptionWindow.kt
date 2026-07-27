@@ -74,13 +74,18 @@ class VoiceTranscriptionWindow(
         attached = true
         val allowsTextInspection = service.allowsTextInspectionFeatures()
         val selectedMode = VoiceProviderModeStore(context).load()
+        val allowsNetworkInput = service.allowsNetworkInputFeatures()
         val allowsSelectedVoice = VoiceProviderPolicy.allowsSelectedMode(
             selectedMode,
-            service.allowsNetworkInputFeatures()
+            allowsNetworkInput
         )
         val resolved = VoiceProviderResolver.resolve(
             context,
-            allowsCredentialAccess = allowsTextInspection && allowsSelectedVoice
+            allowsCredentialAccess = VoiceProviderPolicy.allowsCredentialAccess(
+                mode = selectedMode,
+                allowsTextInspection = allowsTextInspection,
+                allowsNetworkInput = allowsNetworkInput
+            )
         )
         mode = resolved.mode
         profile = resolved.profile

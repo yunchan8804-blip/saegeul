@@ -44,6 +44,23 @@ internal object VoiceProviderModeSelectionPolicy {
 object VoiceProviderPolicy {
     fun allowsSelectedMode(mode: VoiceProviderMode, allowsNetworkInput: Boolean): Boolean =
         mode == VoiceProviderMode.DeviceDictation || allowsNetworkInput
+
+    fun requiresCredential(mode: VoiceProviderMode): Boolean =
+        mode != VoiceProviderMode.DeviceDictation
+
+    /**
+     * A stored STT key is opened only when the selected transport can actually use it.
+     * Device dictation owns no app credential, and private/network-blocked editors must not cause
+     * the encrypted STT store to be read merely to render an unavailable voice surface.
+     */
+    fun allowsCredentialAccess(
+        mode: VoiceProviderMode,
+        allowsTextInspection: Boolean,
+        allowsNetworkInput: Boolean
+    ): Boolean =
+        requiresCredential(mode) &&
+            allowsTextInspection &&
+            allowsNetworkInput
 }
 
 enum class VoiceTranscriptionModel(val id: String) {

@@ -722,6 +722,8 @@
     <string name="voice_provider_mode_openai_summary">녹음을 멈춘 뒤에만 공식 OpenAI Audio API로 음성을 전송합니다.</string>
     <string name="voice_openai_api_settings">OpenAI 음성 전사</string>
     <string name="voice_provider_status_missing">연결되지 않음 · 글쓰기 AI와 별도의 STT API 키를 설정해 주세요</string>
+    <string name="voice_provider_status_optional_missing">선택 사항 · OpenAI 실시간·고정밀 전사가 필요할 때만 설정하세요</string>
+    <string name="voice_provider_status_optional_configured">선택하면 사용 가능 · %1$s · 현재 휴대폰 받아쓰기에서는 사용하지 않음</string>
     <string name="voice_provider_status_unreadable">암호화된 STT 설정을 읽을 수 없습니다 · 제거한 뒤 다시 연결해 주세요</string>
     <string name="voice_provider_configured_summary">연결됨 · %1$s · Keystore 암호화</string>
     <string name="voice_models_configured">정밀 %1$s / 실시간 %2$s</string>

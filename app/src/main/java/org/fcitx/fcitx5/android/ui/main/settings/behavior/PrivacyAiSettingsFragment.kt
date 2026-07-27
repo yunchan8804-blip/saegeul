@@ -53,6 +53,7 @@ import org.fcitx.fcitx5.android.input.voice.VoiceProviderCredentialStore
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderMode
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeStore
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeSelectionPolicy
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderPolicy
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderProfile
 import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionModel
 import org.fcitx.fcitx5.android.ui.main.MainActivity
@@ -268,6 +269,14 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             }
         )
         voiceProviderPreference.summary = when {
+            voiceProfile != null && !VoiceProviderPolicy.requiresCredential(voiceMode) -> getString(
+                R.string.voice_provider_status_optional_configured,
+                getString(
+                    R.string.voice_models_configured,
+                    voiceModelName(voiceProfile.transcriptionModel),
+                    voiceProfile.realtimeTranscriptionModel
+                )
+            )
             voiceProfile != null -> getString(
                 R.string.voice_provider_configured_summary,
                 getString(
@@ -277,6 +286,8 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 )
             )
             voiceStore.hasStoredProfile() -> getString(R.string.voice_provider_status_unreadable)
+            !VoiceProviderPolicy.requiresCredential(voiceMode) ->
+                getString(R.string.voice_provider_status_optional_missing)
             else -> getString(R.string.voice_provider_status_missing)
         }
         clearVoiceProviderPreference.isVisible = voiceStore.hasStoredProfile()

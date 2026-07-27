@@ -11,9 +11,9 @@
 - 같은 정책을 여러 문서에 복사하지 않는다. 하위 문서는 이 문서를 링크하고 세부 증거만 유지한다.
 - 실제 구현 상태와 문서 상태가 다르면 실제 동작을 재검증한 뒤 둘을 함께 수정한다.
 
-최종 갱신일: 2026-07-26
+최종 갱신일: 2026-07-28
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `PC Codex·Claude OAuth companion·단일 키보드 표면 AI 입력·WPF tray checkpoint`
+현재 활성 구현 마일스톤: `AI/STT 분리 마감·전체 기능 회귀·실기기 외부 게이트 폐쇄`
 
 ## 2. 상태 표기
 
@@ -140,8 +140,10 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 검증했다. 다만 저장소에 test key를 넣지 않으며 production key와 partner 승인이 끝날 때까지
 `GIF-02`의 배포 상태는 `IN_PROGRESS`로 유지한다.
 
-현재 코드 우선순위는 `VOICE-01/02` 실제 오류 복구와 `UX-03` 높이 안정성이다. emulator로 대체할 수
-없는 최종 gate는 A35 최신 APK 전체 matrix, Z Fold6 unfolded 전환, 실제 STT key의 한국어 품질,
+현재 코드 우선순위는 글쓰기 AI와 음성 STT의 설정·자격증명·실행 gate를 분리된 제품 흐름으로 마감하고
+전체 기능 회귀를 닫는 것이다. `UX-03` 높이 안정성은 코드와 emulator·Z Fold6 cover 검증을 마쳤다.
+emulator로 대체할 수 없는 최종 gate는 A35 최신 APK 전체 matrix, Z Fold6 unfolded 전환, 실제 STT
+key의 한국어 품질,
 생체 인증, GIF production key·partner 승인이다. 이 gate를 코드 완료와 혼동해 `DONE`으로 올리지 않는다.
 
 ### 6.2 1차 한국어 로컬 기능
@@ -615,7 +617,7 @@ SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OC
 | ID | 구현 계약 | 자동 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
 | `UX-03` | 툴바를 열면 고정 48dp 펼침/접힘 control과 기존 12개 도구의 1행 가로 스크롤을 먼저 표시한다. 사용자가 control을 누른 경우에만 도구를 실제 2행 6열 grid·96dp로 배치한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 해당 editor의 명시적 펼침 envelope를 이어받되 자동 후보 내용은 1행 `NOWRAP`을 유지한다. 새 editor는 48dp로 시작하고 Android same-editor restart만 명시적 펼침을 보존한다. 폭 측정이나 타이핑 자체는 높이 변경 원인이 아니다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, 전체 68 suites·318 tests 실패 0, API 34 x86_64 emulator에서 IME frame `y=1405→1279`, 실제 1행→2행 6열→1행 후보 전환 중 `y=1279` 유지·접기 후 `y=1405`, OOM·GridLayout count 회귀 실동작 수정. Z Fold6 cover의 `0.1.2-141-g89b5f79e`에서도 touchable top `y=1566→1458`, 실제 2행 6열, `hellp` 1행 후보 중 `y=1458` 유지, 접기 뒤 `y=1566`을 확인했다. | Z Fold6 unfolded 전환과 A35 재연결 후 동일 전환 확인 |
-| `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동한 뒤 `내 컴퓨터 자동으로 찾기 / OpenAI API 키 사용 / 고급 연결 설정` chooser를 정확히 한 번 바로 열고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, API 34 x86_64 emulator의 글쓰기 chooser·STT dialog 직행 PASS | A35 최신 APK 재확인 |
+| `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동한 뒤 `내 컴퓨터 자동으로 찾기 / OpenAI API 키 사용 / 고급 연결 설정` chooser를 정확히 한 번 바로 열고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. 기본 휴대폰 받아쓰기에서는 OpenAI STT를 미연결 경고가 아닌 선택 사항으로 표시하고, OpenAI 모드를 실제 선택한 경우에만 별도 키를 요구한다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, API 34 x86_64 emulator의 글쓰기 chooser·STT dialog 직행·선택 모드 summary·취소 후 휴대폰 모드 유지 PASS | A35 최신 APK 재확인 |
 | `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
 
 실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
@@ -681,6 +683,19 @@ message editor에 회의 window가 다시 붙고 실제 전사 요청 단계까�
 회수하도록 수정했다. tablet landscape에서 `OpenAI가 STT API 키를 거부`와 `설정하기`를 확인했으며,
 picker one-shot·취소·editor mismatch·stale 요청·조기 HTTP 실패 회귀를 포함한 app JVM 65 suites·295 tests,
 failure/error/skipped 0과 x86_64 debug build가 통과했다.
+
+2026-07-28 수렴 감사에서는 13시간 이상 지속된 목표를 코드 완료와 외부 게이트로 다시 분리했다. 글쓰기
+AI와 음성 STT는 타입, Keystore alias, `noBackupFilesDir` 저장 파일, 설정 진입점이 이미 분리돼 있었지만,
+한 설정 화면에서 `휴대폰 받아쓰기 사용 중` 바로 아래에 `OpenAI 음성 전사 연결되지 않음`을 같은 비중으로
+표시해 일반 사용자에게 OpenAI 키가 필수처럼 보이는 결함이 남아 있었다. 기본 모드에서는 이를
+`선택 사항`으로 표시하고, OpenAI 실시간·정밀 전사를 실제 선택한 경우에만 STT 전용 key dialog를 연다.
+선택 도중 취소하면 휴대폰 모드가 유지된다. 또한 회의 전사가 offline/app-network-blocked 상태에서도
+STT 저장소를 먼저 읽던 누락을 공통 `VoiceProviderPolicy`로 막아 private·offline·기기 받아쓰기에서는
+자격증명을 복호화하지 않는다. 전체 app JVM 68 suites·319 tests, failure/error/skipped 0, x86_64·arm64
+debug assemble, Pixel 7 API 34 emulator의 설정 문구·모드 선택·dialog 취소·Google Messages 키보드 복귀를
+통과했다. arm64 APK는 Z Fold6에 설치했지만 기기가 잠겨 이번 checkpoint의 화면 상호작용은 수행하지
+못했다. A35는 ADB에 없고 실제 OpenAI STT key도 로컬 환경에 없으므로 두 항목은 실기기·자격증명 gate로
+유지한다.
 
 ## 7. GIF-01 상세 계약
 
@@ -1210,7 +1225,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
 | OAuth public client | `PASS` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현; AppCompat dialog theme와 Android 11+ browser query 회귀 수정 |
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
-| Android 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 68 suites·318 tests failure/error 0, companion Python 11 tests, `:app:assembleDebug -PbuildABI=x86_64`, debug merged manifest redirect scheme 일치 |
+| Android 통합 build/test | `PASS` | 2026-07-28 최종 `:app:testDebugUnitTest` 68 suites·319 tests failure/error/skipped 0, x86_64·arm64 debug assemble, debug merged manifest redirect scheme 일치 |
 | OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과. Pixel 7·QA tablet API 34 emulator도 임시 HTTPS `--public-origin`의 manifest 확인·browser 승인·token 교환·암호화 session 저장 뒤 우리 키보드로 직접 지시문을 입력해 후보 3개·정확히 1회 삽입·undo를 통과했다. 시험 session은 두 emulator에서 revoke·삭제했고 PC 재시작용 companion grant는 Windows DPAPI로 보존한다. |
 | public-origin startup | `PASS` | 새 Quick Tunnel의 route 전파 중 404·502 뒤 정상 manifest를 제한 재시도로 수용하고, 잘못된 manifest 계약은 sleep 없이 즉시 거부하는 Python test를 고정했다. companion Python 11 tests와 실제 Cloudflare tunnel OAuth 왕복을 통과했다. |
 | 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |

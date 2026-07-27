@@ -724,6 +724,8 @@
     <string name="voice_provider_mode_openai_summary">Sends audio to the official OpenAI Audio API only after recording stops.</string>
     <string name="voice_openai_api_settings">OpenAI speech-to-text</string>
     <string name="voice_provider_status_missing">Not connected · enter a separate STT API key</string>
+    <string name="voice_provider_status_optional_missing">Optional · set this up only if you want OpenAI realtime or higher-accuracy transcription</string>
+    <string name="voice_provider_status_optional_configured">Ready when selected · %1$s · not used by device dictation</string>
     <string name="voice_provider_status_unreadable">The encrypted STT setting cannot be read · remove and reconnect it</string>
     <string name="voice_provider_configured_summary">Connected · %1$s · Keystore encrypted</string>
     <string name="voice_models_configured">precision %1$s / realtime %2$s</string>
