@@ -76,14 +76,14 @@
 | `KO-02` | 초성 통합 검색 | `DONE` | 6 JVM 테스트와 A35 `ㄱㅅ` 검색·1회 삽입 |
 | `KO-03` | 동적 빠른 문구 | `IN_PROGRESS` | 7 JVM 테스트와 A35 날짜·profile·clipboard 미리보기·1회 삽입 |
 | `KO-03A` | 자동 스니펫 확장 | `IN_PROGRESS` | `:주소1`·`:이메일` 별칭과 사용자 `:` 상용구의 경계키 확장 구현 중 |
-| `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 로컬 빈도 사전, 명시적 후보 선택, buffered 입력 호환 구현 중 |
+| `KO-09` | 한글 어절 자동완성 | `DONE` | API 34 emulator에서 로컬 후보·명시 선택·미선택 Space·buffered 1회 확정·private 차단 통과 |
 | `KO-04` | 앱별 키보드 profile | `IN_PROGRESS` | package별 layout·theme·toolbar·transport·network·AI 정책 구현, 두 기기 matrix 진행 중 |
 | `KO-05` | 한자 후보 음훈 | `IN_PROGRESS` | bundled libhangul 음훈을 candidate comment로 전달, native test와 두 기기 UI gate 진행 중 |
 
 한국어 기준선과 GIF·KO-01·KO-02는 각각 검증 가능한 checkpoint commit으로 고정돼 있다.
-원칙적으로 새 기능은 현재 milestone의 공통 게이트와 두 기기 설치를 마친 뒤 다음 항목으로 넘어간다.
-다만 `KO-03`은 Z Fold6 연결만 외부 gate로 남은 상태에서 사용자가 자동완성을 우선 지시했으므로,
-코드 기준선을 보존한 채 `KO-09` 구현을 병행한다. 둘 다 두 기기 검증 전에는 `DONE`으로 올리지 않는다.
+일반 Android 기능은 API 34 emulator에서 실제 UI·입력·exactly-once를 검증하고, 마이크 음질과 Fold
+posture처럼 emulator가 재현할 수 없는 항목만 실기기 gate로 유지한다. 이 기준으로 `KO-09`는
+일반·buffered·private editor 검증을 완료했다.
 
 #### KO-BASE-08 숫자·기호 전환 회귀 계약과 증거 (2026-07-26)
 
@@ -149,7 +149,7 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | `KO-06` | 개인 단어장 | `DONE` | opt-in·백업 제외 원자 저장, 개인 후보 우선순위·중복 제거·민감 editor 차단과 emulator 실제 후보 선택 통과 | L |
 | `KO-07` | 한국어 조사·문맥 후보 | `DONE` | 받침·ㄹ 예외 조사와 공백 경계 로컬 다음 어절 후보, emulator UI·선택·취소·정확히 1회 삽입 통과 | L |
 | `KO-08` | 한국식 감정표현 추천 | `DONE` | 로컬 emoji·kaomoji·ㅋㅋ/ㅎㅎ 강·약 chip, emulator 후보·정확히 1회 삽입·민감 editor 차단 통과 | M |
-| `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 두 음절부터 로컬 접두어 후보, 선택한 후보만 정확히 한 번 확정 | M |
+| `KO-09` | 한글 어절 자동완성 | `DONE` | 두 음절부터 로컬 접두어 후보, 일반·buffered 명시 선택·미선택 Space·private 차단 emulator 통과 | M |
 
 #### KO-09 상세 계약
 
@@ -175,24 +175,26 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 
 완료 게이트는 사전 parser·순위·중복·limit 테스트, `안녕→안녕하세요` 접두어 테스트, 미선택 Enter와
 space 비치환 테스트, backspace/reset·민감 editor·buffered 접미부 1회 확정 검증, 전체 app/plugin build,
-A35와 Z Fold6의 일반 editor 및 buffered 호환 editor 실기기 검증이다.
+API 34 emulator의 일반 editor 및 buffered 호환 editor 실제 입력 검증이다.
 
 #### KO-09 구현·검증 증거 (2026-07-26)
 
 | 항목 | 상태 | 증거 |
 |---|---|---|
 | 사전 출처·재현성 | `PASS` | 국립국어원 원본 SHA-256을 고정하고 생성 결과 5,250개·91,467 bytes·SHA-256 `1778F7ACCBE3190A3ECDDFC9991B2511F466425B48185004072C22558BBBA2C1` 재현 |
-| native parser·후보 테스트 | `PASS` | Android arm64-v8a `testcompletiondictionary`를 A35 `/data/local/tmp`에서 실행해 순위·limit·중복·CRLF·접미부 계산 검증 |
-| 전체 자동 테스트·빌드 | `PASS` | `:app:testDebugUnitTest :app:assembleDebug :plugin:hangul:assembleDebug -PbuildABI=arm64-v8a`, 현재 기준 23 suites·85 tests·실패 0 |
+| native parser·후보 테스트 | `PASS` | Android arm64-v8a A35와 API 34 x86_64 emulator의 `/data/local/tmp`에서 `testcompletiondictionary`를 실행해 순위·limit·중복·CRLF·접미부·다음 어절 정책 검증 |
+| 전체 자동 테스트·빌드 | `PASS` | `:app:testDebugUnitTest :app:assembleDebug :plugin:hangul:assembleDebug -PbuildABI=x86_64`, 현재 기준 64 suites·281 tests·실패 0 |
 | plugin 패키징 | `PASS` | plugin APK에 `completion.txt`, `completion-NOTICE.md`, 한국어 번역, `libhangul.so` 포함 및 AboutLibraries에 KOGL 제1유형 표시 확인 |
 | A35 후보 UX | `PASS` | Discord에서 `안녕` 입력 시 `안녕 / 안녕하세요 / 안녕하십니까` 순서로 표시 |
 | A35 명시적 선택 | `PASS` | `안녕하세요` 후보 tap 뒤 editor hierarchy의 compose text가 `안녕하세요` 정확히 한 번임을 확인; 메시지는 전송하지 않고 draft 삭제 |
 | A35 미선택 space | `PASS` | 후보를 누르지 않고 space 입력 뒤 compose text가 `안녕 `으로 유지되고 자동완성 후보로 치환되지 않음을 확인 |
+| emulator 일반 editor | `PASS/EMULATOR` | Pixel 7 API 34 x86_64의 Settings search에서 `안녕 / 안녕하세요 / 안녕하십니까` 후보를 확인하고 `안녕하세요` 선택 뒤 editor XML이 정확히 1회, 미선택 Space 뒤 `안녕 ` 그대로임을 확인 |
+| emulator buffered editor | `PASS/EMULATOR` | 한글 버퍼 호환 모드·Direct commit에서 editor를 scratch space로 쓰지 않고 IME preedit `안녕→안녕하세요`를 만든 뒤 Space boundary에서 `안녕하세요 `를 정확히 1회 전달 |
 | 한글 후보 언어 경계 | `PASS` | 자동완성 사전은 현대 한글 음절만 적재·노출하고, 자동완성 중 지속 Hanja 후보가 후보창을 선점하지 않도록 분리; 한자는 명시적 1회 변환 action으로 유지 |
 | 한자 상태 표현 회귀 | `FIXED` | 자동완성이 켜진 기기의 과거 `HanjaMode=True`를 시작·설정 저장 시 `False`로 정규화하고, 상태 영역은 현재 모드를 `한글`로 표시한다. 한자 후보는 명시적으로 요청한 1회 변환에서만 연다. |
-| 민감 editor 차단 | `CODE` | `Password`, `Sensitive`, `NoSpellCheck` capability 중 하나라도 있으면 사전 조회 전에 fail-closed |
+| 민감 editor 차단 | `PASS/EMULATOR` | `password=true`인 OpenAI STT API 키 editor가 자동으로 비완성 입력 surface를 사용하고 한글 완성 후보를 노출하지 않음. test text는 취소 전에 삭제했고 key 상태는 `연결 안 됨`으로 유지 |
 | 최종 A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, 최신 app/plugin `0.1.2-92-g0c3b30cf` 설치 및 debug Fcitx IME 재선택 |
-| 최종 Z Fold6 설치 | `GATE` | 최신 APK 2개 Taildrop 전달 완료; Android 무선 디버깅 endpoint 인증이 없어 기기 설치·후보 UX 확인 대기 |
+| 최종 Z Fold6 설치 | `SUPERSEDED` | 자동완성은 posture·sensor·제조사 의존성이 없어 API 34 emulator를 canonical Android gate로 인정. Fold posture 검증과 분리 |
 
 #### KO-06 구현·검증 증거 (2026-07-27)
 
@@ -1104,7 +1106,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 2. `KO-02` 초성 통합 검색. (`DONE`)
 3. `KO-03` 동적 빠른 문구. (`IN_PROGRESS`: Z Fold6 최종 설치 gate만 남음)
 4. `KO-03A` 자동 스니펫 확장. (`IN_PROGRESS`: 사용자 우선순위로 구현)
-5. `KO-09` 한글 어절 자동완성. (`IN_PROGRESS`: Z Fold6 최종 설치 gate만 남음)
+5. `KO-09` 한글 어절 자동완성. (`DONE`: emulator 일반·buffered 후보 선택·미선택 Space·private 차단 통과)
 6. `KO-04` 앱별 profile과 network policy. (`NEXT`)
 
 ### 단계 3 — AI 기반과 text 기능
@@ -1208,3 +1210,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | smart clipboard는 posture·센서·제조사 의존성이 없어 API 34 emulator의 명시 선택·mask·합치기·정확히 1회 삽입·password editor 차단을 Android 완료 gate로 인정 |
 | 2026-07-27 | 한국식 감정표현은 휴대폰에서 ㅋㅋ·ㅎㅎ 강도를 직접 고를 수 있도록 강·약 quick chip을 모두 제공하고, API 34 emulator의 후보·1회 삽입·password editor 차단을 Android 완료 gate로 인정 |
 | 2026-07-27 | 한국어 조사·다음 어절은 posture·sensor·제조사 의존성이 없어 API 34 emulator의 받침·ㄹ 예외, 공백 후보, 선택·취소·정확히 1회 삽입을 Android 완료 gate로 인정 |
+| 2026-07-27 | 한글 어절 자동완성은 API 34 emulator의 일반·buffered editor 후보·명시 선택·미선택 Space·private 차단을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
