@@ -223,6 +223,27 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                         provider.displayName,
                         canRetry = true
                     )
+                    is AiResponseTooLargeException -> ui.showError(
+                        context.getString(R.string.ai_response_too_large),
+                        provider.displayName,
+                        canRetry = true
+                    )
+                    is AiResponseRefusedException -> ui.showError(
+                        context.getString(R.string.ai_response_refused),
+                        provider.displayName,
+                        canRetry = true
+                    )
+                    is AiIncompleteResponseException -> ui.showError(
+                        context.getString(
+                            when (exception.reason) {
+                                AiIncompleteReason.OutputLimit -> R.string.ai_response_output_limit
+                                AiIncompleteReason.ContentFilter -> R.string.ai_response_content_filter
+                                AiIncompleteReason.Unknown -> R.string.ai_response_incomplete
+                            }
+                        ),
+                        provider.displayName,
+                        canRetry = true
+                    )
                     else -> ui.showError(
                         exception.message ?: context.getString(R.string.ai_apply_failed),
                         provider.displayName,

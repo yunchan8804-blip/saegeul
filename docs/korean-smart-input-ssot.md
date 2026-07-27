@@ -131,6 +131,8 @@ posture처럼 emulator가 재현할 수 없는 항목만 실기기 gate로 유�
 | `GIF-03` | 선택형 GIPHY 공급자 | `IN_PROGRESS` | 비혼합·branding·analytics·안전등급 구현, production/media-copy 승인 gate | M |
 | `VOICE-01` | GPT 실시간 받아쓰기 안정화 | `IN_PROGRESS` | timeout·서버 오류 즉시 복구 구현, 실제 STT key 한국어 품질 gate 남음 | L |
 | `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | push-to-stop·preview 구현, 실제 STT key·Z Fold6 품질 gate 남음 | L |
+| `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 파일 선택·화자 구간 preview·선택 삽입 구현, 실제 STT key·회의 음원 품질 gate 남음 | L |
+| `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | 공개 CLI·HTTP audio 계약이 없어 비공식 OAuth token 역이용 금지 | L |
 | `UX-03` | 흔들리지 않는 기능 툴바 | `DONE` | 기본 1행·명시적 2행, 입력 중 높이 변화 차단 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 저장·세션 구현, 생체 실기기 gate 남음 | L |
 
@@ -142,9 +144,10 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 
 현재 코드 우선순위는 글쓰기 AI와 음성 STT의 설정·자격증명·실행 gate를 분리된 제품 흐름으로 마감하고
 전체 기능 회귀를 닫는 것이다. `UX-03` 높이 안정성은 코드와 emulator·Z Fold6 cover 검증을 마쳤다.
-emulator로 대체할 수 없는 최종 gate는 A35 최신 APK 전체 matrix, Z Fold6 unfolded 전환, 실제 STT
-key의 한국어 품질,
-생체 인증, GIF production key·partner 승인이다. 이 gate를 코드 완료와 혼동해 `DONE`으로 올리지 않는다.
+코드·emulator로 닫을 수 있는 회귀 gate와 owner·하드웨어·공급자 외부 gate를 별도로 기록한다. 외부
+gate는 A35 최신 APK 전체 matrix, Z Fold6 unfolded 전환, 실제 STT key의 한국어 품질, 생체 인증,
+GIF production key·partner 승인이다. 외부 gate 때문에 무관한 코드 항목을 계속 `IN_PROGRESS`로 두거나,
+반대로 코드가 통과했다는 이유로 외부 gate가 필요한 음성·보안 항목을 `DONE`으로 올리지 않는다.
 
 ### 6.2 1차 한국어 로컬 기능
 
@@ -616,7 +619,7 @@ SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OC
 
 | ID | 구현 계약 | 자동 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `UX-03` | 툴바를 열면 고정 48dp 펼침/접힘 control과 기존 12개 도구의 1행 가로 스크롤을 먼저 표시한다. 사용자가 control을 누른 경우에만 도구를 실제 2행 6열 grid·96dp로 배치한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 해당 editor의 명시적 펼침 envelope를 이어받되 자동 후보 내용은 1행 `NOWRAP`을 유지한다. 새 editor는 48dp로 시작하고 Android same-editor restart만 명시적 펼침을 보존한다. 폭 측정이나 타이핑 자체는 높이 변경 원인이 아니다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, 전체 68 suites·318 tests 실패 0, API 34 x86_64 emulator에서 IME frame `y=1405→1279`, 실제 1행→2행 6열→1행 후보 전환 중 `y=1279` 유지·접기 후 `y=1405`, OOM·GridLayout count 회귀 실동작 수정. Z Fold6 cover의 `0.1.2-141-g89b5f79e`에서도 touchable top `y=1566→1458`, 실제 2행 6열, `hellp` 1행 후보 중 `y=1458` 유지, 접기 뒤 `y=1566`을 확인했다. | Z Fold6 unfolded 전환과 A35 재연결 후 동일 전환 확인 |
+| `UX-03` | 툴바를 열면 고정 48dp 펼침/접힘 control과 기존 12개 도구의 1행 가로 스크롤을 먼저 표시한다. 사용자가 control을 누른 경우에만 도구를 실제 2행 6열 grid·96dp로 배치한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 해당 editor의 명시적 펼침 envelope를 이어받되 자동 후보 내용은 1행 `NOWRAP`을 유지한다. 새 editor는 48dp로 시작하고 Android same-editor restart만 명시적 펼침을 보존한다. 폭 측정이나 타이핑 자체는 높이 변경 원인이 아니다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, 전체 68 suites·318 tests 실패 0, API 34 x86_64 emulator에서 IME frame `y=1405→1279`, 실제 1행→2행 6열→1행 후보 전환 중 `y=1279` 유지·접기 후 `y=1405`, OOM·GridLayout count 회귀 실동작 수정. Z Fold6 cover의 `0.1.2-141-g89b5f79e`에서도 touchable top `y=1566→1458`, 실제 2행 6열, `hellp` 1행 후보 중 `y=1458` 유지, 접기 뒤 `y=1566`을 확인했다. | 제품 완료 gate 없음. Z Fold6 unfolded 전환과 A35 최신 APK 확인은 제조사·posture 회귀 관찰로 별도 추적 |
 | `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동한 뒤 `내 컴퓨터 자동으로 찾기 / OpenAI API 키 사용 / 고급 연결 설정` chooser를 정확히 한 번 바로 열고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. 기본 휴대폰 받아쓰기에서는 OpenAI STT를 미연결 경고가 아닌 선택 사항으로 표시하고, OpenAI 모드를 실제 선택한 경우에만 별도 키를 요구한다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, API 34 x86_64 emulator의 글쓰기 chooser·STT dialog 직행·선택 모드 summary·취소 후 휴대폰 모드 유지 PASS | A35 최신 APK 재확인 |
 | `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
 | `AI-11` | AI 글쓰기 첫 화면은 맞춤법·문장 3개·답장 3개·직접 지시와 화면 안에 고정된 `더보기`만 1행으로 표시한다. `더보기`를 명시적으로 누를 때만 말투와 번역 2행을 추가하고, 가짜 지시문 행을 두지 않는다. `직접 지시`는 원문이 비어 있어도 기존 Fcitx 키보드 입력으로 열리며, 미연결 상태는 비활성 기능 미리보기와 일반 사용자용 `설정하기`를 함께 표시한다. | `AiActionMenuPolicy`의 전체 14 action·중복 0·빈 원문 Custom 단독 활성 테스트, 전체 68 suites·323 tests 실패 0, API 34 x86_64에서 미연결 1행 preview·CTA, 고정 `더보기`·3행 펼침, 빈 Chrome editor의 Custom 단독 활성과 실제 Fcitx prompt keyboard 진입 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
@@ -725,6 +728,24 @@ QWERTY surface·`mInputShown=true`·`mIsInputViewShown=true`·`contentTopInsets=
 빈 editor의 `직접 지시`도 같은 Fcitx keyboard에서 `qw`를 입력해 prompt buffer와 활성 `Run`까지
 확인했다. 시험 provider는 즉시 삭제했다. 전체 app JVM 69 suites·326 tests, failure/error/skipped 0과
 x86_64·arm64 debug assemble가 통과했다.
+
+2026-07-28 AI/STT hardening checkpoint에서는 코드 완료와 live 성공 gate를 다시 분리했다.
+글쓰기 Responses transport는 성공·오류 body를 256 KiB로 제한하고 `refusal`, 출력 한도,
+content filter, 불완전 응답을 서로 다른 정제 오류로 처리하며 한국어·영어 사용자 안내를 제공한다.
+정밀 전사는 활성 `HttpURLConnection`을 세션 client가 소유해 취소 시 즉시 `disconnect()`하고, 취소가
+요청 시작보다 먼저 도착한 경우에도 새 요청을 열지 않는다. Realtime은 ready 직후 recorder 등록 사이에
+terminal socket 오류가 도착하는 race를 두 번째 failure checkpoint로 차단했다. AI와 STT credential
+store는 운영에서 기존 `noBackupFilesDir`·Android Keystore alias·on-disk format을 유지하면서 파일 root와
+cipher를 주입할 수 있게 분리했고, 원자 교체·`.bak` 복구·평문 미기록·손상 격리·독립 삭제를 테스트한다.
+
+통합 app JVM은 70 suites·339 tests, failure/error/skipped 0이며 x86_64·arm64 debug assemble이 모두
+통과했다. API 34 emulator에는 새 x86_64 APK를 설치해 AI profile 저장·복호화 summary·삭제와 STT 전용
+profile 저장·정밀 모드 활성·삭제·휴대폰 받아쓰기 복귀를 UI로 확인했고, 두 `provider.bin` 시험 파일은
+모두 제거했다. 같은 emulator에서 PC companion의 Tailscale MagicDNS 이름은 해석되지 않아 수동 HTTPS
+연결도 `안전하게 확인하지 못했어`로 fail-closed 되었으며, dummy OpenAI 글쓰기 key는 401을 정제 안내와
+`설정하기`로 복구하고 삭제했다. arm64 APK는 Z Fold6에 덮어 설치하고 debug Fcitx를 기본 IME로 확인했지만
+기기가 잠겨 화면 상호작용은 수행하지 않았다. A35와 실제 OpenAI STT key는 연결 환경에 없으므로 실제
+한국어 전사·preview·정확히 1회 입력과 마이크 품질은 외부 live gate로 유지한다.
 
 ## 7. GIF-01 상세 계약
 

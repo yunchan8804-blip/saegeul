@@ -228,6 +228,21 @@ class OpenAiRealtimeTranscriptionClientTest {
         assertEquals(first, thrown)
     }
 
+    @Test
+    fun `terminal failure between ready and recorder registration is rethrown at checkpoint`() {
+        val terminalFailure = RealtimeTerminalFailure()
+        val failure = VoiceAuthenticationException("ready race")
+        var recorderStop: (() -> Unit)? = null
+        var stops = 0
+
+        terminalFailure.report(failure) { recorderStop?.invoke() }
+        recorderStop = { stops += 1 }
+        val thrown = runCatching { terminalFailure.throwIfPresent() }.exceptionOrNull()
+
+        assertEquals(0, stops)
+        assertEquals(failure, thrown)
+    }
+
     private class FakeRealtimeConnector : VoiceRealtimeConnector {
         val sent = mutableListOf<String>()
         var closed = false

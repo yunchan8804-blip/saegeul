@@ -502,6 +502,11 @@
     <string name="ai_error" tools:ignore="MissingTranslation">AI error: %1$s</string>
     <string name="ai_error_empty_result" tools:ignore="MissingTranslation">The provider returned no usable suggestion</string>
     <string name="ai_suggestion_contract_failed" tools:ignore="MissingTranslation">AI did not produce the requested number of distinct drafts. Please try again.</string>
+    <string name="ai_response_too_large" tools:ignore="MissingTranslation">The AI response was too large. Try a shorter request.</string>
+    <string name="ai_response_refused" tools:ignore="MissingTranslation">The AI provider declined this request. Try changing the request.</string>
+    <string name="ai_response_output_limit" tools:ignore="MissingTranslation">The AI response reached its output limit. Try a shorter request.</string>
+    <string name="ai_response_content_filter" tools:ignore="MissingTranslation">The AI response was stopped by a safety filter. Try changing the request.</string>
+    <string name="ai_response_incomplete" tools:ignore="MissingTranslation">The AI response did not finish. Please try again.</string>
     <string name="ai_result_number" tools:ignore="MissingTranslation">Suggestion %1$d</string>
     <string name="ai_replace" tools:ignore="MissingTranslation">Replace</string>
     <string name="ai_insert" tools:ignore="MissingTranslation">Insert</string>

@@ -7,8 +7,15 @@ package org.fcitx.fcitx5.android.input.voice
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.AtomicFile
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import org.fcitx.fcitx5.android.input.EncryptedProfileCipher
+import org.fcitx.fcitx5.android.input.EncryptedProfilePayload
+import org.fcitx.fcitx5.android.input.EncryptedProfileStorage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -21,27 +28,51 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** Stores the STT-only API key outside SharedPreferences, Android backup, and user ZIP exports. */
-class VoiceProviderCredentialStore(context: Context) {
-    private val file = File(context.noBackupFilesDir, RELATIVE_PATH)
-    private val atomicFile = AtomicFile(file)
+class VoiceProviderCredentialStore internal constructor(
+    root: File,
+    private val cipher: EncryptedProfileCipher
+) {
+    constructor(context: Context) : this(
+        context.noBackupFilesDir,
+        AndroidKeystoreVoiceProviderCipher()
+    )
+
+    private val file = File(root, RELATIVE_PATH)
+    private val storage = EncryptedProfileStorage(file)
 
     fun load(): VoiceProviderProfile? {
-        if (!file.isFile) return null
+        if (!storage.exists()) return null
         return runCatching {
-            val encrypted = DataInputStream(ByteArrayInputStream(atomicFile.readFully())).use { input ->
-                require(input.readInt() == MAGIC) { "Unexpected voice provider profile format" }
-                val ivSize = input.readInt()
-                require(ivSize in 12..32) { "Invalid voice provider profile IV" }
-                val iv = ByteArray(ivSize).also(input::readFully)
-                val payloadSize = input.readInt()
-                require(payloadSize in 1..MAX_PAYLOAD_BYTES) { "Invalid voice provider profile size" }
-                EncryptedPayload(iv, ByteArray(payloadSize).also(input::readFully))
-            }
-            val plaintext = decrypt(encrypted)
-            try {
-                decode(plaintext).validate()
+            val bytes = storage.read(MAX_FILE_BYTES) ?: return null
+            val encrypted = try {
+                DataInputStream(ByteArrayInputStream(bytes)).use { input ->
+                    require(input.readInt() == MAGIC) {
+                        "Unexpected voice provider profile format"
+                    }
+                    val ivSize = input.readInt()
+                    require(ivSize in MIN_IV_BYTES..MAX_IV_BYTES) {
+                        "Invalid voice provider profile IV"
+                    }
+                    val iv = ByteArray(ivSize).also(input::readFully)
+                    val payloadSize = input.readInt()
+                    require(payloadSize in 1..MAX_PAYLOAD_BYTES) {
+                        "Invalid voice provider profile size"
+                    }
+                    val payload = ByteArray(payloadSize).also(input::readFully)
+                    require(input.read() == -1) { "Trailing voice provider profile data" }
+                    EncryptedProfilePayload(iv, payload)
+                }
             } finally {
-                plaintext.fill(0)
+                bytes.fill(0)
+            }
+            try {
+                val plaintext = cipher.decrypt(encrypted)
+                try {
+                    decode(plaintext).validate()
+                } finally {
+                    plaintext.fill(0)
+                }
+            } finally {
                 encrypted.payload.fill(0)
             }
         }.getOrNull()
@@ -49,12 +80,17 @@ class VoiceProviderCredentialStore(context: Context) {
 
     fun save(profile: VoiceProviderProfile) {
         val validated = profile.validate()
-        file.parentFile?.mkdirs()
         val plaintext = encode(validated)
         val encrypted = try {
-            encrypt(plaintext)
+            cipher.encrypt(plaintext)
         } finally {
             plaintext.fill(0)
+        }
+        require(encrypted.iv.size in MIN_IV_BYTES..MAX_IV_BYTES) {
+            "Invalid encrypted voice provider profile IV"
+        }
+        require(encrypted.payload.size in 1..MAX_PAYLOAD_BYTES) {
+            "Invalid encrypted voice provider profile size"
         }
         val bytes = ByteArrayOutputStream().use { bytes ->
             DataOutputStream(bytes).use { output ->
@@ -66,66 +102,85 @@ class VoiceProviderCredentialStore(context: Context) {
             }
             bytes.toByteArray()
         }
-        val stream = atomicFile.startWrite()
         try {
-            stream.write(bytes)
-            atomicFile.finishWrite(stream)
-        } catch (error: Throwable) {
-            atomicFile.failWrite(stream)
-            throw error
+            storage.write(bytes)
         } finally {
             bytes.fill(0)
             encrypted.payload.fill(0)
         }
     }
 
-    fun clear() = atomicFile.delete()
+    fun clear() {
+        storage.delete()
+        runCatching(cipher::clear)
+    }
 
-    fun hasStoredProfile(): Boolean = file.isFile
+    fun hasStoredProfile(): Boolean = storage.exists()
 
-    private fun encode(profile: VoiceProviderProfile): ByteArray = JSONObject()
-        .put("apiKey", profile.apiKey)
-        .put("transcriptionModel", profile.transcriptionModel)
-        .put("realtimeTranscriptionModel", profile.realtimeTranscriptionModel)
-        .put("diarizationModel", profile.diarizationModel)
-        .put("baseUrl", profile.baseUrl)
-        .toString()
-        .toByteArray(Charsets.UTF_8)
+    private fun encode(profile: VoiceProviderProfile): ByteArray = buildJsonObject {
+        put("apiKey", profile.apiKey)
+        put("transcriptionModel", profile.transcriptionModel)
+        put("realtimeTranscriptionModel", profile.realtimeTranscriptionModel)
+        put("diarizationModel", profile.diarizationModel)
+        put("baseUrl", profile.baseUrl)
+    }.toString().toByteArray(Charsets.UTF_8)
 
     private fun decode(bytes: ByteArray): VoiceProviderProfile {
-        val json = JSONObject(bytes.toString(Charsets.UTF_8))
+        val json = Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
         return VoiceProviderProfile(
-            apiKey = json.optString("apiKey"),
-            transcriptionModel = json.optString(
+            apiKey = json.string("apiKey"),
+            transcriptionModel = json.string(
                 "transcriptionModel",
                 VoiceTranscriptionModel.Accurate.id
             ),
-            realtimeTranscriptionModel = json.optString(
+            realtimeTranscriptionModel = json.string(
                 "realtimeTranscriptionModel",
                 VoiceRealtimeTranscriptionModel.Streaming.id
             ),
-            diarizationModel = json.optString(
+            diarizationModel = json.string(
                 "diarizationModel",
                 VoiceProviderProfile.DIARIZATION_MODEL
             ),
-            baseUrl = json.optString("baseUrl", VoiceProviderProfile.OPENAI_BASE_URL)
+            baseUrl = json.string("baseUrl", VoiceProviderProfile.OPENAI_BASE_URL)
         )
     }
 
-    private fun encrypt(plaintext: ByteArray): EncryptedPayload {
+    private fun kotlinx.serialization.json.JsonObject.string(
+        name: String,
+        default: String = ""
+    ): String = get(name)?.jsonPrimitive?.contentOrNull ?: default
+
+    companion object {
+        const val RELATIVE_PATH = "voice/provider.bin"
+        internal const val KEY_ALIAS = "fcitx.voice.provider.v1"
+        private const val MAGIC = 0x56505231 // VPR1
+        private const val MIN_IV_BYTES = 12
+        private const val MAX_IV_BYTES = 32
+        private const val MAX_PAYLOAD_BYTES = 16 * 1024
+        private const val MAX_FILE_BYTES = MAX_PAYLOAD_BYTES + MAX_IV_BYTES + 16L
+    }
+}
+
+private class AndroidKeystoreVoiceProviderCipher : EncryptedProfileCipher {
+    override fun encrypt(plaintext: ByteArray): EncryptedProfilePayload {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
-        return EncryptedPayload(cipher.iv, cipher.doFinal(plaintext))
+        return EncryptedProfilePayload(cipher.iv, cipher.doFinal(plaintext))
     }
 
-    private fun decrypt(encrypted: EncryptedPayload): ByteArray {
+    override fun decrypt(encrypted: EncryptedProfilePayload): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(128, encrypted.iv))
         return cipher.doFinal(encrypted.payload)
     }
 
+    override fun clear() {
+        val keyStore = keyStore()
+        if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS)
+    }
+
     private fun secretKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
+        val keyStore = keyStore()
         (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE).run {
             init(
@@ -141,14 +196,11 @@ class VoiceProviderCredentialStore(context: Context) {
         }
     }
 
-    private data class EncryptedPayload(val iv: ByteArray, val payload: ByteArray)
+    private fun keyStore(): KeyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
 
-    companion object {
-        const val RELATIVE_PATH = "voice/provider.bin"
-        private const val MAGIC = 0x56505231 // VPR1
-        private const val MAX_PAYLOAD_BYTES = 16 * 1024
-        private const val KEYSTORE = "AndroidKeyStore"
-        private const val KEY_ALIAS = "fcitx.voice.provider.v1"
-        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+    private companion object {
+        const val KEYSTORE = "AndroidKeyStore"
+        const val KEY_ALIAS = VoiceProviderCredentialStore.KEY_ALIAS
+        const val TRANSFORMATION = "AES/GCM/NoPadding"
     }
 }

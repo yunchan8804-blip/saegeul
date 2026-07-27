@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -130,6 +131,85 @@ class OpenAiResponsesClientTest {
         }.exceptionOrNull()
 
         assertTrue(failure is AiSuggestionContractException)
+    }
+
+    @Test
+    fun `response body byte limit is inclusive`() {
+        val expected = ByteArray(UrlConnectionAiTransport.MAX_RESPONSE_BODY_BYTES) {
+            (it % 251).toByte()
+        }
+
+        val actual = UrlConnectionAiTransport.readResponseBody(
+            expected.inputStream(),
+            expected.size.toLong()
+        )
+
+        assertArrayEquals(expected, actual)
+    }
+
+    @Test
+    fun `response body one byte over limit is rejected with sanitized failure`() {
+        val oversized = ByteArray(
+            UrlConnectionAiTransport.MAX_RESPONSE_BODY_BYTES + 1
+        ) { 'x'.code.toByte() }
+
+        val failure = runCatching {
+            UrlConnectionAiTransport.readResponseBody(oversized.inputStream())
+        }.exceptionOrNull()
+
+        assertTrue(failure is AiResponseTooLargeException)
+        assertEquals(
+            "AI provider response was too large. Try a shorter request.",
+            failure?.message
+        )
+    }
+
+    @Test
+    fun `responses refusal is a typed sanitized failure`() {
+        val payload = """
+            {
+              "status":"completed",
+              "output":[{"type":"message","content":[
+                {"type":"refusal","refusal":"provider-specific refusal details"}
+              ]}]
+            }
+        """.trimIndent()
+
+        val failure = runCatching {
+            OpenAiResponsesClient.parseResponse(payload, 3, "requested", 4)
+        }.exceptionOrNull()
+
+        assertTrue(failure is AiResponseRefusedException)
+        assertEquals(
+            "AI provider declined this request. Try changing the request.",
+            failure?.message
+        )
+        assertFalse(failure?.message.orEmpty().contains("provider-specific refusal details"))
+    }
+
+    @Test
+    fun `incomplete response exposes typed output limit guidance`() {
+        val payload = """
+            {
+              "status":"incomplete",
+              "incomplete_details":{"reason":"max_output_tokens"},
+              "output_text":"{\"suggestions\":[\"부분 응답\"]}"
+            }
+        """.trimIndent()
+
+        val failure = runCatching {
+            OpenAiResponsesClient.parseResponse(payload, 1, "requested", 4)
+        }.exceptionOrNull()
+
+        assertTrue(failure is AiIncompleteResponseException)
+        assertEquals(
+            AiIncompleteReason.OutputLimit,
+            (failure as AiIncompleteResponseException).reason
+        )
+        assertEquals(
+            "AI response reached its output limit. Try a shorter request.",
+            failure.message
+        )
     }
 
     @Test

@@ -4,11 +4,17 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class OpenAiTranscriptionClientTest {
     @Test
@@ -53,5 +59,68 @@ class OpenAiTranscriptionClientTest {
 
         assertTrue(failure is VoiceTranscriptionException)
         assertFalse(failure?.message.orEmpty().contains("{\"text\""))
+    }
+
+    @Test
+    fun `cancel releases a blocked segment transport`() = runBlocking {
+        val transport = BlockingVoiceTransport()
+        val client = OpenAiTranscriptionClient(
+            VoiceProviderProfile(apiKey = "test-key"),
+            transport = transport
+        )
+        val request = async(Dispatchers.Default) {
+            runCatching { client.transcribe(ByteArray(64)) }.exceptionOrNull()
+        }
+        assertTrue(transport.awaitRequest())
+
+        client.cancel()
+
+        val failure = withTimeout(1_000) { request.await() }
+        assertTrue(transport.cancelled)
+        assertTrue(failure is IOException)
+    }
+
+    @Test
+    fun `cancel before segment request prevents transport success`() = runBlocking {
+        val transport = BlockingVoiceTransport()
+        val client = OpenAiTranscriptionClient(
+            VoiceProviderProfile(apiKey = "test-key"),
+            transport = transport
+        )
+
+        client.cancel()
+        val failure = runCatching {
+            client.transcribe(ByteArray(64))
+        }.exceptionOrNull()
+
+        assertTrue(transport.cancelled)
+        assertTrue(failure is IOException)
+    }
+
+    private class BlockingVoiceTransport : VoiceHttpTransport {
+        private val requestStarted = CountDownLatch(1)
+        private val releaseRequest = CountDownLatch(1)
+
+        @Volatile
+        var cancelled = false
+            private set
+
+        override fun post(
+            url: String,
+            authorization: String,
+            request: VoiceMultipartRequest
+        ): String {
+            requestStarted.countDown()
+            releaseRequest.await()
+            if (cancelled) throw IOException("cancelled")
+            return """{"text":"unexpected"}"""
+        }
+
+        override fun cancel() {
+            cancelled = true
+            releaseRequest.countDown()
+        }
+
+        fun awaitRequest(): Boolean = requestStarted.await(1, TimeUnit.SECONDS)
     }
 }

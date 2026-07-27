@@ -30,6 +30,7 @@ data class VoiceMultipartRequest(
 
 fun interface VoiceHttpTransport {
     fun post(url: String, authorization: String, request: VoiceMultipartRequest): String
+    fun cancel() = Unit
 }
 
 class VoiceTranscriptionException(message: String) : Exception(message)
@@ -65,6 +66,10 @@ class OpenAiTranscriptionClient(
         } finally {
             request.body.fill(0)
         }
+    }
+
+    fun cancel() {
+        transport.cancel()
     }
 
     companion object {
@@ -120,13 +125,21 @@ class OpenAiTranscriptionClient(
 }
 
 class UrlConnectionVoiceTransport : VoiceHttpTransport {
+    @Volatile
+    private var activeConnection: HttpURLConnection? = null
+    @Volatile
+    private var cancelled = false
+
     override fun post(
         url: String,
         authorization: String,
         request: VoiceMultipartRequest
     ): String {
+        if (cancelled) throw IOException("Voice transcription request was cancelled")
         val connection = URI(url).toURL().openConnection() as HttpURLConnection
+        activeConnection = connection
         try {
+            if (cancelled) throw IOException("Voice transcription request was cancelled")
             connection.requestMethod = "POST"
             connection.connectTimeout = 15_000
             connection.readTimeout = 90_000
@@ -173,8 +186,15 @@ class UrlConnectionVoiceTransport : VoiceHttpTransport {
                 bytes.fill(0)
             }
         } finally {
+            if (activeConnection === connection) activeConnection = null
             connection.disconnect()
         }
+    }
+
+    override fun cancel() {
+        cancelled = true
+        activeConnection?.disconnect()
+        activeConnection = null
     }
 
     private companion object {

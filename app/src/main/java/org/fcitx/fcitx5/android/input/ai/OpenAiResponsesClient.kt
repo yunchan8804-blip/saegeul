@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
 
@@ -105,8 +106,21 @@ class OpenAiResponsesClient(
             val root = runCatching { JSON.parseToJsonElement(payload).jsonObject }
                 .getOrElse { throw AiProviderException("AI provider returned invalid JSON") }
             val status = root.string("status")
+            if (status == "incomplete") {
+                val details = root["incomplete_details"] as? JsonObject
+                throw AiIncompleteResponseException(
+                    when (details?.string("reason")) {
+                        "max_output_tokens" -> AiIncompleteReason.OutputLimit
+                        "content_filter" -> AiIncompleteReason.ContentFilter
+                        else -> AiIncompleteReason.Unknown
+                    }
+                )
+            }
             if (status.isNotEmpty() && status != "completed") {
                 throw AiProviderException("AI response did not complete")
+            }
+            if (containsRefusal(root["output"] as? JsonArray)) {
+                throw AiResponseRefusedException()
             }
             val outputText = root.string("output_text").takeIf(String::isNotBlank)
                 ?: extractOutputText(root["output"] as? JsonArray)
@@ -142,6 +156,15 @@ class OpenAiResponsesClient(
             }
             return parts.joinToString("\n").takeIf(String::isNotBlank)
         }
+
+        private fun containsRefusal(output: JsonArray?): Boolean =
+            output?.any { item ->
+                val content = (item as? JsonObject)?.get("content") as? JsonArray
+                    ?: return@any false
+                content.any { element ->
+                    (element as? JsonObject)?.string("type") == "refusal"
+                }
+            } == true
 
         private fun parseSuggestions(outputText: String): List<String> {
             val trimmed = outputText.trim()
@@ -181,10 +204,7 @@ class UrlConnectionAiTransport : AiHttpTransport {
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val bytes = stream?.use { input ->
-                ByteArrayOutputStream().use { output ->
-                    input.copyTo(output)
-                    output.toByteArray()
-                }
+                readResponseBody(input, connection.contentLengthLong)
             } ?: ByteArray(0)
             if (status !in 200..299) {
                 val code = runCatching {
@@ -203,12 +223,65 @@ class UrlConnectionAiTransport : AiHttpTransport {
         }
     }
 
-    private companion object {
-        const val USER_AGENT =
+    companion object {
+        private const val USER_AGENT =
             "Fcitx5Android-AiInput/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
+        internal const val MAX_RESPONSE_BODY_BYTES = 256 * 1024
+
+        internal fun readResponseBody(input: InputStream, contentLength: Long = -1L): ByteArray {
+            if (contentLength > MAX_RESPONSE_BODY_BYTES) {
+                throw AiResponseTooLargeException()
+            }
+            val initialCapacity = contentLength
+                .takeIf { it in 1..MAX_RESPONSE_BODY_BYTES.toLong() }
+                ?.toInt()
+                ?: DEFAULT_BUFFER_SIZE
+            return ByteArrayOutputStream(initialCapacity).use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var total = 0
+                while (true) {
+                    val remainingWithOverflowByte = MAX_RESPONSE_BODY_BYTES + 1 - total
+                    val count = input.read(buffer, 0, minOf(buffer.size, remainingWithOverflowByte))
+                    if (count < 0) break
+                    total += count
+                    if (total > MAX_RESPONSE_BODY_BYTES) {
+                        throw AiResponseTooLargeException()
+                    }
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray()
+            }
+        }
     }
 }
 
-class AiProviderException(message: String) : Exception(message)
+open class AiProviderException(message: String) : Exception(message)
+
+class AiResponseTooLargeException : AiProviderException(
+    "AI provider response was too large. Try a shorter request."
+)
+
+class AiResponseRefusedException : AiProviderException(
+    "AI provider declined this request. Try changing the request."
+)
+
+enum class AiIncompleteReason {
+    OutputLimit,
+    ContentFilter,
+    Unknown
+}
+
+class AiIncompleteResponseException(
+    val reason: AiIncompleteReason
+) : AiProviderException(
+    when (reason) {
+        AiIncompleteReason.OutputLimit ->
+            "AI response reached its output limit. Try a shorter request."
+        AiIncompleteReason.ContentFilter ->
+            "AI response was stopped by a safety filter. Try changing the request."
+        AiIncompleteReason.Unknown ->
+            "AI response did not complete. Try again."
+    }
+)
 
 class AiSuggestionContractException : Exception("AI suggestion contract was not satisfied")

@@ -40,6 +40,7 @@ class VoiceTranscriptionWindow(
     private var profile: VoiceProviderProfile? = null
     private var target: VoiceEditorTarget? = null
     private var recorder: PcmMemoryRecorder? = null
+    private var segmentClient: OpenAiTranscriptionClient? = null
     private var realtimeRecorder: PcmStreamRecorder? = null
     private var realtimeSession: OpenAiRealtimeTranscriptionSession? = null
     private var realtimePartial = ""
@@ -236,7 +237,9 @@ class VoiceTranscriptionWindow(
         transcript = null
         commitGate.resetForNewTranscript()
         val activeRecorder = PcmMemoryRecorder()
+        val activeClient = OpenAiTranscriptionClient(configuredProfile)
         recorder = activeRecorder
+        segmentClient = activeClient
         ui.showRecording(0)
         sessionJob = service.lifecycleScope.launch {
             var recording: WavMemoryRecording? = null
@@ -252,7 +255,7 @@ class VoiceTranscriptionWindow(
                 recorder = null
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 ui.showTranscribing()
-                val result = OpenAiTranscriptionClient(configuredProfile).transcribe(captured.bytes)
+                val result = activeClient.transcribe(captured.bytes)
                 if (!validateTarget(boundTarget, showError = true)) return@launch
                 transcript = result.text
                 commitGate.resetForNewTranscript()
@@ -265,6 +268,7 @@ class VoiceTranscriptionWindow(
                 }
             } finally {
                 if (recorder === activeRecorder) recorder = null
+                if (segmentClient === activeClient) segmentClient = null
                 recording?.close()
             }
         }
@@ -321,6 +325,7 @@ class VoiceTranscriptionWindow(
                 val streamingRecorder = PcmStreamRecorder()
                 activeRecorder = streamingRecorder
                 realtimeRecorder = streamingRecorder
+                realtimeFailure.throwIfPresent()
                 ui.showRealtimeRecording(0, "")
                 streamingRecorder.record(
                     onChunk = activeSession::append,
@@ -381,14 +386,16 @@ class VoiceTranscriptionWindow(
     }
 
     private fun cancelWork(clearUi: Boolean) {
+        sessionJob?.cancel()
+        sessionJob = null
         recorder?.cancel()
         recorder = null
+        segmentClient?.cancel()
+        segmentClient = null
         realtimeRecorder?.cancel()
         realtimeRecorder = null
         realtimeSession?.cancel()
         realtimeSession = null
-        sessionJob?.cancel()
-        sessionJob = null
         transcript = null
         target = null
         realtimePartial = ""
