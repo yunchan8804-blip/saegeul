@@ -221,6 +221,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 capture.inputType == info.inputType
         } == true
 
+    /** Prepares a deterministic keyboard return path before an IME-owned settings activity. */
+    fun prepareForSettingsActivity() {
+        inputDeviceMgr.requestVirtualKeyboardOnNextStartInputView(currentInputEditorInfo)
+        inputView?.prepareForSettingsActivity()
+    }
+
     val bufferedHangulPrefix: String
         get() = if (bufferedHangulSessionActive) bufferedHangul.prefix else ""
 

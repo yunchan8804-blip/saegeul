@@ -56,7 +56,10 @@ class MeetingTranscriptionWindow(
                 selectedIds = selected
                 MeetingTranscriptSelection.format(segments, selected, speakerPrefix()) != null
             }
-            onSetupRequested = { AiSettingsNavigator.openVoiceSetup(context) }
+            onSetupRequested = {
+                service.prepareForSettingsActivity()
+                AiSettingsNavigator.openVoiceSetup(context)
+            }
         }
         return ui.root
     }

@@ -620,6 +620,7 @@ SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OC
 | `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동한 뒤 `내 컴퓨터 자동으로 찾기 / OpenAI API 키 사용 / 고급 연결 설정` chooser를 정확히 한 번 바로 열고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. 기본 휴대폰 받아쓰기에서는 OpenAI STT를 미연결 경고가 아닌 선택 사항으로 표시하고, OpenAI 모드를 실제 선택한 경우에만 별도 키를 요구한다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, API 34 x86_64 emulator의 글쓰기 chooser·STT dialog 직행·선택 모드 summary·취소 후 휴대폰 모드 유지 PASS | A35 최신 APK 재확인 |
 | `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
 | `AI-11` | AI 글쓰기 첫 화면은 맞춤법·문장 3개·답장 3개·직접 지시와 화면 안에 고정된 `더보기`만 1행으로 표시한다. `더보기`를 명시적으로 누를 때만 말투와 번역 2행을 추가하고, 가짜 지시문 행을 두지 않는다. `직접 지시`는 원문이 비어 있어도 기존 Fcitx 키보드 입력으로 열리며, 미연결 상태는 비활성 기능 미리보기와 일반 사용자용 `설정하기`를 함께 표시한다. | `AiActionMenuPolicy`의 전체 14 action·중복 0·빈 원문 Custom 단독 활성 테스트, 전체 68 suites·323 tests 실패 0, API 34 x86_64에서 미연결 1행 preview·CTA, 고정 `더보기`·3행 펼침, 빈 Chrome editor의 Custom 단독 활성과 실제 Fcitx prompt keyboard 진입 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
+| `UX-04` | IME가 소유한 AI·STT 설정 Activity를 열 때 원 editor identity를 대상으로 software-keyboard resume를 1회 예약한다. 자체 설정 text field나 다른 editor가 이를 소비하면 안 되며, 복귀 전 transient AI·음성 surface와 확장 높이는 KeyboardWindow로 정리한다. 모든 입력 종료의 전역 virtual 강제는 물리 키보드 사용자를 깨뜨리므로 금지한다. | `VirtualKeyboardResumeGateTest`의 exact editor·one-shot·self-settings non-consume 3개, 전체 69 suites·326 tests 실패 0. API 34 x86_64에서 AI 설정→API key ADB physical text→Settings root→원 editor 복귀 후 실제 QWERTY와 inset 1342, 빈 editor Custom→Fcitx prompt→`qw`·Run 활성 PASS | A35에서 실제 Bluetooth/DeX 물리 키보드와 설정 왕복 시 floating candidates 정책을 보존하는지 확인 |
 | `VOICE-07` | 빠른 받아쓰기 모드와 회의·메모 파일 전사 진입을 독립시킨다. `휴대폰 받아쓰기`가 선택돼 있어도 별도 STT profile 파일이 있고 privacy·network gate가 허용되면 회의 버튼을 표시한다. 표시 단계에서는 파일 존재만 확인하고, 사용자가 회의 창을 명시적으로 연 뒤에만 profile을 복호화한다. | mode를 입력받지 않는 `MeetingVoiceProfileResolver`, 차단 시 credential loader 0회, private/network/setup/ready와 회의 버튼 visibility 계약 테스트, 전체 68 suites·323 tests 실패 0 | 실제 OpenAI key·다화자 음원의 한국어 화자 분리 품질 |
 
 실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
@@ -710,6 +711,20 @@ debug assemble, Pixel 7 API 34 emulator의 설정 문구·모드 선택·dialog 
 깨끗한 재설치에서 미연결 1행, 고정 `더보기`, 3행 펼침, 빈 Chrome editor의 Custom 단독 활성과 기존
 Fcitx prompt keyboard 진입을 다시 확인했다. 두 emulator의 임시 AI test profile은
 `no_backup/ai/provider.bin`에서 삭제했다.
+
+같은 checkpoint의 재현을 더 좁힌 결과, 0-height는 플랫폼 창 자체가 아니라 내부 `InputView`가
+물리 키보드 판정으로 `GONE`인 상태였다. 프레임워크에는 IME가 `shown=true`로 남지만 ADB 입력이나
+실제 하드웨어 키가 `InputDevice` 후보창 모드를 활성화한 뒤 IME 소유 설정 Activity를 오가면, 원래
+editor가 새 touch/tool-type callback 없이 복원되어 소프트웨어 surface가 계속 숨을 수 있었다. 모든
+입력 종료에서 가상 키보드를 강제하면 블루투스 키보드 사용자를 깨뜨리므로 금지했다. 대신 설정 진입
+시 원래 editor identity를 저장하고, 자체 설정의 API key field에서는 소비하지 않은 채 정확히 같은
+editor로 돌아온 첫 `onStartInputView`에서만 software surface를 한 번 복구한다. 설정을 열기 전 AI·음성
+임시 window와 확장 높이도 KeyboardWindow로 정리한다. API 34 emulator에서 OpenAI key dialog에
+ADB physical text를 입력해 의도적으로 키보드를 접은 뒤 Settings root를 거쳐 원 editor로 돌아왔고,
+QWERTY surface·`mInputShown=true`·`mIsInputViewShown=true`·`contentTopInsets=1342`를 함께 확인했다.
+빈 editor의 `직접 지시`도 같은 Fcitx keyboard에서 `qw`를 입력해 prompt buffer와 활성 `Run`까지
+확인했다. 시험 provider는 즉시 삭제했다. 전체 app JVM 69 suites·326 tests, failure/error/skipped 0과
+x86_64·arm64 debug assemble가 통과했다.
 
 ## 7. GIF-01 상세 계약
 
@@ -1422,3 +1437,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 전용 STT credential이 없는 온라인 받아쓰기 선택은 mode를 선저장하지 않는다. key 저장 성공과 mode 변경을 같은 사용자 완료 경로로 묶고, key dialog 취소 시 기존 휴대폰 받아쓰기를 보존한다. |
 | 2026-07-28 | AI 글쓰기는 기본 action 1행과 고정 `더보기`를 사용하고 말투·번역은 명시적 펼침에서만 표시한다. 가짜 prompt row를 금지하며 빈 editor의 `직접 지시`도 기존 Fcitx prompt keyboard로 연다. |
 | 2026-07-28 | 빠른 받아쓰기 mode는 회의·메모 파일 전사의 STT profile 선택을 숨기지 않는다. 회의 버튼 렌더는 암호화 파일 존재만 보고 실제 credential 복호화는 privacy·network 허용 상태의 명시적 회의 진입 뒤에만 수행한다. |
+| 2026-07-28 | IME 소유 설정 Activity 왕복은 원 editor identity에 묶인 one-shot software-keyboard resume로 복구한다. 전역 virtual 강제는 금지하고 자체 설정 editor는 예약을 소비하지 않는다. |

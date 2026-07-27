@@ -63,8 +63,18 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
 
     private var startedInputView = false
     private var isNullInputType = true
+    private val virtualKeyboardResumeGate = VirtualKeyboardResumeGate()
 
     private var candidatesViewMode by AppPrefs.getInstance().candidates.mode
+
+    /**
+     * An IME-owned settings activity temporarily interrupts the editor without a fresh screen
+     * touch on return. Restore the software surface for that single round trip, even when an ADB
+     * or hardware key event previously switched this session to floating-candidate mode.
+     */
+    fun requestVirtualKeyboardOnNextStartInputView(info: EditorInfo) {
+        virtualKeyboardResumeGate.request(info.packageName, info.fieldId, info.inputType)
+    }
 
     fun notifyOnStartInput(attribute: EditorInfo) {
         isNullInputType = attribute.isTypeNull()
@@ -76,6 +86,13 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
     fun evaluateOnStartInputView(info: EditorInfo, service: FcitxInputMethodService): Boolean {
         startedInputView = true
         isNullInputType = info.isTypeNull()
+        if (virtualKeyboardResumeGate.consume(info.packageName, info.fieldId, info.inputType)) {
+            isVirtualKeyboard = true
+            // The state setter intentionally skips unchanged values. Reapply visibility anyway,
+            // because framework shown-state and the child InputView visibility can diverge.
+            setupViewEvents(true)
+            return true
+        }
         isVirtualKeyboard = when (candidatesViewMode) {
             FloatingCandidatesMode.SystemDefault -> service.superEvaluateInputViewShown()
             FloatingCandidatesMode.InputDevice -> isVirtualKeyboard

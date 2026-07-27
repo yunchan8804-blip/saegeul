@@ -65,7 +65,10 @@ class VoiceTranscriptionWindow(
             onDeviceDictation = ::switchToDeviceDictation
             onMeeting = { windowManager.attachWindow(MeetingTranscriptionWindow()) }
             onClose = ::returnToKeyboard
-            onSetupRequested = { AiSettingsNavigator.openVoiceSetup(context) }
+            onSetupRequested = {
+                service.prepareForSettingsActivity()
+                AiSettingsNavigator.openVoiceSetup(context)
+            }
         }
         return ui.root
     }

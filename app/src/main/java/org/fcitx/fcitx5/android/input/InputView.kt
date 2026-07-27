@@ -351,6 +351,14 @@ class InputView(
         requestLayout()
     }
 
+    /** Clears transient IME surfaces before launching an IME-owned settings activity. */
+    fun prepareForSettingsActivity() {
+        discardAiPromptInput()
+        setAssistantContentExpanded(false)
+        windowManager.attachWindow(KeyboardWindow)
+        requestLayout()
+    }
+
     /**
      * Returns the upper edge of every interactive IME-owned surface. The prompt strip sits above
      * [keyboardView], so reporting only the keyboard edge lets touches on Run/Cancel fall through
