@@ -351,7 +351,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `AI-00` | AI provider·보안 기반 | `DONE` | provider profile, key vault, privacy gate, usage 표시 | L |
 | `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `IN_PROGRESS` | Unicode-safe diff·선택 적용 구현, 두 기기 실사용 gate 남음 | M |
 | `AI-02` | 존댓말·말투 변환 | `IN_PROGRESS` | 존댓말·카톡·업무·거절·사과·고객응대 action 구현, action별 실기기 matrix 남음 | M |
-| `AI-03` | 빠른 문장 생성 | `IN_PROGRESS` | 프리셋과 활성 키보드 표면 직접 지시문, 빈 입력창 신규 문장 후보, 명시적 교체/추가 구현; Fold6·3개 후보 품질 matrix 남음 | M |
+| `AI-03` | 빠른 문장 생성 | `IN_PROGRESS` | 프리셋·활성 키보드 직접 지시·빈 입력창 생성과 정확히 3개의 서로 다른 구조화 후보 계약 구현; 실제 provider별 한국어 품질 matrix 남음 | M |
 | `AI-04` | 답장 초안 | `IN_PROGRESS` | 선택·문단·명시적 clipboard·Sharesheet intake 구현, 두 기기 검증 남음 | M |
 | `AI-05` | 키보드 번역 | `IN_PROGRESS` | 한↔영·일·중 action과 preview 구현, 언어별 실기기 matrix 남음 | M |
 | `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
@@ -1024,6 +1024,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI, 7개 신규 테스트 |
 | AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트 |
+| AI 3개 후보 계약 | `PASS/CODE` | Compose·Reply·Custom은 Responses `text.format` strict JSON Schema의 `minItems=maxItems=3`을 전송한다. Android parser와 PC CLI companion도 공백·중복 제거 후 정확히 3개가 아니면 성공 card 대신 한국어 재시도 상태로 fail-closed. 2026-07-27 Android 63 suites·274 tests와 companion Python 8 tests, x86_64 assembly 통과 |
 | action별 품질 matrix | `GATE` | 말투 6종, 답장, 번역 4개, 3후보 보장을 provider/model별로 실제 기기 검증해야 함 |
 
 사용량 저장소는 action·성공/실패·입출력 문자 수·마지막 provider/model만 집계하며 prompt, 결과,
@@ -1069,7 +1070,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 6. `SEC-03` offline network gate. (`DONE`: API 34 emulator에서 AI·OpenAI 전사·GIF 개별 tap 전후 UID BPF network delta 0)
 7. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
 8. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
-9. `AI-03` 문장 생성. (`IN_PROGRESS`: 프리셋·직접 지시문·빈 입력창 생성 코드 완료, 두 기기 결과 UI와 3후보 품질 gate)
+9. `AI-03` 문장 생성. (`IN_PROGRESS`: strict structured output·정확히 3개 후보·한국어 재시도 구현, 실제 provider별 품질 gate)
 10. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
 11. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
 
@@ -1154,3 +1155,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | IME가 keyboard 위에 interactive prompt를 표시하면 그 prompt 상단부터 touchable inset으로 보고하고, 뒤 editor control로 touch를 통과시키지 않음 |
 | 2026-07-27 | 글쓰기 API key 401은 provider 오류 문자열이나 무조건 재시도로 표시하지 않고, 사용자용 연결 확인 문구와 `설정하기`로 복구시킴 |
 | 2026-07-27 | 출근 이후 일반 Android 기능·회귀 검증의 기준 기기는 API 34 x86_64 emulator로 전환. A35 마이크 품질과 Z Fold cover/unfold posture처럼 emulator가 재현할 수 없는 하드웨어 게이트만 최종 실기기 확인으로 남김 |
+| 2026-07-27 | 문장 생성·답장·직접 지시는 Responses strict JSON Schema와 수신측 exact-count 검증을 함께 사용해 서로 다른 후보 3개가 아니면 부분 결과를 표시하지 않음 |

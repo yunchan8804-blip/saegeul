@@ -485,6 +485,7 @@
     <string name="ai_undo">실행 취소</string>
     <string name="ai_error">AI 오류: %1$s</string>
     <string name="ai_error_empty_result">공급자가 사용할 수 있는 결과를 주지 않았어</string>
+    <string name="ai_suggestion_contract_failed">AI가 요청한 개수의 서로 다른 문장을 만들지 못했어. 다시 시도해 줘.</string>
     <string name="ai_result_number">제안 %1$d</string>
     <string name="ai_replace">교체</string>
     <string name="ai_insert">넣기</string>

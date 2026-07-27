@@ -10,6 +10,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -56,7 +58,27 @@ class OpenAiResponsesClient(
                 put("store", false)
                 put("max_output_tokens", MAX_OUTPUT_TOKENS)
                 put("reasoning", buildJsonObject { put("effort", "none") })
-                put("text", buildJsonObject { put("verbosity", "low") })
+                put("text", buildJsonObject {
+                    put("verbosity", "low")
+                    put("format", buildJsonObject {
+                        put("type", "json_schema")
+                        put("name", "fcitx_ai_suggestions")
+                        put("strict", true)
+                        put("schema", buildJsonObject {
+                            put("type", "object")
+                            put("additionalProperties", false)
+                            put("properties", buildJsonObject {
+                                put("suggestions", buildJsonObject {
+                                    put("type", "array")
+                                    put("minItems", action.maxSuggestions)
+                                    put("maxItems", action.maxSuggestions)
+                                    put("items", buildJsonObject { put("type", "string") })
+                                })
+                            })
+                            put("required", buildJsonArray { add("suggestions") })
+                        })
+                    })
+                })
             }
             val authorization = authorizationProvider.authorizationHeader(validated)
             val response = try {
@@ -89,12 +111,14 @@ class OpenAiResponsesClient(
             val outputText = root.string("output_text").takeIf(String::isNotBlank)
                 ?: extractOutputText(root["output"] as? JsonArray)
                 ?: throw AiProviderException("AI response contained no text")
-            val suggestions = parseSuggestions(outputText)
+            val normalizedSuggestions = parseSuggestions(outputText)
                 .map(String::trim)
                 .filter(String::isNotEmpty)
                 .distinct()
-                .take(maxSuggestions)
-            if (suggestions.isEmpty()) throw AiProviderException("AI response contained no suggestions")
+            if (normalizedSuggestions.size < maxSuggestions) {
+                throw AiSuggestionContractException()
+            }
+            val suggestions = normalizedSuggestions.take(maxSuggestions)
             return AiGenerationResult(
                 suggestions = suggestions,
                 model = root.string("model").ifBlank { requestedModel },
@@ -128,7 +152,9 @@ class OpenAiResponsesClient(
             return runCatching {
                 val array = JSON.parseToJsonElement(trimmed).jsonObject["suggestions"] as JsonArray
                 array.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
-            }.getOrElse { listOf(trimmed) }
+            }.getOrElse {
+                throw AiSuggestionContractException()
+            }
         }
 
         private fun JsonObject.string(name: String): String =
@@ -184,3 +210,5 @@ class UrlConnectionAiTransport : AiHttpTransport {
 }
 
 class AiProviderException(message: String) : Exception(message)
+
+class AiSuggestionContractException : Exception("AI suggestion contract was not satisfied")

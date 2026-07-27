@@ -17,6 +17,7 @@ import http.server
 import ipaddress
 import json
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -535,7 +536,13 @@ class CliBackendRunner:
         # Fast proofreading/translation uses Codex; longer writing actions use Claude.
         return {"fast": self.MODEL_CODEX, "balanced": self.MODEL_CLAUDE, "quality": self.MODEL_CODEX}
 
-    def generate(self, model: str, instructions: str, input_text: str) -> str:
+    def generate(
+        self,
+        model: str,
+        instructions: str,
+        input_text: str,
+        expected_suggestions: int,
+    ) -> str:
         if model not in self.available:
             raise ValueError("requested computer AI is unavailable")
         if not self._slot.acquire(blocking=False):
@@ -546,7 +553,7 @@ class CliBackendRunner:
                 output = self._run_codex(prompt)
             else:
                 output = self._run_claude(prompt)
-            return normalize_suggestions(output)
+            return normalize_suggestions(output, expected_suggestions)
         finally:
             self._slot.release()
 
@@ -676,7 +683,22 @@ UNTRUSTED USER TEXT ({len(input_text)} characters):
 """
 
 
-def normalize_suggestions(output: str) -> str:
+def requested_suggestion_count(request: dict, instructions: str) -> int:
+    try:
+        suggestions = request["text"]["format"]["schema"]["properties"]["suggestions"]
+        minimum = suggestions["minItems"]
+        maximum = suggestions["maxItems"]
+        if type(minimum) is int and minimum == maximum and minimum in range(1, 4):
+            return minimum
+    except (KeyError, TypeError):
+        pass
+    match = re.search(r"Return exactly ([1-3]) suggestion\(s\)\.", instructions)
+    if match:
+        return int(match.group(1))
+    raise ValueError("invalid suggestion count contract")
+
+
+def normalize_suggestions(output: str, expected_suggestions: int | None = None) -> str:
     cleaned = output.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     try:
         document = json.loads(cleaned)
@@ -690,6 +712,10 @@ def normalize_suggestions(output: str) -> str:
         if not isinstance(suggestion, str) or not suggestion.strip() or len(suggestion) > 8_000:
             raise RuntimeError("computer AI returned invalid suggestions")
         normalized.append(suggestion.strip())
+    if len(set(normalized)) != len(normalized):
+        raise RuntimeError("computer AI returned duplicate suggestions")
+    if expected_suggestions is not None and len(normalized) != expected_suggestions:
+        raise RuntimeError("computer AI returned an incomplete suggestion set")
     return json.dumps({"suggestions": normalized}, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -821,7 +847,13 @@ class CliGatewayRequestHandler(http.server.BaseHTTPRequestHandler):
                 raise ValueError("invalid input")
             if request.get("store") is not False:
                 raise ValueError("store must be false")
-            result = self.gateway.runner.generate(model, instructions, input_text)
+            expected_suggestions = requested_suggestion_count(request, instructions)
+            result = self.gateway.runner.generate(
+                model,
+                instructions,
+                input_text,
+                expected_suggestions,
+            )
             self.send_json(
                 200,
                 {

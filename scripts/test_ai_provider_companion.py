@@ -133,13 +133,50 @@ class CliBoundaryTest(unittest.TestCase):
         self.assertEqual(
             '{"suggestions":["첫째","둘째"]}',
             companion.normalize_suggestions(
-                '```json\n{"suggestions": [" 첫째 ", "둘째"]}\n```'
+                '```json\n{"suggestions": [" 첫째 ", "둘째"]}\n```',
+                expected_suggestions=2,
             ),
         )
         with self.assertRaises(RuntimeError):
             companion.normalize_suggestions("not json")
         with self.assertRaises(RuntimeError):
             companion.normalize_suggestions('{"suggestions": []}')
+        with self.assertRaises(RuntimeError):
+            companion.normalize_suggestions(
+                '{"suggestions": ["첫째", "둘째"]}',
+                expected_suggestions=3,
+            )
+        with self.assertRaises(RuntimeError):
+            companion.normalize_suggestions(
+                '{"suggestions": ["같음", "같음", "다름"]}',
+                expected_suggestions=3,
+            )
+
+    def test_suggestion_count_uses_structured_schema_with_instruction_fallback(self):
+        structured = {
+            "text": {
+                "format": {
+                    "schema": {
+                        "properties": {
+                            "suggestions": {"minItems": 3, "maxItems": 3}
+                        }
+                    }
+                }
+            }
+        }
+        self.assertEqual(
+            3,
+            companion.requested_suggestion_count(structured, "irrelevant"),
+        )
+        self.assertEqual(
+            1,
+            companion.requested_suggestion_count(
+                {},
+                "Return exactly 1 suggestion(s). Do not use Markdown.",
+            ),
+        )
+        with self.assertRaises(ValueError):
+            companion.requested_suggestion_count({}, "Return some suggestions")
 
     def test_manifest_routes_tiers_without_exposing_cli_credentials(self):
         runner = mock.Mock()

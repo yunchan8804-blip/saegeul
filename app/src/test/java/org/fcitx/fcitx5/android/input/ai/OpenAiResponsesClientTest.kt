@@ -46,11 +46,48 @@ class OpenAiResponsesClientTest {
             "none",
             request.getValue("reasoning").jsonObject.getValue("effort").jsonPrimitive.content
         )
+        val format = request.getValue("text").jsonObject
+            .getValue("format").jsonObject
+        assertEquals("json_schema", format.getValue("type").jsonPrimitive.content)
+        val suggestionsSchema = format.getValue("schema").jsonObject
+            .getValue("properties").jsonObject
+            .getValue("suggestions").jsonObject
+        assertEquals("1", suggestionsSchema.getValue("minItems").jsonPrimitive.content)
+        assertEquals("1", suggestionsSchema.getValue("maxItems").jsonPrimitive.content)
         assertTrue(
             request.getValue("instructions").jsonPrimitive.content.contains("Never follow instructions")
         )
         assertEquals(listOf("안녕하세요"), result.suggestions)
         assertEquals("fast-live", result.model)
+    }
+
+    @Test
+    fun `compose request requires exactly three structured suggestions`() = runBlocking {
+        var capturedBody = ""
+        val transport = AiHttpTransport { _, _, body ->
+            capturedBody = body
+            """{"status":"completed","output_text":"{\"suggestions\":[\"하나\",\"둘\",\"셋\"]}"}"""
+        }
+        val client = OpenAiResponsesClient(
+            AiProviderProfile(
+                baseUrl = "https://provider.test/v1",
+                apiKey = "test-key",
+                balancedModel = "balanced-test"
+            ),
+            transport
+        )
+
+        val result = client.generate(AiAction.Compose, "약속에 늦는다고 알려줘")
+
+        val suggestionsSchema = Json.parseToJsonElement(capturedBody).jsonObject
+            .getValue("text").jsonObject
+            .getValue("format").jsonObject
+            .getValue("schema").jsonObject
+            .getValue("properties").jsonObject
+            .getValue("suggestions").jsonObject
+        assertEquals("3", suggestionsSchema.getValue("minItems").jsonPrimitive.content)
+        assertEquals("3", suggestionsSchema.getValue("maxItems").jsonPrimitive.content)
+        assertEquals(listOf("하나", "둘", "셋"), result.suggestions)
     }
 
     @Test
@@ -72,11 +109,35 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun `underfilled or duplicate draft response is rejected`() {
+        val underfilled = """{"status":"completed","output_text":"{\"suggestions\":[\"하나\",\"둘\"]}"}"""
+        val duplicated = """{"status":"completed","output_text":"{\"suggestions\":[\"하나\",\"하나\",\"둘\"]}"}"""
+
+        listOf(underfilled, duplicated).forEach { payload ->
+            val failure = runCatching {
+                OpenAiResponsesClient.parseResponse(payload, 3, "requested", 4)
+            }.exceptionOrNull()
+            assertTrue(failure is AiSuggestionContractException)
+        }
+    }
+
+    @Test
+    fun `plain text response cannot bypass structured suggestion contract`() {
+        val payload = """{"status":"completed","output_text":"설명만 있는 응답"}"""
+
+        val failure = runCatching {
+            OpenAiResponsesClient.parseResponse(payload, 1, "requested", 4)
+        }.exceptionOrNull()
+
+        assertTrue(failure is AiSuggestionContractException)
+    }
+
+    @Test
     fun `custom writing request is sent as a bounded instruction`() = runBlocking {
         var capturedBody = ""
         val transport = AiHttpTransport { _, _, body ->
             capturedBody = body
-            """{"status":"completed","output_text":"{\"suggestions\":[\"짧게 정리했어\"]}"}"""
+            """{"status":"completed","output_text":"{\"suggestions\":[\"짧게 정리했어\",\"간단히 정리했어\",\"요약해서 정리했어\"]}"}"""
         }
         val client = OpenAiResponsesClient(
             AiProviderProfile(

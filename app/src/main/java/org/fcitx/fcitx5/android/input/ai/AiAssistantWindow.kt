@@ -215,6 +215,11 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                     is AiApiKeyRejectedException -> ui.showSetupRequired(
                         context.getString(R.string.ai_api_key_rejected)
                     )
+                    is AiSuggestionContractException -> ui.showError(
+                        context.getString(R.string.ai_suggestion_contract_failed),
+                        provider.displayName,
+                        canRetry = true
+                    )
                     else -> ui.showError(
                         exception.message ?: context.getString(R.string.ai_apply_failed),
                         provider.displayName,

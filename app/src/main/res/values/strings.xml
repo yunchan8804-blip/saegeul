@@ -486,6 +486,7 @@
     <string name="ai_undo" tools:ignore="MissingTranslation">Undo</string>
     <string name="ai_error" tools:ignore="MissingTranslation">AI error: %1$s</string>
     <string name="ai_error_empty_result" tools:ignore="MissingTranslation">The provider returned no usable suggestion</string>
+    <string name="ai_suggestion_contract_failed" tools:ignore="MissingTranslation">AI did not produce the requested number of distinct drafts. Please try again.</string>
     <string name="ai_result_number" tools:ignore="MissingTranslation">Suggestion %1$d</string>
     <string name="ai_replace" tools:ignore="MissingTranslation">Replace</string>
     <string name="ai_insert" tools:ignore="MissingTranslation">Insert</string>
