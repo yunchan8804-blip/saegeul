@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.net.Uri
+import android.util.Log
 import android.view.View
 import androidx.core.os.ConfigurationCompat
 import androidx.lifecycle.lifecycleScope
@@ -176,6 +177,11 @@ class MeetingTranscriptionWindow(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                Log.w(
+                    TAG,
+                    "Meeting transcription failed: ${exception.javaClass.name}; " +
+                        "cause=${exception.cause?.javaClass?.name ?: "none"}"
+                )
                 if (attached) {
                     if (exception is VoiceAuthenticationException) {
                         clearReviewState()
@@ -330,4 +336,8 @@ class MeetingTranscriptionWindow(
         }
 
     private fun voiceProviderName(): String = context.getString(R.string.voice_openai_provider_name)
+
+    private companion object {
+        const val TAG = "MeetingTranscription"
+    }
 }

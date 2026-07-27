@@ -13,6 +13,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.util.UUID
@@ -136,7 +137,15 @@ class UrlConnectionVoiceTransport : VoiceHttpTransport {
             connection.setRequestProperty("Content-Type", request.contentType)
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("User-Agent", USER_AGENT)
-            connection.outputStream.use { it.write(request.body) }
+            try {
+                connection.outputStream.use { it.write(request.body) }
+            } catch (exception: IOException) {
+                throwHttpStatusOrOriginal(
+                    exception = exception,
+                    providerLabel = "Transcription provider",
+                    responseCode = { connection.responseCode }
+                )
+            }
             val status = connection.responseCode
             if (status !in 200..299) {
                 throw AiHttpStatusException(status, "Transcription provider HTTP $status")
@@ -173,4 +182,16 @@ class UrlConnectionVoiceTransport : VoiceHttpTransport {
         const val USER_AGENT =
             "Fcitx5Android-PrecisionDictation/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
     }
+}
+
+internal fun throwHttpStatusOrOriginal(
+    exception: IOException,
+    providerLabel: String,
+    responseCode: () -> Int
+): Nothing {
+    val status = runCatching(responseCode).getOrNull()
+    if (status != null && status !in 200..299) {
+        throw AiHttpStatusException(status, "$providerLabel HTTP $status")
+    }
+    throw exception
 }

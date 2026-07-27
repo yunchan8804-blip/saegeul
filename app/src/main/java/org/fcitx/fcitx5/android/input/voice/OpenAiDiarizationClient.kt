@@ -14,6 +14,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
+import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -158,39 +159,47 @@ class UrlConnectionDiarizationTransport : DiarizationHttpTransport {
             connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("User-Agent", USER_AGENT)
-            connection.outputStream.use { output ->
-                DiarizationMultipartContract.textFields(request).forEach { (name, value) ->
-                    writeTextPart(output, boundary, name, value)
-                }
-                writeLine(output, "--$boundary")
-                writeLine(
-                    output,
-                    "Content-Disposition: form-data; name=\"file\"; filename=\"${metadata.uploadFileName}\""
-                )
-                writeLine(output, "Content-Type: ${metadata.contentType}")
-                writeLine(output)
-                val buffer = ByteArray(STREAM_BUFFER_BYTES)
-                var total = 0L
-                val input = request.source.openStream()
-                activeInput = input
-                try {
-                    input.use {
-                        while (true) {
-                            val read = it.read(buffer)
-                            if (read < 0) break
-                            total += read
-                            if (total > MeetingAudioPolicy.MAX_FILE_BYTES) {
-                                throw MeetingAudioException("Selected audio exceeds the upload limit")
-                            }
-                            output.write(buffer, 0, read)
-                        }
+            try {
+                connection.outputStream.use { output ->
+                    DiarizationMultipartContract.textFields(request).forEach { (name, value) ->
+                        writeTextPart(output, boundary, name, value)
                     }
-                } finally {
-                    activeInput = null
-                    buffer.fill(0)
+                    writeLine(output, "--$boundary")
+                    writeLine(
+                        output,
+                        "Content-Disposition: form-data; name=\"file\"; filename=\"${metadata.uploadFileName}\""
+                    )
+                    writeLine(output, "Content-Type: ${metadata.contentType}")
+                    writeLine(output)
+                    val buffer = ByteArray(STREAM_BUFFER_BYTES)
+                    var total = 0L
+                    val input = request.source.openStream()
+                    activeInput = input
+                    try {
+                        input.use {
+                            while (true) {
+                                val read = it.read(buffer)
+                                if (read < 0) break
+                                total += read
+                                if (total > MeetingAudioPolicy.MAX_FILE_BYTES) {
+                                    throw MeetingAudioException("Selected audio exceeds the upload limit")
+                                }
+                                output.write(buffer, 0, read)
+                            }
+                        }
+                    } finally {
+                        activeInput = null
+                        buffer.fill(0)
+                    }
+                    writeLine(output)
+                    writeLine(output, "--$boundary--")
                 }
-                writeLine(output)
-                writeLine(output, "--$boundary--")
+            } catch (exception: IOException) {
+                throwHttpStatusOrOriginal(
+                    exception = exception,
+                    providerLabel = "Diarization provider",
+                    responseCode = { connection.responseCode }
+                )
             }
             val status = connection.responseCode
             if (status !in 200..299) {

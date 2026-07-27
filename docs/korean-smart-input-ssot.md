@@ -476,7 +476,7 @@ dialog까지 정상 진입했다. 권한은 자동 승인하지 않았다. A35�
 | --- | --- | --- | --- |
 | `UX-02` | compact와 expanded profile을 독립 저장하고 각각 세로/가로 중앙 간격을 둔다. 두 축이 모두 600dp 이상일 때만 expanded로 판정하며 size가 불명확하면 일반 layout을 유지한다. Text surface는 물리 손 경계 `T/G/V`까지 왼쪽에 유지하고 숫자판은 split하지 않는다. | profile 경계·방향·독립 toggle·gap cap·fill key·두벌식 `ㅎ/ㅍ` 경계를 포함한 10 tests와 API 34 `QA_Tablet`의 첫 editor 복원·세로/가로·Moakey·중앙 무입력·`?123` 왕복 | 없음. hinge/posture 센서 자체는 실기기 전용 관찰 항목으로 분리 |
 | `GIF-03` | GIPHY는 사용자가 명시적으로 고르는 별도 provider다. production review 확인 key가 없으면 network 0회이며 KLIPY로 자동 fallback하지 않는다. rating `g`, 한국어·한국 locale, Powered by GIPHY, canonical/media 분리와 load/click/sent analytics를 적용한다. | provider parser·pagination·안전등급·credential·resolver·analytics tests | 실제 production key review; GIF 첨부는 별도 media-copy 서면 승인 필요 |
-| `VOICE-03` | `ACTION_OPEN_DOCUMENT`로 고른 content URI만 최대 60분·24MiB 범위에서 stream하고 화자·timestamp segment를 preview한다. 사용자가 체크한 segment만 16,000자 이하로 정확히 한 번 입력한다. | MIME/확장자·크기·시간·multipart·response parser·selection·commit tests | 표준 OpenAI profile과 실제 회의 음원 정확도·picker 복귀·취소·두 기기 UI |
+| `VOICE-03` | `ACTION_OPEN_DOCUMENT`로 고른 content URI만 최대 60분·24MiB 범위에서 stream하고 화자·timestamp segment를 preview한다. 사용자가 체크한 segment만 16,000자 이하로 정확히 한 번 입력한다. | MIME/확장자·크기·시간·multipart·response parser·selection·commit tests, phone·tablet emulator picker detach/resume와 401 설정 CTA | 실제 OpenAI key와 회의 음원의 화자 분리 정확도 |
 
 두 번째 checkpoint의 단독 통합 검증은 app JVM 51 suites·219 tests, failure/error/skipped 0과
 arm64 app·Hangul plugin assemble을 통과했다. GIPHY key·회의 음원·화자 전사 원문은 prefs, cache,
@@ -587,10 +587,12 @@ STT profile만 UI로 저장해 두 자격 증명이 실제 설정 화면에서�
 Android 권한 dialog 뒤 같은 Google Messages editor의 `녹음 중` 상태로 복귀했고, 중지 뒤 dummy key
 401을 `STT API 키를 다시 연결`과 `설정하기`로 표시했다. 회의 파일 선택은 과거 window callback이
 picker detach 때 취소되는 결함이 있어, editor-bound process-memory one-shot queue와 새
-`MeetingTranscriptionWindow` 복원으로 교체했다. 1초 WAV를 Downloads에서 고른 뒤 같은 message editor에
-회의 window가 다시 붙고 실제 전사 요청 단계까지 도달하는 것을 확인했다. 화자 분리 401도 파일 오류로
-오인시키는 `다시 선택` 대신 음성 설정 CTA로 분리했다. picker one-shot·취소·editor mismatch·stale 요청과
-401 type 회귀를 포함한 app JVM 65 suites·293 tests, failure/error/skipped 0과 x86_64 debug build가 통과했다.
+`MeetingTranscriptionWindow` 복원으로 교체했다. 1초 WAV를 Downloads에서 고른 뒤 phone과 tablet의 같은
+message editor에 회의 window가 다시 붙고 실제 전사 요청 단계까지 도달했다. 스트리밍 upload 중 공급자가
+인증 header만 보고 조기에 401을 반환하면 body write `IOException`이 먼저 노출되는 결함도 response code를
+회수하도록 수정했다. tablet landscape에서 `OpenAI가 STT API 키를 거부`와 `설정하기`를 확인했으며,
+picker one-shot·취소·editor mismatch·stale 요청·조기 HTTP 실패 회귀를 포함한 app JVM 65 suites·295 tests,
+failure/error/skipped 0과 x86_64 debug build가 통과했다.
 
 ## 7. GIF-01 상세 계약
 
@@ -1139,6 +1141,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | AI-05 번역 matrix | `PASS/EMULATOR` | OAuth companion으로 `안녕하세요 → Hello`, `Hello → 안녕하세요`, `Hello → こんにちは`, `Hello → 你好`를 각 action에서 실제 생성하고 preview card를 확인 |
 | AI-02 말투 matrix | `PASS/A35+EMULATOR` | A35의 Claude 존댓말, API 34 emulator OAuth companion의 카톡체·업무용·정중한 거절·사과·고객응대 action이 모두 실제 한국어 결과 card를 반환 |
 | 구간 녹음 버튼·권한·오류 | `PASS/EMULATOR` | 권한 미허용 상태의 `녹음 시작` 1회 탭으로 Android permission dialog 표시, 승인 뒤 같은 editor에서 `녹음 중`·AudioRecord app-op running 확인, 중지 뒤 dummy key 401을 한국어 설명과 `설정하기`로 복구. 사용자 보고의 무반응은 최신 emulator build에서 재현되지 않아 실기기 microphone 품질 gate와 분리 |
+| 회의 파일 picker·인증 복구 | `PASS/EMULATOR` | Pixel 7과 QA tablet API 34에서 1초 WAV 선택 뒤 같은 editor의 새 회의 window로 one-shot 복귀. tablet landscape에서 streaming body 조기 종료의 HTTP 401을 회수해 일반 파일 오류 대신 STT 재연결 설명과 `설정하기`를 표시 |
 
 사용량 저장소는 action·성공/실패·입출력 문자 수·마지막 provider/model만 집계하며 prompt, 결과,
 API key, endpoint URL 필드를 갖지 않는다. 개인 debug build의 공급자 credential도 Gradle environment
@@ -1193,7 +1196,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 1. push-to-talk audio capture와 permission UX. (`DONE`: A35와 API 34 emulator 최초 권한 자동 복귀·AudioRecord·중지·401 복구 PASS)
 2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview 완료, 실제 key live 품질 gate)
 3. `VOICE-01` realtime partial transcript. (`IN_PROGRESS`: WebSocket·partial/final 상태·emulator 401 UX PASS, 실제 key 한국어 품질과 production ephemeral token/WebRTC gate)
-4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 독립 STT profile 재사용, API 34 x86_64 phone emulator에서 system picker 진입·WAV 선택·동일 editor 복원·요청 실행·401 설정 CTA PASS, tablet landscape 무잘림 PASS; 실제 OpenAI key·회의 음원 품질 gate)
+4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 독립 STT profile 재사용, API 34 x86_64 phone·tablet emulator에서 system picker 진입·WAV 선택·동일 editor 복원·요청 실행·조기 401 설정 CTA·landscape 무잘림 PASS; 실제 OpenAI key·회의 음원 품질 gate)
 5. `VOICE-04` Codex 구독 OAuth voice bridge. (`BLOCK`: desktop UI 외 공개 CLI·HTTP audio 계약 없음)
 
 ### 단계 5 — 개인화·대화면·장기 기능

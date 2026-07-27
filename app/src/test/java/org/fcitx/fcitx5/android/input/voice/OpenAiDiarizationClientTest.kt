@@ -11,6 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 
@@ -24,6 +25,34 @@ class OpenAiDiarizationClientTest {
         )
 
         override fun openStream(): InputStream = ByteArrayInputStream(byteArrayOf(1, 2, 3))
+    }
+
+    @Test
+    fun `early rejected upload recovers provider status`() {
+        val failure = runCatching {
+            throwHttpStatusOrOriginal(
+                exception = IOException("request body write failed"),
+                providerLabel = "Diarization provider",
+                responseCode = { HttpURLConnection.HTTP_UNAUTHORIZED }
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is AiHttpStatusException)
+        assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, (failure as AiHttpStatusException).status)
+    }
+
+    @Test
+    fun `upload failure stays original when no provider status is available`() {
+        val original = IOException("request body write failed")
+        val failure = runCatching {
+            throwHttpStatusOrOriginal(
+                exception = original,
+                providerLabel = "Diarization provider",
+                responseCode = { throw IOException("no response") }
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure === original)
     }
 
     @Test
