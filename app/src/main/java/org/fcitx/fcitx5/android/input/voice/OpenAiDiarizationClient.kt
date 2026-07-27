@@ -61,7 +61,7 @@ class OpenAiDiarizationClient(
                 )
             } catch (exception: AiHttpStatusException) {
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                    throw VoiceTranscriptionException("OpenAI rejected the STT API key")
+                    throw VoiceAuthenticationException("OpenAI rejected the STT API key")
                 }
                 throw VoiceTranscriptionException(
                     exception.message ?: "Diarization provider request failed"

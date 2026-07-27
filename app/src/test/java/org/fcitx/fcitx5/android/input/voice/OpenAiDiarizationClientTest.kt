@@ -5,12 +5,14 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import kotlinx.coroutines.runBlocking
+import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.net.HttpURLConnection
 
 class OpenAiDiarizationClientTest {
     private val source = object : MeetingAudioSource {
@@ -67,6 +69,26 @@ class OpenAiDiarizationClientTest {
         assertEquals("ko", fields["language"])
         assertEquals("diarized_json", fields["response_format"])
         assertEquals("auto", fields["chunking_strategy"])
+    }
+
+    @Test
+    fun `unauthorized diarization is an STT credential failure`() = runBlocking {
+        val transport = object : DiarizationHttpTransport {
+            override fun post(
+                url: String,
+                authorization: String,
+                request: DiarizationRequest
+            ): String = throw AiHttpStatusException(
+                HttpURLConnection.HTTP_UNAUTHORIZED,
+                "provider detail"
+            )
+        }
+        val client = OpenAiDiarizationClient(VoiceProviderProfile(apiKey = "rejected"), transport)
+
+        val failure = runCatching { client.transcribe(source) }.exceptionOrNull()
+
+        assertTrue(failure is VoiceAuthenticationException)
+        assertFalse(failure?.message.orEmpty().contains("provider detail"))
     }
 
     @Test

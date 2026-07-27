@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import android.net.Uri
 import android.view.View
 import androidx.core.os.ConfigurationCompat
 import androidx.lifecycle.lifecycleScope
@@ -22,7 +23,9 @@ import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
 
 /** User-selected file diarization with explicit segment review and an exactly-once insert. */
-class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTranscriptionWindow>() {
+class MeetingTranscriptionWindow(
+    private val documentResume: VoiceAudioDocumentResumeResult? = null
+) : InputWindow.ExtendedInputWindow<MeetingTranscriptionWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
@@ -36,6 +39,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
     private var segments: List<MeetingSpeakerSegment> = emptyList()
     private var selectedIds: Set<String> = emptySet()
     private var attached = false
+    private var documentResumeConsumed = false
     private val commitGate = MeetingCommitGate()
 
     override val title: String by lazy { local("회의·메모 화자 분리", "Meeting transcription") }
@@ -81,20 +85,33 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 )
             )
             AiFeatureEntryGate.SetupRequired -> showSetupRequired()
-            AiFeatureEntryGate.Ready -> if (
-                resolved != null && !MeetingDiarizationCapability.supports(resolved)
-            ) showBlocked(
-                local(
-                    "현재 음성 전사 연결에서는 화자 분리를 사용할 수 없어. 음성 설정에서 연결을 확인해줘.",
-                    "Speaker transcription isn’t available with the current voice connection. Check the model in voice settings."
-                )
-            ) else if (resolved != null) ui.showReady(voiceProviderName())
+            AiFeatureEntryGate.Ready -> {
+                if (resolved != null && !MeetingDiarizationCapability.supports(resolved)) {
+                    showBlocked(
+                        local(
+                            "현재 음성 전사 연결에서는 화자 분리를 사용할 수 없어. 음성 설정에서 연결을 확인해줘.",
+                            "Speaker transcription isn’t available with the current voice connection. Check the model in voice settings."
+                        )
+                    )
+                } else if (resolved != null) {
+                    if (!documentResumeConsumed && documentResume != null) {
+                        documentResumeConsumed = true
+                        resumeAfterDocumentPicker(documentResume, resolved)
+                    } else {
+                        ui.showReady(voiceProviderName())
+                    }
+                }
+            }
         }
     }
 
     override fun onDetached() {
         attached = false
-        cancelSession(clearUi = false)
+        // The picker detaches the IME. Its result is owned by the coordinator and must survive
+        // until InputView restores a fresh meeting window for the original editor.
+        pickerRequestId = null
+        cancelWork()
+        clearReviewState()
         profile = null
     }
 
@@ -109,16 +126,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
         }
         target = boundTarget
         ui.showLoading()
-        pickerRequestId = VoiceAudioDocumentCoordinator.request(context) { uri ->
-            pickerRequestId = null
-            if (!attached) return@request
-            if (uri == null) {
-                clearReviewState()
-                ui.showReady(voiceProviderName())
-                return@request
-            }
-            processSelectedAudio(uri, configured, boundTarget)
-        }
+        pickerRequestId = VoiceAudioDocumentCoordinator.request(context, boundTarget)
         if (pickerRequestId == null) {
             clearReviewState()
             ui.showError(
@@ -126,6 +134,21 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 canRetry = true
             )
         }
+    }
+
+    private fun resumeAfterDocumentPicker(
+        resume: VoiceAudioDocumentResumeResult,
+        configured: VoiceProviderProfile
+    ) {
+        val uri = resume.documentUri?.let(Uri::parse)
+        if (uri == null) {
+            clearReviewState()
+            ui.showReady(voiceProviderName())
+            return
+        }
+        target = resume.target
+        ui.showLoading()
+        processSelectedAudio(uri, configured, resume.target)
     }
 
     private fun processSelectedAudio(
@@ -154,19 +177,24 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 throw exception
             } catch (exception: Exception) {
                 if (attached) {
-                    val message = if (exception is MeetingAudioException) {
-                        local(
-                            "지원되는 60분·24MB 이하 음성 파일을 골라줘.",
-                            "Choose a supported audio file up to 60 minutes and 24 MB."
-                        )
+                    if (exception is VoiceAuthenticationException) {
+                        clearReviewState()
+                        ui.showSetupRequired(context.getString(R.string.voice_provider_auth_failed))
                     } else {
-                        local(
-                            "화자 분리 전사에 실패했어. 파일과 연결을 확인하고 다시 시도해.",
-                            "Speaker transcription failed. Check the file and connection, then retry."
-                        )
+                        val message = if (exception is MeetingAudioException) {
+                            local(
+                                "지원되는 60분·24MB 이하 음성 파일을 골라줘.",
+                                "Choose a supported audio file up to 60 minutes and 24 MB."
+                            )
+                        } else {
+                            local(
+                                "화자 분리 전사에 실패했어. 파일과 연결을 확인하고 다시 시도해.",
+                                "Speaker transcription failed. Check the file and connection, then retry."
+                            )
+                        }
+                        clearReviewState(keepTarget = true)
+                        ui.showError(message, canRetry = true)
                     }
-                    clearReviewState(keepTarget = true)
-                    ui.showError(message, canRetry = true)
                 }
             } finally {
                 if (client === activeClient) client = null
@@ -258,15 +286,19 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
     private fun cancelSession(clearUi: Boolean) {
         pickerRequestId?.let(VoiceAudioDocumentCoordinator::cancel)
         pickerRequestId = null
-        client?.cancel()
-        client = null
-        requestJob?.cancel()
-        requestJob = null
+        cancelWork()
         clearReviewState()
         if (clearUi && attached) {
             val configured = profile
             if (validatePolicy(configured) && configured != null) ui.showReady(voiceProviderName())
         }
+    }
+
+    private fun cancelWork() {
+        client?.cancel()
+        client = null
+        requestJob?.cancel()
+        requestJob = null
     }
 
     private fun clearReviewState(keepTarget: Boolean = false) {

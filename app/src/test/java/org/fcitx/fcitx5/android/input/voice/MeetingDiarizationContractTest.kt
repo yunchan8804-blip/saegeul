@@ -93,4 +93,61 @@ class MeetingDiarizationContractTest {
         gate.resetForSelection()
         assertTrue(gate.claim())
     }
+
+    @Test
+    fun `audio picker result resumes once in the same editor`() {
+        val queue = VoiceAudioDocumentResumeQueue()
+        val target = VoiceEditorTarget("chat.app", 7, 1, 12)
+
+        queue.begin(41L, target)
+        queue.complete(41L, "content://documents/audio/1")
+
+        assertEquals(
+            VoiceAudioDocumentResumeResult(target, "content://documents/audio/1"),
+            queue.consumeForEditor("chat.app", 7, 1)
+        )
+        assertNull(queue.consumeForEditor("chat.app", 7, 1))
+    }
+
+    @Test
+    fun `cancelled audio picker restores meeting window without a file`() {
+        val queue = VoiceAudioDocumentResumeQueue()
+        val target = VoiceEditorTarget("chat.app", 7, 1, 12)
+
+        queue.begin(42L, target)
+        queue.complete(42L, null)
+
+        assertEquals(
+            VoiceAudioDocumentResumeResult(target, null),
+            queue.consumeForEditor("chat.app", 7, 1)
+        )
+    }
+
+    @Test
+    fun `audio picker result is discarded when editor identity changed`() {
+        val queue = VoiceAudioDocumentResumeQueue()
+        val target = VoiceEditorTarget("chat.app", 7, 1, 12)
+
+        queue.begin(43L, target)
+        queue.complete(43L, "content://documents/audio/2")
+
+        assertNull(queue.consumeForEditor("other.app", 7, 1))
+        assertNull(queue.consumeForEditor("chat.app", 7, 1))
+    }
+
+    @Test
+    fun `stale audio picker result cannot replace the latest request`() {
+        val queue = VoiceAudioDocumentResumeQueue()
+        val latestTarget = VoiceEditorTarget("chat.app", 7, 1, 12)
+
+        queue.begin(1L, VoiceEditorTarget("old.app", 1, 1, 0))
+        queue.begin(2L, latestTarget)
+        queue.complete(1L, "content://documents/audio/old")
+        queue.complete(2L, "content://documents/audio/latest")
+
+        assertEquals(
+            VoiceAudioDocumentResumeResult(latestTarget, "content://documents/audio/latest"),
+            queue.consumeForEditor("chat.app", 7, 1)
+        )
+    }
 }

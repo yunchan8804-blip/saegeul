@@ -42,6 +42,8 @@ import org.fcitx.fcitx5.android.input.picker.emoticonPicker
 import org.fcitx.fcitx5.android.input.picker.symbolPicker
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
+import org.fcitx.fcitx5.android.input.voice.MeetingTranscriptionWindow
+import org.fcitx.fcitx5.android.input.voice.VoiceAudioDocumentCoordinator
 import org.fcitx.fcitx5.android.input.voice.VoicePermissionCoordinator
 import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -443,14 +445,25 @@ class InputView(
             info.fieldId,
             info.inputType
         )
-        val voiceResume = VoicePermissionCoordinator.consumeForEditor(
+        if (ocrResume != null) {
+            windowManager.attachWindow(OcrWindow(ocrResume))
+            return
+        }
+        val audioResume = VoiceAudioDocumentCoordinator.consumeForEditor(
             info.packageName,
             info.fieldId,
             info.inputType
         )
-        when {
-            ocrResume != null -> windowManager.attachWindow(OcrWindow(ocrResume))
-            voiceResume != null -> windowManager.attachWindow(VoiceTranscriptionWindow(voiceResume))
+        if (audioResume != null) {
+            windowManager.attachWindow(MeetingTranscriptionWindow(audioResume))
+            return
+        }
+        VoicePermissionCoordinator.consumeForEditor(
+            info.packageName,
+            info.fieldId,
+            info.inputType
+        )?.let { voiceResume ->
+            windowManager.attachWindow(VoiceTranscriptionWindow(voiceResume))
         }
     }
 

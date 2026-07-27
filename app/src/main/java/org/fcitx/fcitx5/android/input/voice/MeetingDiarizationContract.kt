@@ -19,6 +19,57 @@ data class MeetingDiarizationResult(
     val model: String
 )
 
+data class VoiceAudioDocumentResumeResult(
+    val target: VoiceEditorTarget,
+    val documentUri: String?
+)
+
+/**
+ * One-shot process-memory handoff across the system document picker boundary.
+ *
+ * Opening the picker detaches and later restarts the IME. The stale meeting window must therefore
+ * never own the result callback; the new window consumes it only for the editor that launched it.
+ */
+internal class VoiceAudioDocumentResumeQueue {
+    private data class Pending(val id: Long, val target: VoiceEditorTarget)
+
+    private var pending: Pending? = null
+    private var completed: VoiceAudioDocumentResumeResult? = null
+
+    @Synchronized
+    fun begin(id: Long, target: VoiceEditorTarget) {
+        pending = Pending(id, target)
+        completed = null
+    }
+
+    @Synchronized
+    fun complete(id: Long, documentUri: String?) {
+        val request = pending?.takeIf { it.id == id } ?: return
+        pending = null
+        completed = VoiceAudioDocumentResumeResult(request.target, documentUri)
+    }
+
+    @Synchronized
+    fun cancel(id: Long) {
+        if (pending?.id == id) pending = null
+    }
+
+    @Synchronized
+    fun consumeForEditor(
+        packageName: String?,
+        fieldId: Int,
+        inputType: Int
+    ): VoiceAudioDocumentResumeResult? {
+        val result = completed ?: return null
+        completed = null
+        return result.takeIf {
+            packageName == it.target.packageName &&
+                fieldId == it.target.fieldId &&
+                inputType == it.target.inputType
+        }
+    }
+}
+
 object MeetingDiarizationCapability {
     fun supports(profile: VoiceProviderProfile): Boolean {
         val normalized = runCatching(profile::validate).getOrNull() ?: return false
