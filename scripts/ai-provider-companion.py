@@ -2,8 +2,9 @@
 """Connect Fcitx Android to this computer's logged-in Codex or Claude Code CLI.
 
 By default the helper exposes a small PKCE gateway through Tailscale HTTPS and advertises it on
-the local network. The Codex/Claude account token remains in that CLI's own credential store.
-Supplying --manifest-url keeps the original advertise-only mode for an existing OAuth provider.
+the local network. A separately managed HTTPS reverse proxy can be supplied with --public-origin.
+The Codex/Claude account token remains in that CLI's own credential store. Supplying
+--manifest-url keeps the original advertise-only mode for an existing OAuth provider.
 """
 
 from __future__ import annotations
@@ -79,6 +80,21 @@ def manifest_url(value: str) -> str:
     if path != WELL_KNOWN_PATH:
         raise ValueError(f"the manifest address must use {WELL_KNOWN_PATH}")
     return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+
+
+def public_origin(value: str) -> str:
+    parsed = urllib.parse.urlsplit(value.strip())
+    if parsed.scheme.lower() != "https" or not parsed.hostname:
+        raise ValueError("the public origin must use HTTPS")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("the public origin cannot contain credentials, query, or fragment")
+    if parsed.path not in ("", "/"):
+        raise ValueError("the public origin cannot contain a path")
+    try:
+        parsed.port
+    except ValueError as error:
+        raise ValueError("the public origin has an invalid port") from error
+    return urllib.parse.urlunsplit(("https", parsed.netloc, "", "", ""))
 
 
 def reject_credentials(value) -> None:
@@ -979,7 +995,9 @@ def normalized_computer_name(value: str) -> str:
 def run_cli_gateway(args: argparse.Namespace) -> None:
     sandbox = Path(args.sandbox_dir).expanduser().resolve()
     runner = CliBackendRunner(sandbox)
-    origin = tailscale_origin(args.tailscale_https_port)
+    origin = public_origin(args.public_origin) if args.public_origin else tailscale_origin(
+        args.tailscale_https_port
+    )
     oauth_state_path = Path(args.oauth_state_path).expanduser().resolve()
     gateway = CliGateway(
         origin,
@@ -995,7 +1013,8 @@ def run_cli_gateway(args: argparse.Namespace) -> None:
     thread = threading.Thread(target=server.serve_forever, name="fcitx-cli-gateway", daemon=True)
     thread.start()
     try:
-        configure_tailscale_serve(args.gateway_port, args.tailscale_https_port)
+        if not args.public_origin:
+            configure_tailscale_serve(args.gateway_port, args.tailscale_https_port)
         manifest_url_value = f"{origin}{WELL_KNOWN_PATH}"
         manifest = verify_manifest(manifest_url_value)
         print(f"Verified provider: {manifest.get('display_name', 'Computer AI')}")
@@ -1003,7 +1022,7 @@ def run_cli_gateway(args: argparse.Namespace) -> None:
         advertise(
             normalized_computer_name(args.name),
             local_ipv4(args.address),
-            args.tailscale_https_port,
+            urllib.parse.urlsplit(origin).port or 443,
             manifest_url_value,
         )
     finally:
@@ -1126,6 +1145,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--gateway-port", type=int, default=DEFAULT_GATEWAY_PORT)
     parser.add_argument(
+        "--public-origin",
+        help="HTTPS origin of a separately managed reverse proxy for the local CLI gateway",
+    )
+    parser.add_argument(
         "--tailscale-https-port",
         type=int,
         default=DEFAULT_TAILSCALE_HTTPS_PORT,
@@ -1147,9 +1170,14 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
-        if not 1 <= args.gateway_port <= 65535 or not 1 <= args.tailscale_https_port <= 65535:
-            raise ValueError("gateway ports must be between 1 and 65535")
-        if not args.manifest_url and not os.environ.get("FCITX_AI_MANIFEST_URL"):
+        if not 1 <= args.gateway_port <= 65535:
+            raise ValueError("the gateway port must be between 1 and 65535")
+        external_manifest = args.manifest_url or os.environ.get("FCITX_AI_MANIFEST_URL")
+        if external_manifest and args.public_origin:
+            raise ValueError("--public-origin cannot be combined with --manifest-url")
+        if not external_manifest:
+            if not args.public_origin and not 1 <= args.tailscale_https_port <= 65535:
+                raise ValueError("the Tailscale HTTPS port must be between 1 and 65535")
             run_cli_gateway(args)
             return 0
         url, document = find_manifest(args.manifest_url)

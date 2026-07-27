@@ -388,11 +388,11 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
 | `AI-00` | AI provider·보안 기반 | `DONE` | provider profile, key vault, privacy gate, usage 표시 | L |
-| `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `IN_PROGRESS` | Unicode-safe diff·선택 적용 구현, 두 기기 실사용 gate 남음 | M |
-| `AI-02` | 존댓말·말투 변환 | `IN_PROGRESS` | 존댓말·카톡·업무·거절·사과·고객응대 action 구현, action별 실기기 matrix 남음 | M |
-| `AI-03` | 빠른 문장 생성 | `IN_PROGRESS` | 프리셋·활성 키보드 직접 지시·빈 입력창 생성과 정확히 3개의 서로 다른 구조화 후보 계약 구현; 실제 provider별 한국어 품질 matrix 남음 | M |
-| `AI-04` | 답장 초안 | `IN_PROGRESS` | 선택·문단·명시적 clipboard·Sharesheet intake 구현, 두 기기 검증 남음 | M |
-| `AI-05` | 키보드 번역 | `IN_PROGRESS` | 한↔영·일·중 action과 preview 구현, 언어별 실기기 matrix 남음 | M |
+| `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `DONE` | Unicode-safe diff·선택 적용·정확히 1회 교체·undo와 emulator 실제 Codex 교정 통과 | M |
+| `AI-02` | 존댓말·말투 변환 | `DONE` | 존댓말·카톡·업무·거절·사과·고객응대 action과 실제 Codex/Claude 결과 matrix 통과 | M |
+| `AI-03` | 빠른 문장 생성 | `DONE` | 프리셋·활성 키보드 직접 지시·빈 입력창 생성, 서로 다른 후보 정확히 3개, 실제 Codex/Claude 생성·교체·undo 통과 | M |
+| `AI-04` | 답장 초안 | `DONE` | 선택·문단·명시적 clipboard·Sharesheet intake, TTL·privacy·정확히 1회 입력과 실제 답장 생성 통과 | M |
+| `AI-05` | 키보드 번역 | `DONE` | 한↔영·일·중 action·preview·정확히 1회 교체와 emulator 실제 OAuth companion 번역 통과 | M |
 | `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
 | `AI-07` | 원격 호환 endpoint OAuth | `DONE` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인; PC CLI companion과 두 기기 live 통과 | L |
 | `AI-08` | 일반 사용자 AI 연결 안내 | `DONE` | 미연결·OAuth 만료 상태에 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
@@ -993,6 +993,14 @@ local health 열기를 제공하고 helper process를 감시해 장애 시 복�
 배포하고 현재 사용자 logon 예약 작업 `Fcitx5 Android AI Companion`을 설치한다. 기존 독립 OAuth
 provider를 광고할 때만 `--manifest-url`의 advertise-only 호환 모드를 사용한다.
 
+Android emulator처럼 Tailscale private address나 MagicDNS에 직접 들어갈 수 없는 검증 환경은 별도로
+관리하는 HTTPS reverse proxy origin을 `--public-origin https://host[:port]`로 지정할 수 있다. 이 값은
+HTTPS origin만 허용하고 credential, path, query, fragment와 잘못된 port를 거부한다. companion은 이
+origin으로 manifest·OAuth·Responses URL을 만들고 Tailscale Serve 설정은 건드리지 않는다. reverse
+proxy가 loopback gateway로 연결되는지와 외부 노출 수명·access policy는 운영자가 별도로 관리한다.
+`--manifest-url` advertise-only mode와 `--public-origin`은 동시에 사용하지 않는다. 임시 public tunnel은
+emulator 검증용일 뿐 tray의 Tailscale 기본 경로를 대체하는 production 기본값이 아니다.
+
 현재 targetSdk 36에서는 기존 local-network NSD 경로를 쓴다. targetSdk 37 전환 시 Android local
 network protection을 별도 milestone로 올리고, broad `ACCESS_LOCAL_NETWORK` 요청보다 system service
 picker의 scoped grant를 먼저 적용한다. 사용자가 직접 입력하는 fallback도 OAuth 필드가 아니라 동일한
@@ -1067,7 +1075,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | OAuth public client | `PASS` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현; AppCompat dialog theme와 Android 11+ browser query 회귀 수정 |
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
 | OAuth 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 61 suites·261 tests failure/error/skipped 0, `:app:assembleDebug -PbuildABI=arm64-v8a`, debug merged manifest redirect scheme 일치 |
-| OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과; PC 재시작용 companion grant는 Windows DPAPI로 보존 |
+| OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과; API 34 emulator도 임시 HTTPS `--public-origin`의 manifest 확인·browser 승인·token 교환·암호화 session 저장 통과; PC 재시작용 companion grant는 Windows DPAPI로 보존 |
 | 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |
 | PC 유료 CLI 실행 | `PASS` | Codex CLI `exec`는 ChatGPT 로그인, Claude Code `-p`는 Max 로그인으로 실행; API/token 환경 변수 제거, tool·web·write·session persistence 차단, A35에서 Codex 맞춤법과 Claude 존댓말 실제 생성 성공, Fold에서 Codex 생성 성공 |
 | PC WPF tray·자동 실행 | `PASS` | single-file WPF tray의 current-user logon 예약 작업 설치 후 helper를 종료하자 tray-owned 새 PID가 `127.0.0.1:9211` health와 Tailscale HTTPS manifest를 자동 복구; 2026-07-27 Release build warning/error 0, 예약 작업 `Running`, health `ok`, Codex·Claude backend 모두 healthy |
@@ -1089,10 +1097,12 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | Realtime protocol·실패 UX | `PASS/CODE+EMULATOR` | 공식 24 kHz PCM session JSON, append/commit, item별 delta/completed와 401 typed failure를 상태 테스트로 고정. API 34 x86_64에서 `연결 중` 즉시 표시, 거부된 key의 한국어 설명·`설정하기` STT dialog 직행, crash·key log 부재와 test credential 삭제·휴대폰 받아쓰기 복구 확인 |
 | OpenAI 실제 전사 품질 | `GATE` | dummy key로 녹음·요청·401 오류 경계만 검증했다. 실제 STT key를 저장하지 않은 상태이며 한국어 정확도·preview·1회 입력은 사용자 key로 별도 검증 필요 |
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
-| AI-01 diff·부분 적용 | `PASS` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI, 7개 신규 테스트 |
-| AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트 |
-| AI 3개 후보 계약 | `PASS/CODE` | Compose·Reply·Custom은 Responses `text.format` strict JSON Schema의 `minItems=maxItems=3`을 전송한다. Android parser와 PC CLI companion도 공백·중복 제거 후 정확히 3개가 아니면 성공 card 대신 한국어 재시도 상태로 fail-closed. 2026-07-27 Android 63 suites·274 tests와 companion Python 8 tests, x86_64 assembly 통과 |
-| action별 품질 matrix | `GATE` | 말투 6종, 답장, 번역 4개, 3후보 보장을 provider/model별로 실제 기기 검증해야 함 |
+| AI-01 diff·부분 적용 | `PASS/EMULATOR` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI. 실제 `안녕하세욕`에 `욕 → 요`를 선택하고 38dp `선택한 교정 적용` 버튼으로 `안녕하세요`를 정확히 한 번 반영 |
+| AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트와 A35 실제 답장 생성 통과 |
+| AI 3개 후보 계약 | `PASS/EMULATOR` | Compose·Reply·Custom은 Responses `text.format` strict JSON Schema의 `minItems=maxItems=3`을 전송한다. Android parser와 PC CLI companion도 공백·중복 제거 후 정확히 3개가 아니면 성공 card 대신 한국어 재시도 상태로 fail-closed. API 34 emulator에서 OAuth companion의 실제 `문장 3개`가 서로 다른 한국어 후보 3개를 반환했고 첫 후보 교체·원문 undo 통과. Android 65 suites·283 tests, companion Python 9 tests와 x86_64 app/plugin assembly 통과 |
+| AI-05 번역 matrix | `PASS/EMULATOR` | OAuth companion으로 `안녕하세요 → Hello`, `Hello → 안녕하세요`, `Hello → こんにちは`, `Hello → 你好`를 각 action에서 실제 생성하고 preview card를 확인 |
+| AI-02 말투 matrix | `PASS/A35+EMULATOR` | A35의 Claude 존댓말, API 34 emulator OAuth companion의 카톡체·업무용·정중한 거절·사과·고객응대 action이 모두 실제 한국어 결과 card를 반환 |
+| 구간 녹음 버튼·권한·오류 | `PASS/EMULATOR` | 권한 미허용 상태의 `녹음 시작` 1회 탭으로 Android permission dialog 표시, 승인 뒤 같은 editor에서 `녹음 중`·AudioRecord app-op running 확인, 중지 뒤 dummy key 401을 한국어 설명과 `설정하기`로 복구. 사용자 보고의 무반응은 최신 emulator build에서 재현되지 않아 실기기 microphone 품질 gate와 분리 |
 
 사용량 저장소는 action·성공/실패·입출력 문자 수·마지막 provider/model만 집계하며 prompt, 결과,
 API key, endpoint URL 필드를 갖지 않는다. 개인 debug build의 공급자 credential도 Gradle environment
@@ -1136,15 +1146,15 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 4. `AI-09` 컴퓨터 자동 발견·검증·연결 마법사. (`DONE`: 두 기기 mDNS·Tailscale HTTPS·PKCE·DPAPI 재시작 복구 통과)
 5. `AI-10` 직접 지시 터치 안전·API key 인증 복구. (`DONE`: API 34 emulator touchable region·설정 CTA 통과)
 6. `SEC-03` offline network gate. (`DONE`: API 34 emulator에서 AI·OpenAI 전사·GIF 개별 tap 전후 UID BPF network delta 0)
-7. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
-8. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
-9. `AI-03` 문장 생성. (`IN_PROGRESS`: strict structured output·정확히 3개 후보·한국어 재시도 구현, 실제 provider별 품질 gate)
-10. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
-11. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
+7. `AI-01` 맞춤법·띄어쓰기. (`DONE`: emulator 실제 diff 선택·1회 적용 통과)
+8. `AI-02` 말투 변환. (`DONE`: 존댓말·카톡체·업무용·정중한 거절·사과·고객응대 실제 결과 통과)
+9. `AI-03` 문장 생성. (`DONE`: strict structured output·정확히 3개 후보·실제 OAuth companion 생성·교체·undo 통과)
+10. `AI-05` 번역. (`DONE`: emulator 한↔영·일·중 실제 OAuth companion 결과 통과)
+11. `AI-04` 답장 초안. (`DONE`: clipboard/share intake·실제 답장 생성·정확히 1회 입력 통과)
 
 ### 단계 4 — 음성
 
-1. push-to-talk audio capture와 permission UX. (`IN_PROGRESS`: A35 최초 권한 자동 복귀 PASS, Z Fold6 gate)
+1. push-to-talk audio capture와 permission UX. (`DONE`: A35와 API 34 emulator 최초 권한 자동 복귀·AudioRecord·중지·401 복구 PASS)
 2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview 완료, 실제 key live 품질 gate)
 3. `VOICE-01` realtime partial transcript. (`IN_PROGRESS`: WebSocket·partial/final 상태·emulator 401 UX PASS, 실제 key 한국어 품질과 production ephemeral token/WebRTC gate)
 4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 코드·테스트 완료, 표준 OpenAI·실기기 gate)
@@ -1233,3 +1243,5 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 동적 문구와 자동 스니펫은 API 34 emulator의 암호화 profile·Space·Enter·buffered 분할 trigger·private literal 보존을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
 | 2026-07-27 | 앱별 profile은 API 34 emulator의 exact package·전역 fallback·키보드 표면별 저장·network/AI 차단을 Android 완료 gate로 인정. Fold 자세별 표면은 `UX-02`에만 남김 |
 | 2026-07-27 | 한자는 일반 한글 자동완성에 섞지 않고 더보기의 `한글` 상태 액션으로만 1회 연다. flush 전 활성 어절로 조회하고 선택 뒤 즉시 한글 자동완성으로 복귀 |
+| 2026-07-27 | 비하드웨어 Android 회귀의 완료 기준은 Pixel 7 API 34 emulator로 통일하고 A35 microphone 품질·Fold posture·생체 인증만 실기기 gate로 유지. `녹음 시작` 무반응은 최신 emulator build에서 재현되지 않았고 권한 dialog·AudioRecord·중지·401 설정 복구까지 통과 |
+| 2026-07-27 | Tailscale private network를 사용할 수 없는 emulator 검증에는 strict HTTPS origin-only `--public-origin`을 허용하되 임시 tunnel을 production 기본값으로 승격하지 않음 |

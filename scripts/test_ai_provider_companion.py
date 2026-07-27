@@ -115,6 +115,22 @@ class LocalOAuthStateTest(unittest.TestCase):
 
 
 class CliBoundaryTest(unittest.TestCase):
+    def test_public_origin_is_https_origin_only(self):
+        self.assertEqual(
+            "https://keyboard.example:9443",
+            companion.public_origin(" https://keyboard.example:9443/ "),
+        )
+        for value in (
+            "http://keyboard.example",
+            "https://user:secret@keyboard.example",
+            "https://keyboard.example/proxy",
+            "https://keyboard.example?token=secret",
+            "https://keyboard.example/#fragment",
+            "https://keyboard.example:invalid",
+        ):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                companion.public_origin(value)
+
     def test_cli_environment_drops_all_api_and_oauth_overrides(self):
         keys = (
             "OPENAI_API_KEY",

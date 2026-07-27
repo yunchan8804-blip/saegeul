@@ -452,7 +452,10 @@ class AiAssistantUi(
                 }
             }, matchWrap())
         }
-        addView(applyButton, matchWrap().apply { topMargin = dp(3) })
+        addView(applyButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(38)
+        ).apply { topMargin = dp(3) })
     }
 
     private fun highlightedSuggestion(patch: AiTextPatch): CharSequence =
