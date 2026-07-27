@@ -78,7 +78,7 @@
 | `KO-03A` | 자동 스니펫 확장 | `DONE` | API 34 emulator에서 `:주소1`·`:이메일`의 Space·Enter·buffered 분할·private 차단 통과 |
 | `KO-09` | 한글 어절 자동완성 | `DONE` | API 34 emulator에서 로컬 후보·명시 선택·미선택 Space·buffered 1회 확정·private 차단 통과 |
 | `KO-04` | 앱별 키보드 profile | `DONE` | API 34 emulator에서 exact package·전역 fallback·키보드 표면 저장·정책 차단·설정 dialog 검증 통과 |
-| `KO-05` | 한자 후보 음훈 | `IN_PROGRESS` | bundled libhangul 음훈을 candidate comment로 전달, native test와 두 기기 UI gate 진행 중 |
+| `KO-05` | 한자 후보 음훈 | `DONE` | API 34 emulator에서 명시 액션·음훈 렌더·1회 교체·한글 자동완성 복귀 통과 |
 
 한국어 기준선과 GIF·KO-01·KO-02는 각각 검증 가능한 checkpoint commit으로 고정돼 있다.
 일반 Android 기능은 API 34 emulator에서 실제 UI·입력·exactly-once를 검증하고, 마이크 음질과 Fold
@@ -145,7 +145,8 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | `KO-03` | 동적 빠른 문구 | `DONE` | 날짜·시간·이름·전화·이메일·주소·clipboard 변수, preview | M |
 | `KO-03A` | 자동 스니펫 확장 | `DONE` | `:` trigger 뒤 space·Enter로 암호화 profile 또는 사용자 상용구 확장 | M |
 | `KO-04` | 앱별 키보드 profile | `DONE` | package별 layout, theme, transport, toolbar, AI 정책 | M |
-| `KO-05` | 한자·국어사전 후보 | `IN_PROGRESS` | bundled 한자·음훈 후보 구현, 국어사전 정의 source는 별도 gate | M |
+| `KO-05` | 한자 음훈 후보 | `DONE` | bundled libhangul 한자·독음·뜻을 명시적 1회 변환 후보로 표시 | M |
+| `KO-05A` | 국어사전 정의 후보 | `BACKLOG` | 국립국어원 source·license·offline cache 계약을 확정한 뒤 별도 구현 | M |
 | `KO-06` | 개인 단어장 | `DONE` | opt-in·백업 제외 원자 저장, 개인 후보 우선순위·중복 제거·민감 editor 차단과 emulator 실제 후보 선택 통과 | L |
 | `KO-07` | 한국어 조사·문맥 후보 | `DONE` | 받침·ㄹ 예외 조사와 공백 경계 로컬 다음 어절 후보, emulator UI·선택·취소·정확히 1회 삽입 통과 | L |
 | `KO-08` | 한국식 감정표현 추천 | `DONE` | 로컬 emoji·kaomoji·ㅋㅋ/ㅎㅎ 강·약 chip, emulator 후보·정확히 1회 삽입·민감 editor 차단 통과 | M |
@@ -349,7 +350,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | 저장·정리 | `PASS` | profile은 `no_backup/app-profile/profiles.json`에만 존재했고 검증 후 임시 profile 파일을 제거해 기본 상태로 복구 |
 | Z Fold6 profile matrix | `SUPERSEDED` | package 정책 자체는 posture·sensor에 의존하지 않아 emulator를 Android 완료 gate로 인정. Fold 전용 cover/unfold layout은 `UX-02`에서만 별도 검증 |
 
-#### KO-05 한자 음훈과 국어사전 경계 (2026-07-26)
+#### KO-05 한자 음훈과 국어사전 경계 (2026-07-27)
 
 - 배포 중인 libhangul `hanja.txt`에는 `가:可:옳을 가`처럼 글자·독음·뜻이 이미 포함돼 있었지만
   Hangul addon이 candidate text만 전달하고 comment를 버리고 있었다.
@@ -363,7 +364,13 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | native data | `PASS` | prebuilt libhangul 표제 `가→可→옳을 가` 확인 |
 | addon build | `PASS` | comment 전달 코드 포함 arm64 Hangul plugin assemble 성공 |
 | native regression | `PASS` | `testhangul.cpp`가 F9 뒤 첫 후보 `可`와 comment `옳을 가`를 assertion; Android TestFrontend target 부재로 cross compile 실행은 별도 gate |
-| 두 기기 candidate UI | `GATE` | A35·Z Fold6에서 실제 한자 action 뒤 음훈 렌더와 선택 교체를 확인해야 함 |
+| status action UX | `PASS` | 더보기의 상태 항목은 지속 한자 모드가 아닌 `한글`로 표시하고, 실행 직후 keyboard로 자동 복귀해 결과 후보를 바로 노출 |
+| Android surrounding race | `FIXED` | `commitString()` 직후 stale surrounding text를 다시 읽지 않고 flush 전에 전체 활성 어절을 보존해 한자 lookup에 사용 |
+| emulator candidate UI | `PASS` | `가`의 명시 액션 뒤 `可 옳을 가`, `家 집 가`, `加 더할 가`가 표시되고 첫 후보 선택 시 editor가 `可` 한 글자로 정확히 1회 교체 |
+| 한글 모드 복귀 | `PASS` | 한자 선택 뒤 `안녕`을 새로 입력하면 `안녕하세요`·`안녕하십니까` 등 한글 자동완성만 노출되고 한자 후보가 잔류하지 않음 |
+| x86_64 build/test | `PASS` | app·Hangul plugin assemble과 app 65 suites·283 tests, failure/error/skipped 0 |
+| Z Fold6 candidate UI | `SUPERSEDED` | 후보 생성·선택은 posture·sensor에 의존하지 않아 API 34 emulator를 Android 완료 gate로 인정 |
+| 국어사전 정의 | `BACKLOG` | `KO-05A`로 분리. 국립국어원 source·license·offline cache 계약 전에는 원격 정의를 한자 후보에 섞지 않음 |
 
 #### KO-01 구현·검증 증거 (2026-07-26)
 
@@ -1119,7 +1126,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 4. `KO-03A` 자동 스니펫 확장. (`DONE`: emulator 일반·Enter·buffered 분할·private 차단 통과)
 5. `KO-09` 한글 어절 자동완성. (`DONE`: emulator 일반·buffered 후보 선택·미선택 Space·private 차단 통과)
 6. `KO-04` 앱별 profile과 network policy. (`DONE`: emulator exact match·fallback·표면 저장·정책 차단·dialog viewport 통과)
-7. `KO-05` 한자 음훈 candidate UI. (`NEXT`)
+7. `KO-05` 한자 음훈 candidate UI. (`DONE`: emulator 명시 액션·음훈·1회 교체·한글 복귀 통과)
 
 ### 단계 3 — AI 기반과 text 기능
 
@@ -1145,7 +1152,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 
 ### 단계 5 — 개인화·대화면·장기 기능
 
-1. `KO-05` 한자·사전과 `KO-06` 개인 단어장. (`KO-06 DONE`: emulator 등록·삭제·우선 후보·1회 선택 통과, `KO-05` 국어사전 source gate)
+1. `KO-05` 한자 음훈과 `KO-06` 개인 단어장. (`DONE`: 두 기능 모두 emulator 1회 선택 통과; 국어사전 정의는 `KO-05A` backlog로 분리)
 2. `UX-01` smart clipboard action. (`DONE`: emulator 명시 선택·mask·합치기·1회 삽입·private editor 차단 통과)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 펼친 Fold6 한글·영문 손 경계 통과, 회전·모바일·중앙 무입력 gate)
@@ -1225,3 +1232,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 한글 어절 자동완성은 API 34 emulator의 일반·buffered editor 후보·명시 선택·미선택 Space·private 차단을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
 | 2026-07-27 | 동적 문구와 자동 스니펫은 API 34 emulator의 암호화 profile·Space·Enter·buffered 분할 trigger·private literal 보존을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
 | 2026-07-27 | 앱별 profile은 API 34 emulator의 exact package·전역 fallback·키보드 표면별 저장·network/AI 차단을 Android 완료 gate로 인정. Fold 자세별 표면은 `UX-02`에만 남김 |
+| 2026-07-27 | 한자는 일반 한글 자동완성에 섞지 않고 더보기의 `한글` 상태 액션으로만 1회 연다. flush 전 활성 어절로 조회하고 선택 뒤 즉시 한글 자동완성으로 복귀 |

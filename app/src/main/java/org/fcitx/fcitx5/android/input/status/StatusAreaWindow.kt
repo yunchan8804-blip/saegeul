@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.InputMethod
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Keyboard
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ReloadConfig
@@ -80,9 +81,15 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
         )
     }
 
-    private fun activateAction(action: Action) {
+    private fun activateActionAndReturn(action: Action) {
         fcitx.launchOnReady {
             it.activateAction(action.id)
+            service.lifecycleScope.launch {
+                // Status actions operate on the current composition (notably one-shot Hanja).
+                // Return immediately so the resulting candidates are visible without requiring
+                // another tap that could commit or discard the composition.
+                windowManager.attachWindow(KeyboardWindow)
+            }
         }
     }
 
@@ -95,7 +102,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                     is StatusAreaEntry.Fcitx -> {
                         val actions = entry.action.menu
                         if (actions.isNullOrEmpty()) {
-                            activateAction(entry.action)
+                            activateActionAndReturn(entry.action)
                             return
                         }
                         val popup = PopupMenu(context, view)
@@ -125,7 +132,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                             } else {
                                 menu.add(groupId, 0, 0, it.shortText).apply {
                                     setOnMenuItemClickListener { _ ->
-                                        activateAction(it)
+                                        activateActionAndReturn(it)
                                         true
                                     }
                                 }
