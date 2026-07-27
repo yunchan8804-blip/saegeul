@@ -29,4 +29,10 @@ class ToolbarLayoutPolicyTest {
         assertTrue(ToolbarLayoutPolicy.needsSecondRow(334, 48, 12))
         assertFalse(ToolbarLayoutPolicy.needsSecondRow(729, 48, 12))
     }
+
+    @Test
+    fun candidatesWrapOnlyWhenTwoCompleteRowsAreReserved() {
+        assertFalse(ToolbarLayoutPolicy.supportsSecondRow(95, 48))
+        assertTrue(ToolbarLayoutPolicy.supportsSecondRow(96, 48))
+    }
 }

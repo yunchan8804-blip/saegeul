@@ -11,6 +11,7 @@ import android.graphics.drawable.shapes.RectShape
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.flexbox.FlexboxLayoutManager
+import com.google.android.flexbox.FlexWrap
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -21,6 +22,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.bar.ToolbarLayoutPolicy
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.FlexboxVerticalDecoration
@@ -152,6 +154,17 @@ class HorizontalCandidateComponent :
         object : RecyclerView(context) {
             override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
                 super.onSizeChanged(w, h, oldw, oldh)
+                // Only wrap when the stable toolbar session actually reserves two full rows.
+                // A collapsed or wide one-row session must keep the legacy single-row layout.
+                this@HorizontalCandidateComponent.layoutManager.flexWrap =
+                    if (ToolbarLayoutPolicy.supportsSecondRow(
+                            measuredHeight = h,
+                            rowHeight = context.dp(KawaiiBarComponent.HEIGHT)
+                        )) {
+                        FlexWrap.WRAP
+                    } else {
+                        FlexWrap.NOWRAP
+                    }
                 if (fillStyle == AutoFillWidth) {
                     val maxSpanCount = maxSpanCountPref.getValue()
                     layoutMinWidth = w / maxSpanCount - dividerDrawable.intrinsicWidth

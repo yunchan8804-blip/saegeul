@@ -15,9 +15,12 @@ import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
+import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
+import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
+import splitties.views.dsl.core.matchParent
 
 class CandidateUi(override val ctx: Context, theme: Theme, private val horizontalView: View) : Ui {
 
@@ -28,10 +31,10 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
 
     override val root = ctx.constraintLayout {
         add(expandButton, lParams(dp(KawaiiBarComponent.HEIGHT)) {
-            centerVertically()
+            topOfParent()
             endOfParent()
         })
-        add(horizontalView, lParams {
+        add(horizontalView, lParams(matchConstraints, matchParent) {
             centerVertically()
             startOfParent()
             before(expandButton)

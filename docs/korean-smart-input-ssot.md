@@ -448,7 +448,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | --- | --- | --- | --- | --- |
 | `UX-01` | Smart clipboard action | `DONE` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹, emulator 미리보기·1회 삽입·민감 editor 차단 통과 | M |
 | `UX-02` | Fold·tablet 분할 키보드 | `DONE` | compact/expanded·세로/가로 profile, 초기 복원, 중앙 non-touch gap, 두벌식 자음·모음 손 경계와 모바일 표면·숫자판 왕복을 API 34 phone/tablet emulator에서 검증 | L |
-| `UX-03` | 폭 적응형 기능 툴바 | `DONE` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환하고 모든 제어를 최소 48dp로 유지 | M |
+| `UX-03` | 폭 적응형 기능 툴바 | `DONE` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환한다. compact 2행 세션에서는 한글 후보·일시적 bar도 같은 96dp envelope를 이어받아 입력 중 editor가 48dp씩 요동하지 않는다 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
 | `SEC-03` | 완전 offline mode | `DONE` | AI·OpenAI 전사·GIF toolbar를 fail-closed로 비활성화하고 API 34 emulator의 Fcitx UID BPF 통계로 3개 동작 전후 network 0 byte·0 packet 검증 | S |
@@ -606,7 +606,7 @@ SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OC
 
 | ID | 구현 계약 | 자동 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `UX-03` | 별도 중첩 메뉴를 추가하지 않는다. 기존 툴바 열기 상태에서 실제 가용 폭이 `12 × 48dp`보다 좁으면 6×2행·96dp, 충분하면 12×1행·48dp로 즉시 전환한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 항상 1행이며 action의 순서·위치·활성 정책을 유지한다. | `ToolbarLayoutPolicyTest`, Flexbox shrink 금지, 높이 상태 전환과 arm64 build, A35·Z Fold6 cover 6×2, Z Fold6 unfolded 12×1, 두 기기 `?123` PASS | 없음 |
+| `UX-03` | 별도 중첩 메뉴를 추가하지 않는다. 기존 툴바 열기 상태에서 실제 가용 폭이 `12 × 48dp`보다 좁으면 6×2행·96dp, 충분하면 12×1행·48dp로 즉시 전환한다. compact 2행을 사용자가 연 editor 세션은 Candidate·Clipboard·NumberRow·InlineSuggestion·Title로 바뀌어도 96dp 높이를 유지하며, Candidate는 실제 48dp 후보를 최대 2행으로 배치한다. 명시적 접기·새 editor·실제 폭 변화만 48dp 전환을 허용한다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, Flexbox shrink 금지, Android `restarting=true` visible-state 보존, arm64 build, A35·Z Fold6 cover 6×2, Z Fold6 unfolded 12×1, 두 기기 `?123` PASS | 실제 한글 후보가 2행을 채우는 실기기 캡처는 다음 사용자 확인 gate |
 | `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동하고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, A35·Z Fold6 미연결 안내, API 34 x86_64 emulator의 STT dialog 직행 PASS | 없음 |
 | `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
 
@@ -619,6 +619,17 @@ HoneyBoard가 활성인 화면을 이 앱의 숫자판이나 툴바 증거로 �
 안내와 `설정하기` 버튼이 표시됐으며 버튼은 `개인정보·AI` route와 미연결 summary로 직접 이동했다.
 Z Fold6를 펼친 뒤 내부 화면 `1856×2160`, override density 360에서 같은 toolbar가 12×1 한 줄로
 자동 복귀하고 keyboard 본체와 `?123`이 함께 정상 렌더되는 것을 무선 ADB 캡처로 확인했다.
+
+2026-07-27 높이 회귀 감사에서 compact toolbar 2행과 자동 후보 1행이 교대할 때 대상 앱의 editor
+viewport가 매 입력마다 48dp씩 변하는 결함을 다시 재현했다. 첫 sticky-height 구현만으로는 Chrome이
+같은 editor를 `restarting=true`로 재시작할 때 수동 toolbar 상태가 초기화되어 `y=1279 -> y=1405`,
+즉 density 420에서 정확히 `126px = 48dp` 요동이 남았다. `restarting` 신호를 input broadcast에
+전달하고 이전 boolean 자체가 아니라 사용자가 실제로 보던 펼침 상태를 보존하도록 수정했다. 새 editor는
+자기 app profile 기본값을 사용한다. Pixel 7 API 34 emulator에서 수정 APK를 다시 설치한 뒤 Chrome의
+수동 2행 toolbar를 열고 한글 입력·재포커스를 반복해 bar 시작 `y=1280`, keyboard 본체 시작
+`y=1532`가 전후 동일함을 픽셀 측정했다. Candidate adapter는 96dp가 실제 확보된 때만 `WRAP`,
+48dp session에서는 `NOWRAP`을 사용해 잘린 숨은 두 번째 행을 만들지 않는다. 전체 app JVM test,
+arm64 assemble과 `git diff --check`가 통과했고 동일 arm64 APK를 Z Fold6에 설치했다.
 
 2026-07-27 출근 이후 반복 검증 기준은 `Pixel_7_API_34` x86_64 emulator로 전환했다. 첫 toolbar
 확장 때 descendant layout pass 안에서 ancestor 높이를 바꾸면 두 번째 행이 잘리는 문제를 다음 frame으로
@@ -1204,7 +1215,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | Realtime protocol·실패 UX | `PASS/CODE+EMULATOR` | 공식 24 kHz PCM session JSON, append/commit, item별 delta/completed와 401 typed failure를 상태 테스트로 고정. API 34 x86_64에서 `연결 중` 즉시 표시, 거부된 key의 한국어 설명·`설정하기` STT dialog 직행, crash·key log 부재와 test credential 삭제·휴대폰 받아쓰기 복구 확인 |
 | OpenAI 실제 전사 품질 | `GATE` | dummy key로 녹음·요청·401 오류 경계만 검증했다. 실제 STT key를 저장하지 않은 상태이며 한국어 정확도·preview·1회 입력은 사용자 key로 별도 검증 필요 |
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
-| AI-01 diff·부분 적용 | `PASS/EMULATOR` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI. 실제 `안녕하세욕`에 `욕 → 요`를 선택하고 38dp `선택한 교정 적용` 버튼으로 `안녕하세요`를 정확히 한 번 반영 |
+| AI-01 diff·부분 적용 | `PASS/EMULATOR+ZFOLD` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI. emulator의 부분 적용에 더해 Z Fold6 cover에서 기존 OAuth CLI companion으로 `안녕하세욕`을 전송해 `안녕하세요`, `욕 → 요` 결과를 받고 `교체` 정확히 1회·`실행 취소` 시 뒤 공백까지 원문 복원을 실측; 문자는 전송하지 않고 draft 삭제 |
 | AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트와 A35 실제 답장 생성 통과 |
 | AI 3개 후보 계약 | `PASS/EMULATOR` | Compose·Reply·Custom은 Responses `text.format` strict JSON Schema의 `minItems=maxItems=3`을 전송한다. Android parser와 PC CLI companion도 공백·중복 제거 후 정확히 3개가 아니면 성공 card 대신 한국어 재시도 상태로 fail-closed. Pixel 7·QA tablet API 34 emulator에서 OAuth companion의 실제 custom prompt가 서로 다른 한국어 후보 3개를 반환했고 첫 후보 교체·원문 undo 통과. Android 66 suites·299 tests, companion Python 11 tests와 x86_64 app assembly 통과 |
 | AI-05 번역 matrix | `PASS/EMULATOR` | OAuth companion으로 `안녕하세요 → Hello`, `Hello → 안녕하세요`, `Hello → こんにちは`, `Hello → 你好`를 각 action에서 실제 생성하고 preview card를 확인 |

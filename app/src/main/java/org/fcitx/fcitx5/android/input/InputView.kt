@@ -435,7 +435,7 @@ class InputView(
         // Dialogs such as the Hangul surface picker can restart the same editor. Keep the
         // internal target in that case, but fail closed as soon as editor identity changes.
         if (!service.shouldRetainAiPromptCapture(info)) discardAiPromptInput()
-        broadcaster.onStartInput(info, capFlags)
+        broadcaster.onStartInput(info, capFlags, restarting)
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
         if (focusChangeResetKeyboard || !restarting) {
             windowManager.attachWindow(KeyboardWindow)

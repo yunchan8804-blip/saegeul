@@ -18,4 +18,7 @@ internal object ToolbarLayoutPolicy {
 
     fun needsSecondRow(availableWidth: Int, itemSize: Int, itemCount: Int): Boolean =
         availableWidth < itemSize * itemCount
+
+    fun supportsSecondRow(measuredHeight: Int, rowHeight: Int): Boolean =
+        measuredHeight >= rowHeight * EXPANDED_ROWS
 }

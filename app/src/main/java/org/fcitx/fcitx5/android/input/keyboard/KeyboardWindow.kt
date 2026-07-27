@@ -258,7 +258,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         )
     }
 
-    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+    override fun onStartInput(
+        info: EditorInfo,
+        capFlags: CapabilityFlags,
+        restarting: Boolean
+    ) {
         // Re-resolve for every editor session so a Fold posture or multi-window viewport change is
         // reflected without requiring the user to toggle the preference.
         updateThumbSplitProfile()

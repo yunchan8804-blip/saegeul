@@ -124,13 +124,20 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var isCapabilityFlagsPassword: Boolean = false
     private var isKeyboardLayoutNumber: Boolean = false
     private var isToolbarManuallyToggled: Boolean = false
+    private var hasStartedInput: Boolean = false
     private var expandToolbarForEditor: Boolean = expandToolbarByDefault
-    private var activeBarState: KawaiiBarStateMachine.State = KawaiiBarStateMachine.State.Idle
     private var toolbarNeedsSecondRow: Boolean = false
+    private var toolbarHeightSession = ToolbarHeightSession.start(
+        toolbarVisible = expandToolbarForEditor,
+        needsSecondRow = false
+    )
 
     private enum class NumberRowState { Auto, ForceShow, ForceHide }
 
     private var numberRowState = NumberRowState.Auto
+
+    private fun isToolbarRequested(): Boolean =
+        expandToolbarForEditor != isToolbarManuallyToggled
 
     @Keep
     private val onClipboardUpdateListener =
@@ -205,6 +212,23 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         if (newState != idleUi.currentState) {
             idleUi.updateState(newState, fromUser)
+        }
+        when {
+            newState == IdleUi.State.Toolbar -> {
+                toolbarHeightSession = toolbarHeightSession.onToolbarVisibilityChanged(
+                    visible = true,
+                    needsSecondRow = toolbarNeedsSecondRow
+                )
+            }
+            fromUser && newState == IdleUi.State.Empty -> {
+                toolbarHeightSession = toolbarHeightSession.onToolbarVisibilityChanged(
+                    visible = false,
+                    needsSecondRow = toolbarNeedsSecondRow
+                )
+            }
+            else -> {
+                toolbarHeightSession = toolbarHeightSession.onTransientSurfaceChanged()
+            }
         }
         updateBarHeight()
     }
@@ -294,6 +318,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                         idleUi.updateState(IdleUi.State.Toolbar, fromUser = true)
                     }
                 }
+                toolbarHeightSession = toolbarHeightSession.onToolbarVisibilityChanged(
+                    visible = idleUi.currentState == IdleUi.State.Toolbar,
+                    needsSecondRow = toolbarNeedsSecondRow
+                )
+                updateBarHeight()
                 // reset timeout timer (if present) when user switch layout
                 if (clipboardTimeoutJob != null) {
                     launchClipboardTimeoutJob()
@@ -309,6 +338,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             buttonsUi.apply {
                 onNeedsSecondRowChanged = {
                     toolbarNeedsSecondRow = it
+                    toolbarHeightSession = toolbarHeightSession.onToolbarMeasurementChanged(
+                        toolbarVisible = isToolbarRequested(),
+                        needsSecondRow = it
+                    )
                     // onSizeChanged runs inside a layout pass. Resizing the ancestor bar there can
                     // be dropped by ConstraintLayout, leaving the freshly wrapped second row
                     // clipped on the first toolbar expansion. Defer the host resize to the next
@@ -458,7 +491,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private fun switchUiByState(state: KawaiiBarStateMachine.State) {
-        activeBarState = state
         updateBarHeight()
         val index = state.ordinal
         if (view.displayedChild == index) return
@@ -495,7 +527,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
     }
 
-    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+    override fun onStartInput(
+        info: EditorInfo,
+        capFlags: CapabilityFlags,
+        restarting: Boolean
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }
@@ -503,8 +539,18 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         val allowsTextInspection = !EditorPrivacyPolicy.forbidsTextInspection(info, capFlags)
         val allowsNetwork = service.allowsNetworkInputFeatures()
         val allowsAi = service.allowsAiInputFeatures()
+        val previouslyRequested = isToolbarRequested()
         expandToolbarForEditor = service.effectiveToolbarExpanded(expandToolbarByDefault)
-        isToolbarManuallyToggled = false
+        isToolbarManuallyToggled = ToolbarInputRestartPolicy.manualToggleForStart(
+            expandedForEditor = expandToolbarForEditor,
+            preserveVisibleState = restarting && hasStartedInput,
+            previouslyRequested = previouslyRequested
+        )
+        hasStartedInput = true
+        toolbarHeightSession = ToolbarHeightSession.start(
+            toolbarVisible = isToolbarRequested(),
+            needsSecondRow = idleUi.buttonsUi.needsSecondRow()
+        )
         idleUi.buttonsUi.typoRecoveryButton.apply {
             isEnabled = allowsTextInspection
             alpha = if (isEnabled) 1f else 0.35f
@@ -644,11 +690,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         // can finish measuring before the callback is installed, or while the idle state is still
         // Empty, so a callback-only cache can leave the wrapped second row clipped.
         toolbarNeedsSecondRow = idleUi.buttonsUi.needsSecondRow()
-        val secondRowVisible =
-            activeBarState == KawaiiBarStateMachine.State.Idle &&
-                idleUi.currentState == IdleUi.State.Toolbar &&
-                toolbarNeedsSecondRow
-        val targetHeight = context.dp(ToolbarLayoutPolicy.heightDp(secondRowVisible))
+        toolbarHeightSession = toolbarHeightSession.onToolbarMeasurementChanged(
+            toolbarVisible = isToolbarRequested(),
+            needsSecondRow = toolbarNeedsSecondRow
+        )
+        // Candidate/preedit and other transient bar states inherit the toolbar height selected for
+        // this editor. This prevents the editor viewport from jumping 48 dp on every composition.
+        val targetHeight = context.dp(toolbarHeightSession.heightDp)
         val params = view.layoutParams ?: return
         if (params.height == targetHeight) return
         params.height = targetHeight

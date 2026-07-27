@@ -1,0 +1,113 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.bar
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ToolbarHeightSessionTest {
+    @Test
+    fun sameEditorRestartPreservesManuallyOpenedToolbar() {
+        val manualToggle = ToolbarInputRestartPolicy.manualToggleForStart(
+            expandedForEditor = false,
+            preserveVisibleState = true,
+            previouslyRequested = true
+        )
+
+        assertTrue(false != manualToggle)
+    }
+
+    @Test
+    fun sameEditorRestartPreservesVisibleStateWhenProfileDefaultChanges() {
+        val manualToggle = ToolbarInputRestartPolicy.manualToggleForStart(
+            expandedForEditor = true,
+            preserveVisibleState = true,
+            previouslyRequested = true
+        )
+
+        assertTrue(true != manualToggle)
+    }
+
+    @Test
+    fun newEditorUsesItsResolvedDefaultInsteadOfPreviousManualState() {
+        val manualToggle = ToolbarInputRestartPolicy.manualToggleForStart(
+            expandedForEditor = false,
+            preserveVisibleState = false,
+            previouslyRequested = true
+        )
+
+        assertFalse(false != manualToggle)
+    }
+
+    @Test
+    fun compactExpandedToolbarKeepsHeightAcrossCandidateAndToolSurfaces() {
+        val toolbar = ToolbarHeightSession.start(
+            toolbarVisible = true,
+            needsSecondRow = true
+        )
+
+        val candidate = toolbar.onTransientSurfaceChanged()
+        val toolTitle = candidate.onTransientSurfaceChanged()
+
+        assertEquals(96, toolbar.heightDp)
+        assertEquals(toolbar, candidate)
+        assertEquals(toolbar, toolTitle)
+    }
+
+    @Test
+    fun explicitlyHidingToolbarIsTheOnlyTransientSessionCollapse() {
+        val expanded = ToolbarHeightSession.start(
+            toolbarVisible = true,
+            needsSecondRow = true
+        )
+        val hidden = expanded.onToolbarVisibilityChanged(
+            visible = false,
+            needsSecondRow = true
+        )
+
+        assertEquals(48, hidden.heightDp)
+        assertEquals(hidden, hidden.onTransientSurfaceChanged())
+    }
+
+    @Test
+    fun showingToolbarAgainRestoresMeasuredRows() {
+        val hidden = ToolbarHeightSession.start(
+            toolbarVisible = false,
+            needsSecondRow = true
+        )
+        val shown = hidden.onToolbarVisibilityChanged(
+            visible = true,
+            needsSecondRow = true
+        )
+
+        assertEquals(48, hidden.heightDp)
+        assertEquals(96, shown.heightDp)
+    }
+
+    @Test
+    fun realWidthChangeUpdatesVisibleToolbarButNotHiddenToolbar() {
+        val compact = ToolbarHeightSession.start(
+            toolbarVisible = true,
+            needsSecondRow = true
+        )
+        val wide = compact.onToolbarMeasurementChanged(
+            toolbarVisible = true,
+            needsSecondRow = false
+        )
+        val hidden = compact.onToolbarVisibilityChanged(
+            visible = false,
+            needsSecondRow = true
+        )
+        val hiddenAfterMeasurement = hidden.onToolbarMeasurementChanged(
+            toolbarVisible = false,
+            needsSecondRow = true
+        )
+
+        assertEquals(48, wide.heightDp)
+        assertEquals(hidden, hiddenAfterMeasurement)
+    }
+}
