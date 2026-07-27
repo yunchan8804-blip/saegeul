@@ -12,7 +12,9 @@ import org.fcitx.fcitx5.android.input.search.KoreanSearchSource
 /** Local-only Korean reaction catalog. It never receives editor or clipboard text. */
 object KoreanEmotionLexicon {
     val quickQueries: List<String> = listOf(
-        "축하", "죄송", "감사", "당황", "웃음", "ㅋㅋ", "ㅎㅎ", "사랑", "화남", "슬픔", "응원", "인정"
+        "축하", "죄송", "감사", "당황", "웃음",
+        "ㅋㅋ", "ㅋㅋㅋㅋ", "ㅎㅎ", "ㅎㅎㅎㅎ",
+        "사랑", "화남", "슬픔", "응원", "인정"
     )
 
     private enum class Emotion(val label: String, vararg val aliases: String) {

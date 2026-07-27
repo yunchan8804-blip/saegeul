@@ -32,6 +32,13 @@ class KoreanEmotionLexiconTest {
     }
 
     @Test
+    fun weakAndStrongLaughterProfilesAreDirectlyAvailableAsQuickQueries() {
+        assertTrue(KoreanEmotionLexicon.quickQueries.containsAll(listOf(
+            "ㅋㅋ", "ㅋㅋㅋㅋ", "ㅎㅎ", "ㅎㅎㅎㅎ"
+        )))
+    }
+
+    @Test
     fun unifiedCatalogHasNoDuplicateCommitText() {
         assertEquals(
             KoreanEmotionLexicon.entries.size,

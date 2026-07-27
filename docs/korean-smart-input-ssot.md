@@ -148,7 +148,7 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | `KO-05` | 한자·국어사전 후보 | `IN_PROGRESS` | bundled 한자·음훈 후보 구현, 국어사전 정의 source는 별도 gate | M |
 | `KO-06` | 개인 단어장 | `DONE` | opt-in·백업 제외 원자 저장, 개인 후보 우선순위·중복 제거·민감 editor 차단과 emulator 실제 후보 선택 통과 | L |
 | `KO-07` | 한국어 조사·문맥 후보 | `IN_PROGRESS` | 받침별 조사와 로컬 다음 어절 후보 구현, 두 기기 UX gate | L |
-| `KO-08` | 한국식 감정표현 추천 | `IN_PROGRESS` | 로컬 emoji·kaomoji·ㅋㅋ/ㅎㅎ 강도 후보 구현, 두 기기 검증 남음 | M |
+| `KO-08` | 한국식 감정표현 추천 | `DONE` | 로컬 emoji·kaomoji·ㅋㅋ/ㅎㅎ 강·약 chip, emulator 후보·정확히 1회 삽입·민감 editor 차단 통과 | M |
 | `KO-09` | 한글 어절 자동완성 | `IN_PROGRESS` | 두 음절부터 로컬 접두어 후보, 선택한 후보만 정확히 한 번 확정 | M |
 
 #### KO-09 상세 계약
@@ -202,6 +202,16 @@ A35와 Z Fold6의 일반 editor 및 buffered 호환 editor 실기기 검증이�
 | opt-in·privacy | `PASS` | 기본 off이며 직접 추가한 단어만 저장한다. Password·Sensitive·NoSpellCheck editor는 개인/기본 자동완성을 모두 조회 전 차단하고 입력 원문·선택 기록·package를 저장하지 않는다 |
 | emulator 실제 후보 | `PASS/EMULATOR` | API 34 x86_64에서 `챈파카`를 이름으로 추가하고 개인 후보를 켠 뒤 `챈파` 조합 시 `챈파 / 챈파카` 순서 확인. 개인 후보 tap 뒤 대상 editor가 `챈파카` 정확히 1회이며 crash 없음 |
 | cleanup | `PASS/EMULATOR` | 테스트 단어를 앱 UI로 삭제하고 개인 후보를 off로 복구. 최종 파일은 v1 header와 `enabled\t0`만 남아 사용자 테스트 데이터 없음 |
+
+#### KO-08 구현·검증 증거 (2026-07-27)
+
+| 항목 | 상태 | 증거 |
+|---|---|---|
+| 로컬 catalog·privacy | `PASS` | 축하·죄송·감사·당황·웃음·사랑·화남·슬픔·응원·인정별 emoji·한국형 표현·kaomoji를 editor·clipboard·network 입력 없이 정렬하고 중복 제거. private policy는 후보 생성 전에 차단 |
+| 강·약 웃음 chip | `PASS/EMULATOR` | Pixel 7 API 34 x86_64에서 `ㅋㅋ` top `😂`, `ㅋㅋㅋㅋ` top `🤣`, `ㅎㅎㅎㅎ` top `😄`를 확인. `ㅋㅋ/ㅋㅋㅋㅋ/ㅎㅎ/ㅎㅎㅎㅎ`를 같은 가로 quick row에서 직접 선택 가능하도록 노출 |
+| 일반 감정 후보 | `PASS/EMULATOR` | `축하` chip에서 `🎉`, `🥳`, `👏`, 한국형 표현·kaomoji 후보를 세로 목록으로 탐색하고 설명 label이 함께 표시되는 것을 확인 |
+| 정확히 1회 삽입 | `PASS/EMULATOR` | `축하` 후보 `🥳`와 강한 웃음 후보 `😄`를 각각 명시적으로 tap한 뒤 대상 editor XML이 선택한 표현 하나만 정확히 1회 포함하고 일반 keyboard로 복귀함을 확인 |
+| private editor 차단 | `PASS/EMULATOR` | `password=true`인 OpenAI STT API 키 editor에서는 감정 검색을 포함한 clipboard·AI toolbar surface가 노출되지 않음. 별도 policy·stale editor·exactly-once 회귀 테스트도 통과 |
 
 #### KO-02 상세 계약
 
@@ -408,7 +418,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | --- | --- | --- | --- |
 | `KO-06` | `noBackupFilesDir` versioned·atomic 사전, 기본 off, 최대 500개, 개인 후보를 정적 후보보다 우선하고 중복 제거 | Kotlin store·policy test, native completion/cache test, API 34 emulator 등록·삭제·우선 후보·정확히 1회 선택 | 없음. 기기 posture·hardware 의존성이 없어 emulator를 canonical Android gate로 인정 |
 | `KO-07` | 사용자가 `조사` chip을 눌렀을 때만 은/는·이/가·을/를·과/와·으로/로·이에요/예요를 받침과 ㄹ 예외로 제안 | 순수 규칙·editor identity·exactly-once 테스트 | 두 기기 UI와 실제 어절 검증; 다음 어절 문맥 모델은 별도 구현 |
-| `KO-08` | editor·clipboard를 읽지 않는 명시적 감정 chip, 로컬 emoji/kaomoji, ㅋㅋ·ㅎㅎ 반복 강도 순위 | 강도·privacy·dedupe·exactly-once 테스트 | 두 기기 chip·후보·삽입 검증 |
+| `KO-08` | editor·clipboard를 읽지 않는 명시적 감정 chip, 로컬 emoji/kaomoji, ㅋㅋ·ㅎㅎ 반복 강도 순위 | 강도·privacy·dedupe·exactly-once 테스트, API 34 emulator의 일반·강한 웃음 chip·후보·1회 삽입·password editor 차단 | 없음. posture·sensor·제조사 의존성이 없어 emulator를 canonical Android gate로 인정 |
 | `AI-04` | `ACTION_SEND text/plain` 또는 사용자가 누른 clipboard 행만 4,000자 이하로 process memory에 5분 보관 | action/MIME/TTL/private gate·editor identity·exactly-once 테스트 | Sharesheet→키보드 preview→답장 생성·삽입을 두 기기에서 확인 |
 | `UX-01` | 최대 10개 명시 선택, plain text·합치기·한국 전화·명시적 계좌 grouping·PII mask preview | transformer·선택 상태·private gate·exactly-once 테스트, API 34 emulator의 일반 editor mask·합치기·1회 삽입과 password editor 차단 | 없음. posture·sensor·제조사 의존성이 없어 emulator를 canonical Android gate로 인정 |
 | `SEC-01` | vault 전용 auth-bound AES-GCM, 매 read/write `CryptoObject` identity 확인, package allowlist, 60초 memory session | codec·allowlist·TTL·앱 전환·손상·commit gate 테스트 | Android 11+ 생체/기기 인증 prompt, 앱 전환 재잠금, 허용/비허용 package 확인 |
@@ -1115,7 +1125,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 2. `UX-01` smart clipboard action. (`DONE`: emulator 명시 선택·mask·합치기·1회 삽입·private editor 차단 통과)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 펼친 Fold6 한글·영문 손 경계 통과, 회전·모바일·중앙 무입력 gate)
-5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
+5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`KO-08 DONE`: emulator 강·약 chip·후보·1회 삽입·private 차단 통과, `KO-07` UI gate)
 6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`IN_PROGRESS`: 코드·자동 테스트 완료, 두 기기 UX·정확도와 OCR native 배포 gate)
 7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)
 
@@ -1186,3 +1196,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 실시간 받아쓰기는 개인 고급 BYOK에서 공식 Realtime WebSocket을 허용하고 partial은 preview 전용, completed만 명시적 최종 입력 gate로 전달. 일반 배포는 backend 단기 token과 WebRTC를 production gate로 유지 |
 | 2026-07-27 | 개인 단어장은 posture·센서·제조사 의존성이 없어 API 34 emulator의 등록·삭제·후보 우선순위·1회 선택을 Android 완료 gate로 인정하고 실기기 중복 gate를 제거 |
 | 2026-07-27 | smart clipboard는 posture·센서·제조사 의존성이 없어 API 34 emulator의 명시 선택·mask·합치기·정확히 1회 삽입·password editor 차단을 Android 완료 gate로 인정 |
+| 2026-07-27 | 한국식 감정표현은 휴대폰에서 ㅋㅋ·ㅎㅎ 강도를 직접 고를 수 있도록 강·약 quick chip을 모두 제공하고, API 34 emulator의 후보·1회 삽입·password editor 차단을 Android 완료 gate로 인정 |
