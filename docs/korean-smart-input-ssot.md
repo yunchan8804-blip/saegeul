@@ -476,7 +476,10 @@ Z Fold6를 펼친 뒤 내부 화면 `1856×2160`, override density 360에서 같
 높이 갱신을 미뤄 수정했고, 1080×1920에서 12개 action의 6×2 렌더를 다시 확인했다. 미연결 정밀
 받아쓰기의 `설정하기`는 일반 설정 목록에 멈추지 않고 STT 전용 key·model dialog를 바로 열며, dialog
 소비 뒤 resume·회전으로 자동 재표시되지 않는다. 전체 JVM 62 suites·267 tests와 x86_64 debug build가
-통과했다. 실제 microphone 품질과 Fold 자세 전환은 emulator가 대체할 수 없으므로 실기기 gate로 유지한다.
+통과했다. 같은 emulator의 Google Messages draft에서 암호화 test profile을 잠시 저장한 뒤 `:주소1`과
+Space를 입력해 `서울시 테스트로 1 `로 정확히 한 번 교체되는 것을 확인했고, draft와 test profile은
+검증 직후 삭제했다. 실제 microphone 품질과 Fold 자세 전환은 emulator가 대체할 수 없으므로 실기기
+gate로 유지한다.
 
 ## 7. GIF-01 상세 계약
 
@@ -713,8 +716,10 @@ GIPHY optional provider는 위 계약을 코드로 구현했다. 별도 Keystore
 | A35 설치 | `PASS` | `SM-A356N / RFCX60GBL3D`, AI·KLIPY 통합 app과 Hangul plugin 최종 APK 재설치, debug Fcitx IME 재선택 |
 | 기본 source live probe | `PASS` | catalog 881개, party WebP·GIF 모두 HTTP 200, GIF MIME과 957,983-byte 응답 확인 |
 | 검색 입력·preview | `PASS` | A35에서 검색창 탭 즉시 독립 자판 표시, `cnrgk→축하`, 결과 grid 표시. 0.7초 간격 화면의 GIF 영역 256,605 pixel 변화 확인 |
+| x86_64 emulator 검색 UI | `PASS` | Pixel 7 API 34에서 toolbar GIF 진입, 검색창 탭 즉시 인라인 한글 자판 표시, `웃음` 검색 결과와 선택 카드의 `링크 넣기`·`GIF 첨부` overlay 확인 |
 | 일반 text editor | `PASS` | Chrome은 `contentMimeTypes`에 GIF 미지원; 첨부 disabled 설명 표시, Noto canonical URL을 focused editor에 정확히 1회 입력 |
 | GIF 지원 editor | `PASS` | Discord `contentMimeTypes=[image/*]`; 1,176,505-byte animated GIF를 `commitContent`로 전달해 전송 전 compose preview가 실제 표시됨 |
+| x86_64 emulator commit path | `PASS` | Google Messages가 `image/gif` content URI와 canonical link를 `SOURCE_INPUT_METHOD`로 수신하고 1,176,505-byte 원본을 조회함. 해당 SMS conversation의 후속 attachment 제약 거부 뒤 link 자동 삽입은 0회였고 draft는 비움 |
 | attach 실패 fallback | `PASS` | attach 경로에는 URL commit이 없고 실패는 상태 표시만 수행 |
 | private editor network | `PASS` | `GifSearchGateTest.privateEditorMakesZeroProviderRequests`가 provider 호출 0을 검증 |
 | Z Fold6 설치 | `PASS` | `SM-F956N`, wireless ADB로 동일 app과 Hangul plugin 재설치, Fcitx 입력기 서비스 등록 및 기본 입력기 전환 확인 |
