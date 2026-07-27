@@ -358,6 +358,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `AI-07` | 원격 호환 endpoint OAuth | `DONE` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인; PC CLI companion과 두 기기 live 통과 | L |
 | `AI-08` | 일반 사용자 AI 연결 안내 | `DONE` | 미연결·OAuth 만료 상태에 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
 | `AI-09` | 내 컴퓨터 자동 발견·연결 | `DONE` | mDNS 발견, Tailscale HTTPS manifest 검증, 연결 확인, AppAuth login과 PC 재시작 후 DPAPI grant 복구; A35·Z Fold6 통과 | L |
+| `AI-10` | 직접 지시 터치 안전·인증 복구 | `DONE` | prompt 상단까지 IME touchable inset으로 보고해 뒤 editor touch 관통을 차단하고 API key 401은 사용자용 `설정하기` 상태로 복구 | S |
 
 ### 6.4 음성·멀티모달 기능
 
@@ -460,6 +461,7 @@ backup, 일반 log에 저장하지 않으며 Bitmap은 작업 종료 시 지우�
 | --- | --- | --- | --- |
 | `UX-03` | 별도 중첩 메뉴를 추가하지 않는다. 기존 툴바 열기 상태에서 실제 가용 폭이 `12 × 48dp`보다 좁으면 6×2행·96dp, 충분하면 12×1행·48dp로 즉시 전환한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 항상 1행이며 action의 순서·위치·활성 정책을 유지한다. | `ToolbarLayoutPolicyTest`, Flexbox shrink 금지, 높이 상태 전환과 arm64 build, A35·Z Fold6 cover 6×2, Z Fold6 unfolded 12×1, 두 기기 `?123` PASS | 없음 |
 | `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동하고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, A35·Z Fold6 미연결 안내, API 34 x86_64 emulator의 STT dialog 직행 PASS | 없음 |
+| `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
 
 실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
 HoneyBoard가 활성인 화면을 이 앱의 숫자판이나 툴바 증거로 사용하지 않는다.
@@ -484,6 +486,16 @@ Space를 입력해 `서울시 테스트로 1 `로 정확히 한 번 교체되는
 표시한다. test STT key는 앱의 제거 동작으로 삭제하고 기본 휴대폰 받아쓰기로 복구했다. 전체 JVM
 62 suites·268 tests와 x86_64 debug build가 통과했다. 실제 microphone 품질과 Fold 자세 전환은
 emulator가 대체할 수 없으므로 실기기 gate로 유지한다.
+
+같은 emulator에서 글쓰기 AI Direct OpenAI test profile을 UI로 잠시 저장하고, 대상 editor 원문
+preview -> 같은 Fcitx `KeyboardWindow`의 내부 prompt 입력 -> `실행` 경로를 다시 검증했다. 기존 구현은
+prompt strip을 `keyboardView` 위에 그리면서도 `onComputeInsets()`에는 keyboard 상단만 보고해, strip의
+버튼을 누르면 뒤 editor control로 touch가 관통할 수 있었다. 최상단 interactive IME surface를 inset
+기준으로 바꾸고 WindowManager의 touchable region이 실제 prompt 상단과 일치함을 확인했다. dummy
+API key의 401은 영문 provider 오류 대신 `글쓰기 AI가 이 API 키를 거부했어요`와 `설정하기`로
+표시되며, CTA는 `개인정보·AI` route로 이동했다. test profile의 `provider.bin`은 검증 직후 앱의
+연결 끊기로 삭제했다. 이 checkpoint는 app JVM 63 suites·271 tests, failure/error/skipped 0과 x86_64
+debug build를 통과했다.
 
 ## 7. GIF-01 상세 계약
 
@@ -1002,6 +1014,8 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | Z Fold6 UI | `PASS` | cover 화면에서 AI toolbar, 원문 preview와 전체 action group이 잘림 없이 표시됨 |
 | AI 결과 우선 UI | `CODE_DONE` | 결과 상태에서 보이지 않는 `weight=1` status container를 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 이동, 결과 card가 전체 가용 높이를 사용 |
 | AI 직접 지시문 | `PASS` | 기능별 두벌식 복제판 제거. 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme을 그대로 쓰되 output은 내부 최대 300자 buffer로 격리; A35에서 영문 입력·후보·숫자판·천지인 picker·picker restart prompt 보존과 target editor 무변경 통과, pure buffer Unicode·preedit·limit 회귀 테스트 통과 |
+| AI 직접 지시 터치 경계 | `PASS/EMULATOR` | prompt strip 상단을 IME content·visible·touchable inset으로 사용해 뒤 editor의 전송/검색 버튼 touch 관통을 차단. API 34 WindowManager region·target activity 유지와 실제 `실행` -> 401 설정 안내 전이를 검증 |
+| API key 거부 UX | `PASS/EMULATOR` | API key 401을 typed failure로 분리해 provider 영문 원문과 의미 없는 재시도를 숨기고 한국어 설명·`설정하기`를 표시; CTA의 `개인정보·AI` 직행과 test credential 삭제 확인 |
 | 음성 모드 gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. 글쓰기 Codex/Claude companion과 STT를 분리하고 기본 `휴대폰 받아쓰기`를 제공한다. A35·Z Fold6에서 Google voice IME 전환과 입력 focus 유지를 확인했고 fallback 정책 unit test 및 companion Python 7 tests 통과 |
 | 독립 STT 설정 | `PASS` | 글쓰기 AI/OAuth와 분리된 휴대폰 받아쓰기·OpenAI STT 모드, 정확도/효율 모델, STT 전용 Keystore/no-backup key 저장·삭제와 공식 endpoint allowlist 구현. API 34 emulator에서 미연결 CTA가 STT key·model dialog를 한 번에 직접 여는 경로와 private editor에서 credential loader 0회인 회귀 테스트 확인 |
 | 최초 마이크 권한 복귀 | `PASS/A35+EMULATOR` | 권한 Activity가 IME를 재시작해도 같은 editor identity에서 결과를 한 번만 소비한다. A35 권한 철회 상태의 첫 탭·승인 직후 `녹음 중` 및 audio HAL capture 확인; API 34 emulator에서도 권한 dialog와 `녹음 중` 상태 전이 재확인; 다른 editor·stale request 회귀 테스트 통과 |
@@ -1050,12 +1064,13 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 2. `AI-07` endpoint OAuth public-client flow와 token lifecycle. (`DONE`: PC CLI companion·두 기기 login·generation 통과)
 3. `AI-08` 일반 사용자용 AI 연결·재로그인 CTA. (`DONE`: 코드·테스트·두 기기 미연결 안내와 설정 직행 통과)
 4. `AI-09` 컴퓨터 자동 발견·검증·연결 마법사. (`DONE`: 두 기기 mDNS·Tailscale HTTPS·PKCE·DPAPI 재시작 복구 통과)
-5. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
-6. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
-7. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
-8. `AI-03` 문장 생성. (`IN_PROGRESS`: 프리셋·직접 지시문·빈 입력창 생성 코드 완료, 두 기기 결과 UI와 3후보 품질 gate)
-9. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
-10. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
+5. `AI-10` 직접 지시 터치 안전·API key 인증 복구. (`DONE`: API 34 emulator touchable region·설정 CTA 통과)
+6. `SEC-03` offline network gate. (`IN_PROGRESS`: 실제 기기 zero-request gate)
+7. `AI-01` 맞춤법·띄어쓰기. (`IN_PROGRESS`: diff·부분 적용 코드 완료, 두 기기 UX 검증)
+8. `AI-02` 말투 변환. (`IN_PROGRESS`: action별 품질 matrix)
+9. `AI-03` 문장 생성. (`IN_PROGRESS`: 프리셋·직접 지시문·빈 입력창 생성 코드 완료, 두 기기 결과 UI와 3후보 품질 gate)
+10. `AI-05` 번역. (`IN_PROGRESS`: 언어별 matrix)
+11. `AI-04` 답장 초안. (`IN_PROGRESS`: clipboard/share intake 코드 완료, 두 기기 UX·품질 gate)
 
 ### 단계 4 — 음성
 
@@ -1135,3 +1150,5 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | provider manifest capability를 profile SSOT로 보존하고 실제 `transcription` 미선언 provider에서는 음성 capture를 시작하지 않음 |
 | 2026-07-27 | Codex desktop Voice는 공개 companion audio 계약이 생기기 전까지 `BLOCK`; 구독 OAuth token의 비공식 endpoint 사용 금지 |
 | 2026-07-27 | 음성 미지원 공급자 화면은 비활성 녹음 버튼을 금지하고, 활성 system voice IME가 있으면 `휴대폰 받아쓰기 사용`, 없으면 `설정하기`를 제공 |
+| 2026-07-27 | IME가 keyboard 위에 interactive prompt를 표시하면 그 prompt 상단부터 touchable inset으로 보고하고, 뒤 editor control로 touch를 통과시키지 않음 |
+| 2026-07-27 | 글쓰기 API key 401은 provider 오류 문자열이나 무조건 재시도로 표시하지 않고, 사용자용 연결 확인 문구와 `설정하기`로 복구시킴 |

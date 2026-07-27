@@ -571,6 +571,7 @@
     <string name="ai_oauth_token_failed">인가 코드를 토큰으로 교환하지 못했어</string>
     <string name="ai_oauth_connected">OAuth 계정을 연결했어</string>
     <string name="ai_oauth_reauth_required">AI 연결이 만료되었어요. 다시 로그인하면 계속 사용할 수 있어요.</string>
+    <string name="ai_api_key_rejected">글쓰기 AI가 이 API 키를 거부했어요. 설정에서 키를 확인한 뒤 다시 시도해 주세요.</string>
     <string name="ai_provider_removed">AI 공급자와 로컬 인증 정보를 지웠어</string>
     <string name="ai_oauth_revocation_failed">로컬 토큰은 지웠지만 원격 서버의 폐기 확인은 받지 못했어</string>
     <string name="ai_setup_wizard_title">내 컴퓨터에서 AI 연결</string>

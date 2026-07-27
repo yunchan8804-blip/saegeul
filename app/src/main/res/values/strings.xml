@@ -572,6 +572,7 @@
     <string name="ai_oauth_token_failed" tools:ignore="MissingTranslation">Could not exchange the authorization code for a token</string>
     <string name="ai_oauth_connected" tools:ignore="MissingTranslation">OAuth account connected</string>
     <string name="ai_oauth_reauth_required" tools:ignore="MissingTranslation">Your AI connection has expired. Sign in again to keep using AI features.</string>
+    <string name="ai_api_key_rejected" tools:ignore="MissingTranslation">Writing AI rejected this API key. Check the key in settings and try again.</string>
     <string name="ai_provider_removed" tools:ignore="MissingTranslation">AI provider and local credentials removed</string>
     <string name="ai_oauth_revocation_failed" tools:ignore="MissingTranslation">Local tokens were removed, but the remote server did not confirm revocation</string>
     <string name="ai_setup_wizard_title" tools:ignore="MissingTranslation">Connect AI from your computer</string>

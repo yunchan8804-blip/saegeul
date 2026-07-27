@@ -195,6 +195,7 @@ class InputView(
     private var assistantContentExpanded = false
     private var aiPromptOnSubmit: ((String) -> Unit)? = null
     private var aiPromptOnCancel: (() -> Unit)? = null
+    private val promptInputBarLocation = IntArray(2)
 
     private val inputContentHeightPx: Int
         get() = if (assistantContentExpanded) {
@@ -344,6 +345,22 @@ class InputView(
             height = inputContentHeightPx
         }
         requestLayout()
+    }
+
+    /**
+     * Returns the upper edge of every interactive IME-owned surface. The prompt strip sits above
+     * [keyboardView], so reporting only the keyboard edge lets touches on Run/Cancel fall through
+     * to the editor app underneath.
+     */
+    fun getTouchableTopLocationInWindow(outLocation: IntArray) {
+        keyboardView.getLocationInWindow(outLocation)
+        if (aiPromptInputBar.visibility != VISIBLE) return
+        aiPromptInputBar.getLocationInWindow(promptInputBarLocation)
+        outLocation[1] = ImeTouchableTopPolicy.resolve(
+            keyboardTop = outLocation[1],
+            promptTop = promptInputBarLocation[1],
+            promptVisible = true
+        )
     }
 
     /**

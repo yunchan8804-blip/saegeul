@@ -127,4 +127,23 @@ class OpenAiResponsesClientTest {
         assertEquals(1, requests)
         assertTrue(failure is AiReauthenticationRequiredException)
     }
+
+    @Test
+    fun `api key 401 requires settings instead of exposing provider error text`() = runBlocking {
+        val profile = AiProviderProfile(
+            baseUrl = "https://api.openai.com/v1",
+            apiKey = "rejected-key"
+        )
+        val transport = AiHttpTransport { _, _, _ ->
+            throw AiHttpStatusException(401, "provider-specific secret error")
+        }
+
+        val failure = runCatching {
+            OpenAiResponsesClient(profile, transport)
+                .generate(AiAction.Proofread, "테스트")
+        }.exceptionOrNull()
+
+        assertTrue(failure is AiApiKeyRejectedException)
+        assertEquals("AI provider rejected the API key", failure?.message)
+    }
 }

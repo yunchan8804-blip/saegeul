@@ -1601,7 +1601,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onComputeInsets(outInsets: Insets) {
         if (inputDeviceMgr.isVirtualKeyboard) {
-            inputView?.keyboardView?.getLocationInWindow(inputViewLocation)
+            inputView?.getTouchableTopLocationInWindow(inputViewLocation)
             outInsets.apply {
                 contentTopInsets = inputViewLocation[1]
                 visibleTopInsets = inputViewLocation[1]

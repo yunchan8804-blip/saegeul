@@ -208,10 +208,14 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                     provider.model(action.tier),
                     source.source.length
                 )
-                if (exception is AiReauthenticationRequiredException) {
-                    ui.showSetupRequired(context.getString(R.string.ai_oauth_reauth_required))
-                } else {
-                    ui.showError(
+                when (exception) {
+                    is AiReauthenticationRequiredException -> ui.showSetupRequired(
+                        context.getString(R.string.ai_oauth_reauth_required)
+                    )
+                    is AiApiKeyRejectedException -> ui.showSetupRequired(
+                        context.getString(R.string.ai_api_key_rejected)
+                    )
+                    else -> ui.showError(
                         exception.message ?: context.getString(R.string.ai_apply_failed),
                         provider.displayName,
                         canRetry = true

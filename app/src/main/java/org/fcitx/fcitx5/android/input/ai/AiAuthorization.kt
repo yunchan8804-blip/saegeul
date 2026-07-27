@@ -39,7 +39,7 @@ interface AiBearerTokenProvider {
         if (profile.authMode == AiAuthMode.OAuthPkce) {
             AiReauthenticationRequiredException()
         } else {
-            AiProviderException("AI provider rejected the API key")
+            AiApiKeyRejectedException()
         }
 }
 
@@ -57,6 +57,8 @@ object ProfileAiBearerTokenProvider : AiBearerTokenProvider {
 class AiReauthenticationRequiredException : Exception(
     "OAuth session expired or is unavailable. Sign in again in AI settings."
 )
+
+class AiApiKeyRejectedException : Exception("AI provider rejected the API key")
 
 class AiHttpStatusException(
     val status: Int,
