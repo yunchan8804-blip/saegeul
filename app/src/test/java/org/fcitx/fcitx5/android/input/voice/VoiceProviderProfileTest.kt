@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.voice
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -66,5 +67,23 @@ class VoiceProviderProfileTest {
                 allowsNetworkInput = true
             )
         )
+    }
+
+    @Test
+    fun `private editor resolution never reads the STT credential`() {
+        var credentialReads = 0
+
+        val blocked = VoiceProviderResolver.resolve(
+            mode = VoiceProviderMode.OpenAiApi,
+            allowsCredentialAccess = false,
+            loadCredential = {
+                credentialReads += 1
+                VoiceProviderProfile(apiKey = "must-not-be-read")
+            }
+        )
+
+        assertEquals(VoiceProviderMode.OpenAiApi, blocked.mode)
+        assertNull(blocked.profile)
+        assertEquals(0, credentialReads)
     }
 }

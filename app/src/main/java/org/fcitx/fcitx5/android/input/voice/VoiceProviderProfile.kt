@@ -98,10 +98,19 @@ data class EffectiveVoiceProvider(
 )
 
 object VoiceProviderResolver {
-    fun resolve(context: Context): EffectiveVoiceProvider {
-        val mode = VoiceProviderModeStore(context).load()
-        val profile = if (mode == VoiceProviderMode.OpenAiApi) {
-            VoiceProviderCredentialStore(context).load()?.takeIf(VoiceProviderProfile::isConfigured)
+    fun resolve(context: Context, allowsCredentialAccess: Boolean): EffectiveVoiceProvider = resolve(
+        mode = VoiceProviderModeStore(context).load(),
+        allowsCredentialAccess = allowsCredentialAccess,
+        loadCredential = { VoiceProviderCredentialStore(context).load() }
+    )
+
+    internal fun resolve(
+        mode: VoiceProviderMode,
+        allowsCredentialAccess: Boolean,
+        loadCredential: () -> VoiceProviderProfile?
+    ): EffectiveVoiceProvider {
+        val profile = if (allowsCredentialAccess && mode == VoiceProviderMode.OpenAiApi) {
+            loadCredential()?.takeIf(VoiceProviderProfile::isConfigured)
         } else {
             null
         }

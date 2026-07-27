@@ -459,7 +459,7 @@ backup, 일반 log에 저장하지 않으며 Bitmap은 작업 종료 시 지우�
 | ID | 구현 계약 | 자동 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
 | `UX-03` | 별도 중첩 메뉴를 추가하지 않는다. 기존 툴바 열기 상태에서 실제 가용 폭이 `12 × 48dp`보다 좁으면 6×2행·96dp, 충분하면 12×1행·48dp로 즉시 전환한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 항상 1행이며 action의 순서·위치·활성 정책을 유지한다. | `ToolbarLayoutPolicyTest`, Flexbox shrink 금지, 높이 상태 전환과 arm64 build, A35·Z Fold6 cover 6×2, Z Fold6 unfolded 12×1, 두 기기 `?123` PASS | 없음 |
-| `AI-08` | AI 글쓰기·정밀 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동하고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, A35·Z Fold6 미연결 안내, API 34 x86_64 emulator의 STT dialog 직행 PASS | 없음 |
+| `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동하고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, A35·Z Fold6 미연결 안내, API 34 x86_64 emulator의 STT dialog 직행 PASS | 없음 |
 
 실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
 HoneyBoard가 활성인 화면을 이 앱의 숫자판이나 툴바 증거로 사용하지 않는다.
@@ -473,13 +473,17 @@ Z Fold6를 펼친 뒤 내부 화면 `1856×2160`, override density 360에서 같
 
 2026-07-27 출근 이후 반복 검증 기준은 `Pixel_7_API_34` x86_64 emulator로 전환했다. 첫 toolbar
 확장 때 descendant layout pass 안에서 ancestor 높이를 바꾸면 두 번째 행이 잘리는 문제를 다음 frame으로
-높이 갱신을 미뤄 수정했고, 1080×1920에서 12개 action의 6×2 렌더를 다시 확인했다. 미연결 정밀
+높이 갱신을 미뤄 수정했고, 1080×1920에서 12개 action의 6×2 렌더를 다시 확인했다. 미연결 음성
 받아쓰기의 `설정하기`는 일반 설정 목록에 멈추지 않고 STT 전용 key·model dialog를 바로 열며, dialog
-소비 뒤 resume·회전으로 자동 재표시되지 않는다. 전체 JVM 62 suites·267 tests와 x86_64 debug build가
-통과했다. 같은 emulator의 Google Messages draft에서 암호화 test profile을 잠시 저장한 뒤 `:주소1`과
+소비 뒤 resume·회전으로 자동 재표시되지 않는다. 같은 emulator의 Google Messages draft에서 암호화
+test profile을 잠시 저장한 뒤 `:주소1`과
 Space를 입력해 `서울시 테스트로 1 `로 정확히 한 번 교체되는 것을 확인했고, draft와 test profile은
-검증 직후 삭제했다. 실제 microphone 품질과 Fold 자세 전환은 emulator가 대체할 수 없으므로 실기기
-gate로 유지한다.
+검증 직후 삭제했다. 같은 emulator에서 글쓰기 AI와 별도인 OpenAI STT test profile을 설정하고
+`녹음 시작` -> Android 권한 dialog -> `녹음 중` 상태 전이를 확인했다. 공통 window title과 toolbar
+접근성 명칭은 `음성 받아쓰기`로 통일하고, 내부 상태만 `휴대폰 받아쓰기` 또는 `정밀 받아쓰기`로
+표시한다. test STT key는 앱의 제거 동작으로 삭제하고 기본 휴대폰 받아쓰기로 복구했다. 전체 JVM
+62 suites·268 tests와 x86_64 debug build가 통과했다. 실제 microphone 품질과 Fold 자세 전환은
+emulator가 대체할 수 없으므로 실기기 gate로 유지한다.
 
 ## 7. GIF-01 상세 계약
 
@@ -932,12 +936,16 @@ private/offline/app별 AI 차단과 editor identity가 하나라도 맞지 않�
 
 ### 8.4 음성 privacy와 정확한 제품 명칭
 
-현재 구현은 `AI 정밀 받아쓰기`인 `VOICE-02`다. `VOICE-01` 실시간이라고 표시하지 않는다. UI는 30초를
-권장하거나 countdown하지 않고 사용자가 멈출 때까지 elapsed time만 보여 준다. 녹음은 16 kHz mono PCM,
+toolbar entry와 window title은 두 mode를 포괄하는 `음성 받아쓰기`다. 기본 mode의 내부 title은
+`휴대폰 받아쓰기`, OpenAI `VOICE-02`의 내부 title은 `정밀 받아쓰기`이며 `VOICE-01` 실시간이라고
+표시하지 않는다. UI는 30초를 권장하거나 countdown하지 않고 사용자가 멈출 때까지 elapsed time만
+보여 준다. 녹음은 16 kHz mono PCM,
 5분의 내부 memory safety boundary이며 WAV multipart 전송 뒤 모든 byte array를 지운다.
 음성·전사문을 file, cache, prefs, backup, log에 저장하지 않는다. `RECORD_AUDIO` 권한은
 `exported=false` 투명 permission Activity에서만 요청한다. private/no-personalized/offline/app AI 차단,
-editor identity 변경, 취소에서는 전송 또는 입력을 fail-closed한다.
+editor identity 변경, 취소에서는 전송 또는 입력을 fail-closed한다. provider resolver는 editor의 text
+inspection 허용 여부를 필수 입력으로 받고, private editor에서는 STT credential loader 자체를 호출하지
+않는다.
 
 음성 모드는 글쓰기 provider capability와 분리한다. 기본 `휴대폰 받아쓰기`는 활성 system voice IME로
 즉시 전환하고, `OpenAI 음성 전사`를 사용자가 고른 경우에만 별도 STT key와 모델을 요구한다. 음성 toolbar
@@ -995,8 +1003,8 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | AI 결과 우선 UI | `CODE_DONE` | 결과 상태에서 보이지 않는 `weight=1` status container를 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 이동, 결과 card가 전체 가용 높이를 사용 |
 | AI 직접 지시문 | `PASS` | 기능별 두벌식 복제판 제거. 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme을 그대로 쓰되 output은 내부 최대 300자 buffer로 격리; A35에서 영문 입력·후보·숫자판·천지인 picker·picker restart prompt 보존과 target editor 무변경 통과, pure buffer Unicode·preedit·limit 회귀 테스트 통과 |
 | 음성 모드 gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. 글쓰기 Codex/Claude companion과 STT를 분리하고 기본 `휴대폰 받아쓰기`를 제공한다. A35·Z Fold6에서 Google voice IME 전환과 입력 focus 유지를 확인했고 fallback 정책 unit test 및 companion Python 7 tests 통과 |
-| 독립 STT 설정 | `PASS` | 글쓰기 AI/OAuth와 분리된 휴대폰 받아쓰기·OpenAI STT 모드, 정확도/효율 모델, STT 전용 Keystore/no-backup key 저장·삭제와 공식 endpoint allowlist 구현. API 34 emulator에서 미연결 CTA가 STT key·model dialog를 한 번에 직접 여는 경로 확인 |
-| 최초 마이크 권한 복귀 | `PASS/A35` | 권한 Activity가 IME를 재시작해도 같은 editor identity에서 결과를 한 번만 소비한다. A35 권한 철회 상태의 첫 탭·승인 직후 `녹음 중` 및 audio HAL capture 확인; 다른 editor·stale request 회귀 테스트 통과 |
+| 독립 STT 설정 | `PASS` | 글쓰기 AI/OAuth와 분리된 휴대폰 받아쓰기·OpenAI STT 모드, 정확도/효율 모델, STT 전용 Keystore/no-backup key 저장·삭제와 공식 endpoint allowlist 구현. API 34 emulator에서 미연결 CTA가 STT key·model dialog를 한 번에 직접 여는 경로와 private editor에서 credential loader 0회인 회귀 테스트 확인 |
+| 최초 마이크 권한 복귀 | `PASS/A35+EMULATOR` | 권한 Activity가 IME를 재시작해도 같은 editor identity에서 결과를 한 번만 소비한다. A35 권한 철회 상태의 첫 탭·승인 직후 `녹음 중` 및 audio HAL capture 확인; API 34 emulator에서도 권한 dialog와 `녹음 중` 상태 전이 재확인; 다른 editor·stale request 회귀 테스트 통과 |
 | OpenAI 실제 전사 품질 | `GATE` | dummy key로 녹음·요청·401 오류 경계만 검증했다. 실제 STT key를 저장하지 않은 상태이며 한국어 정확도·preview·1회 입력은 사용자 key로 별도 검증 필요 |
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI, 7개 신규 테스트 |

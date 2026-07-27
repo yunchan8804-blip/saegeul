@@ -46,7 +46,7 @@ class VoiceTranscriptionWindow(
     private var attached = false
     private val commitGate = VoiceCommitGate()
 
-    override val title: String by lazy { context.getString(R.string.voice_precision_title) }
+    override val title: String by lazy { context.getString(R.string.voice_provider_settings) }
     override val showTitle: Boolean = false
 
     override fun onCreateView(): View {
@@ -67,7 +67,7 @@ class VoiceTranscriptionWindow(
     override fun onAttached() {
         attached = true
         val allowsTextInspection = service.allowsTextInspectionFeatures()
-        val resolved = VoiceProviderResolver.resolve(context)
+        val resolved = VoiceProviderResolver.resolve(context, allowsTextInspection)
         mode = resolved.mode
         profile = resolved.profile
         val allowsSelectedVoice = VoiceProviderPolicy.allowsSelectedMode(

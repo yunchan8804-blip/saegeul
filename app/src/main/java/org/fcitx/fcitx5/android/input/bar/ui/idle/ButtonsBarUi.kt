@@ -114,7 +114,7 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
     }
 
     val precisionDictationButton = toolButton(R.drawable.ic_precision_dictation_24).apply {
-        contentDescription = ctx.getString(R.string.voice_precision_title)
+        contentDescription = ctx.getString(R.string.voice_provider_settings)
     }
 
     val ocrButton = toolButton(R.drawable.ic_baseline_text_format_24).apply {
