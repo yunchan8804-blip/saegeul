@@ -59,6 +59,44 @@ class ToolbarHeightSessionTest {
     }
 
     @Test
+    fun defaultOneRowToolbarDoesNotMoveWhenSuggestionsAppearWhileTyping() {
+        val toolbar = ToolbarHeightSession.start(
+            toolbarVisible = true,
+            needsSecondRow = false
+        )
+
+        val afterSuggestionUpdates = (1..20).fold(toolbar) { session, _ ->
+            session.onTransientSurfaceChanged()
+        }
+
+        assertEquals(48, toolbar.heightDp)
+        assertEquals(toolbar, afterSuggestionUpdates)
+    }
+
+    @Test
+    fun explicitlyExpandedTwoRowToolbarDoesNotCollapseDuringSuggestionUpdates() {
+        val expanded = ToolbarHeightSession.start(
+            toolbarVisible = true,
+            needsSecondRow = false
+        ).onToolbarRowsChanged(
+            toolbarVisible = true,
+            expanded = true
+        )
+
+        val afterSuggestionUpdates = (1..20).fold(expanded) { session, _ ->
+            session.onTransientSurfaceChanged()
+        }
+        val explicitlyCollapsed = afterSuggestionUpdates.onToolbarRowsChanged(
+            toolbarVisible = true,
+            expanded = false
+        )
+
+        assertEquals(96, expanded.heightDp)
+        assertEquals(expanded, afterSuggestionUpdates)
+        assertEquals(48, explicitlyCollapsed.heightDp)
+    }
+
+    @Test
     fun explicitlyHidingToolbarIsTheOnlyTransientSessionCollapse() {
         val expanded = ToolbarHeightSession.start(
             toolbarVisible = true,
