@@ -757,6 +757,20 @@ editor를 변경하지 않고 명시적 insert에서만 정확히 한 번 commit
 tests, failure/error/skipped 0이고 x86_64·arm64 debug assemble이 모두 통과했다. 이 자동화는 실제 API
 품질을 대체하지 않으므로 A35·잠금 해제 Fold·실제 STT key gate는 그대로 유지한다.
 
+2026-07-28 최종 OAuth 실동작 감사에서는 Pixel 7 API 34 emulator가 임시 HTTPS manifest를 직접
+검증하고 외부 browser의 Authorization Code + PKCE 승인을 거쳐 PC CLI companion에 연결됐다.
+Settings 검색 원문 `hello world`를 한국어 번역해 `안녕, 세상` preview를 받은 뒤 `교체`가 정확히
+한 번 적용됐고, 일반 Fcitx toolbar의 실행 취소가 원문을 그대로 복원했다. 같은 Fcitx keyboard에서
+`Make 3 friendly Korean greetings` 직접 지시를 입력하자 서로 다른 한국어 후보 3개가 반환됐다.
+결과 화면은 공급자 이름을 숨기고 원문 선택을 `AI 글쓰기` 제목 우측 clipboard action으로 유지했다.
+기본 48dp 도구줄과 1행 자동 후보 전환에서 IME touchable top은 `y=1405`로 고정됐고, 사용자가 펼침을
+누른 경우에만 96dp 2행이 나타났다. 검증 profile은 앱의 `글쓰기 AI 연결 끊기`로 revoke·삭제했으며
+`no_backup/ai`에는 usage 집계 외 credential·session 파일이 남지 않았다. 임시 tunnel·companion만
+종료한 뒤 WPF tray 소유 companion의 local health가 계속 `ok`인 것도 확인했다. app JVM 72 suites·
+348 tests와 companion Python 11 tests가 모두 통과했고 x86_64·arm64 앱/한글 plugin을 다시 빌드해
+emulator와 Z Fold6에 동일 `0.1.2-148-g54817146`을 설치했다. A35의 실제 OpenAI STT 한국어 품질은
+기기와 사용자 STT key가 필요한 별도 최종 gate로 유지한다.
+
 ## 7. GIF-01 상세 계약
 
 ### 7.1 핵심 UX
