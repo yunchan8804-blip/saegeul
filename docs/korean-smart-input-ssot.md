@@ -141,7 +141,7 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 `GIF-02`의 배포 상태는 `IN_PROGRESS`로 유지한다.
 
 현재 코드 우선순위는 `VOICE-01/02` 실제 오류 복구와 `UX-03` 높이 안정성이다. emulator로 대체할 수
-없는 최종 gate는 A35 최신 APK 전체 matrix, Z Fold6 cover/unfold 전환, 실제 STT key의 한국어 품질,
+없는 최종 gate는 A35 최신 APK 전체 matrix, Z Fold6 unfolded 전환, 실제 STT key의 한국어 품질,
 생체 인증, GIF production key·partner 승인이다. 이 gate를 코드 완료와 혼동해 `DONE`으로 올리지 않는다.
 
 ### 6.2 1차 한국어 로컬 기능
@@ -614,7 +614,7 @@ SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OC
 
 | ID | 구현 계약 | 자동 증거 | 남은 완료 게이트 |
 | --- | --- | --- | --- |
-| `UX-03` | 툴바를 열면 고정 48dp 펼침/접힘 control과 기존 12개 도구의 1행 가로 스크롤을 먼저 표시한다. 사용자가 control을 누른 경우에만 도구를 실제 2행 6열 grid·96dp로 배치한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 해당 editor의 명시적 펼침 envelope를 이어받되 자동 후보 내용은 1행 `NOWRAP`을 유지한다. 새 editor는 48dp로 시작하고 Android same-editor restart만 명시적 펼침을 보존한다. 폭 측정이나 타이핑 자체는 높이 변경 원인이 아니다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, 전체 68 suites·318 tests 실패 0, API 34 x86_64 emulator에서 IME frame `y=1405→1279`, 실제 1행→2행 6열→1행 후보 전환 중 `y=1279` 유지·접기 후 `y=1405`, OOM·GridLayout count 회귀 실동작 수정 | Z Fold6 cover/unfold 최신 APK와 A35 재연결 후 동일 전환 확인 |
+| `UX-03` | 툴바를 열면 고정 48dp 펼침/접힘 control과 기존 12개 도구의 1행 가로 스크롤을 먼저 표시한다. 사용자가 control을 누른 경우에만 도구를 실제 2행 6열 grid·96dp로 배치한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 해당 editor의 명시적 펼침 envelope를 이어받되 자동 후보 내용은 1행 `NOWRAP`을 유지한다. 새 editor는 48dp로 시작하고 Android same-editor restart만 명시적 펼침을 보존한다. 폭 측정이나 타이핑 자체는 높이 변경 원인이 아니다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, 전체 68 suites·318 tests 실패 0, API 34 x86_64 emulator에서 IME frame `y=1405→1279`, 실제 1행→2행 6열→1행 후보 전환 중 `y=1279` 유지·접기 후 `y=1405`, OOM·GridLayout count 회귀 실동작 수정. Z Fold6 cover의 `0.1.2-141-g89b5f79e`에서도 touchable top `y=1566→1458`, 실제 2행 6열, `hellp` 1행 후보 중 `y=1458` 유지, 접기 뒤 `y=1566`을 확인했다. | Z Fold6 unfolded 전환과 A35 재연결 후 동일 전환 확인 |
 | `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동한 뒤 `내 컴퓨터 자동으로 찾기 / OpenAI API 키 사용 / 고급 연결 설정` chooser를 정확히 한 번 바로 열고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, API 34 x86_64 emulator의 글쓰기 chooser·STT dialog 직행 PASS | A35 최신 APK 재확인 |
 | `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
 
@@ -1307,7 +1307,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 4. `UX-02` Fold·tablet 분할 layout. (`DONE`: 펼친 Fold6 한글·영문 손 경계와 API 34 tablet emulator 초기 복원·회전·모바일·중앙 무입력·숫자판 왕복 통과)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`DONE`: emulator 조사 받침·ㄹ 예외, 감정 강·약 chip, 후보·1회 삽입 통과)
 6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`DONE`: emulator 공백 후보·선택·취소·1회 삽입, OCR picker 복원·정방향·90도 회전·저화질 인식·줄 선택·1회 삽입, 공개 native source build·라이선스 export 통과)
-7. `UX-03` 기본 1행·명시적 2행 안정형 툴바. (`DONE/CODE+EMULATOR`: 1행 scroll·2행 6열·1행 후보 높이 유지 통과, Z Fold6·A35 최신 APK 확인 gate)
+7. `UX-03` 기본 1행·명시적 2행 안정형 툴바. (`DONE/CODE+EMULATOR+FOLD_COVER`: 1행 scroll·2행 6열·1행 후보 높이 유지 통과, Z Fold6 unfolded·A35 최신 APK 확인 gate)
 
 ## 10. 공통 검증 게이트
 
