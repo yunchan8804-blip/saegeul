@@ -789,9 +789,9 @@
     <string name="secret_vault_saved">암호화된 금고를 저장했어</string>
     <string name="secret_vault_save_failed">금고를 변경하지 않았어</string>
     <string name="ocr_title">이미지에서 한글 추출</string>
-    <string name="ocr_engine_attribution">기기 내 처리 · Tesseract 5 · Apache-2.0 · 공식 tessdata_fast 한국어 모델</string>
+    <string name="ocr_engine_attribution">기기 내 처리 · Tesseract 5 · Apache-2.0 · 공식 tessdata_best 한국어 모델</string>
     <string name="ocr_checking_model">기기 내 한국어 OCR 모델을 확인 중…</string>
-    <string name="ocr_model_missing">검증된 한국어 모델 1.7MB를 한 번 받아야 해. 이미지와 인식 결과는 전송하지 않아.</string>
+    <string name="ocr_model_missing">정확도 우선 한국어 모델(약 13MB)을 한 번 받아야 해. 이미지와 인식 결과는 전송하지 않아.</string>
     <string name="ocr_model_missing_offline">한국어 OCR 모델이 없고 현재 오프라인 또는 앱 정책이 최초 다운로드를 차단하고 있어.</string>
     <string name="ocr_model_download">한국어 모델 받기</string>
     <string name="ocr_model_downloading">공식 한국어 모델을 받고 무결성을 확인 중…</string>

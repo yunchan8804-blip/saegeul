@@ -115,12 +115,12 @@ class OcrModelManager(
 
     suspend fun hasValidModel(): Boolean = withContext(Dispatchers.IO) {
         val model = modelFile()
-        model.isFile && model.length() == KOREAN_FAST_MODEL.sizeBytes &&
-            sha256(model) == KOREAN_FAST_MODEL.sha256
+        model.isFile && model.length() == KOREAN_BEST_MODEL.sizeBytes &&
+            sha256(model) == KOREAN_BEST_MODEL.sha256
     }
 
     suspend fun install(): Unit = withContext(Dispatchers.IO) {
-        installModel(modelRoot, KOREAN_FAST_MODEL, transport)
+        installModel(modelRoot, KOREAN_BEST_MODEL, transport)
     }
 
     fun cancel() {
@@ -130,14 +130,14 @@ class OcrModelManager(
     private fun modelFile(): File = File(File(modelRoot, "tessdata"), MODEL_FILE_NAME)
 
     companion object {
-        const val MAX_MODEL_BYTES = 3_000_000L
+        const val MAX_MODEL_BYTES = 16_000_000L
         const val MODEL_FILE_NAME = "kor.traineddata"
 
-        val KOREAN_FAST_MODEL = OcrModelDescriptor(
-            downloadUrl = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/" +
-                "87416418657359cb625c412a48b6e1d6d41c29bd/kor.traineddata",
-            sizeBytes = 1_677_415L,
-            sha256 = "6b85e11d9bbf07863b97b3523b1b112844c43e713df8b66418a081fd1060b3b2"
+        val KOREAN_BEST_MODEL = OcrModelDescriptor(
+            downloadUrl = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/" +
+                "e12c65a915945e4c28e237a9b52bc4a8f39a0cec/kor.traineddata",
+            sizeBytes = 12_528_128L,
+            sha256 = "f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff"
         )
 
         internal fun installModel(

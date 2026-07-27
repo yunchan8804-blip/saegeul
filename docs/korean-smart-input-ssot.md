@@ -409,7 +409,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
 | `VOICE-05` | 휴대폰 받아쓰기 기본 모드 | `DONE` | 글쓰기 AI 연결 여부와 무관한 기본 음성 모드다. system voice IME가 있으면 즉시 전환하고, 없으면 Android 음성 입력 설정 안내를 제공한다 | S |
 | `VOICE-06` | 독립 STT 공급자·보안 저장소 | `DONE` | 글쓰기 AI/OAuth와 분리된 OpenAI STT key·모델 선택, 공식 endpoint allowlist, Keystore/no-backup 저장과 즉시 삭제 | M |
-| `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입과 picker 복귀 복원 구현, 회전·저화질 정확도와 native 배포 gate | L |
+| `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입과 picker 복귀 복원, `tessdata_best`·EXIF/픽셀 회전·저화질 emulator 정확도 matrix 구현; native 배포 gate만 남음 | L |
 
 ### 6.5 편의·기기·보안 기능
 
@@ -519,7 +519,7 @@ assemble을 통과했다.
 | --- | --- | --- | --- |
 | `KO-07` | 실제 공백 경계 뒤에만 project-curated 로컬 다음 어절을 미선택 후보로 표시한다. 기존 완성·개인 단어·한자 후보와 mode를 섞지 않고, 선택 시 현재 후보 membership을 다시 확인한 뒤 1회 확정한다. | 64KiB·500행 fail-closed parser, 중복·limit·민감 editor policy, A35·Z Fold6 arm64 native test와 API 34 emulator의 `오늘 ` 노출·선택·취소·1회 삽입 | 없음. emulator를 canonical Android gate로 인정 |
 | `GIF-02` | KLIPY exact query의 성공한 첫 page가 비었을 때만 한국어 반응 intent를 최대 2개 시도한다. 원 결과와 합치지 않고 recovery page를 단일 page로 종료한다. Noto는 로컬 tag 가중치와 emoji family 다양성을 적용한다. GIPHY에는 query 보정·재정렬·필터를 적용하지 않는다. | GIF 17 suites·64 tests, provider isolation·stable dedupe·safe fallback·Noto family diversity | KLIPY production access·branding review, 실제 희소 query의 두 기기 grid 품질 matrix |
-| `MM-01` | JPEG·PNG·WebP content URI만 system document picker로 1회 받는다. 최대 15MiB·100MP source를 4MP 이하로 축소하고 Tesseract 한국어 모델로 기기 안에서 인식한다. 결과는 기본 미선택 줄별 preview 뒤 선택분만 1회 입력한다. picker가 IME를 분리해도 원 editor 신원과 one-shot URI를 process memory에 보관하고 같은 editor에서만 OCR window를 복원한다. | OCR contract·image bound·고정 commit/크기/SHA-256 model install·picker resume tests 13개, Pixel 7 API 34 emulator의 picker 복귀·한국어 UI 이미지 인식·줄 선택·정확히 1회 삽입, tablet emulator 가로 화면 진입 UI | 회전·저화질·실물 촬영 정확도 matrix, F-Droid용 native AAR 재현성 또는 source build 전환 |
+| `MM-01` | JPEG·PNG·WebP content URI만 system document picker로 1회 받는다. 최대 15MiB·100MP source를 4MP 이하로 축소하고 Tesseract 한국어 모델로 기기 안에서 인식한다. 결과는 기본 미선택 줄별 preview 뒤 선택분만 1회 입력한다. picker가 IME를 분리해도 원 editor 신원과 one-shot URI를 process memory에 보관하고 같은 editor에서만 OCR window를 복원한다. | OCR contract·image bound·고정 commit/크기/SHA-256 model install·picker resume·orientation policy tests 17개, Pixel 7 API 34 emulator의 picker 복귀·한국어 UI 이미지 인식·줄 선택·정확히 1회 삽입, tablet emulator의 정방향·픽셀 90도 회전·저화질 이미지 목표 3줄 인식과 저화질 선택분 1회 삽입 | F-Droid용 native AAR 재현성 또는 source build 전환 |
 
 이 checkpoint의 통합 자동 검증은 app JVM 56 suites·236 tests, failure/error/skipped 0과 arm64
 app·Hangul plugin assemble을 통과했다. lint에서 새로 발견한 Android 6 `contentLengthLong` 1건은
@@ -527,8 +527,9 @@ API guard로 수정했고, 재실행 결과 이번 OCR·GIF·toolbar 변경 파�
 선행 부채 286 errors·67 warnings 때문에 계속 실패하며 첫 항목은 기존 `fragment_setup.xml`의
 `android:tint`다.
 
-OCR engine과 `tessdata_fast` 한국어 모델은 Apache-2.0 계열의 공개 소스다. 모델은 사용자가 명시한
-다운로드 동작에서만 고정 HTTPS URL로 받고, 응답 크기와 SHA-256을 모두 검증해
+OCR engine과 `tessdata_best` 한국어 모델은 Apache-2.0 계열의 공개 소스다. 모델은 사용자가 명시한
+다운로드 동작에서만 고정 HTTPS URL로 받고, 고정 commit `e12c65a915945e4c28e237a9b52bc4a8f39a0cec`,
+크기 12,528,128 bytes, SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`를 모두 검증해
 `noBackupFilesDir/ocr/tesseract`에 둔다. 선택한 원본 이미지·content URI·인식 결과는 prefs, cache,
 backup, 일반 log에 저장하지 않으며 Bitmap은 작업 종료 시 지우고 recycle한다. 모델 설치 뒤 OCR은
 완전 offline mode에서도 동작하지만 password·sensitive·`NoSpellCheck` editor에서는 picker 전 차단한다.
@@ -539,6 +540,15 @@ backup, 일반 log에 저장하지 않으며 Bitmap은 작업 종료 시 지우�
 한국어 UI screenshot에서 `이미지에서 한글` 줄을 인식하고 명시 선택한 그 줄만 설정 검색란에 1회
 삽입했다. QA tablet API 34 가로 화면에서는 미설치 모델 안내와 두 동작 버튼이 겹침·잘림 없이
 표시됐다. 통합 JVM 결과는 65 suites·288 tests, failure/error/skipped 0이다.
+
+같은 날 정확도 재검증에서 기존 `tessdata_fast`는 선명한 생성 이미지조차 한국어 세 줄을 심하게
+파편화해 기본 모델로 부적합하다고 판정했다. `tessdata_best`로 교체하고 8개 EXIF orientation을 decode
+단계에서 보정했으며, 신뢰도·한글 비율·짧은 파편 줄 기준이 약할 때만 `PSM_SINGLE_BLOCK`·
+`PSM_SPARSE_TEXT`와 90/-90/180도 픽셀 회전을 순차 시도하는 bounded fallback을 추가했다. QA tablet
+API 34에서 정방향, EXIF 없는 픽셀 90도 회전, 480×304 blur/JPEG quality 18 이미지가 모두 목표 한국어
+세 줄을 인식했다. 저화질 결과 세 줄을 선택해 기존 draft 뒤에 각각 정확히 한 번 삽입하고 삭제 뒤 원문
+`17`로 복원했다. orientation policy 4개를 포함한 통합 JVM 결과는 66 suites·299 tests,
+failure/error/skipped 0이며 x86_64 debug build도 통과했다.
 
 ### 6.9 반응형 툴바·AI 설정 CTA checkpoint 계약
 
@@ -1206,7 +1216,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`DONE`: 펼친 Fold6 한글·영문 손 경계와 API 34 tablet emulator 초기 복원·회전·모바일·중앙 무입력·숫자판 왕복 통과)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`DONE`: emulator 조사 받침·ㄹ 예외, 감정 강·약 chip, 후보·1회 삽입 통과)
-6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`KO-07 DONE`: emulator 공백 후보·선택·취소·1회 삽입 통과, `MM-01`: emulator picker 복원·한국어 줄 선택·1회 삽입 통과, 회전·저화질 정확도와 native 배포 gate)
+6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`KO-07 DONE`: emulator 공백 후보·선택·취소·1회 삽입 통과, `MM-01`: emulator picker 복원·정방향·90도 회전·저화질 인식·줄 선택·1회 삽입 통과, native 배포 gate)
 7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)
 
 ## 10. 공통 검증 게이트

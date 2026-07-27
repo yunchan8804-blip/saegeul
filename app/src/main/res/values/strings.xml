@@ -791,9 +791,9 @@
     <string name="secret_vault_saved" tools:ignore="MissingTranslation">Encrypted vault saved</string>
     <string name="secret_vault_save_failed" tools:ignore="MissingTranslation">The vault was not changed</string>
     <string name="ocr_title" tools:ignore="MissingTranslation">Korean text from image</string>
-    <string name="ocr_engine_attribution" tools:ignore="MissingTranslation">On-device · Tesseract 5 · Apache-2.0 · official tessdata_fast Korean model</string>
+    <string name="ocr_engine_attribution" tools:ignore="MissingTranslation">On-device · Tesseract 5 · Apache-2.0 · official tessdata_best Korean model</string>
     <string name="ocr_checking_model" tools:ignore="MissingTranslation">Checking the local Korean OCR model…</string>
-    <string name="ocr_model_missing" tools:ignore="MissingTranslation">Download the verified 1.7 MB Korean model once. Images and recognized text are never sent.</string>
+    <string name="ocr_model_missing" tools:ignore="MissingTranslation">Download the verified Korean accuracy model (about 13 MB) once. Images and recognized text are never sent.</string>
     <string name="ocr_model_missing_offline" tools:ignore="MissingTranslation">The Korean OCR model is not installed, and current offline or app policy blocks its one-time download.</string>
     <string name="ocr_model_download" tools:ignore="MissingTranslation">Download Korean model</string>
     <string name="ocr_model_downloading" tools:ignore="MissingTranslation">Downloading and verifying the official Korean model…</string>
