@@ -747,6 +747,16 @@ profile 저장·정밀 모드 활성·삭제·휴대폰 받아쓰기 복귀를 U
 기기가 잠겨 화면 상호작용은 수행하지 않았다. A35와 실제 OpenAI STT key는 연결 환경에 없으므로 실제
 한국어 전사·preview·정확히 1회 입력과 마이크 품질은 외부 live gate로 유지한다.
 
+같은 날 후속 voice runtime checkpoint에서는 반복 수동 검증의 원인이던 Window 내부 직접 생성을
+제거했다. 구간 녹음, Realtime socket·stream recorder, 회의 diarization을 각각 주입 가능한 runtime으로
+분리하되 운영 factory는 기존 `AudioRecord`와 OpenAI client만 생성한다. 테스트 factory는 가짜 microphone,
+socket, 전사 결과를 사용해 구간 `녹음 -> 전사 -> preview`, Realtime `connect -> PCM append -> finalize ->
+preview`, 회의 `파일 metadata -> diarization -> 선택 preview`의 성공 순서를 재현한다. Preview publish는
+editor를 변경하지 않고 명시적 insert에서만 정확히 한 번 commit하며, editor 변경·취소·terminal 인증
+실패·commit 실패에서는 자동 fallback이나 중복 입력이 0회임을 고정했다. 통합 app JVM은 72 suites·348
+tests, failure/error/skipped 0이고 x86_64·arm64 debug assemble이 모두 통과했다. 이 자동화는 실제 API
+품질을 대체하지 않으므로 A35·잠금 해제 Fold·실제 STT key gate는 그대로 유지한다.
+
 ## 7. GIF-01 상세 계약
 
 ### 7.1 핵심 UX
@@ -1297,6 +1307,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | 독립 STT 설정 | `PASS` | 글쓰기 AI/OAuth와 분리된 휴대폰 받아쓰기·OpenAI STT 모드, 정확도/효율 모델, STT 전용 Keystore/no-backup key 저장·삭제와 공식 endpoint allowlist 구현. API 34 emulator에서 미연결 CTA가 STT key·model dialog를 한 번에 직접 여는 경로와 private editor에서 credential loader 0회인 회귀 테스트 확인 |
 | 최초 마이크 권한 복귀 | `PASS/A35+EMULATOR` | 권한 Activity가 IME를 재시작해도 같은 editor identity에서 결과를 한 번만 소비한다. A35 권한 철회 상태의 첫 탭·승인 직후 `녹음 중` 및 audio HAL capture 확인; API 34 emulator에서도 권한 dialog와 `녹음 중` 상태 전이 재확인; 다른 editor·stale request 회귀 테스트 통과 |
 | Realtime protocol·실패 UX | `PASS/CODE+EMULATOR` | 공식 24 kHz PCM session JSON, append/commit, item별 delta/completed와 401 typed failure를 상태 테스트로 고정. API 34 x86_64에서 `연결 중` 즉시 표시, 거부된 key의 한국어 설명·`설정하기` STT dialog 직행, crash·key log 부재와 test credential 삭제·휴대폰 받아쓰기 복구 확인 |
+| 음성 성공 경로 자동 재현 | `PASS/CODE` | 운영 Window가 사용하는 주입 가능 runtime으로 구간·Realtime·회의 성공 순서, audio wipe, editor 변경 시 provider 0회, socket terminal race, 취소 전파, preview 이전 editor mutation 0회와 명시 insert 정확히 1회를 검증. 전체 app 72 suites·348 tests 실패 0, x86_64·arm64 debug assemble 통과 |
 | OpenAI 실제 전사 품질 | `GATE` | dummy key로 녹음·요청·401 오류 경계만 검증했다. 실제 STT key를 저장하지 않은 상태이며 한국어 정확도·preview·1회 입력은 사용자 key로 별도 검증 필요 |
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS/EMULATOR+ZFOLD` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI. emulator의 부분 적용에 더해 Z Fold6 cover에서 기존 OAuth CLI companion으로 `안녕하세욕`을 전송해 `안녕하세요`, `욕 → 요` 결과를 받고 `교체` 정확히 1회·`실행 취소` 시 뒤 공백까지 원문 복원을 실측; 문자는 전송하지 않고 draft 삭제 |
@@ -1360,9 +1371,9 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 ### 단계 4 — 음성
 
 1. push-to-talk audio capture와 permission UX. (`DONE`: A35와 API 34 emulator 최초 권한 자동 복귀·AudioRecord·중지·401 복구 PASS)
-2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview 완료, 실제 key live 품질 gate)
-3. `VOICE-01` realtime partial transcript. (`IN_PROGRESS`: WebSocket·partial/final 상태·emulator 401 UX PASS, 실제 key 한국어 품질과 production ephemeral token/WebRTC gate)
-4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 독립 STT profile 재사용, API 34 x86_64 phone·tablet emulator에서 system picker 진입·WAV 선택·동일 editor 복원·요청 실행·조기 401 설정 CTA·landscape 무잘림 PASS; 실제 OpenAI key·회의 음원 품질 gate)
+2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview와 deterministic 성공/취소/1회 삽입 runtime PASS, 실제 key live 품질 gate)
+3. `VOICE-01` realtime partial transcript. (`IN_PROGRESS`: WebSocket·partial/final·terminal race·deterministic stream/finalize 상태와 emulator 401 UX PASS, 실제 key 한국어 품질과 production ephemeral token/WebRTC gate)
+4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 독립 STT profile 재사용, deterministic diarization·선택 1회 삽입 runtime PASS, API 34 x86_64 phone·tablet emulator에서 system picker 진입·WAV 선택·동일 editor 복원·요청 실행·조기 401 설정 CTA·landscape 무잘림 PASS; 실제 OpenAI key·회의 음원 품질 gate)
 5. `VOICE-04` Codex 구독 OAuth voice bridge. (`BLOCK`: desktop UI 외 공개 CLI·HTTP audio 계약 없음)
 
 ### 단계 5 — 개인화·대화면·장기 기능

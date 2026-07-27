@@ -115,3 +115,60 @@ internal class VoiceCommitGate {
         consumed = false
     }
 }
+
+internal enum class VoiceReviewedCommitResult {
+    Inserted,
+    NotReady,
+    AlreadyConsumed,
+    EditorChanged,
+    CommitFailed
+}
+
+/**
+ * Preview-first transcript state shared by the production Window and deterministic runtime tests.
+ * Publishing a transcript never mutates the editor; only [insert] can dispatch one mutation.
+ */
+internal class VoiceTranscriptReviewSession {
+    private val gate = VoiceCommitGate()
+    private var target: VoiceEditorTarget? = null
+    private var transcript: String? = null
+
+    @Synchronized
+    fun begin(target: VoiceEditorTarget) {
+        this.target = target
+        transcript = null
+        gate.resetForNewTranscript()
+    }
+
+    @Synchronized
+    fun publish(value: String): Boolean {
+        if (target == null || VoiceTranscriptPolicy.normalize(value) != value) return false
+        transcript = value
+        gate.resetForNewTranscript()
+        return true
+    }
+
+    fun insert(
+        matchesCurrentEditor: (VoiceEditorTarget) -> Boolean,
+        commitText: (String) -> Boolean
+    ): VoiceReviewedCommitResult {
+        val reviewed: String
+        val boundTarget: VoiceEditorTarget
+        synchronized(this) {
+            reviewed = transcript ?: return VoiceReviewedCommitResult.NotReady
+            boundTarget = target ?: return VoiceReviewedCommitResult.NotReady
+            if (!gate.claim()) return VoiceReviewedCommitResult.AlreadyConsumed
+        }
+        if (!matchesCurrentEditor(boundTarget)) return VoiceReviewedCommitResult.EditorChanged
+        if (!commitText(reviewed)) return VoiceReviewedCommitResult.CommitFailed
+        clear()
+        return VoiceReviewedCommitResult.Inserted
+    }
+
+    @Synchronized
+    fun clear() {
+        target = null
+        transcript = null
+        gate.resetForNewTranscript()
+    }
+}

@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.net.Uri
-import android.util.Log
 import android.view.View
 import androidx.core.os.ConfigurationCompat
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +21,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
+import timber.log.Timber
 
 /** User-selected file diarization with explicit segment review and an exactly-once insert. */
 class MeetingTranscriptionWindow(
@@ -36,7 +36,9 @@ class MeetingTranscriptionWindow(
     private var target: VoiceEditorTarget? = null
     private var pickerRequestId: Long? = null
     private var requestJob: Job? = null
-    private var client: OpenAiDiarizationClient? = null
+    internal var runtimeFactory: MeetingTranscriptionRuntimeFactory =
+        ProductionMeetingTranscriptionRuntimeFactory
+    private var runtime: MeetingTranscriptionRuntime? = null
     private var segments: List<MeetingSpeakerSegment> = emptyList()
     private var selectedIds: Set<String> = emptySet()
     private var attached = false
@@ -164,17 +166,18 @@ class MeetingTranscriptionWindow(
     ) {
         if (!validateTarget(boundTarget, showError = true)) return
         requestJob = service.lifecycleScope.launch {
-            var activeClient: OpenAiDiarizationClient? = null
+            var activeRuntime: MeetingTranscriptionRuntime? = null
             try {
                 ui.showLoading()
-                val source = ContentUriMeetingAudioSource.inspect(context, uri)
-                if (!validateTarget(boundTarget, showError = true)) return@launch
-                ui.showLoading(source.metadata.durationMillis)
-                val transcriber = OpenAiDiarizationClient(configured)
-                activeClient = transcriber
-                client = transcriber
-                val result = transcriber.transcribe(source)
-                if (!validateTarget(boundTarget, showError = true)) return@launch
+                val source = runtimeFactory.inspect(context, uri)
+                val transcriber = runtimeFactory.create(configured)
+                activeRuntime = transcriber
+                runtime = transcriber
+                val result = transcriber.run(
+                    source = source,
+                    canContinue = { validateTarget(boundTarget, showError = true) },
+                    onSourceReady = { ui.showLoading(it.durationMillis) }
+                ) ?: return@launch
                 segments = result.segments
                 selectedIds = emptySet()
                 commitGate.resetForSelection()
@@ -182,10 +185,10 @@ class MeetingTranscriptionWindow(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
-                Log.w(
-                    TAG,
-                    "Meeting transcription failed: ${exception.javaClass.name}; " +
-                        "cause=${exception.cause?.javaClass?.name ?: "none"}"
+                Timber.w(
+                    "Meeting transcription failed: %s; cause=%s",
+                    exception.javaClass.name,
+                    exception.cause?.javaClass?.name ?: "none"
                 )
                 if (attached) {
                     if (exception is VoiceAuthenticationException) {
@@ -208,7 +211,7 @@ class MeetingTranscriptionWindow(
                     }
                 }
             } finally {
-                if (client === activeClient) client = null
+                if (runtime === activeRuntime) runtime = null
             }
         }
     }
@@ -306,8 +309,8 @@ class MeetingTranscriptionWindow(
     }
 
     private fun cancelWork() {
-        client?.cancel()
-        client = null
+        runtime?.cancel()
+        runtime = null
         requestJob?.cancel()
         requestJob = null
     }
@@ -342,7 +345,4 @@ class MeetingTranscriptionWindow(
 
     private fun voiceProviderName(): String = context.getString(R.string.voice_openai_provider_name)
 
-    private companion object {
-        const val TAG = "MeetingTranscription"
-    }
 }
