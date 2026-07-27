@@ -65,21 +65,15 @@ class MeetingTranscriptionWindow(
         attached = true
         val allowsTextInspection = service.allowsTextInspectionFeatures()
         val allowsOnlineVoice = service.allowsNetworkInputFeatures()
-        val selectedMode = VoiceProviderModeStore(context).load()
-        val effective = VoiceProviderResolver.resolve(
+        val resolved = MeetingVoiceProfileResolver.resolve(
             context,
-            allowsCredentialAccess = VoiceProviderPolicy.allowsCredentialAccess(
-                mode = selectedMode,
-                allowsTextInspection = allowsTextInspection,
-                allowsNetworkInput = allowsOnlineVoice
-            )
+            allowsCredentialAccess = allowsTextInspection && allowsOnlineVoice
         )
-        val resolved = MeetingVoiceProfilePolicy.resolve(effective)
         profile = resolved
-        when (AiFeatureEntryGate.evaluate(
+        when (MeetingWindowEntryPolicy.evaluate(
             allowsTextInspection = allowsTextInspection,
-            allowsAiInput = allowsOnlineVoice,
-            hasConfiguredProfile = resolved != null
+            allowsNetworkInput = allowsOnlineVoice,
+            profile = resolved
         )) {
             AiFeatureEntryGate.PrivateEditor -> showBlocked(
                 local(
@@ -250,10 +244,10 @@ class MeetingTranscriptionWindow(
     }
 
     private fun validatePolicy(configured: VoiceProviderProfile?): Boolean {
-        when (AiFeatureEntryGate.evaluate(
+        when (MeetingWindowEntryPolicy.evaluate(
             allowsTextInspection = service.allowsTextInspectionFeatures(),
-            allowsAiInput = service.allowsNetworkInputFeatures(),
-            hasConfiguredProfile = configured != null
+            allowsNetworkInput = service.allowsNetworkInputFeatures(),
+            profile = configured
         )) {
             AiFeatureEntryGate.PrivateEditor -> showBlocked(local(
                 "민감하거나 비공개인 입력란에서는 사용할 수 없어.",

@@ -109,3 +109,41 @@ enum class AiAction(
         const val MAX_CUSTOM_INSTRUCTION_CHARACTERS = 300
     }
 }
+
+/**
+ * Keeps the first AI writing surface focused while preserving every explicit action.
+ * Custom is the single entry point to the real Fcitx prompt editor, not a second fake text row.
+ */
+object AiActionMenuPolicy {
+    val primary: List<AiAction> = listOf(
+        AiAction.Proofread,
+        AiAction.Compose,
+        AiAction.Reply,
+        AiAction.Custom
+    )
+
+    val tone: List<AiAction> = listOf(
+        AiAction.Polite,
+        AiAction.Casual,
+        AiAction.Business,
+        AiAction.Decline,
+        AiAction.Apology,
+        AiAction.CustomerService
+    )
+
+    val translation: List<AiAction> = listOf(
+        AiAction.TranslateEnglish,
+        AiAction.TranslateKorean,
+        AiAction.TranslateJapanese,
+        AiAction.TranslateChinese
+    )
+
+    fun visibleButtons(secondaryExpanded: Boolean): List<AiAction> =
+        if (secondaryExpanded) primary + tone + translation else primary
+
+    fun allEntryPoints(): Set<AiAction> = (primary + tone + translation).toSet()
+
+    /** Custom generation remains useful when the editor has no source text yet. */
+    fun enabledActions(hasSource: Boolean): Set<AiAction> =
+        if (hasSource) allEntryPoints() else setOf(AiAction.Custom)
+}

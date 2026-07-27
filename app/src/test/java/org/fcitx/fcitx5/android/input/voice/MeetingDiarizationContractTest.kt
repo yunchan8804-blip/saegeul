@@ -9,6 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
 
 class MeetingDiarizationContractTest {
     @Test
@@ -51,25 +52,53 @@ class MeetingDiarizationContractTest {
     }
 
     @Test
-    fun `meeting reuses the STT profile for both OpenAI dictation modes`() {
+    fun `meeting resolves the stored STT profile without a quick dictation mode`() {
         val profile = VoiceProviderProfile(apiKey = "key")
 
         assertEquals(
             profile,
-            MeetingVoiceProfilePolicy.resolve(
-                EffectiveVoiceProvider(VoiceProviderMode.OpenAiApi, profile)
+            MeetingVoiceProfileResolver.resolve(
+                allowsCredentialAccess = true,
+                loadCredential = { profile }
             )
+        )
+    }
+
+    @Test
+    fun `blocked meeting entry never reads the STT credential`() {
+        var reads = 0
+
+        val resolved = MeetingVoiceProfileResolver.resolve(
+            allowsCredentialAccess = false,
+            loadCredential = {
+                reads += 1
+                VoiceProviderProfile(apiKey = "must-not-be-read")
+            }
+        )
+
+        assertNull(resolved)
+        assertEquals(0, reads)
+    }
+
+    @Test
+    fun `meeting window gate keeps privacy network and setup states distinct`() {
+        val profile = VoiceProviderProfile(apiKey = "key")
+
+        assertEquals(
+            AiFeatureEntryGate.PrivateEditor,
+            MeetingWindowEntryPolicy.evaluate(false, false, null)
         )
         assertEquals(
-            profile,
-            MeetingVoiceProfilePolicy.resolve(
-                EffectiveVoiceProvider(VoiceProviderMode.OpenAiRealtime, profile)
-            )
+            AiFeatureEntryGate.NetworkPolicyBlocked,
+            MeetingWindowEntryPolicy.evaluate(true, false, null)
         )
-        assertNull(
-            MeetingVoiceProfilePolicy.resolve(
-                EffectiveVoiceProvider(VoiceProviderMode.DeviceDictation, profile)
-            )
+        assertEquals(
+            AiFeatureEntryGate.SetupRequired,
+            MeetingWindowEntryPolicy.evaluate(true, true, null)
+        )
+        assertEquals(
+            AiFeatureEntryGate.Ready,
+            MeetingWindowEntryPolicy.evaluate(true, true, profile)
         )
     }
 

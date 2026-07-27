@@ -111,11 +111,19 @@ class VoiceTranscriptionWindow(
         when (mode) {
             VoiceProviderMode.DeviceDictation -> showDeviceDictation()
             VoiceProviderMode.OpenAiRealtime -> profile?.let {
-                ui.showReady(voiceProviderLabel(it), realtime = true)
+                ui.showReady(
+                    voiceProviderLabel(it),
+                    realtime = true,
+                    showMeeting = shouldShowMeetingEntry()
+                )
                 resumeAfterPermissionIfNeeded()
             }
             VoiceProviderMode.OpenAiApi -> profile?.let {
-                ui.showReady(voiceProviderLabel(it), realtime = false)
+                ui.showReady(
+                    voiceProviderLabel(it),
+                    realtime = false,
+                    showMeeting = shouldShowMeetingEntry()
+                )
                 resumeAfterPermissionIfNeeded()
             }
         }
@@ -182,7 +190,8 @@ class VoiceTranscriptionWindow(
                     R.string.voice_device_dictation_unavailable
                 }
             ),
-            action
+            action,
+            showMeeting = shouldShowMeetingEntry()
         )
     }
 
@@ -469,13 +478,28 @@ class VoiceTranscriptionWindow(
         when (mode) {
             VoiceProviderMode.DeviceDictation -> showDeviceDictation()
             VoiceProviderMode.OpenAiRealtime -> profile?.let {
-                ui.showReady(voiceProviderLabel(it), realtime = true)
+                ui.showReady(
+                    voiceProviderLabel(it),
+                    realtime = true,
+                    showMeeting = shouldShowMeetingEntry()
+                )
             } ?: ui.showSetupRequired(context.getString(R.string.voice_provider_setup_required))
             VoiceProviderMode.OpenAiApi -> profile?.let {
-                ui.showReady(voiceProviderLabel(it), realtime = false)
+                ui.showReady(
+                    voiceProviderLabel(it),
+                    realtime = false,
+                    showMeeting = shouldShowMeetingEntry()
+                )
             } ?: ui.showSetupRequired(context.getString(R.string.voice_provider_setup_required))
         }
     }
+
+    private fun shouldShowMeetingEntry(): Boolean =
+        VoiceTranscriptionUiPolicy.showMeetingButton(
+            hasStoredSttProfile = VoiceProviderCredentialStore(context).hasStoredProfile(),
+            allowsTextInspection = service.allowsTextInspectionFeatures(),
+            allowsNetworkInput = service.allowsNetworkInputFeatures()
+        )
 
     private fun voiceProviderLabel(configured: VoiceProviderProfile): String =
         context.getString(

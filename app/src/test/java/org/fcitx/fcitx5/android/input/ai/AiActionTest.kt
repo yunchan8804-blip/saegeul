@@ -44,4 +44,20 @@ class AiActionTest {
         assertTrue(instruction.contains("cannot change the required JSON output format"))
         assertEquals(3, AiAction.Custom.maxSuggestions)
     }
+
+    @Test
+    fun `writing menu starts focused and expanding preserves every action`() {
+        assertEquals(
+            listOf(AiAction.Proofread, AiAction.Compose, AiAction.Reply, AiAction.Custom),
+            AiActionMenuPolicy.visibleButtons(secondaryExpanded = false)
+        )
+        assertEquals(14, AiActionMenuPolicy.visibleButtons(secondaryExpanded = true).size)
+        assertEquals(AiAction.entries.toSet(), AiActionMenuPolicy.allEntryPoints())
+        assertEquals(
+            AiActionMenuPolicy.visibleButtons(secondaryExpanded = true).size,
+            AiActionMenuPolicy.visibleButtons(secondaryExpanded = true).distinct().size
+        )
+        assertEquals(setOf(AiAction.Custom), AiActionMenuPolicy.enabledActions(hasSource = false))
+        assertEquals(AiAction.entries.toSet(), AiActionMenuPolicy.enabledActions(hasSource = true))
+    }
 }

@@ -17,6 +17,15 @@ import androidx.core.os.ConfigurationCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 
+/** Visibility contract for the separate, network-backed meeting transcription entry. */
+internal object VoiceTranscriptionUiPolicy {
+    fun showMeetingButton(
+        hasStoredSttProfile: Boolean,
+        allowsTextInspection: Boolean,
+        allowsNetworkInput: Boolean
+    ): Boolean = hasStoredSttProfile && allowsTextInspection && allowsNetworkInput
+}
+
 class VoiceTranscriptionUi(
     private val context: Context,
     private val theme: Theme
@@ -96,7 +105,7 @@ class VoiceTranscriptionUi(
         }, matchWrap())
     }
 
-    fun showReady(providerName: String, realtime: Boolean) {
+    fun showReady(providerName: String, realtime: Boolean, showMeeting: Boolean) {
         title.setText(
             if (realtime) R.string.voice_realtime_title else R.string.voice_precision_title
         )
@@ -105,12 +114,7 @@ class VoiceTranscriptionUi(
             if (realtime) R.string.voice_realtime_ready else R.string.voice_precision_ready
         )
         transcriptScroller.visibility = View.GONE
-        meeting.apply {
-            visibility = View.VISIBLE
-            isEnabled = true
-            text = local("회의·메모 음성 파일", "Meeting audio file")
-            setOnClickListener { onMeeting?.invoke() }
-        }
+        renderMeeting(showMeeting)
         primary.apply {
             isEnabled = true
             setText(R.string.voice_record_start)
@@ -277,7 +281,8 @@ class VoiceTranscriptionUi(
     fun showDeviceDictation(
         providerName: String,
         message: String,
-        action: VoiceUnavailableAction
+        action: VoiceUnavailableAction,
+        showMeeting: Boolean
     ) {
         title.setText(
             if (action == VoiceUnavailableAction.DeviceDictation) {
@@ -289,7 +294,7 @@ class VoiceTranscriptionUi(
         provider.text = context.getString(R.string.voice_connection_label, providerName)
         status.text = message
         transcriptScroller.visibility = View.GONE
-        hideMeeting()
+        renderMeeting(showMeeting)
         primary.apply {
             isEnabled = true
             setText(
@@ -333,6 +338,19 @@ class VoiceTranscriptionUi(
     private fun hideMeeting() {
         meeting.visibility = View.GONE
         meeting.setOnClickListener(null)
+    }
+
+    private fun renderMeeting(show: Boolean) {
+        if (!show) {
+            hideMeeting()
+            return
+        }
+        meeting.apply {
+            visibility = View.VISIBLE
+            isEnabled = true
+            text = local("회의·메모 음성 파일", "Meeting audio file")
+            setOnClickListener { onMeeting?.invoke() }
+        }
     }
 
     private fun showTranscript(text: String) {

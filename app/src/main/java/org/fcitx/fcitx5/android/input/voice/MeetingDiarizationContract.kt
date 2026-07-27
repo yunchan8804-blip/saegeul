@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import android.content.Context
+import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
 import java.util.Locale
 
 data class MeetingSpeakerSegment(
@@ -79,15 +81,35 @@ object MeetingDiarizationCapability {
 }
 
 /**
- * Meeting transcription reuses the independently stored speech-to-text credential.
- * The selected online dictation transport must not make the same OpenAI key disappear.
+ * Meeting transcription owns an explicit online entry and therefore resolves the independently
+ * stored STT profile without consulting the quick-dictation transport selection.
  */
-object MeetingVoiceProfilePolicy {
-    fun resolve(effective: EffectiveVoiceProvider): VoiceProviderProfile? = when (effective.mode) {
-        VoiceProviderMode.DeviceDictation -> null
-        VoiceProviderMode.OpenAiRealtime,
-        VoiceProviderMode.OpenAiApi -> effective.profile
+object MeetingVoiceProfileResolver {
+    fun resolve(context: Context, allowsCredentialAccess: Boolean): VoiceProviderProfile? = resolve(
+        allowsCredentialAccess = allowsCredentialAccess,
+        loadCredential = { VoiceProviderCredentialStore(context).load() }
+    )
+
+    internal fun resolve(
+        allowsCredentialAccess: Boolean,
+        loadCredential: () -> VoiceProviderProfile?
+    ): VoiceProviderProfile? {
+        if (!allowsCredentialAccess) return null
+        return loadCredential()?.takeIf(VoiceProviderProfile::isConfigured)
     }
+}
+
+/** Pure window-state contract kept testable without constructing an InputMethodService. */
+internal object MeetingWindowEntryPolicy {
+    fun evaluate(
+        allowsTextInspection: Boolean,
+        allowsNetworkInput: Boolean,
+        profile: VoiceProviderProfile?
+    ): AiFeatureEntryGate = AiFeatureEntryGate.evaluate(
+        allowsTextInspection = allowsTextInspection,
+        allowsAiInput = allowsNetworkInput,
+        hasConfiguredProfile = profile != null
+    )
 }
 
 object MeetingTranscriptSelection {

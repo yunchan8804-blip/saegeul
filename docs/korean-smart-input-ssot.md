@@ -619,6 +619,8 @@ SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OC
 | `UX-03` | 툴바를 열면 고정 48dp 펼침/접힘 control과 기존 12개 도구의 1행 가로 스크롤을 먼저 표시한다. 사용자가 control을 누른 경우에만 도구를 실제 2행 6열 grid·96dp로 배치한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 해당 editor의 명시적 펼침 envelope를 이어받되 자동 후보 내용은 1행 `NOWRAP`을 유지한다. 새 editor는 48dp로 시작하고 Android same-editor restart만 명시적 펼침을 보존한다. 폭 측정이나 타이핑 자체는 높이 변경 원인이 아니다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, 전체 68 suites·318 tests 실패 0, API 34 x86_64 emulator에서 IME frame `y=1405→1279`, 실제 1행→2행 6열→1행 후보 전환 중 `y=1279` 유지·접기 후 `y=1405`, OOM·GridLayout count 회귀 실동작 수정. Z Fold6 cover의 `0.1.2-141-g89b5f79e`에서도 touchable top `y=1566→1458`, 실제 2행 6열, `hellp` 1행 후보 중 `y=1458` 유지, 접기 뒤 `y=1566`을 확인했다. | Z Fold6 unfolded 전환과 A35 재연결 후 동일 전환 확인 |
 | `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동한 뒤 `내 컴퓨터 자동으로 찾기 / OpenAI API 키 사용 / 고급 연결 설정` chooser를 정확히 한 번 바로 열고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. 기본 휴대폰 받아쓰기에서는 OpenAI STT를 미연결 경고가 아닌 선택 사항으로 표시하고, OpenAI 모드를 실제 선택한 경우에만 별도 키를 요구한다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, API 34 x86_64 emulator의 글쓰기 chooser·STT dialog 직행·선택 모드 summary·취소 후 휴대폰 모드 유지 PASS | A35 최신 APK 재확인 |
 | `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
+| `AI-11` | AI 글쓰기 첫 화면은 맞춤법·문장 3개·답장 3개·직접 지시와 화면 안에 고정된 `더보기`만 1행으로 표시한다. `더보기`를 명시적으로 누를 때만 말투와 번역 2행을 추가하고, 가짜 지시문 행을 두지 않는다. `직접 지시`는 원문이 비어 있어도 기존 Fcitx 키보드 입력으로 열리며, 미연결 상태는 비활성 기능 미리보기와 일반 사용자용 `설정하기`를 함께 표시한다. | `AiActionMenuPolicy`의 전체 14 action·중복 0·빈 원문 Custom 단독 활성 테스트, 전체 68 suites·323 tests 실패 0, API 34 x86_64에서 미연결 1행 preview·CTA, 고정 `더보기`·3행 펼침, 빈 Chrome editor의 Custom 단독 활성과 실제 Fcitx prompt keyboard 진입 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
+| `VOICE-07` | 빠른 받아쓰기 모드와 회의·메모 파일 전사 진입을 독립시킨다. `휴대폰 받아쓰기`가 선택돼 있어도 별도 STT profile 파일이 있고 privacy·network gate가 허용되면 회의 버튼을 표시한다. 표시 단계에서는 파일 존재만 확인하고, 사용자가 회의 창을 명시적으로 연 뒤에만 profile을 복호화한다. | mode를 입력받지 않는 `MeetingVoiceProfileResolver`, 차단 시 credential loader 0회, private/network/setup/ready와 회의 버튼 visibility 계약 테스트, 전체 68 suites·323 tests 실패 0 | 실제 OpenAI key·다화자 음원의 한국어 화자 분리 품질 |
 
 실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
 HoneyBoard가 활성인 화면을 이 앱의 숫자판이나 툴바 증거로 사용하지 않는다.
@@ -696,6 +698,18 @@ debug assemble, Pixel 7 API 34 emulator의 설정 문구·모드 선택·dialog 
 통과했다. arm64 APK는 Z Fold6에 설치했지만 기기가 잠겨 이번 checkpoint의 화면 상호작용은 수행하지
 못했다. A35는 ADB에 없고 실제 OpenAI STT key도 로컬 환경에 없으므로 두 항목은 실기기·자격증명 gate로
 유지한다.
+
+같은 날 후속 수렴에서 장시간 목표가 끝나지 않은 이유를 코드 결함과 외부 gate로 다시 나눴다. 기본
+휴대폰 받아쓰기를 고른 상태가 별도 회의 전사의 STT profile까지 숨기던 결합을 제거했다. 음성 toolbar는
+암호화 profile 파일의 존재와 privacy·network policy만으로 회의 버튼을 결정하며, 실제 Keystore 복호화는
+명시적 회의 창 진입 뒤에만 수행한다. AI 글쓰기 첫 화면은 값도 보존하지 않던 40dp 가짜 지시문 행과
+항상 보이던 3개 action 행을 제거했다. 기본 1행의 `더보기`는 가로 스크롤 밖에 고정해 좁은 화면에서도
+보이게 하고, 직접 지시는 빈 editor에서도 기존 Fcitx prompt keyboard로 들어간다. 전체 app JVM
+68 suites·323 tests, failure/error/skipped 0을 통과했다. emulator-5556은 설정 Activity 복귀 뒤
+`mInputShown=true`인데 실제 IME surface가 0-height인 플랫폼 수명주기 상태가 남았지만, emulator-5554의
+깨끗한 재설치에서 미연결 1행, 고정 `더보기`, 3행 펼침, 빈 Chrome editor의 Custom 단독 활성과 기존
+Fcitx prompt keyboard 진입을 다시 확인했다. 두 emulator의 임시 AI test profile은
+`no_backup/ai/provider.bin`에서 삭제했다.
 
 ## 7. GIF-01 상세 계약
 
@@ -1238,7 +1252,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | A35 생성 결과 | `PASS` | `meeting 30 minutes late polite` 선택 범위로 한국어 지각 안내 초안 생성, 결과 card와 공급자 표시 확인 |
 | 교체 exactly-once·undo | `PASS` | Chrome URL editor에서 결과를 한 번 교체한 뒤 `실행 취소`로 원문이 정확히 복원됨 |
 | Z Fold6 UI | `PASS` | cover 화면에서 AI toolbar, 원문 preview와 전체 action group이 잘림 없이 표시됨 |
-| AI 결과 우선 UI | `CODE_DONE` | 결과 상태에서 보이지 않는 `weight=1` status container를 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 이동, 결과 card가 전체 가용 높이를 사용 |
+| AI 결과 우선 UI | `PASS/EMULATOR` | 결과 상태에서 보이지 않는 `weight=1` status container와 가짜 지시문 행을 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 유지, 기본 action은 1행·말투/번역은 명시적 펼침으로 분리해 결과 card가 전체 가용 높이를 사용 |
 | AI 직접 지시문 | `PASS` | 기능별 두벌식 복제판 제거. 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme을 그대로 쓰되 output은 내부 최대 300자 buffer로 격리; A35에서 영문 입력·후보·숫자판·천지인 picker·picker restart prompt 보존과 target editor 무변경 통과, pure buffer Unicode·preedit·limit 회귀 테스트 통과 |
 | AI 직접 지시 터치 경계 | `PASS/EMULATOR` | prompt strip 상단을 IME content·visible·touchable inset으로 사용해 뒤 editor의 전송/검색 버튼 touch 관통을 차단. API 34 WindowManager region·target activity 유지와 실제 `실행` -> 401 설정 안내 전이를 검증 |
 | API key 거부 UX | `PASS/EMULATOR` | API key 401을 typed failure로 분리해 provider 영문 원문과 의미 없는 재시도를 숨기고 한국어 설명·`설정하기`를 표시; CTA의 `개인정보·AI` 직행과 test credential 삭제 확인 |
@@ -1257,6 +1271,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | 구간 녹음 버튼·권한·오류 | `PASS/EMULATOR` | 권한 미허용 상태의 `녹음 시작` 1회 탭으로 Android permission dialog 표시, 승인 뒤 같은 editor에서 `녹음 중 0초`·mic indicator·2초 경과를 확인하고, 중지 뒤 dummy key 401을 한국어 설명과 `설정하기`로 복구했다. 보고된 무반응 상태는 emulator가 input device를 물리 keyboard로 오인해 Fcitx input view 전체를 접은 수명주기 상태와 상관됐고 IME 재선택으로 복구됐다. 정상 input view에서 recorder 버튼 자체는 즉시 동작하므로 microphone 품질 gate와 분리한다. |
 | STT 모드 설정 원자성 | `PASS/EMULATOR` | 전용 key가 없는 Pixel 7·QA tablet에서 OpenAI 정밀 전사를 선택한 뒤 key dialog를 취소해도 `휴대폰 받아쓰기`가 유지됐다. Pixel 7에서 test key 저장 성공 뒤에만 정밀 모드가 활성화됐고 앱 UI의 `STT API 키 제거`로 key 삭제·휴대폰 모드 복귀·제거 행 소멸을 확인했다. test key는 남기지 않았다. 설정 아이콘은 별도 mutable drawable과 theme tint를 사용해 phone·tablet light theme에서 흰색 소실 없이 표시한다. |
 | 회의 파일 picker·인증 복구 | `PASS/EMULATOR` | Pixel 7과 QA tablet API 34에서 1초 WAV 선택 뒤 같은 editor의 새 회의 window로 one-shot 복귀. tablet landscape에서 streaming body 조기 종료의 HTTP 401을 회수해 일반 파일 오류 대신 STT 재연결 설명과 `설정하기`를 표시 |
+| 회의 전사 모드 독립 | `PASS/CODE` | 빠른 받아쓰기가 `휴대폰 받아쓰기`여도 저장된 STT profile이 있으면 회의 버튼을 표시한다. 표시 시 파일 존재만 확인하고 명시적 회의 창 진입 뒤에만 복호화하며 private/offline/app-network 차단에서는 loader 0회 |
 
 사용량 저장소는 action·성공/실패·입출력 문자 수·마지막 provider/model만 집계하며 prompt, 결과,
 API key, endpoint URL 필드를 갖지 않는다. 개인 debug build의 공급자 credential도 Gradle environment
@@ -1405,3 +1420,5 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | Tailscale private network를 사용할 수 없는 emulator 검증에는 strict HTTPS origin-only `--public-origin`을 허용하되 임시 tunnel을 production 기본값으로 승격하지 않음 |
 | 2026-07-27 | 새 `--public-origin` route의 일시적 404·502는 bounded backoff로만 재검증하고 manifest 계약 오류는 즉시 fail-closed. Pixel 7·QA tablet에서 OAuth·직접 지시·후보 3개·삽입·undo 뒤 시험 grant와 tunnel을 모두 정리 |
 | 2026-07-27 | 전용 STT credential이 없는 온라인 받아쓰기 선택은 mode를 선저장하지 않는다. key 저장 성공과 mode 변경을 같은 사용자 완료 경로로 묶고, key dialog 취소 시 기존 휴대폰 받아쓰기를 보존한다. |
+| 2026-07-28 | AI 글쓰기는 기본 action 1행과 고정 `더보기`를 사용하고 말투·번역은 명시적 펼침에서만 표시한다. 가짜 prompt row를 금지하며 빈 editor의 `직접 지시`도 기존 Fcitx prompt keyboard로 연다. |
+| 2026-07-28 | 빠른 받아쓰기 mode는 회의·메모 파일 전사의 STT profile 선택을 숨기지 않는다. 회의 버튼 렌더는 암호화 파일 존재만 보고 실제 credential 복호화는 privacy·network 허용 상태의 명시적 회의 진입 뒤에만 수행한다. |

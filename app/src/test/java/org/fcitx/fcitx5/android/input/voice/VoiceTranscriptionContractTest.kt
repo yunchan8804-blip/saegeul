@@ -54,6 +54,38 @@ class VoiceTranscriptionContractTest {
     }
 
     @Test
+    fun `meeting button ignores quick dictation mode but requires stored STT and network access`() {
+        assertTrue(
+            VoiceTranscriptionUiPolicy.showMeetingButton(
+                hasStoredSttProfile = true,
+                allowsTextInspection = true,
+                allowsNetworkInput = true
+            )
+        )
+        assertFalse(
+            VoiceTranscriptionUiPolicy.showMeetingButton(
+                hasStoredSttProfile = false,
+                allowsTextInspection = true,
+                allowsNetworkInput = true
+            )
+        )
+        assertFalse(
+            VoiceTranscriptionUiPolicy.showMeetingButton(
+                hasStoredSttProfile = true,
+                allowsTextInspection = false,
+                allowsNetworkInput = true
+            )
+        )
+        assertFalse(
+            VoiceTranscriptionUiPolicy.showMeetingButton(
+                hasStoredSttProfile = true,
+                allowsTextInspection = true,
+                allowsNetworkInput = false
+            )
+        )
+    }
+
+    @Test
     fun `granted microphone permission resumes once in the same editor`() {
         val queue = VoicePermissionResumeQueue()
         val target = VoiceEditorTarget("chat.app", 7, 1, 12)
