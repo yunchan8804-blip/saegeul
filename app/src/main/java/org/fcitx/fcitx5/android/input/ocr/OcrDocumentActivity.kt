@@ -13,15 +13,12 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** Process-memory-only bridge for a user-confirmed, one-shot image document selection. */
 object OcrDocumentCoordinator {
-    private data class Pending(val id: Long, val callback: (Uri?) -> Unit)
-
     private val nextId = AtomicLong(1L)
-    private var pending: Pending? = null
+    private val resumeQueue = OcrDocumentResumeQueue()
 
-    @Synchronized
-    fun request(context: Context, callback: (Uri?) -> Unit): Long? {
+    fun request(context: Context, target: OcrEditorTarget): Long? {
         val id = nextId.getAndIncrement()
-        pending = Pending(id, callback)
+        resumeQueue.begin(id, target)
         val launched = runCatching {
             context.startActivity(
                 Intent(context, OcrDocumentActivity::class.java)
@@ -30,23 +27,29 @@ object OcrDocumentCoordinator {
             )
         }.isSuccess
         if (!launched) {
-            pending = null
+            resumeQueue.cancel(id)
             return null
         }
         return id
     }
 
-    @Synchronized
     fun cancel(id: Long) {
-        if (pending?.id == id) pending = null
+        resumeQueue.cancel(id)
     }
 
-    @Synchronized
     internal fun deliver(id: Long, uri: Uri?) {
-        val request = pending?.takeIf { it.id == id } ?: return
-        pending = null
-        request.callback(uri?.takeIf { it.scheme == "content" })
+        resumeQueue.complete(
+            id,
+            uri?.takeIf { it.scheme == "content" }?.toString()
+        )
     }
+
+    fun consumeForEditor(
+        packageName: String?,
+        fieldId: Int,
+        inputType: Int
+    ): OcrDocumentResumeResult? =
+        resumeQueue.consumeForEditor(packageName, fieldId, inputType)
 }
 
 /** Internal translucent boundary that opens the system picker and never persists URI access. */

@@ -35,6 +35,8 @@ import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
 import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.ocr.OcrDocumentCoordinator
+import org.fcitx.fcitx5.android.input.ocr.OcrWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
 import org.fcitx.fcitx5.android.input.picker.emoticonPicker
 import org.fcitx.fcitx5.android.input.picker.symbolPicker
@@ -436,11 +438,20 @@ class InputView(
         if (focusChangeResetKeyboard || !restarting) {
             windowManager.attachWindow(KeyboardWindow)
         }
-        VoicePermissionCoordinator.consumeForEditor(
+        val ocrResume = OcrDocumentCoordinator.consumeForEditor(
             info.packageName,
             info.fieldId,
             info.inputType
-        )?.let { windowManager.attachWindow(VoiceTranscriptionWindow(it)) }
+        )
+        val voiceResume = VoicePermissionCoordinator.consumeForEditor(
+            info.packageName,
+            info.fieldId,
+            info.inputType
+        )
+        when {
+            ocrResume != null -> windowManager.attachWindow(OcrWindow(ocrResume))
+            voiceResume != null -> windowManager.attachWindow(VoiceTranscriptionWindow(voiceResume))
+        }
     }
 
     override fun onStartHandleFcitxEvent() {

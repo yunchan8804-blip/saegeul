@@ -409,7 +409,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
 | `VOICE-05` | 휴대폰 받아쓰기 기본 모드 | `DONE` | 글쓰기 AI 연결 여부와 무관한 기본 음성 모드다. system voice IME가 있으면 즉시 전환하고, 없으면 Android 음성 입력 설정 안내를 제공한다 | S |
 | `VOICE-06` | 독립 STT 공급자·보안 저장소 | `DONE` | 글쓰기 AI/OAuth와 분리된 OpenAI STT key·모델 선택, 공식 endpoint allowlist, Keystore/no-backup 저장과 즉시 삭제 | M |
-| `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입 구현, 실기기 정확도 gate | L |
+| `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입과 picker 복귀 복원 구현, 회전·저화질 정확도와 native 배포 gate | L |
 
 ### 6.5 편의·기기·보안 기능
 
@@ -510,7 +510,7 @@ turn에 다시 적용하도록 고쳐 초기 복원을 통과했다.
 Hangul을 추가하고 `Moakey (two hand)` 표면으로 바꾼 뒤에도 세로·가로 gap 탭은 입력 0회,
 실제 `ㅃ` 키는 각각 1회 입력됐다. 따라서 기능 완료 gate는 emulator로 닫으며, 실제 Fold의
 hinge/posture 센서 이벤트는 코드 완료를 막지 않는 실기기 전용 관찰 항목으로 유지한다. 최종
-통합 회귀는 app JVM 65 suites·283 tests, failure/error/skipped 0과 x86_64 app·Hangul plugin
+통합 회귀는 app JVM 65 suites·288 tests, failure/error/skipped 0과 x86_64 app·Hangul plugin
 assemble을 통과했다.
 
 ### 6.8 한국어 다음 단어·GIF 밈 품질·로컬 OCR checkpoint 계약
@@ -519,7 +519,7 @@ assemble을 통과했다.
 | --- | --- | --- | --- |
 | `KO-07` | 실제 공백 경계 뒤에만 project-curated 로컬 다음 어절을 미선택 후보로 표시한다. 기존 완성·개인 단어·한자 후보와 mode를 섞지 않고, 선택 시 현재 후보 membership을 다시 확인한 뒤 1회 확정한다. | 64KiB·500행 fail-closed parser, 중복·limit·민감 editor policy, A35·Z Fold6 arm64 native test와 API 34 emulator의 `오늘 ` 노출·선택·취소·1회 삽입 | 없음. emulator를 canonical Android gate로 인정 |
 | `GIF-02` | KLIPY exact query의 성공한 첫 page가 비었을 때만 한국어 반응 intent를 최대 2개 시도한다. 원 결과와 합치지 않고 recovery page를 단일 page로 종료한다. Noto는 로컬 tag 가중치와 emoji family 다양성을 적용한다. GIPHY에는 query 보정·재정렬·필터를 적용하지 않는다. | GIF 17 suites·64 tests, provider isolation·stable dedupe·safe fallback·Noto family diversity | KLIPY production access·branding review, 실제 희소 query의 두 기기 grid 품질 matrix |
-| `MM-01` | JPEG·PNG·WebP content URI만 system document picker로 1회 받는다. 최대 15MiB·100MP source를 4MP 이하로 축소하고 Tesseract 한국어 모델로 기기 안에서 인식한다. 결과는 기본 미선택 줄별 preview 뒤 선택분만 1회 입력한다. | OCR contract·image bound·고정 commit/크기/SHA-256 model install tests 9개와 Kotlin compile | A35·Z Fold6 실제 한국어 인쇄물·회전 이미지 정확도, picker 취소·focus 이동, F-Droid용 native AAR 재현성 또는 source build 전환 |
+| `MM-01` | JPEG·PNG·WebP content URI만 system document picker로 1회 받는다. 최대 15MiB·100MP source를 4MP 이하로 축소하고 Tesseract 한국어 모델로 기기 안에서 인식한다. 결과는 기본 미선택 줄별 preview 뒤 선택분만 1회 입력한다. picker가 IME를 분리해도 원 editor 신원과 one-shot URI를 process memory에 보관하고 같은 editor에서만 OCR window를 복원한다. | OCR contract·image bound·고정 commit/크기/SHA-256 model install·picker resume tests 13개, Pixel 7 API 34 emulator의 picker 복귀·한국어 UI 이미지 인식·줄 선택·정확히 1회 삽입, tablet emulator 가로 화면 진입 UI | 회전·저화질·실물 촬영 정확도 matrix, F-Droid용 native AAR 재현성 또는 source build 전환 |
 
 이 checkpoint의 통합 자동 검증은 app JVM 56 suites·236 tests, failure/error/skipped 0과 arm64
 app·Hangul plugin assemble을 통과했다. lint에서 새로 발견한 Android 6 `contentLengthLong` 1건은
@@ -532,6 +532,13 @@ OCR engine과 `tessdata_fast` 한국어 모델은 Apache-2.0 계열의 공개 �
 `noBackupFilesDir/ocr/tesseract`에 둔다. 선택한 원본 이미지·content URI·인식 결과는 prefs, cache,
 backup, 일반 log에 저장하지 않으며 Bitmap은 작업 종료 시 지우고 recycle한다. 모델 설치 뒤 OCR은
 완전 offline mode에서도 동작하지만 password·sensitive·`NoSpellCheck` editor에서는 picker 전 차단한다.
+
+2026-07-27 emulator 재검증에서 기존 callback 방식은 system picker가 IME window를 분리할 때
+결과를 버리고 일반 키보드로 복귀하는 결함이 확인됐다. 이를 editor-bound one-shot resume queue로
+교체해 동일 editor에서만 OCR window를 정확히 한 번 복원하도록 수정했다. Pixel 7 API 34에서는
+한국어 UI screenshot에서 `이미지에서 한글` 줄을 인식하고 명시 선택한 그 줄만 설정 검색란에 1회
+삽입했다. QA tablet API 34 가로 화면에서는 미설치 모델 안내와 두 동작 버튼이 겹침·잘림 없이
+표시됐다. 통합 JVM 결과는 65 suites·288 tests, failure/error/skipped 0이다.
 
 ### 6.9 반응형 툴바·AI 설정 CTA checkpoint 계약
 
@@ -1186,7 +1193,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`DONE`: 펼친 Fold6 한글·영문 손 경계와 API 34 tablet emulator 초기 복원·회전·모바일·중앙 무입력·숫자판 왕복 통과)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`DONE`: emulator 조사 받침·ㄹ 예외, 감정 강·약 chip, 후보·1회 삽입 통과)
-6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`KO-07 DONE`: emulator 공백 후보·선택·취소·1회 삽입 통과, `MM-01` 실제 OCR 정확도와 native 배포 gate)
+6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`KO-07 DONE`: emulator 공백 후보·선택·취소·1회 삽입 통과, `MM-01`: emulator picker 복원·한국어 줄 선택·1회 삽입 통과, 회전·저화질 정확도와 native 배포 gate)
 7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)
 
 ## 10. 공통 검증 게이트
@@ -1206,9 +1213,9 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 최소 공통 명령은 다음과 같다.
 
 ```powershell
-.\gradlew.bat :app:testDebugUnitTest -PbuildABI=arm64-v8a
-.\gradlew.bat :app:assembleDebug -PbuildABI=arm64-v8a
-.\gradlew.bat :plugin:hangul:assembleDebug -PbuildABI=arm64-v8a
+.\gradlew.bat :app:testDebugUnitTest -PbuildABI=x86_64
+.\gradlew.bat :app:assembleDebug -PbuildABI=x86_64
+.\gradlew.bat :plugin:hangul:assembleDebug -PbuildABI=x86_64
 git diff --check
 ```
 

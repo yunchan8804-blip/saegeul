@@ -45,4 +45,61 @@ class OcrContractTest {
         gate.resetForReview()
         assertTrue(gate.claim())
     }
+
+    @Test
+    fun `document picker result resumes once in the same editor`() {
+        val queue = OcrDocumentResumeQueue()
+        val target = OcrEditorTarget("chat.app", 4, 1, 12)
+
+        queue.begin(41L, target)
+        queue.complete(41L, "content://documents/image/1")
+
+        assertEquals(
+            OcrDocumentResumeResult(target, "content://documents/image/1"),
+            queue.consumeForEditor("chat.app", 4, 1)
+        )
+        assertNull(queue.consumeForEditor("chat.app", 4, 1))
+    }
+
+    @Test
+    fun `cancelled picker still restores OCR without an image`() {
+        val queue = OcrDocumentResumeQueue()
+        val target = OcrEditorTarget("chat.app", 4, 1, 12)
+
+        queue.begin(42L, target)
+        queue.complete(42L, null)
+
+        assertEquals(
+            OcrDocumentResumeResult(target, null),
+            queue.consumeForEditor("chat.app", 4, 1)
+        )
+    }
+
+    @Test
+    fun `document result is discarded when editor identity changed`() {
+        val queue = OcrDocumentResumeQueue()
+        val target = OcrEditorTarget("chat.app", 4, 1, 12)
+
+        queue.begin(43L, target)
+        queue.complete(43L, "content://documents/image/2")
+
+        assertNull(queue.consumeForEditor("other.app", 4, 1))
+        assertNull(queue.consumeForEditor("chat.app", 4, 1))
+    }
+
+    @Test
+    fun `stale picker result cannot replace latest request`() {
+        val queue = OcrDocumentResumeQueue()
+        val latestTarget = OcrEditorTarget("chat.app", 4, 1, 12)
+
+        queue.begin(1L, OcrEditorTarget("old.app", 1, 1, 0))
+        queue.begin(2L, latestTarget)
+        queue.complete(1L, "content://documents/image/old")
+        queue.complete(2L, "content://documents/image/latest")
+
+        assertEquals(
+            OcrDocumentResumeResult(latestTarget, "content://documents/image/latest"),
+            queue.consumeForEditor("chat.app", 4, 1)
+        )
+    }
 }

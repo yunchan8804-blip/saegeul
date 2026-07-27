@@ -22,7 +22,9 @@ import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
 
 /** Local Korean OCR with one-shot image access, explicit review, and exactly-once insertion. */
-class OcrWindow : InputWindow.ExtendedInputWindow<OcrWindow>() {
+class OcrWindow(
+    private val documentResume: OcrDocumentResumeResult? = null
+) : InputWindow.ExtendedInputWindow<OcrWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
@@ -37,6 +39,7 @@ class OcrWindow : InputWindow.ExtendedInputWindow<OcrWindow>() {
     private var selectedIds: Set<String> = emptySet()
     private var modelInstalled = false
     private var attached = false
+    private var documentResumeConsumed = false
     private val commitGate = OcrCommitGate()
 
     override val title: String by lazy { context.getString(R.string.ocr_title) }
@@ -63,12 +66,21 @@ class OcrWindow : InputWindow.ExtendedInputWindow<OcrWindow>() {
             showPrivateBlocked()
             return
         }
-        checkModel()
+        if (!documentResumeConsumed && documentResume != null) {
+            documentResumeConsumed = true
+            resumeAfterDocumentPicker(documentResume)
+        } else {
+            checkModel()
+        }
     }
 
     override fun onDetached() {
         attached = false
-        cancelSession(clearUi = false)
+        // A document picker temporarily detaches the IME. Its result belongs to the coordinator,
+        // not this stale window instance, and must survive until InputView restores the editor.
+        pickerRequestId = null
+        cancelWork()
+        clearReviewState()
     }
 
     private fun checkModel() {
@@ -146,19 +158,43 @@ class OcrWindow : InputWindow.ExtendedInputWindow<OcrWindow>() {
         }
         target = boundTarget
         ui.showWaitingForImage()
-        pickerRequestId = OcrDocumentCoordinator.request(context) { uri ->
-            pickerRequestId = null
-            if (!attached) return@request
-            if (uri == null) {
-                clearReviewState()
-                ui.showReady()
-                return@request
-            }
-            recognize(uri, boundTarget)
-        }
+        pickerRequestId = OcrDocumentCoordinator.request(context, boundTarget)
         if (pickerRequestId == null) {
             clearReviewState()
             ui.showRecognitionError(R.string.ocr_failed, canRetry = true)
+        }
+    }
+
+    private fun resumeAfterDocumentPicker(resume: OcrDocumentResumeResult) {
+        val uri = resume.documentUri?.let(Uri::parse)
+        if (uri == null) {
+            checkModel()
+            return
+        }
+        target = resume.target
+        ui.showRecognizing()
+        workJob = service.lifecycleScope.launch {
+            try {
+                modelInstalled = modelManager.hasValidModel()
+                if (!attached) return@launch
+                if (!modelInstalled) {
+                    clearReviewState()
+                    ui.showModelMissing(
+                        canDownload = service.allowsNetworkInputFeatures(),
+                        failed = true
+                    )
+                    return@launch
+                }
+                workJob = null
+                recognize(uri, resume.target)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                if (attached) {
+                    clearReviewState(keepTarget = true)
+                    ui.showRecognitionError(R.string.ocr_failed, canRetry = true)
+                }
+            }
         }
     }
 
