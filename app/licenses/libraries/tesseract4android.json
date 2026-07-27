@@ -1,0 +1,11 @@
+{
+    "uniqueId": "cz.adaptech.tesseract4android:tesseract4android",
+    "artifactVersion": "4.9.0",
+    "description": "Android JNI wrapper and source build of Tesseract OCR",
+    "name": "Tesseract4Android",
+    "website": "https://github.com/adaptech-cz/Tesseract4Android",
+    "tag": "native",
+    "licenses": [
+        "Apache-2.0"
+    ]
+}

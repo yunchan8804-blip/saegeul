@@ -1,0 +1,11 @@
+{
+    "uniqueId": "tesseract-ocr/tesseract",
+    "artifactVersion": "5.5.1",
+    "description": "Open source optical character recognition engine bundled by Tesseract4Android",
+    "name": "Tesseract OCR",
+    "website": "https://github.com/tesseract-ocr/tesseract",
+    "tag": "native",
+    "licenses": [
+        "Apache-2.0"
+    ]
+}

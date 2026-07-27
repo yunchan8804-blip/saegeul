@@ -1,0 +1,11 @@
+{
+    "uniqueId": "DanBloomberg/leptonica",
+    "artifactVersion": "1.85.0",
+    "description": "Image processing and analysis library bundled by Tesseract4Android",
+    "name": "Leptonica",
+    "website": "https://github.com/DanBloomberg/leptonica",
+    "tag": "native",
+    "licenses": [
+        "BSD-2-Clause"
+    ]
+}

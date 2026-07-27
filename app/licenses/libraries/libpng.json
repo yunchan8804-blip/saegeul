@@ -1,0 +1,11 @@
+{
+    "uniqueId": "pnggroup/libpng",
+    "artifactVersion": "1.6.48",
+    "description": "PNG reference library bundled by Tesseract4Android",
+    "name": "libpng",
+    "website": "https://github.com/pnggroup/libpng",
+    "tag": "native",
+    "licenses": [
+        "Libpng"
+    ]
+}

@@ -1,0 +1,11 @@
+{
+    "uniqueId": "ijg/libjpeg",
+    "artifactVersion": "9f",
+    "description": "Independent JPEG Group reference library bundled by Tesseract4Android",
+    "name": "IJG libjpeg",
+    "website": "https://www.ijg.org/",
+    "tag": "native",
+    "licenses": [
+        "IJG"
+    ]
+}

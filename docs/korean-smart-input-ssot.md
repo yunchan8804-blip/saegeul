@@ -409,7 +409,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
 | `VOICE-05` | 휴대폰 받아쓰기 기본 모드 | `DONE` | 글쓰기 AI 연결 여부와 무관한 기본 음성 모드다. system voice IME가 있으면 즉시 전환하고, 없으면 Android 음성 입력 설정 안내를 제공한다 | S |
 | `VOICE-06` | 독립 STT 공급자·보안 저장소 | `DONE` | 글쓰기 AI/OAuth와 분리된 OpenAI STT key·모델 선택, 공식 endpoint allowlist, Keystore/no-backup 저장과 즉시 삭제. 온라인 모드는 전용 key 저장 성공과 함께만 확정하고 설정 취소 시 기존 휴대폰 받아쓰기를 보존 | M |
-| `MM-01` | OCR·사진 속 한글 입력 | `IN_PROGRESS` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입과 picker 복귀 복원, `tessdata_best`·EXIF/픽셀 회전·저화질 emulator 정확도 matrix 구현; native 배포 gate만 남음 | L |
+| `MM-01` | OCR·사진 속 한글 입력 | `DONE` | 명시 선택 이미지의 로컬 한글 OCR·줄별 preview·1회 삽입과 picker 복귀 복원, `tessdata_best`·EXIF/픽셀 회전·저화질 emulator 정확도 matrix, 공개 native source build·라이선스 고지 통과 | L |
 
 ### 6.5 편의·기기·보안 기능
 
@@ -519,7 +519,7 @@ assemble을 통과했다.
 | --- | --- | --- | --- |
 | `KO-07` | 실제 공백 경계 뒤에만 project-curated 로컬 다음 어절을 미선택 후보로 표시한다. 기존 완성·개인 단어·한자 후보와 mode를 섞지 않고, 선택 시 현재 후보 membership을 다시 확인한 뒤 1회 확정한다. | 64KiB·500행 fail-closed parser, 중복·limit·민감 editor policy, A35·Z Fold6 arm64 native test와 API 34 emulator의 `오늘 ` 노출·선택·취소·1회 삽입 | 없음. emulator를 canonical Android gate로 인정 |
 | `GIF-02` | KLIPY exact query의 성공한 첫 page가 비었을 때만 한국어 반응 intent를 최대 2개 시도한다. 원 결과와 합치지 않고 recovery page를 단일 page로 종료한다. Noto는 로컬 tag 가중치와 emoji family 다양성을 적용한다. GIPHY에는 query 보정·재정렬·필터를 적용하지 않는다. | GIF 17 suites·64 tests, provider isolation·stable dedupe·safe fallback·Noto family diversity | KLIPY production access·branding review, 실제 희소 query의 두 기기 grid 품질 matrix |
-| `MM-01` | JPEG·PNG·WebP content URI만 system document picker로 1회 받는다. 최대 15MiB·100MP source를 4MP 이하로 축소하고 Tesseract 한국어 모델로 기기 안에서 인식한다. 결과는 기본 미선택 줄별 preview 뒤 선택분만 1회 입력한다. picker가 IME를 분리해도 원 editor 신원과 one-shot URI를 process memory에 보관하고 같은 editor에서만 OCR window를 복원한다. | OCR contract·image bound·고정 commit/크기/SHA-256 model install·picker resume·orientation policy tests 17개, Pixel 7 API 34 emulator의 picker 복귀·한국어 UI 이미지 인식·줄 선택·정확히 1회 삽입, tablet emulator의 정방향·픽셀 90도 회전·저화질 이미지 목표 3줄 인식과 저화질 선택분 1회 삽입 | F-Droid용 native AAR 재현성 또는 source build 전환 |
+| `MM-01` | JPEG·PNG·WebP content URI만 system document picker로 1회 받는다. 최대 15MiB·100MP source를 4MP 이하로 축소하고 Tesseract 한국어 모델로 기기 안에서 인식한다. 결과는 기본 미선택 줄별 preview 뒤 선택분만 1회 입력한다. picker가 IME를 분리해도 원 editor 신원과 one-shot URI를 process memory에 보관하고 같은 editor에서만 OCR window를 복원한다. | OCR contract·image bound·고정 commit/크기/SHA-256 model install·picker resume·orientation policy tests 17개, Pixel 7 API 34 emulator의 picker 복귀·한국어 UI 이미지 인식·줄 선택·정확히 1회 삽입, tablet emulator의 정방향·픽셀 90도 회전·저화질 이미지 목표 3줄 인식과 저화질 선택분 1회 삽입, Tesseract4Android 4.9.0 공개 tag source build와 native 라이선스 export | 없음. emulator를 canonical Android gate로 인정하고 생체·Fold posture처럼 하드웨어 고유 항목만 별도 관찰 |
 
 이 checkpoint의 통합 자동 검증은 app JVM 56 suites·236 tests, failure/error/skipped 0과 arm64
 app·Hangul plugin assemble을 통과했다. lint에서 새로 발견한 Android 6 `contentLengthLong` 1건은
@@ -549,6 +549,27 @@ API 34에서 정방향, EXIF 없는 픽셀 90도 회전, 480×304 blur/JPEG qual
 세 줄을 인식했다. 저화질 결과 세 줄을 선택해 기존 draft 뒤에 각각 정확히 한 번 삽입하고 삭제 뒤 원문
 `17`로 복원했다. orientation policy 4개를 포함한 통합 JVM 결과는 66 suites·299 tests,
 failure/error/skipped 0이며 x86_64 debug build도 통과했다.
+
+2026-07-27 native 배포 감사에서 앱이 해석한 JitPack AAR의 SHA-256은
+`bce5d6413a1a5ae3d7240033fbbc851ba3217d0a08d9769400e17a077f42cb2a`였고, APK에는
+x86_64 `libtesseract.so`·`libleptonica.so`·`libjpeg.so`·`libpngx.so`가 모두 포함됐다. upstream
+`Tesseract4Android 4.9.0` tag의 공개 commit
+`15c534717b1cb58261b58d4e4c1200c7f81f668c`를 별도 clean checkout하고 Temurin JDK 17,
+NDK `27.2.12479018`, CMake 3.22.1로 `:tesseract4android:assembleStandardRelease`를 실행해
+arm64-v8a·armeabi-v7a·x86·x86_64 네 ABI AAR source build가 성공했다. 로컬 source-build AAR은
+native build-id 등의 차이로 JitPack AAR과 byte-identical하지 않았으므로 재현성을 과장하지 않는다.
+다만 F-Droid 공식 inclusion policy는 자유 소프트웨어이며 공개 source가 있는 JitPack prebuilt를 trusted
+Maven dependency로 허용한다. 따라서 완료 기준은 공개 tag source build·license·현재 artifact 식별·APK
+패키징으로 고정한다.
+
+JitPack POM에 license 선언이 없어 기존 오픈 소스 라이선스 화면에서 Tesseract4Android가 빈 라이선스로
+노출되던 결함도 함께 수정했다. wrapper·Tesseract·Leptonica·IJG libjpeg·libpng의 버전, source URL과
+Apache-2.0·BSD-2-Clause·IJG·Libpng를 `app/licenses`에 명시했고,
+`:app:exportLibrariesDebug` 결과 `ARTIFACTS WITHOUT LICENSE`와 `UNKNOWN LICENSES`가 모두 0이었다.
+새 APK를 phone·tablet API 34 emulator에 설치한 뒤 라이선스 화면에서 wrapper와 네 native 구성요소의
+라이선스를 확인했다. phone emulator에 보존돼 있던 구형 fast model(1,677,415 bytes)은 유효 모델로
+오인하지 않았고, 명시적인 `한국어 모델 받기` 뒤 best model 12,528,128 bytes로 원자 교체되어 최종
+SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OCR ready 상태를 통과했다.
 
 ### 6.9 반응형 툴바·AI 설정 CTA checkpoint 계약
 
@@ -1224,7 +1245,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`DONE`: 펼친 Fold6 한글·영문 손 경계와 API 34 tablet emulator 초기 복원·회전·모바일·중앙 무입력·숫자판 왕복 통과)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`DONE`: emulator 조사 받침·ㄹ 예외, 감정 강·약 chip, 후보·1회 삽입 통과)
-6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`KO-07 DONE`: emulator 공백 후보·선택·취소·1회 삽입 통과, `MM-01`: emulator picker 복원·정방향·90도 회전·저화질 인식·줄 선택·1회 삽입 통과, native 배포 gate)
+6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`DONE`: emulator 공백 후보·선택·취소·1회 삽입, OCR picker 복원·정방향·90도 회전·저화질 인식·줄 선택·1회 삽입, 공개 native source build·라이선스 export 통과)
 7. `UX-03` compact 2행·wide 1행 반응형 툴바. (`DONE`: A35·Fold cover 6×2, Fold unfolded 12×1, 두 기기 숫자판 통과)
 
 ## 10. 공통 검증 게이트
@@ -1278,7 +1299,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | 툴바는 별도 중첩 메뉴 없이 실제 가용 폭으로 1행·2행을 자동 결정하고 모든 도구 위치와 48dp 터치 영역을 유지 |
 | 2026-07-26 | 일반 사용자용 AI 미연결·재로그인 상태에만 `설정하기`를 제공하며 private/offline/policy 차단은 CTA 없이 fail-closed |
 | 2026-07-26 | GIPHY exact query 계약은 보존하고 한국 밈 query fallback은 성공한 empty KLIPY 첫 page와 로컬 Noto에만 적용 |
-| 2026-07-26 | OCR은 proprietary ML SDK 대신 Apache-2.0 Tesseract 계열과 pinned 한국어 fast model을 사용하며 원본·결과를 저장하지 않음 |
+| 2026-07-26 | OCR은 proprietary ML SDK 대신 Apache-2.0 Tesseract 계열과 pinned 한국어 best model을 사용하며 원본·결과를 저장하지 않음 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
 | 2026-07-26 | AI text action은 선택/현재 문단 preview 후에만 network를 호출하고 결과 교체·추가·undo를 명시적 동작으로 제한 |
 | 2026-07-27 | 글쓰기 AI와 음성 STT profile/key를 분리하고 휴대폰 받아쓰기를 기본값으로 유지. 최초 마이크 권한 뒤에는 동일 editor에서만 음성 window와 녹음을 정확히 한 번 재개 |
@@ -1289,6 +1310,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 음성 미지원 공급자 화면은 비활성 녹음 버튼을 금지하고, 활성 system voice IME가 있으면 `휴대폰 받아쓰기 사용`, 없으면 `설정하기`를 제공 |
 | 2026-07-27 | IME가 keyboard 위에 interactive prompt를 표시하면 그 prompt 상단부터 touchable inset으로 보고하고, 뒤 editor control로 touch를 통과시키지 않음 |
 | 2026-07-27 | 글쓰기 API key 401은 provider 오류 문자열이나 무조건 재시도로 표시하지 않고, 사용자용 연결 확인 문구와 `설정하기`로 복구시킴 |
+| 2026-07-27 | OCR native 배포는 공개 tag source build·trusted JitPack FLOSS dependency·artifact 식별·전이 라이선스 고지를 완료 기준으로 삼고 byte-identical하지 않은 AAR을 재현 빌드라고 주장하지 않음 |
 | 2026-07-27 | 출근 이후 일반 Android 기능·회귀 검증의 기준 기기는 API 34 x86_64 emulator로 전환. A35 마이크 품질과 Z Fold cover/unfold posture처럼 emulator가 재현할 수 없는 하드웨어 게이트만 최종 실기기 확인으로 남김 |
 | 2026-07-27 | 문장 생성·답장·직접 지시는 Responses strict JSON Schema와 수신측 exact-count 검증을 함께 사용해 서로 다른 후보 3개가 아니면 부분 결과를 표시하지 않음 |
 | 2026-07-27 | 실시간 받아쓰기는 개인 고급 BYOK에서 공식 Realtime WebSocket을 허용하고 partial은 preview 전용, completed만 명시적 최종 입력 gate로 전달. 일반 배포는 backend 단기 token과 WebRTC를 production gate로 유지 |
