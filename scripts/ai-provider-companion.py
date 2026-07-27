@@ -43,6 +43,9 @@ MULTICAST_GROUP = "224.0.0.251"
 MULTICAST_PORT = 5353
 MAX_MANIFEST_BYTES = 128 * 1024
 MAX_REQUEST_BYTES = 128 * 1024
+PUBLIC_ORIGIN_VERIFY_ATTEMPTS = 7
+PUBLIC_ORIGIN_VERIFY_INITIAL_DELAY_SECONDS = 0.5
+PUBLIC_ORIGIN_VERIFY_MAX_DELAY_SECONDS = 3.0
 # Avoid Windows' Hyper-V/WSL excluded ranges, which commonly cover 8790-9200.
 DEFAULT_GATEWAY_PORT = 9211
 DEFAULT_TAILSCALE_HTTPS_PORT = 9210
@@ -151,6 +154,42 @@ def verify_manifest(url: str) -> dict:
     if any(not str(models.get(tier) or "").strip() for tier in ("fast", "balanced", "quality")):
         raise ValueError("the provider model mapping is incomplete")
     return document
+
+
+def transient_manifest_verification_failure(error: ValueError) -> bool:
+    message = str(error)
+    if message.startswith("could not verify the provider:"):
+        return True
+    match = re.fullmatch(r"the provider returned HTTP (\d{3})", message)
+    if not match:
+        return False
+    return int(match.group(1)) in {404, 408, 425, 429, 500, 502, 503, 504}
+
+
+def verify_public_manifest_with_retry(
+    url: str,
+    *,
+    attempts: int = PUBLIC_ORIGIN_VERIFY_ATTEMPTS,
+    initial_delay_seconds: float = PUBLIC_ORIGIN_VERIFY_INITIAL_DELAY_SECONDS,
+    verify=verify_manifest,
+    sleep=time.sleep,
+) -> dict:
+    """Wait briefly for a newly-created HTTPS reverse proxy to publish its route."""
+    if attempts < 1:
+        raise ValueError("manifest verification attempts must be positive")
+    delay = max(0.0, initial_delay_seconds)
+    for attempt in range(attempts):
+        try:
+            return verify(url)
+        except ValueError as error:
+            if attempt + 1 >= attempts or not transient_manifest_verification_failure(error):
+                raise
+            sleep(delay)
+            delay = min(
+                max(delay * 2, PUBLIC_ORIGIN_VERIFY_INITIAL_DELAY_SECONDS),
+                PUBLIC_ORIGIN_VERIFY_MAX_DELAY_SECONDS,
+            )
+    raise AssertionError("manifest verification loop exited unexpectedly")
 
 
 def tailscale_status() -> dict:
@@ -1016,7 +1055,11 @@ def run_cli_gateway(args: argparse.Namespace) -> None:
         if not args.public_origin:
             configure_tailscale_serve(args.gateway_port, args.tailscale_https_port)
         manifest_url_value = f"{origin}{WELL_KNOWN_PATH}"
-        manifest = verify_manifest(manifest_url_value)
+        manifest = (
+            verify_public_manifest_with_retry(manifest_url_value)
+            if args.public_origin
+            else verify_manifest(manifest_url_value)
+        )
         print(f"Verified provider: {manifest.get('display_name', 'Computer AI')}")
         print(f"CLI backends: {', '.join(sorted(runner.available))}")
         advertise(

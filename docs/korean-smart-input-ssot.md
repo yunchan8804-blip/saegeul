@@ -1049,6 +1049,12 @@ proxy가 loopback gateway로 연결되는지와 외부 노출 수명·access pol
 `--manifest-url` advertise-only mode와 `--public-origin`은 동시에 사용하지 않는다. 임시 public tunnel은
 emulator 검증용일 뿐 tray의 Tailscale 기본 경로를 대체하는 production 기본값이 아니다.
 
+새 HTTPS tunnel은 URL 발급 직후 route 전파가 끝나기 전까지 일시적으로 404·502를 반환할 수 있다.
+`--public-origin` startup 검증은 network 실패와 HTTP 404/408/425/429/500/502/503/504만 0.5초부터
+최대 3초 backoff로 7회까지 제한 재시도한다. protocol version, capability, OAuth field, model mapping처럼
+manifest 자체가 잘못된 경우에는 재시도하지 않고 즉시 fail-closed한다. Quick Tunnel 검증 harness는 사용자의
+기존 named-tunnel ingress 설정을 상속하지 않는 빈 cloudflared config를 사용해야 한다.
+
 현재 targetSdk 36에서는 기존 local-network NSD 경로를 쓴다. targetSdk 37 전환 시 Android local
 network protection을 별도 milestone로 올리고, broad `ACCESS_LOCAL_NETWORK` 요청보다 system service
 picker의 scoped grant를 먼저 적용한다. 사용자가 직접 입력하는 fallback도 OAuth 필드가 아니라 동일한
@@ -1122,8 +1128,9 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
 | OAuth public client | `PASS` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현; AppCompat dialog theme와 Android 11+ browser query 회귀 수정 |
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
-| OAuth 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 61 suites·261 tests failure/error/skipped 0, `:app:assembleDebug -PbuildABI=arm64-v8a`, debug merged manifest redirect scheme 일치 |
-| OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과; API 34 emulator도 임시 HTTPS `--public-origin`의 manifest 확인·browser 승인·token 교환·암호화 session 저장 통과; PC 재시작용 companion grant는 Windows DPAPI로 보존 |
+| OAuth 통합 build/test | `PASS` | 2026-07-27 최종 `:app:testDebugUnitTest` 66 suites·299 tests failure/error/skipped 0, companion Python 11 tests, `:app:assembleDebug -PbuildABI=x86_64`, debug merged manifest redirect scheme 일치 |
+| OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과. Pixel 7·QA tablet API 34 emulator도 임시 HTTPS `--public-origin`의 manifest 확인·browser 승인·token 교환·암호화 session 저장 뒤 우리 키보드로 직접 지시문을 입력해 후보 3개·정확히 1회 삽입·undo를 통과했다. 시험 session은 두 emulator에서 revoke·삭제했고 PC 재시작용 companion grant는 Windows DPAPI로 보존한다. |
+| public-origin startup | `PASS` | 새 Quick Tunnel의 route 전파 중 404·502 뒤 정상 manifest를 제한 재시도로 수용하고, 잘못된 manifest 계약은 sleep 없이 즉시 거부하는 Python test를 고정했다. companion Python 11 tests와 실제 Cloudflare tunnel OAuth 왕복을 통과했다. |
 | 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |
 | PC 유료 CLI 실행 | `PASS` | Codex CLI `exec`는 ChatGPT 로그인, Claude Code `-p`는 Max 로그인으로 실행; API/token 환경 변수 제거, tool·web·write·session persistence 차단, A35에서 Codex 맞춤법과 Claude 존댓말 실제 생성 성공, Fold에서 Codex 생성 성공 |
 | PC WPF tray·자동 실행 | `PASS` | single-file WPF tray의 current-user logon 예약 작업 설치 후 helper를 종료하자 tray-owned 새 PID가 `127.0.0.1:9211` health와 Tailscale HTTPS manifest를 자동 복구; 2026-07-27 Release build warning/error 0, 예약 작업 `Running`, health `ok`, Codex·Claude backend 모두 healthy |
@@ -1147,10 +1154,10 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS/EMULATOR` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI. 실제 `안녕하세욕`에 `욕 → 요`를 선택하고 38dp `선택한 교정 적용` 버튼으로 `안녕하세요`를 정확히 한 번 반영 |
 | AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트와 A35 실제 답장 생성 통과 |
-| AI 3개 후보 계약 | `PASS/EMULATOR` | Compose·Reply·Custom은 Responses `text.format` strict JSON Schema의 `minItems=maxItems=3`을 전송한다. Android parser와 PC CLI companion도 공백·중복 제거 후 정확히 3개가 아니면 성공 card 대신 한국어 재시도 상태로 fail-closed. API 34 emulator에서 OAuth companion의 실제 `문장 3개`가 서로 다른 한국어 후보 3개를 반환했고 첫 후보 교체·원문 undo 통과. Android 65 suites·283 tests, companion Python 9 tests와 x86_64 app/plugin assembly 통과 |
+| AI 3개 후보 계약 | `PASS/EMULATOR` | Compose·Reply·Custom은 Responses `text.format` strict JSON Schema의 `minItems=maxItems=3`을 전송한다. Android parser와 PC CLI companion도 공백·중복 제거 후 정확히 3개가 아니면 성공 card 대신 한국어 재시도 상태로 fail-closed. Pixel 7·QA tablet API 34 emulator에서 OAuth companion의 실제 custom prompt가 서로 다른 한국어 후보 3개를 반환했고 첫 후보 교체·원문 undo 통과. Android 66 suites·299 tests, companion Python 11 tests와 x86_64 app assembly 통과 |
 | AI-05 번역 matrix | `PASS/EMULATOR` | OAuth companion으로 `안녕하세요 → Hello`, `Hello → 안녕하세요`, `Hello → こんにちは`, `Hello → 你好`를 각 action에서 실제 생성하고 preview card를 확인 |
 | AI-02 말투 matrix | `PASS/A35+EMULATOR` | A35의 Claude 존댓말, API 34 emulator OAuth companion의 카톡체·업무용·정중한 거절·사과·고객응대 action이 모두 실제 한국어 결과 card를 반환 |
-| 구간 녹음 버튼·권한·오류 | `PASS/EMULATOR` | 권한 미허용 상태의 `녹음 시작` 1회 탭으로 Android permission dialog 표시, 승인 뒤 같은 editor에서 `녹음 중`·AudioRecord app-op running 확인, 중지 뒤 dummy key 401을 한국어 설명과 `설정하기`로 복구. 사용자 보고의 무반응은 최신 emulator build에서 재현되지 않아 실기기 microphone 품질 gate와 분리 |
+| 구간 녹음 버튼·권한·오류 | `PASS/EMULATOR` | 권한 미허용 상태의 `녹음 시작` 1회 탭으로 Android permission dialog 표시, 승인 뒤 같은 editor에서 `녹음 중 0초`·mic indicator·2초 경과를 확인하고, 중지 뒤 dummy key 401을 한국어 설명과 `설정하기`로 복구했다. 보고된 무반응 상태는 emulator가 input device를 물리 keyboard로 오인해 Fcitx input view 전체를 접은 수명주기 상태와 상관됐고 IME 재선택으로 복구됐다. 정상 input view에서 recorder 버튼 자체는 즉시 동작하므로 microphone 품질 gate와 분리한다. |
 | 회의 파일 picker·인증 복구 | `PASS/EMULATOR` | Pixel 7과 QA tablet API 34에서 1초 WAV 선택 뒤 같은 editor의 새 회의 window로 one-shot 복귀. tablet landscape에서 streaming body 조기 종료의 HTTP 401을 회수해 일반 파일 오류 대신 STT 재연결 설명과 `설정하기`를 표시 |
 
 사용량 저장소는 action·성공/실패·입출력 문자 수·마지막 provider/model만 집계하며 prompt, 결과,
@@ -1292,6 +1299,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 동적 문구와 자동 스니펫은 API 34 emulator의 암호화 profile·Space·Enter·buffered 분할 trigger·private literal 보존을 Android 완료 gate로 인정하고 Fold posture gate와 분리 |
 | 2026-07-27 | 앱별 profile은 API 34 emulator의 exact package·전역 fallback·키보드 표면별 저장·network/AI 차단을 Android 완료 gate로 인정. Fold 자세별 표면은 `UX-02`에만 남김 |
 | 2026-07-27 | 한자는 일반 한글 자동완성에 섞지 않고 더보기의 `한글` 상태 액션으로만 1회 연다. flush 전 활성 어절로 조회하고 선택 뒤 즉시 한글 자동완성으로 복귀 |
-| 2026-07-27 | 비하드웨어 Android 회귀의 완료 기준은 Pixel 7 API 34 emulator로 통일하고 A35 microphone 품질·Fold posture·생체 인증만 실기기 gate로 유지. `녹음 시작` 무반응은 최신 emulator build에서 재현되지 않았고 권한 dialog·AudioRecord·중지·401 설정 복구까지 통과 |
+| 2026-07-27 | 비하드웨어 Android 회귀의 완료 기준은 Pixel 7 API 34 emulator와 QA tablet로 통일하고 A35 microphone 품질·Fold posture·생체 인증만 실기기 gate로 유지. `녹음 시작` 경로는 권한 dialog·즉시 녹음 상태·2초 경과·중지·401 설정 복구까지 통과했다. 보고된 무반응은 emulator가 물리 keyboard로 오인해 Fcitx input view 전체를 접은 수명주기 상태와 상관되므로 IME 재선택 복구와 recorder 동작을 분리해 판정한다. |
 | 2026-07-27 | 회의 음성 `ACTION_OPEN_DOCUMENT` 결과는 detach된 window callback으로 전달하지 않고 원래 editor identity와 함께 process memory에서 1회 보관한 뒤 새 meeting window가 소비한다. STT 401은 파일 재선택이 아니라 음성 설정 CTA로 복구한다. |
 | 2026-07-27 | Tailscale private network를 사용할 수 없는 emulator 검증에는 strict HTTPS origin-only `--public-origin`을 허용하되 임시 tunnel을 production 기본값으로 승격하지 않음 |
+| 2026-07-27 | 새 `--public-origin` route의 일시적 404·502는 bounded backoff로만 재검증하고 manifest 계약 오류는 즉시 fail-closed. Pixel 7·QA tablet에서 OAuth·직접 지시·후보 3개·삽입·undo 뒤 시험 grant와 tunnel을 모두 정리 |

@@ -115,6 +115,45 @@ class LocalOAuthStateTest(unittest.TestCase):
 
 
 class CliBoundaryTest(unittest.TestCase):
+    def test_public_manifest_verification_retries_transient_tunnel_propagation(self):
+        failures = iter(
+            (
+                ValueError("the provider returned HTTP 404"),
+                ValueError("the provider returned HTTP 502"),
+                {"protocol_version": 1},
+            )
+        )
+        delays = []
+
+        def verify(_url):
+            result = next(failures)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        manifest = companion.verify_public_manifest_with_retry(
+            "https://computer.example/.well-known/fcitx-ai-provider",
+            attempts=3,
+            initial_delay_seconds=0.25,
+            verify=verify,
+            sleep=delays.append,
+        )
+
+        self.assertEqual({"protocol_version": 1}, manifest)
+        self.assertEqual([0.25, 0.5], delays)
+
+    def test_public_manifest_verification_fails_fast_on_invalid_contract(self):
+        delays = []
+        with self.assertRaisesRegex(ValueError, "unsupported discovery protocol"):
+            companion.verify_public_manifest_with_retry(
+                "https://computer.example/.well-known/fcitx-ai-provider",
+                verify=lambda _url: (_ for _ in ()).throw(
+                    ValueError("the provider uses an unsupported discovery protocol")
+                ),
+                sleep=delays.append,
+            )
+        self.assertEqual([], delays)
+
     def test_public_origin_is_https_origin_only(self):
         self.assertEqual(
             "https://keyboard.example:9443",
