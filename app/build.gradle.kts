@@ -163,6 +163,7 @@ dependencies {
     implementation(libs.timber)
     implementation(libs.tesseract4android)
     implementation(libs.appauth)
+    implementation(libs.okhttp)
     implementation(libs.splitties.bitflags)
     implementation(libs.splitties.dimensions)
     implementation(libs.splitties.resources)

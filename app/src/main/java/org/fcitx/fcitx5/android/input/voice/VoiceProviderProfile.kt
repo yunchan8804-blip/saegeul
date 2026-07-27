@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.input.ai.AiEndpointPolicy
 
 enum class VoiceProviderMode {
     DeviceDictation,
+    OpenAiRealtime,
     OpenAiApi
 }
 
@@ -26,16 +27,27 @@ enum class VoiceTranscriptionModel(val id: String) {
     }
 }
 
+enum class VoiceRealtimeTranscriptionModel(val id: String) {
+    Streaming("gpt-realtime-whisper");
+
+    companion object {
+        fun fromId(value: String): VoiceRealtimeTranscriptionModel? =
+            entries.firstOrNull { it.id == value }
+    }
+}
+
 /** Dedicated STT credential. It is deliberately separate from the writing-LLM profile. */
 data class VoiceProviderProfile(
     val apiKey: String,
     val transcriptionModel: String = VoiceTranscriptionModel.Accurate.id,
+    val realtimeTranscriptionModel: String = VoiceRealtimeTranscriptionModel.Streaming.id,
     val diarizationModel: String = DIARIZATION_MODEL,
     val baseUrl: String = OPENAI_BASE_URL
 ) {
     fun normalized(): VoiceProviderProfile = copy(
         apiKey = apiKey.trim(),
         transcriptionModel = transcriptionModel.trim(),
+        realtimeTranscriptionModel = realtimeTranscriptionModel.trim(),
         diarizationModel = diarizationModel.trim(),
         baseUrl = baseUrl.trim().trimEnd('/')
     )
@@ -52,6 +64,11 @@ data class VoiceProviderProfile(
         require(VoiceTranscriptionModel.fromId(profile.transcriptionModel) != null) {
             "Unsupported transcription model"
         }
+        require(
+            VoiceRealtimeTranscriptionModel.fromId(profile.realtimeTranscriptionModel) != null
+        ) {
+            "Unsupported realtime transcription model"
+        }
         require(profile.diarizationModel == DIARIZATION_MODEL) {
             "Unsupported diarization model"
         }
@@ -60,6 +77,9 @@ data class VoiceProviderProfile(
 
     val endpoint: String
         get() = "${normalized().baseUrl}/audio/transcriptions"
+
+    val realtimeEndpoint: String
+        get() = "wss://api.openai.com/v1/realtime?model=${normalized().realtimeTranscriptionModel}"
 
     val isConfigured: Boolean
         get() = runCatching(::validate).isSuccess
@@ -109,7 +129,7 @@ object VoiceProviderResolver {
         allowsCredentialAccess: Boolean,
         loadCredential: () -> VoiceProviderProfile?
     ): EffectiveVoiceProvider {
-        val profile = if (allowsCredentialAccess && mode == VoiceProviderMode.OpenAiApi) {
+        val profile = if (allowsCredentialAccess && mode != VoiceProviderMode.DeviceDictation) {
             loadCredential()?.takeIf(VoiceProviderProfile::isConfigured)
         } else {
             null

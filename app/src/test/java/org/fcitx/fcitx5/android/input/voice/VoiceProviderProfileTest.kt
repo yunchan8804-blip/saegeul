@@ -22,9 +22,14 @@ class VoiceProviderProfileTest {
         assertEquals("voice-secret", accurate.apiKey)
         assertEquals("gpt-4o-transcribe", accurate.transcriptionModel)
         assertEquals("gpt-4o-mini-transcribe", efficient.transcriptionModel)
+        assertEquals("gpt-realtime-whisper", accurate.realtimeTranscriptionModel)
         assertEquals(
             "https://api.openai.com/v1/audio/transcriptions",
             accurate.endpoint
+        )
+        assertEquals(
+            "wss://api.openai.com/v1/realtime?model=gpt-realtime-whisper",
+            accurate.realtimeEndpoint
         )
     }
 
@@ -43,6 +48,12 @@ class VoiceProviderProfileTest {
                 transcriptionModel = "writing-model"
             ).isConfigured
         )
+        assertFalse(
+            VoiceProviderProfile(
+                apiKey = "key",
+                realtimeTranscriptionModel = "arbitrary-realtime-model"
+            ).isConfigured
+        )
         assertFalse(VoiceProviderProfile(apiKey = "bad\nkey").isConfigured)
         assertTrue(VoiceProviderProfile(apiKey = "key").isConfigured)
     }
@@ -58,6 +69,18 @@ class VoiceProviderProfileTest {
         assertFalse(
             VoiceProviderPolicy.allowsSelectedMode(
                 VoiceProviderMode.OpenAiApi,
+                allowsNetworkInput = false
+            )
+        )
+        assertTrue(
+            VoiceProviderPolicy.allowsSelectedMode(
+                VoiceProviderMode.OpenAiRealtime,
+                allowsNetworkInput = true
+            )
+        )
+        assertFalse(
+            VoiceProviderPolicy.allowsSelectedMode(
+                VoiceProviderMode.OpenAiRealtime,
                 allowsNetworkInput = false
             )
         )

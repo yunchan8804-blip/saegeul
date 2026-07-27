@@ -86,6 +86,7 @@ class VoiceProviderCredentialStore(context: Context) {
     private fun encode(profile: VoiceProviderProfile): ByteArray = JSONObject()
         .put("apiKey", profile.apiKey)
         .put("transcriptionModel", profile.transcriptionModel)
+        .put("realtimeTranscriptionModel", profile.realtimeTranscriptionModel)
         .put("diarizationModel", profile.diarizationModel)
         .put("baseUrl", profile.baseUrl)
         .toString()
@@ -98,6 +99,10 @@ class VoiceProviderCredentialStore(context: Context) {
             transcriptionModel = json.optString(
                 "transcriptionModel",
                 VoiceTranscriptionModel.Accurate.id
+            ),
+            realtimeTranscriptionModel = json.optString(
+                "realtimeTranscriptionModel",
+                VoiceRealtimeTranscriptionModel.Streaming.id
             ),
             diarizationModel = json.optString(
                 "diarizationModel",

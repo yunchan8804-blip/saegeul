@@ -96,10 +96,14 @@ class VoiceTranscriptionUi(
         }, matchWrap())
     }
 
-    fun showReady(providerName: String) {
-        title.setText(R.string.voice_precision_title)
+    fun showReady(providerName: String, realtime: Boolean) {
+        title.setText(
+            if (realtime) R.string.voice_realtime_title else R.string.voice_precision_title
+        )
         provider.text = context.getString(R.string.ai_provider, providerName)
-        status.setText(R.string.voice_precision_ready)
+        status.setText(
+            if (realtime) R.string.voice_realtime_ready else R.string.voice_precision_ready
+        )
         transcriptScroller.visibility = View.GONE
         meeting.apply {
             visibility = View.VISIBLE
@@ -145,6 +149,57 @@ class VoiceTranscriptionUi(
             isEnabled = true
             setText(R.string.voice_record_stop)
             setOnClickListener { onStop?.invoke() }
+        }
+        secondary.apply {
+            isEnabled = true
+            setText(android.R.string.cancel)
+            setOnClickListener { onCancel?.invoke() }
+        }
+    }
+
+    fun showRealtimeConnecting() {
+        title.setText(R.string.voice_realtime_title)
+        status.setText(R.string.voice_realtime_connecting)
+        transcriptScroller.visibility = View.GONE
+        hideMeeting()
+        primary.apply {
+            isEnabled = false
+            setText(R.string.voice_realtime_connecting_button)
+            setOnClickListener(null)
+        }
+        secondary.apply {
+            isEnabled = true
+            setText(android.R.string.cancel)
+            setOnClickListener { onCancel?.invoke() }
+        }
+    }
+
+    fun showRealtimeRecording(elapsedSeconds: Int, partial: String) {
+        title.setText(R.string.voice_realtime_title)
+        status.text = context.getString(R.string.voice_realtime_recording, elapsedSeconds)
+        showTranscript(partial)
+        hideMeeting()
+        primary.apply {
+            isEnabled = true
+            setText(R.string.voice_record_stop)
+            setOnClickListener { onStop?.invoke() }
+        }
+        secondary.apply {
+            isEnabled = true
+            setText(android.R.string.cancel)
+            setOnClickListener { onCancel?.invoke() }
+        }
+    }
+
+    fun showRealtimeFinalizing(partial: String) {
+        title.setText(R.string.voice_realtime_title)
+        status.setText(R.string.voice_realtime_finalizing)
+        showTranscript(partial)
+        hideMeeting()
+        primary.apply {
+            isEnabled = false
+            setText(R.string.voice_transcribing_button)
+            setOnClickListener(null)
         }
         secondary.apply {
             isEnabled = true
@@ -278,6 +333,11 @@ class VoiceTranscriptionUi(
     private fun hideMeeting() {
         meeting.visibility = View.GONE
         meeting.setOnClickListener(null)
+    }
+
+    private fun showTranscript(text: String) {
+        transcript.text = text
+        transcriptScroller.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
     }
 
     private fun local(korean: String, english: String): String =

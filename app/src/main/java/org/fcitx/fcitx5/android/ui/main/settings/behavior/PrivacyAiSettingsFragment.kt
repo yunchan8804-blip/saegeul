@@ -243,13 +243,19 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         voiceModePreference.summary = getString(
             when (voiceMode) {
                 VoiceProviderMode.DeviceDictation -> R.string.voice_provider_mode_device_summary
+                VoiceProviderMode.OpenAiRealtime ->
+                    R.string.voice_provider_mode_openai_realtime_summary
                 VoiceProviderMode.OpenAiApi -> R.string.voice_provider_mode_openai_summary
             }
         )
         voiceProviderPreference.summary = when {
             voiceProfile != null -> getString(
                 R.string.voice_provider_configured_summary,
-                voiceModelName(voiceProfile.transcriptionModel)
+                getString(
+                    R.string.voice_models_configured,
+                    voiceModelName(voiceProfile.transcriptionModel),
+                    voiceProfile.realtimeTranscriptionModel
+                )
             )
             voiceStore.hasStoredProfile() -> getString(R.string.voice_provider_status_unreadable)
             else -> getString(R.string.voice_provider_status_missing)
@@ -321,6 +327,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val values = VoiceProviderMode.entries
         val labels = arrayOf(
             getString(R.string.voice_provider_mode_device),
+            getString(R.string.voice_provider_mode_openai_realtime),
             getString(R.string.voice_provider_mode_openai)
         )
         var selected = values.indexOf(store.load()).coerceAtLeast(0)
@@ -332,7 +339,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 runCatching { store.save(mode) }
                     .onSuccess {
                         refreshSummaries()
-                        if (mode == VoiceProviderMode.OpenAiApi &&
+                        if (mode != VoiceProviderMode.DeviceDictation &&
                             VoiceProviderCredentialStore(ctx).load() == null
                         ) {
                             view?.post { showVoiceProviderDialog() }
@@ -416,7 +423,10 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     .getOrNull() ?: return@setOnClickListener
                 runCatching {
                     store.save(validated)
-                    VoiceProviderModeStore(ctx).save(VoiceProviderMode.OpenAiApi)
+                    val selectedMode = VoiceProviderModeStore(ctx).load()
+                        .takeIf { it != VoiceProviderMode.DeviceDictation }
+                        ?: VoiceProviderMode.OpenAiApi
+                    VoiceProviderModeStore(ctx).save(selectedMode)
                 }.onSuccess {
                     apiKey.text?.clear()
                     dialog.dismiss()

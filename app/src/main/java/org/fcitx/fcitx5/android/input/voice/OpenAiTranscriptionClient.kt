@@ -32,6 +32,7 @@ fun interface VoiceHttpTransport {
 }
 
 class VoiceTranscriptionException(message: String) : Exception(message)
+class VoiceAuthenticationException(message: String) : Exception(message)
 
 /** Accuracy-first segment transcription. This is deliberately not labelled as Realtime. */
 class OpenAiTranscriptionClient(
@@ -53,7 +54,7 @@ class OpenAiTranscriptionClient(
                 )
             } catch (exception: AiHttpStatusException) {
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                    throw VoiceTranscriptionException("OpenAI rejected the STT API key")
+                    throw VoiceAuthenticationException("OpenAI rejected the STT API key")
                 }
                 throw VoiceTranscriptionException(
                     exception.message ?: "Transcription provider request failed"

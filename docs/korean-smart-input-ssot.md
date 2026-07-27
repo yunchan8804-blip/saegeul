@@ -364,7 +364,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | push-to-talk·권한·한국어 hint·최종 preview·exactly-once commit 구현, Realtime partial transcript GATE | L |
+| `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | 24 kHz PCM streaming·item별 partial/final 조정·한국어 hint·최종 preview·exactly-once commit 구현, 실제 key 한국어 품질 gate | L |
 | `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, preview와 최초 권한 복귀 구현; 실제 STT key 품질·Z Fold6 gate 남음 | L |
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, OpenAI profile·실기기 gate | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
@@ -760,8 +760,10 @@ compose preview까지만 확인했고 메시지는 전송하지 않았으며, �
 
 - 글쓰기 `AiProviderProfile`은 Responses API만 소유한다. PC Codex/Claude OAuth companion 또는
   OpenAI-compatible 글쓰기 endpoint가 음성 전사를 암묵적으로 제공한다고 추정하지 않는다.
-- 음성은 별도 `VoiceProviderProfile`과 모드(`DeviceDictation`, `OpenAiApi`)를 사용한다. 기본값은
+- 음성은 별도 `VoiceProviderProfile`과 모드(`DeviceDictation`, `OpenAiRealtime`, `OpenAiApi`)를 사용한다. 기본값은
   네트워크와 API key가 필요 없는 `DeviceDictation`이다.
+- `OpenAiRealtime`은 고급 사용자가 명시적으로 선택한 개인 BYOK 경로다. 공식
+  `wss://api.openai.com/v1/realtime?model=gpt-realtime-whisper`만 허용하며 24 kHz mono PCM을 stream한다.
 - `OpenAiApi` 음성 모드는 공식 `https://api.openai.com/v1/audio/transcriptions`만 허용하며,
   `gpt-4o-transcribe`와 `gpt-4o-mini-transcribe` 중 하나를 명시적으로 선택한다.
 - model ID를 UI 문자열이나 action 코드에 직접 흩뿌리지 않고 registry와 profile로 관리한다.
@@ -790,16 +792,21 @@ Responses API typed streaming event를 기본 text integration 후보로 사용�
 투명 Activity에서만 요청한다. 현재 IME는 Android background activity start 예외에 해당하지만 실기기
 permission dialog와 focus 복귀는 별도 gate다.
 
-진짜 `VOICE-01` 완료 조건은 OpenAI Realtime transcription session에서 24 kHz mono PCM,
-`gpt-realtime-whisper`, `language: ko`, `input_audio_buffer.append/commit`, transcript delta/completed를
-`item_id`별로 조정하는 것이다. 표준 BYOK를 WebSocket에 장기 노출하지 않도록 backend ephemeral token
-발급 경로도 함께 필요하다. 공식 기준은 [Realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription)과
+2026-07-27 `VOICE-01`은 OpenAI Realtime transcription session에서 24 kHz mono PCM,
+`gpt-realtime-whisper`, `language: ko`, `input_audio_buffer.append/commit`, transcript delta/completed의
+`item_id`별 조정을 구현했다. partial은 window preview에만 쓰고 completed transcript만 기존 final preview와
+editor identity·exactly-once commit gate로 넘긴다. Android 앱의 현재 개인 BYOK 경로는 기존 STT 전용
+Keystore credential을 OkHttp WebSocket에 명시적으로 사용한다. 일반 배포 기본 구조는 모바일 표준 key 대신
+backend가 발급한 짧은 수명의 token과 WebRTC transport를 사용해야 하며 이 production hardening은 별도 gate다.
+공식 기준은 [Realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription),
+[Realtime WebSocket](https://developers.openai.com/api/docs/guides/realtime-websocket),
 [Speech to text](https://developers.openai.com/api/docs/guides/speech-to-text)다.
 
 ### 8.2 API key와 token
 
 - 일반 배포 기본 경로는 backend가 standard provider key를 보관한다.
-- Realtime client에는 backend가 발급한 짧은 수명의 ephemeral token을 사용한다.
+- 일반 배포 Realtime client에는 backend가 발급한 짧은 수명의 token을 사용한다. 개인 고급 BYOK는
+  사용자의 명시적 선택일 때만 STT 전용 Keystore key를 직접 사용하고 추출 위험을 숨기지 않는다.
 - 개인용 advanced BYOK는 workload별로 분리한다. 글쓰기 key는 `noBackupFilesDir/ai/provider.bin`,
   STT key는 별도 Keystore alias와 `noBackupFilesDir/voice/provider.bin`에 저장한다.
 - BYOK standard key는 추출 위험이 0이라고 표시하지 않는다.
@@ -948,11 +955,11 @@ private/offline/app별 AI 차단과 editor identity가 하나라도 맞지 않�
 
 ### 8.4 음성 privacy와 정확한 제품 명칭
 
-toolbar entry와 window title은 두 mode를 포괄하는 `음성 받아쓰기`다. 기본 mode의 내부 title은
-`휴대폰 받아쓰기`, OpenAI `VOICE-02`의 내부 title은 `정밀 받아쓰기`이며 `VOICE-01` 실시간이라고
-표시하지 않는다. UI는 30초를 권장하거나 countdown하지 않고 사용자가 멈출 때까지 elapsed time만
-보여 준다. 녹음은 16 kHz mono PCM,
-5분의 내부 memory safety boundary이며 WAV multipart 전송 뒤 모든 byte array를 지운다.
+toolbar entry와 window title은 세 mode를 포괄하는 `음성 받아쓰기`다. 기본 mode의 내부 title은
+`휴대폰 받아쓰기`, OpenAI `VOICE-01`은 `실시간 받아쓰기`, `VOICE-02`는 `정밀 받아쓰기`다.
+UI는 30초를 권장하거나 countdown하지 않고 사용자가 멈출 때까지 elapsed time만 보여 준다. Realtime은
+24 kHz mono PCM chunk를 보내 partial을 미리 보여 주고, 구간 전사는 16 kHz mono PCM과 5분의 내부
+memory safety boundary를 사용해 WAV multipart로 보낸다. 종료 뒤 모든 audio byte array를 지운다.
 음성·전사문을 file, cache, prefs, backup, log에 저장하지 않는다. `RECORD_AUDIO` 권한은
 `exported=false` 투명 permission Activity에서만 요청한다. private/no-personalized/offline/app AI 차단,
 editor identity 변경, 취소에서는 전송 또는 입력을 fail-closed한다. provider resolver는 editor의 text
@@ -980,9 +987,9 @@ token을 추출해 비공식 endpoint를 호출하거나 표준 API 사용량으
 [Voice Dictation FAQ](https://help.openai.com/en/articles/12168547-voice-dictation-faq),
 [GPT-4o Transcribe](https://developers.openai.com/api/docs/models/gpt-4o-transcribe).
 
-`VOICE-01` realtime delta는 `gpt-realtime-whisper` WebSocket, item별 delta/completed 조정, backend
-ephemeral token 발급이 함께 준비될 때 별도로 구현한다. 장기 표준 API key를 실시간 client에 내장하는
-방식은 허용하지 않는다.
+`VOICE-01` realtime delta는 `gpt-realtime-whisper` WebSocket과 item별 delta/completed 조정까지
+구현됐다. 표준 key를 APK에 내장하지 않으며, 사용자가 직접 저장한 STT 전용 BYOK만 advanced mode에서
+사용한다. 일반 배포의 backend ephemeral token·WebRTC 전환은 production hardening gate로 유지한다.
 
 `VOICE-03`은 Realtime과 분리된 명시적 파일 작업이다. Android system document picker에서 사용자가
 고른 `content://` audio만 허용하고, FLAC·MP3/MP4/M4A·MPEG/MPGA·OGG·WAV·WebM 중 metadata와
@@ -1020,6 +1027,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | 음성 모드 gate | `PASS` | 30초 권장/countdown 제거, elapsed-only·5분 memory safety boundary 적용. 글쓰기 Codex/Claude companion과 STT를 분리하고 기본 `휴대폰 받아쓰기`를 제공한다. A35·Z Fold6에서 Google voice IME 전환과 입력 focus 유지를 확인했고 fallback 정책 unit test 및 companion Python 7 tests 통과 |
 | 독립 STT 설정 | `PASS` | 글쓰기 AI/OAuth와 분리된 휴대폰 받아쓰기·OpenAI STT 모드, 정확도/효율 모델, STT 전용 Keystore/no-backup key 저장·삭제와 공식 endpoint allowlist 구현. API 34 emulator에서 미연결 CTA가 STT key·model dialog를 한 번에 직접 여는 경로와 private editor에서 credential loader 0회인 회귀 테스트 확인 |
 | 최초 마이크 권한 복귀 | `PASS/A35+EMULATOR` | 권한 Activity가 IME를 재시작해도 같은 editor identity에서 결과를 한 번만 소비한다. A35 권한 철회 상태의 첫 탭·승인 직후 `녹음 중` 및 audio HAL capture 확인; API 34 emulator에서도 권한 dialog와 `녹음 중` 상태 전이 재확인; 다른 editor·stale request 회귀 테스트 통과 |
+| Realtime protocol·실패 UX | `PASS/CODE+EMULATOR` | 공식 24 kHz PCM session JSON, append/commit, item별 delta/completed와 401 typed failure를 상태 테스트로 고정. API 34 x86_64에서 `연결 중` 즉시 표시, 거부된 key의 한국어 설명·`설정하기` STT dialog 직행, crash·key log 부재와 test credential 삭제·휴대폰 받아쓰기 복구 확인 |
 | OpenAI 실제 전사 품질 | `GATE` | dummy key로 녹음·요청·401 오류 경계만 검증했다. 실제 STT key를 저장하지 않은 상태이며 한국어 정확도·preview·1회 입력은 사용자 key로 별도 검증 필요 |
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | AI-01 diff·부분 적용 | `PASS` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI, 7개 신규 테스트 |
@@ -1078,7 +1086,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 
 1. push-to-talk audio capture와 permission UX. (`IN_PROGRESS`: A35 최초 권한 자동 복귀 PASS, Z Fold6 gate)
 2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview 완료, 실제 key live 품질 gate)
-3. `VOICE-01` realtime partial transcript. (`GATE`: Realtime WebSocket와 ephemeral token backend)
+3. `VOICE-01` realtime partial transcript. (`IN_PROGRESS`: WebSocket·partial/final 상태·emulator 401 UX PASS, 실제 key 한국어 품질과 production ephemeral token/WebRTC gate)
 4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 코드·테스트 완료, 표준 OpenAI·실기기 gate)
 5. `VOICE-04` Codex 구독 OAuth voice bridge. (`BLOCK`: desktop UI 외 공개 CLI·HTTP audio 계약 없음)
 
@@ -1156,3 +1164,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 글쓰기 API key 401은 provider 오류 문자열이나 무조건 재시도로 표시하지 않고, 사용자용 연결 확인 문구와 `설정하기`로 복구시킴 |
 | 2026-07-27 | 출근 이후 일반 Android 기능·회귀 검증의 기준 기기는 API 34 x86_64 emulator로 전환. A35 마이크 품질과 Z Fold cover/unfold posture처럼 emulator가 재현할 수 없는 하드웨어 게이트만 최종 실기기 확인으로 남김 |
 | 2026-07-27 | 문장 생성·답장·직접 지시는 Responses strict JSON Schema와 수신측 exact-count 검증을 함께 사용해 서로 다른 후보 3개가 아니면 부분 결과를 표시하지 않음 |
+| 2026-07-27 | 실시간 받아쓰기는 개인 고급 BYOK에서 공식 Realtime WebSocket을 허용하고 partial은 preview 전용, completed만 명시적 최종 입력 gate로 전달. 일반 배포는 backend 단기 token과 WebRTC를 production gate로 유지 |

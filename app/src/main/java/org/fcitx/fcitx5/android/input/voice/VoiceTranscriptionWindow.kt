@@ -40,6 +40,11 @@ class VoiceTranscriptionWindow(
     private var profile: VoiceProviderProfile? = null
     private var target: VoiceEditorTarget? = null
     private var recorder: PcmMemoryRecorder? = null
+    private var realtimeRecorder: PcmStreamRecorder? = null
+    private var realtimeSession: OpenAiRealtimeTranscriptionSession? = null
+    private var realtimePartial = ""
+    private var realtimeElapsedSeconds = 0
+    private var realtimeStopping = false
     private var sessionJob: Job? = null
     private var transcript: String? = null
     private var systemVoiceInput: Pair<String, InputMethodSubtype>? = null
@@ -95,8 +100,12 @@ class VoiceTranscriptionWindow(
         }
         when (mode) {
             VoiceProviderMode.DeviceDictation -> showDeviceDictation()
+            VoiceProviderMode.OpenAiRealtime -> profile?.let {
+                ui.showReady(voiceProviderLabel(it), realtime = true)
+                resumeAfterPermissionIfNeeded()
+            }
             VoiceProviderMode.OpenAiApi -> profile?.let {
-                ui.showReady(voiceProviderLabel(it))
+                ui.showReady(voiceProviderLabel(it), realtime = false)
                 resumeAfterPermissionIfNeeded()
             }
         }
@@ -184,6 +193,14 @@ class VoiceTranscriptionWindow(
         )
 
     private fun startRecordingWithPermission(resumedTarget: VoiceEditorTarget? = null) {
+        when (mode) {
+            VoiceProviderMode.DeviceDictation -> return
+            VoiceProviderMode.OpenAiRealtime -> startRealtimeRecordingWithPermission(resumedTarget)
+            VoiceProviderMode.OpenAiApi -> startSegmentRecordingWithPermission(resumedTarget)
+        }
+    }
+
+    private fun startSegmentRecordingWithPermission(resumedTarget: VoiceEditorTarget? = null) {
         if (!validatePolicy() || !hasMicrophonePermission()) return
         cancelWork(clearUi = false)
         val boundTarget = resumedTarget ?: captureTarget()
@@ -222,16 +239,7 @@ class VoiceTranscriptionWindow(
                 throw exception
             } catch (exception: Exception) {
                 if (attached) {
-                    ui.showError(
-                        context.getString(
-                            when (exception) {
-                                is VoiceRecordingException -> R.string.voice_record_failed
-                                is VoiceTranscriptionException -> R.string.voice_transcription_failed
-                                else -> R.string.voice_transcription_failed
-                            }
-                        ),
-                        canRetry = true
-                    )
+                    showSessionError(exception)
                 }
             } finally {
                 if (recorder === activeRecorder) recorder = null
@@ -240,11 +248,97 @@ class VoiceTranscriptionWindow(
         }
     }
 
+    private fun startRealtimeRecordingWithPermission(resumedTarget: VoiceEditorTarget? = null) {
+        if (!validatePolicy() || !hasMicrophonePermission()) return
+        cancelWork(clearUi = false)
+        val boundTarget = resumedTarget ?: captureTarget()
+        if (boundTarget == null) {
+            ui.showError(context.getString(R.string.voice_cursor_required), canRetry = false)
+            return
+        }
+        if (resumedTarget != null && !validateTarget(boundTarget, showError = true)) return
+        val configuredProfile = profile ?: return
+        target = boundTarget
+        transcript = null
+        realtimePartial = ""
+        realtimeElapsedSeconds = 0
+        realtimeStopping = false
+        commitGate.resetForNewTranscript()
+        lateinit var activeSession: OpenAiRealtimeTranscriptionSession
+        activeSession = OpenAiRealtimeTranscriptionSession(configuredProfile) { partial ->
+            ui.root.post {
+                if (attached && realtimeSession === activeSession) {
+                    realtimePartial = partial
+                    if (realtimeStopping) {
+                        ui.showRealtimeFinalizing(partial)
+                    } else {
+                        ui.showRealtimeRecording(realtimeElapsedSeconds, partial)
+                    }
+                }
+            }
+        }
+        realtimeSession = activeSession
+        ui.showRealtimeConnecting()
+        sessionJob = service.lifecycleScope.launch {
+            var activeRecorder: PcmStreamRecorder? = null
+            try {
+                activeSession.connect()
+                if (!validateTarget(boundTarget, showError = true)) return@launch
+                val streamingRecorder = PcmStreamRecorder()
+                activeRecorder = streamingRecorder
+                realtimeRecorder = streamingRecorder
+                ui.showRealtimeRecording(0, "")
+                streamingRecorder.record(
+                    onChunk = activeSession::append,
+                    onProgress = { elapsedMillis ->
+                        ui.root.post {
+                            if (attached && realtimeSession === activeSession) {
+                                realtimeElapsedSeconds = (elapsedMillis / 1_000L).toInt()
+                                if (!realtimeStopping) {
+                                    ui.showRealtimeRecording(
+                                        realtimeElapsedSeconds,
+                                        realtimePartial
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+                if (realtimeRecorder === streamingRecorder) realtimeRecorder = null
+                if (!validateTarget(boundTarget, showError = true)) return@launch
+                realtimeStopping = true
+                ui.showRealtimeFinalizing(realtimePartial)
+                val result = activeSession.finish()
+                if (!validateTarget(boundTarget, showError = true)) return@launch
+                transcript = result.text
+                commitGate.resetForNewTranscript()
+                ui.showPreview(result.text)
+            } catch (exception: CancellationException) {
+                activeSession.cancel()
+                throw exception
+            } catch (exception: Exception) {
+                if (attached) showSessionError(exception)
+            } finally {
+                if (realtimeRecorder === activeRecorder) realtimeRecorder = null
+                if (realtimeSession === activeSession) realtimeSession = null
+                activeSession.close()
+            }
+        }
+    }
+
     private fun stopRecording() {
-        val activeRecorder = recorder ?: return
-        recorder = null
-        ui.showTranscribing()
-        activeRecorder.stop()
+        recorder?.let { activeRecorder ->
+            recorder = null
+            ui.showTranscribing()
+            activeRecorder.stop()
+            return
+        }
+        realtimeRecorder?.let { activeRecorder ->
+            realtimeRecorder = null
+            realtimeStopping = true
+            ui.showRealtimeFinalizing(realtimePartial)
+            activeRecorder.stop()
+        }
     }
 
     private fun cancelSession() {
@@ -254,10 +348,17 @@ class VoiceTranscriptionWindow(
     private fun cancelWork(clearUi: Boolean) {
         recorder?.cancel()
         recorder = null
+        realtimeRecorder?.cancel()
+        realtimeRecorder = null
+        realtimeSession?.cancel()
+        realtimeSession = null
         sessionJob?.cancel()
         sessionJob = null
         transcript = null
         target = null
+        realtimePartial = ""
+        realtimeElapsedSeconds = 0
+        realtimeStopping = false
         commitGate.resetForNewTranscript()
         if (clearUi && attached) {
             renderReadyState()
@@ -343,12 +444,43 @@ class VoiceTranscriptionWindow(
     private fun renderReadyState() {
         when (mode) {
             VoiceProviderMode.DeviceDictation -> showDeviceDictation()
+            VoiceProviderMode.OpenAiRealtime -> profile?.let {
+                ui.showReady(voiceProviderLabel(it), realtime = true)
+            } ?: ui.showSetupRequired(context.getString(R.string.voice_provider_setup_required))
             VoiceProviderMode.OpenAiApi -> profile?.let {
-                ui.showReady(voiceProviderLabel(it))
+                ui.showReady(voiceProviderLabel(it), realtime = false)
             } ?: ui.showSetupRequired(context.getString(R.string.voice_provider_setup_required))
         }
     }
 
     private fun voiceProviderLabel(configured: VoiceProviderProfile): String =
-        context.getString(R.string.voice_openai_provider_label, configured.transcriptionModel)
+        context.getString(
+            if (mode == VoiceProviderMode.OpenAiRealtime) {
+                R.string.voice_openai_realtime_provider_label
+            } else {
+                R.string.voice_openai_provider_label
+            },
+            if (mode == VoiceProviderMode.OpenAiRealtime) {
+                configured.realtimeTranscriptionModel
+            } else {
+                configured.transcriptionModel
+            }
+        )
+
+    private fun showSessionError(exception: Exception) {
+        if (exception is VoiceAuthenticationException) {
+            ui.showSetupRequired(context.getString(R.string.voice_provider_auth_failed))
+            return
+        }
+        ui.showError(
+            context.getString(
+                if (exception is VoiceRecordingException) {
+                    R.string.voice_record_failed
+                } else {
+                    R.string.voice_transcription_failed
+                }
+            ),
+            canRetry = true
+        )
+    }
 }
