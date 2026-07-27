@@ -309,7 +309,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             buttonsUi.apply {
                 onNeedsSecondRowChanged = {
                     toolbarNeedsSecondRow = it
-                    updateBarHeight()
+                    // onSizeChanged runs inside a layout pass. Resizing the ancestor bar there can
+                    // be dropped by ConstraintLayout, leaving the freshly wrapped second row
+                    // clipped on the first toolbar expansion. Defer the host resize to the next
+                    // frame, then re-evaluate the current state before applying it.
+                    view.post { updateBarHeight() }
                 }
                 undoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)

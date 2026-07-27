@@ -533,7 +533,7 @@
     <string name="privacy_ai" tools:ignore="MissingTranslation">Privacy &amp; AI</string>
     <string name="privacy_network_controls" tools:ignore="MissingTranslation">Network controls</string>
     <string name="ai_provider_settings" tools:ignore="MissingTranslation">Writing AI connection</string>
-    <string name="ai_clear_custom_provider" tools:ignore="MissingTranslation">Remove custom provider</string>
+    <string name="ai_clear_custom_provider" tools:ignore="MissingTranslation">Disconnect writing AI</string>
     <string name="ai_provider_configured_summary" tools:ignore="MissingTranslation">%1$s · %2$s · %3$s</string>
     <string name="ai_provider_source_custom" tools:ignore="MissingTranslation">encrypted BYOK profile</string>
     <string name="ai_provider_source_bundled" tools:ignore="MissingTranslation">private debug build profile</string>

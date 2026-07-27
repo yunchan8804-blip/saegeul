@@ -51,7 +51,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
                 selectedIds = selected
                 MeetingTranscriptSelection.format(segments, selected, speakerPrefix()) != null
             }
-            onSetupRequested = { AiSettingsNavigator.open(context) }
+            onSetupRequested = { AiSettingsNavigator.openVoiceSetup(context) }
         }
         return ui.root
     }

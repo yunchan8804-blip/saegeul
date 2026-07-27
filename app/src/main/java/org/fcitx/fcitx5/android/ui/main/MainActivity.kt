@@ -98,6 +98,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         processIntent(intent)
     }
 
@@ -210,6 +211,9 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_SETTINGS_ROUTE = "${BuildConfig.APPLICATION_ID}.EXTRA_SETTINGS_ROUTE"
+        const val EXTRA_PRIVACY_AI_ACTION =
+            "${BuildConfig.APPLICATION_ID}.EXTRA_PRIVACY_AI_ACTION"
+        const val PRIVACY_AI_ACTION_VOICE_SETUP = "voice_setup"
     }
 
 }

@@ -49,6 +49,7 @@ import org.fcitx.fcitx5.android.input.voice.VoiceProviderMode
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeStore
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderProfile
 import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionModel
+import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
@@ -57,6 +58,7 @@ import splitties.dimensions.dp
 /** User-visible controls for network input, BYOK credentials, and local traces. */
 class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     private lateinit var providerPreference: Preference
+    private lateinit var clearAiProviderPreference: Preference
     private lateinit var voiceModePreference: Preference
     private lateinit var voiceProviderPreference: Preference
     private lateinit var clearVoiceProviderPreference: Preference
@@ -94,9 +96,14 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     }
                 }
                 addPreference(providerPreference)
-                addPreference(R.string.ai_clear_custom_provider, onClick = {
-                    clearAiProvider()
-                })
+                clearAiProviderPreference = Preference(ctx).apply {
+                    setTitle(R.string.ai_clear_custom_provider)
+                    setOnPreferenceClickListener {
+                        clearAiProvider()
+                        true
+                    }
+                }
+                addPreference(clearAiProviderPreference)
             }
             addCategory(R.string.voice_provider_settings) {
                 voiceModePreference = Preference(ctx).apply {
@@ -195,11 +202,19 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     override fun onResume() {
         super.onResume()
         if (::providerPreference.isInitialized) refreshSummaries()
+        val intent = requireActivity().intent
+        val action = intent.getStringExtra(MainActivity.EXTRA_PRIVACY_AI_ACTION)
+        if (action != MainActivity.PRIVACY_AI_ACTION_VOICE_SETUP) return
+        intent.removeExtra(MainActivity.EXTRA_PRIVACY_AI_ACTION)
+        view?.post {
+            if (isAdded) showVoiceProviderDialog()
+        }
     }
 
     private fun refreshSummaries() {
         val ctx = requireContext()
         val effective = AiProviderResolver.resolve(ctx)
+        val aiStore = AiProviderCredentialStore(ctx)
         providerPreference.summary = effective.profile?.let { profile ->
             val source = when (effective.source) {
                 EffectiveAiProfile.Source.Custom -> getString(R.string.ai_provider_source_custom)
@@ -221,6 +236,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 "$source · $authentication"
             )
         } ?: getString(R.string.ai_not_configured)
+        clearAiProviderPreference.isVisible = aiStore.hasCustomProfile()
         val voiceMode = VoiceProviderModeStore(ctx).load()
         val voiceStore = VoiceProviderCredentialStore(ctx)
         val voiceProfile = voiceStore.load()
@@ -238,7 +254,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             voiceStore.hasStoredProfile() -> getString(R.string.voice_provider_status_unreadable)
             else -> getString(R.string.voice_provider_status_missing)
         }
-        clearVoiceProviderPreference.isEnabled = voiceStore.hasStoredProfile()
+        clearVoiceProviderPreference.isVisible = voiceStore.hasStoredProfile()
         val usage = AiUsageStore(ctx).snapshot()
         usagePreference.summary = getString(
             R.string.ai_usage_summary,
@@ -261,7 +277,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             }
             else -> getString(R.string.gif_provider_status_noto)
         }
-        clearGifProviderPreference.isEnabled =
+        clearGifProviderPreference.isVisible =
             gifProvider.credentialState != GifProviderCredentialState.Missing
         giphyProviderPreference.summary = when (gifProvider.giphyCredentialState) {
             GiphyCredentialState.Missing -> getString(R.string.gif_giphy_status_missing)
@@ -275,7 +291,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 }
             )
         }
-        clearGiphyProviderPreference.isEnabled =
+        clearGiphyProviderPreference.isVisible =
             gifProvider.giphyCredentialState != GiphyCredentialState.Missing
     }
 
