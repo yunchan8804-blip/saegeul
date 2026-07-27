@@ -385,12 +385,22 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `UX-01` | Smart clipboard action | `IN_PROGRESS` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹 구현, 기기 검증 남음 | M |
+| `UX-01` | Smart clipboard action | `DONE` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹, emulator 미리보기·1회 삽입·민감 editor 차단 통과 | M |
 | `UX-02` | Fold·tablet 분할 키보드 | `IN_PROGRESS` | compact/expanded·세로/가로 profile, 중앙 non-touch gap, 두벌식 자음·모음 손 경계 구현; 회전·중앙 무입력 검증 gate | L |
 | `UX-03` | 폭 적응형 기능 툴바 | `DONE` | 열린 툴바는 compact 화면에서 6×2행, 넓은 화면에서 12×1행으로 자동 전환하고 모든 제어를 최소 48dp로 유지 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
 | `SEC-03` | 완전 offline mode | `DONE` | AI·OpenAI 전사·GIF toolbar를 fail-closed로 비활성화하고 API 34 emulator의 Fcitx UID BPF 통계로 3개 동작 전후 network 0 byte·0 packet 검증 | S |
+
+#### UX-01 구현·검증 증거 (2026-07-27)
+
+| 항목 | 상태 | 증거 |
+|---|---|---|
+| 명시 선택·동작 menu | `PASS/EMULATOR` | Pixel 7 API 34 x86_64에서 smart mode 진입 뒤 카드 1개·2개를 직접 선택하고, 선택 수에 따라 단일 항목 동작과 `선택 항목 합치기` 활성 상태가 달라지는 것을 확인 |
+| 개인정보 마스킹 | `PASS/EMULATOR` | `user@example.com 01012345678 123456789012`를 선택해 이메일·한국 전화번호·계좌 후보 3개가 각각 `u•••@e••••••.com`, `010-••••-5678`, `123-•••••-9012`로 가려진 local preview 확인 |
+| 합치기·정확히 1회 삽입 | `PASS/EMULATOR` | `second item`과 개인정보 test 항목을 선택 순서대로 줄바꿈 합친 preview를 확인하고 명시적 `미리보기 넣기` 뒤 대상 editor XML에서 `user@example.com`과 `second item`이 각각 정확히 1회임을 확인 |
+| private editor 차단 | `PASS/EMULATOR` | `password=true`인 OpenAI STT API 키 editor에서 clipboard·AI toolbar surface가 노출되지 않고 저장된 clipboard 원문에 접근할 수 없음을 확인 |
+| 자동·회귀 검증 | `PASS` | transformer의 plain text·합치기·한국 전화·계좌 grouping·PII mask와 선택 상태·private/editor identity·exactly-once 회귀 테스트 통과 |
 
 ### 6.6 2026-07-26 병렬 구현 checkpoint 계약
 
@@ -400,7 +410,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `KO-07` | 사용자가 `조사` chip을 눌렀을 때만 은/는·이/가·을/를·과/와·으로/로·이에요/예요를 받침과 ㄹ 예외로 제안 | 순수 규칙·editor identity·exactly-once 테스트 | 두 기기 UI와 실제 어절 검증; 다음 어절 문맥 모델은 별도 구현 |
 | `KO-08` | editor·clipboard를 읽지 않는 명시적 감정 chip, 로컬 emoji/kaomoji, ㅋㅋ·ㅎㅎ 반복 강도 순위 | 강도·privacy·dedupe·exactly-once 테스트 | 두 기기 chip·후보·삽입 검증 |
 | `AI-04` | `ACTION_SEND text/plain` 또는 사용자가 누른 clipboard 행만 4,000자 이하로 process memory에 5분 보관 | action/MIME/TTL/private gate·editor identity·exactly-once 테스트 | Sharesheet→키보드 preview→답장 생성·삽입을 두 기기에서 확인 |
-| `UX-01` | 최대 10개 명시 선택, plain text·합치기·한국 전화·명시적 계좌 grouping·PII mask preview | transformer·선택 상태·private gate·exactly-once 테스트 | 일반 editor 두 기기와 private editor 차단 확인 |
+| `UX-01` | 최대 10개 명시 선택, plain text·합치기·한국 전화·명시적 계좌 grouping·PII mask preview | transformer·선택 상태·private gate·exactly-once 테스트, API 34 emulator의 일반 editor mask·합치기·1회 삽입과 password editor 차단 | 없음. posture·sensor·제조사 의존성이 없어 emulator를 canonical Android gate로 인정 |
 | `SEC-01` | vault 전용 auth-bound AES-GCM, 매 read/write `CryptoObject` identity 확인, package allowlist, 60초 memory session | codec·allowlist·TTL·앱 전환·손상·commit gate 테스트 | Android 11+ 생체/기기 인증 prompt, 앱 전환 재잠금, 허용/비허용 package 확인 |
 | `VOICE-02` | elapsed-only 16 kHz mono in-memory WAV, 5분 safety boundary, 명시 `transcription` capability, 한국어 hint, preview 뒤 1회 삽입 | PCM/WAV·multipart·capability·privacy·stale editor·commit 테스트 | 표준 transcription endpoint로 두 기기 permission/focus 복귀, 정확도와 취소 확인 |
 
@@ -1102,7 +1112,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 ### 단계 5 — 개인화·대화면·장기 기능
 
 1. `KO-05` 한자·사전과 `KO-06` 개인 단어장. (`KO-06 DONE`: emulator 등록·삭제·우선 후보·1회 선택 통과, `KO-05` 국어사전 source gate)
-2. `UX-01` smart clipboard action. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
+2. `UX-01` smart clipboard action. (`DONE`: emulator 명시 선택·mask·합치기·1회 삽입·private editor 차단 통과)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`IN_PROGRESS`: 펼친 Fold6 한글·영문 손 경계 통과, 회전·모바일·중앙 무입력 gate)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`IN_PROGRESS`: 코드 완료, 두 기기 gate)
@@ -1175,3 +1185,4 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 문장 생성·답장·직접 지시는 Responses strict JSON Schema와 수신측 exact-count 검증을 함께 사용해 서로 다른 후보 3개가 아니면 부분 결과를 표시하지 않음 |
 | 2026-07-27 | 실시간 받아쓰기는 개인 고급 BYOK에서 공식 Realtime WebSocket을 허용하고 partial은 preview 전용, completed만 명시적 최종 입력 gate로 전달. 일반 배포는 backend 단기 token과 WebRTC를 production gate로 유지 |
 | 2026-07-27 | 개인 단어장은 posture·센서·제조사 의존성이 없어 API 34 emulator의 등록·삭제·후보 우선순위·1회 선택을 Android 완료 gate로 인정하고 실기기 중복 gate를 제거 |
+| 2026-07-27 | smart clipboard는 posture·센서·제조사 의존성이 없어 API 34 emulator의 명시 선택·mask·합치기·정확히 1회 삽입·password editor 차단을 Android 완료 gate로 인정 |
