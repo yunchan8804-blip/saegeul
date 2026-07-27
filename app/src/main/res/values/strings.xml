@@ -481,7 +481,7 @@
     <string name="ai_actions_translation" tools:ignore="MissingTranslation">Translate</string>
     <string name="ai_select_action" tools:ignore="MissingTranslation">Review the source, then choose an AI action</string>
     <string name="ai_loading" tools:ignore="MissingTranslation">Generating suggestions…</string>
-    <string name="ai_provider" tools:ignore="MissingTranslation">Provider: %1$s</string>
+    <string name="voice_connection_label" tools:ignore="MissingTranslation">Voice connection: %1$s</string>
     <string name="ai_retry" tools:ignore="MissingTranslation">Retry</string>
     <string name="ai_undo" tools:ignore="MissingTranslation">Undo</string>
     <string name="ai_error" tools:ignore="MissingTranslation">AI error: %1$s</string>

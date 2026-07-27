@@ -81,7 +81,7 @@ class MeetingTranscriptionUi(
     }
 
     fun showReady(providerName: String) {
-        provider.text = context.getString(R.string.ai_provider, providerName)
+        provider.text = context.getString(R.string.voice_connection_label, providerName)
         status.text = local(
             "직접 고른 60분·24MB 이하 음성만 전송해. 화자별 구간을 고른 뒤 입력할 수 있어.",
             "Only your selected audio up to 60 minutes and 24 MB is sent. Review and choose speaker segments before inserting."

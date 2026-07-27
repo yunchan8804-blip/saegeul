@@ -405,7 +405,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | --- | --- | --- | --- | --- |
 | `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | 24 kHz PCM streaming·item별 partial/final 조정·한국어 hint·최종 preview·exactly-once commit 구현, 실제 key 한국어 품질 gate | L |
 | `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, preview와 최초 권한 복귀 구현; 실제 STT key 품질·Z Fold6 gate 남음 | L |
-| `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, OpenAI profile·실기기 gate | L |
+| `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, 실시간·정밀 모드가 같은 독립 STT profile을 재사용하고 emulator picker 통과; 실제 OpenAI key·음원 품질 gate | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
 | `VOICE-05` | 휴대폰 받아쓰기 기본 모드 | `DONE` | 글쓰기 AI 연결 여부와 무관한 기본 음성 모드다. system voice IME가 있으면 즉시 전환하고, 없으면 Android 음성 입력 설정 안내를 제공한다 | S |
 | `VOICE-06` | 독립 STT 공급자·보안 저장소 | `DONE` | 글쓰기 AI/OAuth와 분리된 OpenAI STT key·모델 선택, 공식 endpoint allowlist, Keystore/no-backup 저장과 즉시 삭제 | M |
@@ -1176,7 +1176,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 1. push-to-talk audio capture와 permission UX. (`DONE`: A35와 API 34 emulator 최초 권한 자동 복귀·AudioRecord·중지·401 복구 PASS)
 2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview 완료, 실제 key live 품질 gate)
 3. `VOICE-01` realtime partial transcript. (`IN_PROGRESS`: WebSocket·partial/final 상태·emulator 401 UX PASS, 실제 key 한국어 품질과 production ephemeral token/WebRTC gate)
-4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 코드·테스트 완료, 표준 OpenAI·실기기 gate)
+4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 실시간·정밀 모드의 독립 STT profile 재사용, API 34 x86_64 phone emulator에서 `회의·메모 음성 파일`이 설정 오류 없이 system document picker로 진입, tablet landscape 무잘림 PASS; 실제 OpenAI key·회의 음원 품질 gate)
 5. `VOICE-04` Codex 구독 OAuth voice bridge. (`BLOCK`: desktop UI 외 공개 CLI·HTTP audio 계약 없음)
 
 ### 단계 5 — 개인화·대화면·장기 기능

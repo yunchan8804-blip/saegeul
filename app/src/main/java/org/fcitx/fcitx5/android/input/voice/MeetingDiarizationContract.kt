@@ -27,6 +27,18 @@ object MeetingDiarizationCapability {
     }
 }
 
+/**
+ * Meeting transcription reuses the independently stored speech-to-text credential.
+ * The selected online dictation transport must not make the same OpenAI key disappear.
+ */
+object MeetingVoiceProfilePolicy {
+    fun resolve(effective: EffectiveVoiceProvider): VoiceProviderProfile? = when (effective.mode) {
+        VoiceProviderMode.DeviceDictation -> null
+        VoiceProviderMode.OpenAiRealtime,
+        VoiceProviderMode.OpenAiApi -> effective.profile
+    }
+}
+
 object MeetingTranscriptSelection {
     const val MAX_SEGMENTS = 500
     const val MAX_SEGMENT_CHARACTERS = 1_000

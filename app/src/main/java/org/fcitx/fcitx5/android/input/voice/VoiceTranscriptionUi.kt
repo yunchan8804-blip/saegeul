@@ -100,7 +100,7 @@ class VoiceTranscriptionUi(
         title.setText(
             if (realtime) R.string.voice_realtime_title else R.string.voice_precision_title
         )
-        provider.text = context.getString(R.string.ai_provider, providerName)
+        provider.text = context.getString(R.string.voice_connection_label, providerName)
         status.setText(
             if (realtime) R.string.voice_realtime_ready else R.string.voice_precision_ready
         )
@@ -286,7 +286,7 @@ class VoiceTranscriptionUi(
                 R.string.voice_precision_title
             }
         )
-        provider.text = context.getString(R.string.ai_provider, providerName)
+        provider.text = context.getString(R.string.voice_connection_label, providerName)
         status.text = message
         transcriptScroller.visibility = View.GONE
         hideMeeting()

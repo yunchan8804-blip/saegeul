@@ -480,7 +480,7 @@
     <string name="ai_actions_translation">번역</string>
     <string name="ai_select_action">원문을 확인한 뒤 AI 동작을 골라</string>
     <string name="ai_loading">AI 문장 생성 중…</string>
-    <string name="ai_provider">공급자: %1$s</string>
+    <string name="voice_connection_label">음성 연결: %1$s</string>
     <string name="ai_retry">다시 시도</string>
     <string name="ai_undo">실행 취소</string>
     <string name="ai_error">AI 오류: %1$s</string>

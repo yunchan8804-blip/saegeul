@@ -61,7 +61,7 @@ class MeetingTranscriptionWindow : InputWindow.ExtendedInputWindow<MeetingTransc
         val allowsTextInspection = service.allowsTextInspectionFeatures()
         val allowsOnlineVoice = service.allowsNetworkInputFeatures()
         val effective = VoiceProviderResolver.resolve(context, allowsTextInspection)
-        val resolved = effective.profile.takeIf { effective.mode == VoiceProviderMode.OpenAiApi }
+        val resolved = MeetingVoiceProfilePolicy.resolve(effective)
         profile = resolved
         when (AiFeatureEntryGate.evaluate(
             allowsTextInspection = allowsTextInspection,

@@ -51,6 +51,29 @@ class MeetingDiarizationContractTest {
     }
 
     @Test
+    fun `meeting reuses the STT profile for both OpenAI dictation modes`() {
+        val profile = VoiceProviderProfile(apiKey = "key")
+
+        assertEquals(
+            profile,
+            MeetingVoiceProfilePolicy.resolve(
+                EffectiveVoiceProvider(VoiceProviderMode.OpenAiApi, profile)
+            )
+        )
+        assertEquals(
+            profile,
+            MeetingVoiceProfilePolicy.resolve(
+                EffectiveVoiceProvider(VoiceProviderMode.OpenAiRealtime, profile)
+            )
+        )
+        assertNull(
+            MeetingVoiceProfilePolicy.resolve(
+                EffectiveVoiceProvider(VoiceProviderMode.DeviceDictation, profile)
+            )
+        )
+    }
+
+    @Test
     fun `only selected speaker segments are formatted and insert gate is exactly once`() {
         val segments = listOf(
             MeetingSpeakerSegment("a", "A", 1.2, 2.0, "첫 문장"),
