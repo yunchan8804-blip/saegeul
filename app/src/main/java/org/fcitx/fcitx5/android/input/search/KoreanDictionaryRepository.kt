@@ -5,11 +5,12 @@
 package org.fcitx.fcitx5.android.input.search
 
 import android.content.Context
+import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.zip.GZIPInputStream
+import timber.log.Timber
 
 class KoreanDictionaryRepository(private val context: Context) {
     @Volatile
@@ -23,15 +24,19 @@ class KoreanDictionaryRepository(private val context: Context) {
 
     private suspend fun loadIndex(): KoreanDictionaryIndex =
         cachedIndex ?: loadMutex.withLock {
-            cachedIndex ?: context.assets.open(ASSET_PATH).use { source ->
-                GZIPInputStream(source).bufferedReader(Charsets.UTF_8).use(KoreanDictionaryIndex::read)
-            }.also { cachedIndex = it }
+            cachedIndex ?: run {
+                val startedAt = SystemClock.elapsedRealtime()
+                context.assets.open(ASSET_PATH).use(KoreanDictionaryIndex::read).also {
+                    cachedIndex = it
+                    Timber.i(
+                        "Korean dictionary binary index loaded in %d ms",
+                        SystemClock.elapsedRealtime() - startedAt
+                    )
+                }
+            }
         }
 
     companion object {
-        // Android packaging transparently expands assets ending in `.gz` and strips
-        // the suffix. Keep a non-special extension so the descriptor and runtime
-        // path stay identical while the payload remains gzip-compressed.
-        const val ASSET_PATH = "korean/dictionary.tsv.gzip"
+        const val ASSET_PATH = "korean/dictionary.bin"
     }
 }

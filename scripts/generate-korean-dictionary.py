@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Generate the bundled Korean dictionary from a pinned Wiktextract snapshot.
 
-The output is a deterministic gzip-compressed TSV. It contains only Korean-language
+The output is a deterministic, sorted binary index. It contains only Korean-language
 entries whose headword is written in modern Hangul, and up to four normalized glosses
-for each headword/part-of-speech pair.
+for each headword/part-of-speech pair. Android can binary-search the offset table
+without materializing every definition during the first lookup.
 """
 
 from __future__ import annotations
@@ -11,13 +12,14 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
-import io
 import json
 import re
 import shutil
+import struct
 import tempfile
 import urllib.request
 from collections import OrderedDict
+from itertools import groupby
 from pathlib import Path
 
 
@@ -29,6 +31,8 @@ SOURCE_WIKTEXTRACT_COMMITS = "d9fa233, 9e92f4b"
 HEADWORD = re.compile(r"^[가-힣]+(?:[- ][가-힣]+)*$")
 MAX_HEADWORD_LENGTH = 40
 MAX_GLOSSES = 4
+MAX_FIELD_BYTES = 8_192
+MAGIC = b"KODICT1\0"
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,7 +51,7 @@ def parse_args() -> argparse.Namespace:
         / "main"
         / "assets"
         / "korean"
-        / "dictionary.tsv.gzip",
+        / "dictionary.bin",
     )
     return parser.parse_args()
 
@@ -109,25 +113,48 @@ def extract(source: Path) -> OrderedDict[tuple[str, str], list[str]]:
     return OrderedDict(sorted(entries.items(), key=lambda item: item[0]))
 
 
+def sized_utf8(value: str) -> bytes:
+    encoded = value.encode("utf-8")
+    if len(encoded) > MAX_FIELD_BYTES:
+        raise ValueError(f"Dictionary field exceeds {MAX_FIELD_BYTES} bytes")
+    return encoded
+
+
+def encode_record(word: str, entries: list[tuple[str, list[str]]]) -> bytes:
+    record = bytearray()
+    word_bytes = sized_utf8(word)
+    record.extend(struct.pack("<H", len(word_bytes)))
+    record.extend(word_bytes)
+    record.extend(struct.pack("<H", len(entries)))
+    for pos, glosses in entries:
+        pos_bytes = sized_utf8(pos)
+        record.extend(struct.pack("<H", len(pos_bytes)))
+        record.extend(pos_bytes)
+        record.extend(struct.pack("<B", len(glosses)))
+        for gloss in glosses:
+            gloss_bytes = sized_utf8(gloss)
+            record.extend(struct.pack("<H", len(gloss_bytes)))
+            record.extend(gloss_bytes)
+    return bytes(record)
+
+
 def write_output(output: Path, entries: OrderedDict[tuple[str, str], list[str]]) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    headers = (
-        "# Korean Wiktionary offline dictionary extract",
-        f"# Source: {SOURCE_URL}",
-        f"# Source SHA-256: {SOURCE_SHA256}",
-        f"# Korean Wiktionary dump: {SOURCE_DUMP_DATE}",
-        f"# Wiktextract build: {SOURCE_EXTRACT_DATE} ({SOURCE_WIKTEXTRACT_COMMITS})",
-        "# License: CC BY-SA 4.0; attribution: Korean Wiktionary contributors",
-        "# Modified: Korean entries and modern-Hangul headwords only; whitespace normalized; four glosses maximum",
-        "# Format: headword<TAB>part of speech<TAB>definition...",
-    )
+    records: list[bytes] = []
+    for word, grouped in groupby(entries.items(), key=lambda item: item[0][0]):
+        word_entries = [(key[1], glosses) for key, glosses in grouped]
+        records.append(encode_record(word, word_entries))
+
+    header_size = len(MAGIC) + 4 + len(records) * 4
+    offset = header_size
     with output.open("wb") as raw:
-        with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=9, mtime=0) as compressed:
-            with io.TextIOWrapper(compressed, encoding="utf-8", newline="\n") as text:
-                for header in headers:
-                    text.write(header + "\n")
-                for (word, pos), glosses in entries.items():
-                    text.write("\t".join((word, pos, *glosses)) + "\n")
+        raw.write(MAGIC)
+        raw.write(struct.pack("<I", len(records)))
+        for record in records:
+            raw.write(struct.pack("<I", offset))
+            offset += len(record)
+        for record in records:
+            raw.write(record)
 
 
 def main() -> None:

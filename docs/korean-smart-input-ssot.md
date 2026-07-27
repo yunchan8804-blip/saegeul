@@ -147,7 +147,7 @@ Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 
 | `KO-04` | 앱별 키보드 profile | `DONE` | package별 layout, theme, transport, toolbar, AI 정책 | M |
 | `KO-05` | 한자 음훈 후보 | `DONE` | bundled libhangul 한자·독음·뜻을 명시적 1회 변환 후보로 표시 | M |
 | `KO-05A` | 국어사전 정의 후보 | `DONE` | 한글 통합 검색에서 오프라인 정의·품사·출처를 읽기 전용으로 표시하고 입력 원문은 변경하지 않음 | M |
-| `KO-05B` | 국어사전 cold-load 최적화 | `BACKLOG` | 저사양·대화면 emulator 첫 조회 p95 2초 이하, 이후 조회 200ms 이하를 계측으로 보장 | M |
+| `KO-05B` | 국어사전 cold-load 최적화 | `DONE` | 정렬 binary offset index로 정의를 lazy decode하고 JVM p95·phone/wide emulator 첫 조회 2초 이하를 검증 | M |
 | `KO-06` | 개인 단어장 | `DONE` | opt-in·백업 제외 원자 저장, 개인 후보 우선순위·중복 제거·민감 editor 차단과 emulator 실제 후보 선택 통과 | L |
 | `KO-07` | 한국어 조사·문맥 후보 | `DONE` | 받침·ㄹ 예외 조사와 공백 경계 로컬 다음 어절 후보, emulator UI·선택·취소·정확히 1회 삽입 통과 | L |
 | `KO-08` | 한국식 감정표현 추천 | `DONE` | 로컬 emoji·kaomoji·ㅋㅋ/ㅎㅎ 강·약 chip, emulator 후보·정확히 1회 삽입·민감 editor 차단 통과 | M |
@@ -381,10 +381,10 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 - 무키·오프라인 MVP는 한국어 위키낱말사전의 2026-07-03 dump를 2026-07-24에 추출한 Kaikki
   Wiktextract snapshot을 사용한다. 원본 gzip SHA-256은
   `DF65C8B26BD20DED6D7FC7616106670443C08B551E8D61949A1040E6D68A22E1`, 생성 결과는 현대 한글
-  31,808개 표제어·33,530개 품사 entry·1,016,049 bytes이며 SHA-256은
-  `808DA44928AD3E1D3D6EAEB8232E4FAF32DC7FB2F6884688017DDDA9C609B2FE`다.
+  31,808개 표제어·33,530개 품사 entry·3,414,000 bytes이며 SHA-256은
+  `F3EFFF8B1DEB278A890912B180106F9298EBFED9F617BAB2618DC2094CE7AB48`다.
 - 생성 스크립트는 `lang_code=ko`와 현대 한글 표제어만 허용하고 한 entry당 정의를 최대 4개로
-  제한한다. 결과는 mtime 0인 deterministic gzip이며 원본 URL·원본 checksum·dump/extract date와
+  제한한다. 결과는 deterministic sorted binary index이며 원본 URL·원본 checksum·dump/extract date와
   wiktextract commit을 attribution asset에 고정한다.
 - 데이터는 CC BY-SA 4.0으로 표기하고 각 결과에서 정확한 한국어 위키낱말사전 문서 URL을 열어
   출처·기여자 이력에 도달할 수 있게 한다. 정의는 읽기 전용이며 `commitText`를 호출하지 않는다.
@@ -395,12 +395,12 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | --- | --- | --- |
 | 생성 재현성·라이선스 | `PASS` | 원본/결과 SHA-256 고정, 동일 결과 2회 재생성, AboutLibraries `CC-BY-SA-4.0`, 누락·unknown license 0 |
 | parser·query 정책 | `PASS` | 현대 한글 exact/prefix, 선택·cursor 경계, malformed row·비한글·민감 editor fail-closed 단위 테스트 |
-| 전체 자동 테스트·빌드 | `PASS` | `:app:testDebugUnitTest :app:assembleDebug -PbuildABI=x86_64`, 67 suites·304 tests·failure/error/skipped 0 |
-| APK asset 계약 | `FIXED/PASS` | Android asset packaging이 `.gz`를 자동 확장해 만든 경로 불일치를 발견하고 `.gzip`으로 교정; APK·`descriptor.json` 경로와 checksum 일치 |
+| 전체 자동 테스트·빌드 | `PASS` | `:app:testDebugUnitTest :app:assembleDebug -PbuildABI=x86_64`, 67 suites·306 tests·failure/error/skipped 0 |
+| APK asset 계약 | `FIXED/PASS` | Android asset packaging이 `.gz`를 자동 확장해 만든 초기 경로 불일치를 발견한 뒤 최종 binary asset으로 교체; APK·`descriptor.json` 경로와 checksum 일치 |
 | phone emulator UX | `PASS/EMULATOR` | Pixel 7 API 34 Settings search에서 `나무`를 입력하고 `국어사전` mode를 열어 `나무 · 명사`와 정의를 확인; editor 원문은 `나무` 그대로 유지 |
 | wide emulator UX | `PASS/EMULATOR` | API 34 2560×1600 landscape·모아키에서 `나무` 입력, 영문 attribution·정의·source link가 잘림 없이 표시되고 원문이 변하지 않음을 확인 |
 | runtime 안정성 | `PASS/EMULATOR` | 두 emulator에 동일 APK 설치, default IME 유지, startup crash·`FileNotFound`·`AndroidRuntime` fatal 0 |
-| cold-load 성능 | `FOLLOW-UP` | wide emulator 첫 조회가 약 20초 걸렸다. 기능 정확성 gate는 통과했지만 production 목표에는 부적합하므로 `KO-05B`에서 index format·cache와 p95를 별도 최적화 |
+| cold-load 성능 | `FIXED/PASS` | 3만여 정의 객체 eager parse를 offset table+조회 record lazy decode로 교체. bundled asset 20회 JVM cold-load p95 9ms·warm lookup p95 0ms, phone emulator 1,559ms·wide emulator 520ms |
 | Z Fold6 실기기 | `NOT RUN` | 기기는 연결됐지만 사용자가 이후 작업을 emulator로 한정했으므로 설치·입력·데이터 변경을 수행하지 않음 |
 
 #### KO-01 구현·검증 증거 (2026-07-26)
@@ -1271,7 +1271,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 
 ### 단계 5 — 개인화·대화면·장기 기능
 
-1. `KO-05` 한자 음훈, `KO-05A` 국어사전 정의, `KO-06` 개인 단어장. (`DONE`: 세 기능 모두 emulator 검증 통과; 국어사전 cold-load 성능은 `KO-05B` backlog로 분리)
+1. `KO-05` 한자 음훈, `KO-05A` 국어사전 정의·`KO-05B` 색인 성능, `KO-06` 개인 단어장. (`DONE`: emulator 기능·cold-load gate 통과)
 2. `UX-01` smart clipboard action. (`DONE`: emulator 명시 선택·mask·합치기·1회 삽입·private editor 차단 통과)
 3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`DONE`: 펼친 Fold6 한글·영문 손 경계와 API 34 tablet emulator 초기 복원·회전·모바일·중앙 무입력·숫자판 왕복 통과)
@@ -1319,7 +1319,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | 앱별 profile은 package별 layout·theme·toolbar·transport·network·AI 정책만 저장하며 private editor와 전역 offline hard deny가 항상 우선 |
 | 2026-07-26 | 한자 음훈은 새 네트워크 사전이 아니라 이미 배포되는 libhangul `hanja.txt` comment를 먼저 정확히 노출하고 국어사전 정의는 별도 source/license gate로 분리 |
 | 2026-07-27 | 국어사전 정의는 계정·API key 없이 재현 가능한 한국어 위키낱말사전 snapshot을 현대 한글만 추출해 오프라인 제공하고, 품사·CC BY-SA 4.0 attribution·원문/기여자 링크를 함께 노출. 국립국어원 Open API/전체 내려받기는 key·사용 목적·이메일 동의가 필요한 별도 provider 후보로 유지 |
-| 2026-07-27 | 국어사전 기능 정확성은 phone·wide API 34 emulator를 완료 gate로 인정하되 약 20초의 wide cold-load는 production에 허용하지 않고 `KO-05B` 성능 backlog로 분리 |
+| 2026-07-27 | 국어사전 3만여 정의의 eager object parse는 production에 허용하지 않는다. 정렬 binary offset index와 조회 record lazy decode로 교체하고 bundled JVM cold-load p95 9ms, phone 1,559ms, wide 520ms를 `KO-05B` 완료 gate로 확정 |
 | 2026-07-26 | GIF attach 실패 뒤 link 자동 삽입 금지 |
 | 2026-07-26 | GIF 품질은 KLIPY pagination·한국어 밈 chip·safe gate로 보강하고 GIPHY는 branding·tracking·production review를 갖춘 별도 provider로만 허용 |
 | 2026-07-26 | 답장 intake는 Sharesheet/명시적 clipboard만 허용하고 화면 임의 읽기와 영구 원문 저장을 금지 |
