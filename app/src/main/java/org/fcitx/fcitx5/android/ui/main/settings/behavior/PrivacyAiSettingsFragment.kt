@@ -9,12 +9,15 @@ import android.os.Build
 import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AlertDialog
@@ -317,13 +320,32 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 arrayOf(
                     getString(R.string.ai_auth_mode_auto_discovery),
                     getString(R.string.ai_auth_mode_api_key),
-                    getString(R.string.ai_auth_mode_oauth_advanced)
+                    getString(R.string.ai_auth_mode_advanced)
                 )
             ) { _, which ->
                 when (which) {
                     0 -> startActivity(AiProviderSetupActivity.createIntent(requireContext()))
-                    1 -> showProviderDialog()
-                    else -> showOAuthProviderDialog()
+                    1 -> showOpenAiProviderDialog()
+                    else -> showAdvancedProviderModeDialog()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showAdvancedProviderModeDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.ai_auth_mode_advanced)
+            .setItems(
+                arrayOf(
+                    getString(R.string.ai_auth_mode_api_key_advanced),
+                    getString(R.string.ai_auth_mode_oauth_advanced)
+                )
+            ) { _, which ->
+                if (which == 0) {
+                    showCompatibleProviderDialog()
+                } else {
+                    showOAuthProviderDialog()
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -476,15 +498,93 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         }
     )
 
-    private fun showProviderDialog() {
+    private fun showOpenAiProviderDialog() {
         val ctx = requireContext()
         val store = AiProviderCredentialStore(ctx)
-        val custom = store.load()?.takeIf { it.authMode == AiAuthMode.ApiKey }
+        val configured = store.load()?.takeIf {
+            it.kind == AiProviderKind.OpenAI && it.authMode == AiAuthMode.ApiKey
+        }
+        val apiKey = EditText(ctx).apply {
+            setHint(
+                if (configured == null) {
+                    R.string.ai_provider_key_hint
+                } else {
+                    R.string.ai_provider_key_unchanged_hint
+                }
+            )
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+            }
+            maxLines = 1
+            isSaveEnabled = false
+        }
+        val horizontal = ctx.dp(20)
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            isFocusableInTouchMode = true
+            addView(TextView(ctx).apply {
+                setText(R.string.ai_openai_api_key_endpoint_summary)
+            })
+            addView(apiKey)
+        }
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle(R.string.ai_openai_api_key_settings)
+            .setMessage(R.string.ai_openai_api_key_security_note)
+            .setView(container)
+            .setPositiveButton(R.string.save, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.window?.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+            )
+            container.requestFocus()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val key = apiKey.text.toString().trim().ifEmpty {
+                    configured?.apiKey.orEmpty()
+                }
+                val validated = runCatching {
+                    AiProviderProfile(apiKey = key).validate()
+                }.onFailure { error ->
+                    apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
+                }.getOrNull() ?: return@setOnClickListener
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                replaceProviderProfile(validated) { result ->
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                    result.onSuccess {
+                        apiKey.text?.clear()
+                        dialog.dismiss()
+                        refreshSummaries()
+                        Toast.makeText(
+                            ctx,
+                            R.string.ai_openai_api_key_saved,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }.onFailure { error ->
+                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
+                    }
+                }
+            }
+        }
+        dialog.setOnDismissListener { apiKey.text?.clear() }
+        dialog.show()
+    }
+
+    private fun showCompatibleProviderDialog() {
+        val ctx = requireContext()
+        val store = AiProviderCredentialStore(ctx)
+        val custom = store.load()?.takeIf {
+            it.authMode == AiAuthMode.ApiKey && it.kind == AiProviderKind.OpenAICompatible
+        }
         val effective = custom ?: AiProviderResolver.resolve(ctx).profile
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             val horizontal = ctx.dp(20)
             setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            isFocusableInTouchMode = true
         }
         fun field(hint: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT) =
             EditText(ctx).apply {
@@ -524,15 +624,21 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             effective?.balancedModel ?: "gpt-5.6-terra"
         )
         val quality = field(R.string.ai_quality_model_hint, effective?.qualityModel ?: "gpt-5.6-sol")
+        val scrollContent = boundedAdvancedDialogContent(ctx, container)
 
         val dialog = AlertDialog.Builder(ctx)
-            .setTitle(R.string.ai_provider_settings)
-            .setMessage(R.string.ai_provider_security_note)
-            .setView(container)
+            .setTitle(R.string.ai_compatible_api_settings)
+            .setMessage(R.string.ai_compatible_api_security_note)
+            .setView(scrollContent)
             .setPositiveButton(R.string.save, null)
             .setNegativeButton(android.R.string.cancel, null)
             .create()
         dialog.setOnShowListener {
+            dialog.window?.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+            )
+            container.requestFocus()
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val key = apiKey.text.toString().trim().ifEmpty { custom?.apiKey.orEmpty() }
                 val profile = AiProviderProfile(
@@ -622,15 +728,21 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             custom?.balancedModel ?: "gpt-5.6-terra"
         )
         val quality = field(R.string.ai_quality_model_hint, custom?.qualityModel ?: "gpt-5.6-sol")
+        val scrollContent = boundedAdvancedDialogContent(ctx, container)
 
         val dialog = AlertDialog.Builder(ctx)
             .setTitle(R.string.ai_auth_mode_oauth)
             .setMessage(R.string.ai_oauth_security_note)
-            .setView(container)
+            .setView(scrollContent)
             .setPositiveButton(R.string.ai_oauth_save_and_sign_in, null)
             .setNegativeButton(android.R.string.cancel, null)
             .create()
         dialog.setOnShowListener {
+            dialog.window?.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+            )
+            container.requestFocus()
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val profile = AiProviderProfile(
                     kind = AiProviderKind.OpenAICompatible,
@@ -666,6 +778,28 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             }
         }
         dialog.show()
+    }
+
+    private fun boundedAdvancedDialogContent(
+        context: android.content.Context,
+        content: View
+    ): ScrollView {
+        val heightDp = (context.resources.configuration.screenHeightDp / 5)
+            .coerceIn(132, 240)
+        val maxHeight = context.dp(heightDp)
+        return object : ScrollView(context) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val available = View.MeasureSpec.getSize(heightMeasureSpec)
+                val cappedHeight = if (available > 0) minOf(available, maxHeight) else maxHeight
+                super.onMeasure(
+                    widthMeasureSpec,
+                    View.MeasureSpec.makeMeasureSpec(cappedHeight, View.MeasureSpec.AT_MOST)
+                )
+            }
+        }.apply {
+            isFillViewport = true
+            addView(content)
+        }
     }
 
     /** Revoke/clear the previous OAuth session before either auth mode or provider identity changes. */

@@ -560,9 +560,17 @@
     <string name="ai_provider_invalid" tools:ignore="MissingTranslation">Check the key, HTTPS URL, and model names</string>
     <string name="ai_auth_mode_title" tools:ignore="MissingTranslation">Connect writing AI</string>
     <string name="ai_auth_mode_auto_discovery" tools:ignore="MissingTranslation">Find my computer automatically (recommended)</string>
-    <string name="ai_auth_mode_api_key" tools:ignore="MissingTranslation">Direct API key</string>
+    <string name="ai_auth_mode_api_key" tools:ignore="MissingTranslation">Use an OpenAI API key</string>
     <string name="ai_auth_mode_oauth" tools:ignore="MissingTranslation">OAuth 2.0 login (PKCE)</string>
     <string name="ai_auth_mode_oauth_advanced" tools:ignore="MissingTranslation">Advanced OAuth settings</string>
+    <string name="ai_auth_mode_advanced" tools:ignore="MissingTranslation">Advanced connection settings</string>
+    <string name="ai_auth_mode_api_key_advanced" tools:ignore="MissingTranslation">OpenAI-compatible API endpoint</string>
+    <string name="ai_openai_api_key_settings" tools:ignore="MissingTranslation">Connect an OpenAI API key</string>
+    <string name="ai_openai_api_key_endpoint_summary" tools:ignore="MissingTranslation">Official OpenAI API · writing only</string>
+    <string name="ai_openai_api_key_security_note" tools:ignore="MissingTranslation">Enter your OpenAI API key. Requests use your OpenAI API usage and billing. The key is encrypted with Android Keystore in no-backup storage and is never shared with voice dictation.</string>
+    <string name="ai_openai_api_key_saved" tools:ignore="MissingTranslation">OpenAI writing AI is connected</string>
+    <string name="ai_compatible_api_settings" tools:ignore="MissingTranslation">OpenAI-compatible API</string>
+    <string name="ai_compatible_api_security_note" tools:ignore="MissingTranslation">Advanced settings for a compatible HTTPS endpoint and its models. Use the standard OpenAI API key option for OpenAI.</string>
     <string name="ai_auth_api_key" tools:ignore="MissingTranslation">API key</string>
     <string name="ai_auth_oauth_connected" tools:ignore="MissingTranslation">OAuth connected</string>
     <string name="ai_auth_oauth_reauth" tools:ignore="MissingTranslation">OAuth sign-in required</string>
