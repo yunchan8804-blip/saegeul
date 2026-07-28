@@ -72,8 +72,36 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         setTextColor(theme.altKeyTextColor)
         alpha = 0.72f
         textSize = 10f
-        gravity = Gravity.CENTER
+        gravity = Gravity.CENTER_VERTICAL
         setPadding(0, context.dp(1), 0, context.dp(3))
+    }
+
+    private val moreGifSettingsButton = Button(context).apply {
+        isAllCaps = false
+        text = context.getString(R.string.gif_more_settings)
+        textSize = 11f
+        minHeight = 0
+        minimumHeight = 0
+        setPadding(context.dp(9), 0, context.dp(9), 0)
+        setTextColor(theme.genericActiveForegroundColor)
+        background = rounded(theme.genericActiveBackgroundColor, context.dp(12).toFloat())
+        contentDescription = text
+        visibility = View.GONE
+        setOnClickListener { onMoreGifSettings?.invoke() }
+    }
+
+    private val providerRow = LinearLayout(context).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(context.dp(8), 0, context.dp(8), context.dp(2))
+        addView(providerLabel, LinearLayout.LayoutParams(
+            0,
+            context.dp(30),
+            1f
+        ))
+        addView(moreGifSettingsButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            context.dp(30)
+        ).apply { marginStart = context.dp(6) })
     }
 
     val recyclerView = RecyclerView(context).apply {
@@ -160,41 +188,9 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
     var onQueryLanguage: (() -> Unit)? = null
     var onQueryShift: (() -> Unit)? = null
     var onQuerySubmit: (() -> Unit)? = null
+    var onMoreGifSettings: (() -> Unit)? = null
 
     init {
-        val keywords = listOf(
-            R.string.gif_keyword_trending to "",
-            R.string.gif_keyword_meme to context.getString(R.string.gif_keyword_meme),
-            R.string.gif_keyword_leave_work to context.getString(R.string.gif_keyword_leave_work),
-            R.string.gif_keyword_monday to context.getString(R.string.gif_keyword_monday),
-            R.string.gif_keyword_laugh to context.getString(R.string.gif_keyword_laugh),
-            R.string.gif_keyword_awkward to context.getString(R.string.gif_keyword_awkward),
-            R.string.gif_keyword_agree to context.getString(R.string.gif_keyword_agree),
-            R.string.gif_keyword_wow to context.getString(R.string.gif_keyword_wow),
-            R.string.gif_keyword_celebrate to context.getString(R.string.gif_keyword_celebrate),
-            R.string.gif_keyword_fighting to context.getString(R.string.gif_keyword_fighting),
-            R.string.gif_keyword_love to context.getString(R.string.gif_keyword_love),
-            R.string.gif_keyword_thanks to context.getString(R.string.gif_keyword_thanks),
-            R.string.gif_keyword_angry to context.getString(R.string.gif_keyword_angry),
-            R.string.gif_keyword_sad to context.getString(R.string.gif_keyword_sad)
-        )
-        keywords.forEach { (stringRes, query) ->
-            val label = context.getString(stringRes)
-            keywordRow.addView(TextView(context).apply {
-                text = label
-                gravity = Gravity.CENTER
-                setTextColor(theme.altKeyTextColor)
-                textSize = 12f
-                typeface = Typeface.DEFAULT_BOLD
-                setPadding(context.dp(12), 0, context.dp(12), 0)
-                background = rounded(theme.altKeyBackgroundColor, context.dp(14).toFloat())
-                setOnClickListener { onKeyword?.invoke(query) }
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                context.dp(30)
-            ).apply { marginEnd = context.dp(5) })
-        }
-
         queryKeyboard.addView(letterRow("qwertyuiop", horizontalInset = 0), weightedRowParams())
         queryKeyboard.addView(letterRow("asdfghjkl", horizontalInset = 14), weightedRowParams())
         queryKeyboard.addView(LinearLayout(context).apply {
@@ -221,9 +217,9 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
             LinearLayout.LayoutParams.MATCH_PARENT,
             context.dp(32)
         ))
-        column.addView(providerLabel, LinearLayout.LayoutParams(
+        column.addView(providerRow, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
+            context.dp(32)
         ))
         column.addView(content, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -242,6 +238,30 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         setQuery("")
     }
 
+    internal fun setQuickSuggestions(suggestions: List<GifQuickSuggestion>) {
+        keywordRow.removeAllViews()
+        suggestions.forEach { suggestion ->
+            val (labelRes, query) = suggestion.labelAndQuery()
+            keywordRow.addView(TextView(context).apply {
+                text = context.getString(labelRes)
+                gravity = Gravity.CENTER
+                setTextColor(theme.altKeyTextColor)
+                textSize = 12f
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(context.dp(12), 0, context.dp(12), 0)
+                background = rounded(theme.altKeyBackgroundColor, context.dp(14).toFloat())
+                setOnClickListener { onKeyword?.invoke(query) }
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                context.dp(30)
+            ).apply { marginEnd = context.dp(5) })
+        }
+    }
+
+    fun setMoreGifSettingsVisible(visible: Boolean) {
+        moreGifSettingsButton.visibility = if (visible) View.VISIBLE else View.GONE
+    }
+
     fun setProviderLabel(label: CharSequence) {
         providerLabel.text = label
     }
@@ -253,7 +273,7 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
     fun showQueryEditor(state: GifSearchQueryState) {
         content.visibility = View.GONE
         keywordScroller.visibility = View.GONE
-        providerLabel.visibility = View.GONE
+        providerRow.visibility = View.GONE
         queryKeyboard.visibility = View.VISIBLE
         renderQueryEditor(state)
     }
@@ -284,7 +304,7 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         queryKeyboard.visibility = View.GONE
         content.visibility = View.VISIBLE
         keywordScroller.visibility = View.VISIBLE
-        providerLabel.visibility = View.VISIBLE
+        providerRow.visibility = View.VISIBLE
         queryText.alpha = 1f
     }
 
@@ -339,6 +359,36 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
 
     private fun Context.dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
+
+    private fun GifQuickSuggestion.labelAndQuery(): Pair<Int, String> = when (this) {
+        GifQuickSuggestion.Trending -> R.string.gif_keyword_trending to ""
+        GifQuickSuggestion.Meme -> R.string.gif_keyword_meme to
+            context.getString(R.string.gif_keyword_meme)
+        GifQuickSuggestion.LeaveWork -> R.string.gif_keyword_leave_work to
+            context.getString(R.string.gif_keyword_leave_work)
+        GifQuickSuggestion.Monday -> R.string.gif_keyword_monday to
+            context.getString(R.string.gif_keyword_monday)
+        GifQuickSuggestion.Laugh -> R.string.gif_keyword_laugh to
+            context.getString(R.string.gif_keyword_laugh)
+        GifQuickSuggestion.Awkward -> R.string.gif_keyword_awkward to
+            context.getString(R.string.gif_keyword_awkward)
+        GifQuickSuggestion.Agree -> R.string.gif_keyword_agree to
+            context.getString(R.string.gif_keyword_agree)
+        GifQuickSuggestion.Wow -> R.string.gif_keyword_wow to
+            context.getString(R.string.gif_keyword_wow)
+        GifQuickSuggestion.Celebrate -> R.string.gif_keyword_celebrate to
+            context.getString(R.string.gif_keyword_celebrate)
+        GifQuickSuggestion.Fighting -> R.string.gif_keyword_fighting to
+            context.getString(R.string.gif_keyword_fighting)
+        GifQuickSuggestion.Love -> R.string.gif_keyword_love to
+            context.getString(R.string.gif_keyword_love)
+        GifQuickSuggestion.Thanks -> R.string.gif_keyword_thanks to
+            context.getString(R.string.gif_keyword_thanks)
+        GifQuickSuggestion.Angry -> R.string.gif_keyword_angry to
+            context.getString(R.string.gif_keyword_angry)
+        GifQuickSuggestion.Sad -> R.string.gif_keyword_sad to
+            context.getString(R.string.gif_keyword_sad)
+    }
 
     private fun letterRow(keys: String, horizontalInset: Int): LinearLayout =
         LinearLayout(context).apply {

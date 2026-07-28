@@ -381,6 +381,7 @@
     <string name="gif_source_license">%1$s · %2$s</string>
     <string name="gif_powered_by_commons">Wikimedia Commons 공개 라이선스 결과</string>
     <string name="gif_powered_by_noto">소규모 엄선 대체 목록 · Animated Noto Emoji · CC BY 4.0</string>
+    <string name="gif_more_settings">더 많은 GIF 설정</string>
     <string name="gif_loading">GIF 검색 중…</string>
     <string name="gif_downloading">GIF 다운로드 및 검증 중…</string>
     <string name="gif_no_results">GIF 검색 결과가 없어</string>

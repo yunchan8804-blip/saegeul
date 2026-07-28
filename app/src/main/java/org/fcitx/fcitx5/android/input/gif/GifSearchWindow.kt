@@ -15,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -30,6 +31,9 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
     private val effectiveProvider: EffectiveGifProvider by lazy { GifProviderResolver.resolve(context) }
+    private val providerPresentation by lazy {
+        GifProviderPresentationPolicy.forProvider(effectiveProvider.kind)
+    }
     private val provider: GifProvider by lazy { effectiveProvider.provider }
     private val searchGate by lazy { GifSearchGate(provider) }
     private val cache by lazy { GifCache(context) }
@@ -91,7 +95,10 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 GifProviderKind.GiphyUnavailable -> GiphyGifProvider.POWERED_BY_GIPHY
             }
         )
+        ui.setQuickSuggestions(providerPresentation.quickSuggestions)
+        ui.setMoreGifSettingsVisible(providerPresentation.showsMoreGifSettings)
         ui.onQueryClick = ::beginQueryEditing
+        ui.onMoreGifSettings = ::openMoreGifSettings
         ui.onKeyword = { query ->
             queryState = GifSearchQueryState(query)
             search(query)
@@ -133,7 +140,11 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         val selection = service.currentInputSelection
         target = GifEditorTarget.from(info, selection.start, selection.end)
         cache.cleanupExpired()
-        if (!service.allowsNetworkInputFeatures()) {
+        val networkInputAllowed = service.allowsNetworkInputFeatures()
+        ui.setMoreGifSettingsVisible(
+            providerPresentation.showsMoreGifSettings && networkInputAllowed
+        )
+        if (!networkInputAllowed) {
             retryAction = null
             ui.showBlockingMessage(context.getString(R.string.gif_private_disabled))
             return
@@ -245,6 +256,16 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         searchJob?.cancel()
         queryState = GifSearchQueryState(currentQuery)
         ui.showQueryEditor(queryState)
+    }
+
+    private fun openMoreGifSettings() {
+        if (!providerPresentation.showsMoreGifSettings || !service.allowsNetworkInputFeatures()) {
+            return
+        }
+        // The CTA leaves the private fallback surface before opening the existing Privacy & AI
+        // settings route, so the active editor returns to the normal keyboard afterwards.
+        service.prepareForSettingsActivity()
+        AiSettingsNavigator.open(context)
     }
 
     private fun insertLink(result: GifResult) {

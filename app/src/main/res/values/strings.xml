@@ -382,6 +382,7 @@
     <string name="gif_source_license" tools:ignore="MissingTranslation">%1$s · %2$s</string>
     <string name="gif_powered_by_commons" tools:ignore="MissingTranslation">Open-license results from Wikimedia Commons</string>
     <string name="gif_powered_by_noto" tools:ignore="MissingTranslation">Small curated fallback · Animated Noto Emoji · CC BY 4.0</string>
+    <string name="gif_more_settings" tools:ignore="MissingTranslation">More GIF settings</string>
     <string name="gif_loading" tools:ignore="MissingTranslation">Searching GIFs…</string>
     <string name="gif_downloading" tools:ignore="MissingTranslation">Downloading and verifying GIF…</string>
     <string name="gif_no_results" tools:ignore="MissingTranslation">No GIF results found</string>
