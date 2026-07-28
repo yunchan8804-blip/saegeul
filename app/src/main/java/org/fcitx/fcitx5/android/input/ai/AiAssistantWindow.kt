@@ -8,7 +8,6 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -24,6 +23,7 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
+import timber.log.Timber
 
 /** Preview-first AI writing assistant. Network requests only begin after an action tap. */
 class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
@@ -49,6 +49,8 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     private var clipboardBarAvailable = false
     private var clipboardBarInteractionEnabled = true
     private var pendingCustomInstruction: String? = null
+    private var clipboardCandidates: List<AiClipboardCandidate> = emptyList()
+    private var clipboardTarget: AiEditorTarget? = null
     private val promptEntryPolicy = AiPromptEntryPolicy()
 
     override val title: String by lazy { context.getString(R.string.ai_assistant_title) }
@@ -64,6 +66,8 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             onUndo = ::undo
             onRetry = { lastAction?.let { generate(it, lastCustomInstruction) } }
             onClipboardSourceRequested = ::showClipboardSourcePicker
+            onClipboardSourceSelected = ::selectClipboardSource
+            onClipboardSourceSelectionCancelled = ::cancelClipboardSourcePicker
             onSetupRequested = {
                 service.prepareForSettingsActivity()
                 AiSettingsNavigator.openWritingSetup(context)
@@ -164,6 +168,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     override fun onDetached() {
         requestJob?.cancel()
         intakeJob?.cancel()
+        clearClipboardSourcePicker()
         inputView.setAssistantContentExpanded(false)
     }
 
@@ -370,58 +375,83 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         intakeJob = service.lifecycleScope.launch {
             try {
                 val entries = ClipboardManager.searchableEntries(AiClipboardIntakePolicy.MAX_CHOICES)
+                if (!windowManager.isAttached(this@AiAssistantWindow)) {
+                    return@launch
+                }
                 if (!service.allowsAiInputFeatures() || !matchesCurrentEditor(target)) {
                     ui.showError(context.getString(R.string.ai_editor_changed), canRetry = false)
                     return@launch
                 }
-                val choices = AiClipboardIntakePolicy.choices(entries.map { entry ->
+                val candidates = entries.map { entry ->
                     AiClipboardCandidate(
                         id = entry.id,
                         text = entry.text,
                         sensitive = entry.sensitive,
                         deleted = entry.deleted
                     )
-                })
-                if (choices.isEmpty()) {
+                }
+                val items = AiClipboardPickerPresentation.items(candidates)
+                if (items.isEmpty()) {
                     Toast.makeText(context, R.string.ai_clipboard_source_empty, Toast.LENGTH_SHORT)
                         .show()
                     return@launch
                 }
-                val labels = choices.map { choice ->
-                    choice.text
-                        .replace(Regex("\\s+"), " ")
-                        .take(CLIPBOARD_LABEL_CHARACTERS)
-                }.toTypedArray()
-                val dialog = AlertDialog.Builder(context)
-                    .setTitle(R.string.ai_clipboard_source_title)
-                    .setItems(labels) { _, index ->
-                        val source = AiClipboardIntakePolicy.select(
-                            choices = choices,
-                            selectedId = choices[index].id,
-                            allowed = service.allowsAiInputFeatures() &&
-                                matchesCurrentEditor(target)
-                        )
-                        if (source == null) {
-                            ui.showError(
-                                context.getString(R.string.ai_editor_changed),
-                                canRetry = false
-                            )
-                        } else {
-                            adoptReplySource(source, target)
-                        }
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .create()
-                service.showDialog(dialog)
+                clipboardCandidates = AiClipboardIntakePolicy.choices(candidates)
+                clipboardTarget = target
+                ui.showClipboardSourceChoices(items)
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: Exception) {
-                ui.showError(context.getString(R.string.ai_clipboard_source_failed), canRetry = false)
+            } catch (exception: Exception) {
+                // Never include a clipboard value in logs. The UI must not mistake an IME window
+                // lifecycle race for a database read failure, so only report a read failure while
+                // this assistant window remains current.
+                Timber.w("AI clipboard source read failed: ${exception.javaClass.simpleName}")
+                if (windowManager.isAttached(this@AiAssistantWindow)) {
+                    ui.showError(context.getString(R.string.ai_clipboard_source_failed), canRetry = false)
+                }
             } finally {
                 ui.setIntakeInteractionEnabled(true)
                 setClipboardBarInteractionEnabled(true)
             }
         }
+    }
+
+    private fun selectClipboardSource(selectedId: Int) {
+        val target = clipboardTarget
+        if (target == null) {
+            clearClipboardSourcePicker()
+            if (windowManager.isAttached(this)) {
+                ui.showError(context.getString(R.string.ai_editor_changed), canRetry = false)
+            }
+            return
+        }
+        val source = AiClipboardIntakePolicy.select(
+            choices = clipboardCandidates,
+            selectedId = selectedId,
+            allowed = service.allowsAiInputFeatures() &&
+                windowManager.isAttached(this) &&
+                matchesCurrentEditor(target)
+        )
+        clearClipboardSourcePicker()
+        if (source == null) {
+            if (windowManager.isAttached(this)) {
+                ui.showError(context.getString(R.string.ai_editor_changed), canRetry = false)
+            }
+            return
+        }
+        adoptReplySource(source, target)
+    }
+
+    private fun cancelClipboardSourcePicker() {
+        clearClipboardSourcePicker()
+        if (!windowManager.isAttached(this)) return
+        val current = snapshot ?: return
+        ui.showSourcePreview(current.source, profile?.displayName, replySourceOrigin)
+    }
+
+    private fun clearClipboardSourcePicker() {
+        clipboardCandidates = emptyList()
+        clipboardTarget = null
     }
 
     private fun adoptReplySource(source: AiReplySource, target: AiEditorTarget) {
@@ -514,7 +544,4 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
 
     private fun Int.dp(): Int = (this * context.resources.displayMetrics.density).toInt()
 
-    private companion object {
-        const val CLIPBOARD_LABEL_CHARACTERS = 80
-    }
 }

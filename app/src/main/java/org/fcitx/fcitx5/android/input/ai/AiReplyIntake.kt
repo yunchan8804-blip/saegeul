@@ -106,6 +106,16 @@ data class AiClipboardCandidate(
     val deleted: Boolean
 )
 
+/**
+ * A display-safe clipboard selection. The source text stays in the in-memory candidate used by
+ * [AiClipboardIntakePolicy.select]; the IME UI only receives a bounded, single-line label and
+ * the row id it must explicitly select.
+ */
+data class AiClipboardPickerItem(
+    val id: Int,
+    val label: String
+)
+
 /** Double-checks the database query contract and requires selection by a concrete row id. */
 object AiClipboardIntakePolicy {
     const val MAX_CHOICES = 12
@@ -130,6 +140,23 @@ object AiClipboardIntakePolicy {
         val normalized = AiReplySourcePolicy.normalize(selected.text) ?: return null
         return AiReplySource(normalized, AiReplySourceOrigin.Clipboard, nowMillis)
     }
+}
+
+/** Keeps the IME-owned picker small and prevents hidden, deleted, or sensitive rows from surfacing. */
+object AiClipboardPickerPresentation {
+    const val MAX_LABEL_CHARACTERS = 80
+
+    fun items(entries: List<AiClipboardCandidate>): List<AiClipboardPickerItem> =
+        AiClipboardIntakePolicy.choices(entries).map { choice ->
+            AiClipboardPickerItem(
+                id = choice.id,
+                label = choice.text
+                    .replace(WHITESPACE, " ")
+                    .take(MAX_LABEL_CHARACTERS)
+            )
+        }
+
+    private val WHITESPACE = Regex("\\s+")
 }
 
 object AiReplySourcePolicy {

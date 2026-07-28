@@ -2992,6 +2992,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     fun showDialog(dialog: Dialog) {
         showingDialog?.dismiss()
+        // IME windows may not resolve the platform dialog dim attribute on every OEM theme.
+        // Keep the dialog usable rather than rejecting an otherwise valid user action.
+        val dimAmount = runCatching { styledFloat(android.R.attr.backgroundDimAmount) }
+            .getOrElse { exception ->
+                Timber.w(exception, "Unable to resolve dialog dim amount; using fallback")
+                0.32f
+            }
         dialog.window?.also {
             it.attributes.apply {
                 token = decorView.windowToken
@@ -3000,7 +3007,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             it.addFlags(
                 WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM or WindowManager.LayoutParams.FLAG_DIM_BEHIND
             )
-            it.setDimAmount(styledFloat(android.R.attr.backgroundDimAmount))
+            it.setDimAmount(dimAmount)
         }
         dialog.setOnDismissListener {
             showingDialog = null

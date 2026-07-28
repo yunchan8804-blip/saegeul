@@ -54,6 +54,8 @@ class AiAssistantUi(
     var onUndo: (() -> Unit)? = null
     var onRetry: (() -> Unit)? = null
     var onClipboardSourceRequested: (() -> Unit)? = null
+    var onClipboardSourceSelected: ((Int) -> Unit)? = null
+    var onClipboardSourceSelectionCancelled: (() -> Unit)? = null
     var onSetupRequested: (() -> Unit)? = null
 
     private val actionButtons = mutableMapOf<AiAction, Button>()
@@ -312,6 +314,46 @@ class AiAssistantUi(
         status.sendAccessibilityEvent(AccessibilityEvent.TYPE_ANNOUNCEMENT)
     }
 
+    /**
+     * Renders clipboard choices in the IME-owned window instead of opening an attached Android
+     * dialog. This remains valid across the prompt-to-assistant handoff on foldables.
+     */
+    fun showClipboardSourceChoices(items: List<AiClipboardPickerItem>) {
+        replySourceOrigin = null
+        sourceText.visibility = View.GONE
+        sourceSection.visibility = View.GONE
+        actionSection.visibility = View.GONE
+        updateActionButtons(emptySet())
+        progress.visibility = View.GONE
+        statusArea.visibility = View.GONE
+        retryButton.visibility = View.GONE
+        setupButton.visibility = View.GONE
+        results.removeAllViews()
+        results.addView(sectionLabel(R.string.ai_clipboard_source_title), matchWrap().apply {
+            bottomMargin = dp(4)
+        })
+        items.forEach { item ->
+            results.addView(compactButtonText(item.label, active = false).apply {
+                contentDescription = item.label
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                setOnClickListener { onClipboardSourceSelected?.invoke(item.id) }
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(42)
+            ).apply { bottomMargin = dp(4) })
+        }
+        results.addView(compactButton(android.R.string.cancel, active = false).apply {
+            setOnClickListener { onClipboardSourceSelectionCancelled?.invoke() }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(38)
+        ))
+        resultsScroll.visibility = View.VISIBLE
+        setIntakeInteractionEnabled(true)
+        updateFooterVisibility()
+        resultsScroll.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
+    }
+
     fun setUndoAvailable(available: Boolean) {
         undoButton.visibility = if (available) View.VISIBLE else View.GONE
         updateFooterVisibility()
@@ -548,6 +590,21 @@ class AiAssistantUi(
     private fun compactButton(@StringRes textRes: Int, active: Boolean) = Button(context).apply {
         isAllCaps = false
         setText(textRes)
+        textSize = 12f
+        minHeight = 0
+        minimumHeight = 0
+        minWidth = 0
+        minimumWidth = 0
+        setPadding(dp(10), 0, dp(10), 0)
+        setTextColor(if (active) theme.genericActiveForegroundColor else theme.keyTextColor)
+        backgroundTintList = ColorStateList.valueOf(
+            if (active) theme.genericActiveBackgroundColor else theme.keyBackgroundColor
+        )
+    }
+
+    private fun compactButtonText(text: CharSequence, active: Boolean) = Button(context).apply {
+        isAllCaps = false
+        this.text = text
         textSize = 12f
         minHeight = 0
         minimumHeight = 0

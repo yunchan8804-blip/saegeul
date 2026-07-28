@@ -62,6 +62,28 @@ class AiReplyIntakeTest {
     }
 
     @Test
+    fun inlineClipboardPickerUsesBoundedLabelsForOnlySelectableRows() {
+        val items = AiClipboardPickerPresentation.items(
+            listOf(
+                AiClipboardCandidate(1, "first\nline", sensitive = false, deleted = false),
+                AiClipboardCandidate(2, "secret", sensitive = true, deleted = false),
+                AiClipboardCandidate(3, "deleted", sensitive = false, deleted = true),
+                AiClipboardCandidate(
+                    4,
+                    "가".repeat(AiClipboardPickerPresentation.MAX_LABEL_CHARACTERS + 1),
+                    sensitive = false,
+                    deleted = false
+                )
+            )
+        )
+
+        assertEquals(listOf(1, 4), items.map(AiClipboardPickerItem::id))
+        assertEquals("first line", items.first().label)
+        assertEquals(AiClipboardPickerPresentation.MAX_LABEL_CHARACTERS, items.last().label.length)
+        assertFalse(items.any { it.label.contains("secret") || it.label.contains("deleted") })
+    }
+
+    @Test
     fun externalSourceBindsOnlyToCollapsedKnownEditorCursor() {
         val source = AiReplySource("context", AiReplySourceOrigin.Shared, 0L)
         val target = AiEditorTarget("chat.app", 7, 1, 3, 3)
