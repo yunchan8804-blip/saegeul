@@ -94,10 +94,20 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         val resolved = if (allowsTextInspection && allowsAiInput) {
             AiProviderResolver.resolve(context).profile
         } else null
+        // A structurally valid OAuth profile without its encrypted AppAuth session cannot make a
+        // request. Surface the existing reauthentication CTA before the user spends time typing
+        // a prompt, while API-key profiles remain immediately usable.
+        val profileReady = resolved?.let { candidate ->
+            AiProviderReadinessPolicy.isReady(
+                candidate,
+                hasOAuthSession = candidate.authMode != AiAuthMode.OAuthPkce ||
+                    AiOAuthSessionStore(context).hasSession(candidate)
+            )
+        } == true
         when (AiFeatureEntryGate.evaluate(
             allowsTextInspection = allowsTextInspection,
             allowsAiInput = allowsAiInput,
-            hasConfiguredProfile = resolved != null
+            hasConfiguredProfile = profileReady
         )) {
             AiFeatureEntryGate.PrivateEditor -> {
                 ui.showError(context.getString(R.string.ai_private_disabled), canRetry = false)
@@ -108,7 +118,13 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                 return
             }
             AiFeatureEntryGate.SetupRequired -> {
-                ui.showSetupRequired(context.getString(R.string.ai_setup_required))
+                ui.showSetupRequired(context.getString(
+                    if (resolved?.authMode == AiAuthMode.OAuthPkce) {
+                        R.string.ai_oauth_reauth_required
+                    } else {
+                        R.string.ai_setup_required
+                    }
+                ))
                 return
             }
             AiFeatureEntryGate.Ready -> Unit

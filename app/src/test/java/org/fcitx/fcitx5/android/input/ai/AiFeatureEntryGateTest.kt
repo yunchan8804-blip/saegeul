@@ -40,4 +40,38 @@ class AiFeatureEntryGateTest {
             AiFeatureEntryGate.evaluate(true, true, true)
         )
     }
+
+    @Test
+    fun oauthProfileNeedsAnEncryptedSessionBeforeTheWritingEntryIsReady() {
+        val oauth = AiProviderProfile(
+            kind = AiProviderKind.OpenAICompatible,
+            displayName = "Home AI",
+            baseUrl = "https://home.example.test/v1",
+            authMode = AiAuthMode.OAuthPkce,
+            oauthAuthorizationEndpoint = "https://home.example.test/oauth/authorize",
+            oauthTokenEndpoint = "https://home.example.test/oauth/token",
+            oauthClientId = "fcitx-android-public"
+        )
+
+        assertFalse(AiProviderReadinessPolicy.isReady(oauth, hasOAuthSession = false))
+        assertTrue(AiProviderReadinessPolicy.isReady(oauth, hasOAuthSession = true))
+        assertEquals(
+            AiFeatureEntryGate.SetupRequired,
+            AiFeatureEntryGate.evaluate(
+                allowsTextInspection = true,
+                allowsAiInput = true,
+                hasConfiguredProfile = AiProviderReadinessPolicy.isReady(
+                    oauth,
+                    hasOAuthSession = false
+                )
+            )
+        )
+    }
+
+    @Test
+    fun apiKeyProfileDoesNotRequireAnOAuthSession() {
+        val apiKey = AiProviderProfile(apiKey = "test-key")
+
+        assertTrue(AiProviderReadinessPolicy.isReady(apiKey, hasOAuthSession = false))
+    }
 }

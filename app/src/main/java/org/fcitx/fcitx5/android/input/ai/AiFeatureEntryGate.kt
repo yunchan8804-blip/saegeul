@@ -32,3 +32,14 @@ enum class AiFeatureEntryGate {
         }
     }
 }
+
+/**
+ * A saved OAuth profile alone is not an actionable AI connection. Keep the entry surface from
+ * opening a prompt that cannot be submitted because its encrypted AppAuth session is gone.
+ */
+internal object AiProviderReadinessPolicy {
+    fun isReady(profile: AiProviderProfile?, hasOAuthSession: Boolean): Boolean {
+        val configured = profile?.takeIf(AiProviderProfile::isConfigured) ?: return false
+        return configured.authMode != AiAuthMode.OAuthPkce || hasOAuthSession
+    }
+}
