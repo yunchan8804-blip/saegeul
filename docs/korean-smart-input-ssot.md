@@ -127,11 +127,11 @@ posture처럼 emulator가 재현할 수 없는 항목만 실기기 gate로 유�
 | ID | 기능 | 상태 | 가치 | 난이도 |
 | --- | --- | --- | --- | --- |
 | `GIF-01` | GIF 검색·링크·첨부 파이프라인 | `DONE` | 현재 Fcitx 키보드로 검색·링크·첨부 전달 | L |
-| `GIF-02` | 실사용 리액션 GIF 공급자 | `IN_PROGRESS` | Noto fallback의 정직한 반응 chip·GIF 설정 CTA와 KLIPY 한국어 검색 구현, production key·승인 gate 남음 | M |
+| `GIF-02` | 실사용 리액션 GIF 공급자 | `IN_PROGRESS` | 키 없는 Commons 공개 미디어 source·Noto 반응 fallback·KLIPY 한국어 검색 구현, production key·승인 gate 남음 | M |
 | `GIF-03` | 선택형 GIPHY 공급자 | `IN_PROGRESS` | 비혼합·branding·analytics·안전등급 구현, production/media-copy 승인 gate | M |
 | `VOICE-01` | GPT 실시간 받아쓰기 안정화 | `IN_PROGRESS` | timeout·서버 오류 복구와 stale editor의 capture·연결 시작 차단 구현, 실제 STT key 한국어 품질 gate 남음 | L |
 | `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | push-to-stop·preview·취소 시 전송 중단 구현, 실제 STT key·Z Fold6 품질 gate 남음 | L |
-| `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 파일 선택·화자 구간 preview·선택 삽입 구현, 실제 STT key·회의 음원 품질 gate 남음 | L |
+| `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 파일 선택·형식 모순 차단·화자 구간 preview·선택 삽입 구현, 실제 STT key·회의 음원 품질 gate 남음 | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | 공개 CLI·HTTP audio 계약이 없어 비공식 OAuth token 역이용 금지 | L |
 | `UX-03` | 흔들리지 않는 기능 툴바 | `DONE` | 기본 1행·명시적 2행, 입력 중 높이 변화 차단 | M |
 | `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | Activity 소유 인증·60초 실제 세션 만료·allowlist 구현, 생체 실기기 gate 남음 | L |
@@ -139,9 +139,12 @@ posture처럼 emulator가 재현할 수 없는 항목만 실기기 gate로 유�
 `GIF-01`의 전송 파이프라인 계약과 `GIF-02`의 공급자 계약은 7절에 있다. 사용자 실사용 결과
 Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 리액션 GIF catalog로는 현저히
 부족했다. 그래서 Noto fallback에는 실제 반응 가능한 chip만 노출하고 `더 많은 GIF 설정` CTA를 둔다.
-KLIPY 공급자를 별도 source와 cache namespace로 구현하고 A35·Z Fold6에서 실사용 catalog를
-검증했다. 다만 저장소에 test key를 넣지 않으며 production key와 partner 승인이 끝날 때까지
-`GIF-02`의 배포 상태는 `IN_PROGRESS`로 유지한다.
+키 없이 쓸 수 있는 `공개 미디어 · Wikimedia Commons`는 Standard와 분리된 명시 source로 열었다.
+Commons·KLIPY·GIPHY 결과는 같은 grid나 cache namespace에 섞지 않으며, Commons는 license·author·canonical
+page를 카드에 표시한다. Commons도 현대 밈 catalog를 대신하지는 않으므로 Noto와 같은 반응 chip만 제공하고
+자유 검색으로 공개 애니메이션을 찾게 한다. KLIPY 공급자를 별도 source와 cache namespace로 구현하고
+A35·Z Fold6에서 실사용 catalog를 검증했다. 다만 저장소에 test key를 넣지 않으며 production key와 partner
+승인이 끝날 때까지 `GIF-02`의 배포 상태는 `IN_PROGRESS`로 유지한다.
 
 현재 코드 우선순위는 글쓰기 AI와 음성 STT의 설정·자격증명·실행 gate를 분리된 제품 흐름으로 마감하고
 전체 기능 회귀를 닫는 것이다. `UX-03` 높이 안정성은 코드와 emulator·Z Fold6 cover 검증을 마쳤다.
@@ -822,6 +825,14 @@ GIF 검색 prompt에서 `q`는 내부 query에만 나타나고 원 editor는 계
 `q`가 입력되지 않았다. Fcitx debug IME는 bound·visible·input shown 상태를 유지했다. 실제 GIF content
 attachment의 provider/editor compatibility는 별도 GIF-01 gate로 유지한다.
 
+2026-07-28 공개 GIF catalog·회의 음성 형식 checkpoint에서는 `기본`, `공개 미디어 · Wikimedia Commons`,
+`GIPHY`의 세 source 선택을 실제 settings에서 확인했고, `emulator-5556` Google Messages의 Commons grid에서
+복수의 실제 animated GIF 카드와 author·CC BY-SA attribution을 확인했다. 원 editor는 계속 `Text message`
+placeholder로 남아 검색 결과가 입력으로 새지 않았다. `MeetingAudioPolicy`는 인식 가능한 MIME과 확장자가
+서로 다른 실제 format을 가리키면 upload 전에 거부하고 WAV/MP3와 MPEG/M4A 모순, MIME alias, 한쪽만
+인식되는 fallback 회귀를 테스트한다. 전체 단일 build/test는 app JVM 81 suites·391 tests,
+failure/error/skipped 0과 x86_64 app·Hangul plugin debug assemble을 통과했다.
+
 ## 7. GIF-01 상세 계약
 
 ### 7.1 핵심 UX
@@ -937,14 +948,17 @@ canonical page URL과 downloadable media URL을 혼동하지 않는다.
 
 ### 7.8 Wikimedia Commons 보조 공급자와 공급자 평가
 
-Commons provider와 license parser는 보존하지만 기본 반응 GIF 화면에서는 제외한다. Commons 검색은
-공개 라이선스 출처로는 적합하지만, 한국어 반응 검색 결과가 비거나 정적 자료 중심이라 일상적인
-키보드 반응 GIF의 기본 소스로는 품질이 부족했다. 향후 `공개 미디어` 별도 tab으로 제공한다.
+Commons provider와 license parser는 Standard 자동 반응 화면에는 넣지 않는다. 대신 2026-07-28부터
+`공개 미디어 · Wikimedia Commons`를 사용자가 명시적으로 고르는 keyless source로 제공한다. 이 경로는
+MIME `image/gif`, 크기, license allowlist, restriction/do-not-use metadata, author attribution, canonical/media
+URL 분리를 통과한 결과만 보이고 KLIPY·Noto·GIPHY와 한 grid에 섞이지 않는다. 한국어 반응 검색 결과의
+recall과 현대 밈 품질은 여전히 상용 reaction catalog보다 낮으므로, misleading한 밈·출퇴근·월요일 chip을
+보이지 않고 반응 chip과 자유 검색만 제공한다.
 
 | 후보 | 결정 | 근거 |
 | --- | --- | --- |
 | Animated Noto Emoji | 공개 fallback | key 불필요, CC BY 4.0이지만 리액션·밈 recall이 현저히 낮음 |
-| Wikimedia Commons | 별도 tab backlog | license metadata는 우수하지만 반응 GIF recall·품질이 낮음 |
+| Wikimedia Commons | 별도 공개 미디어 source `DONE` | key 없이 공개 license metadata를 표시하지만 반응 GIF recall·현대 밈 품질은 제한적 |
 | Openverse | 기본 제외 | 라이브 GIF 검색이 사실상 Wikimedia 결과에 집중되고 한국어 recall 개선이 없음 |
 | GifCities | 제외 | GeoCities archive 자산으로 현대 반응 품질과 개별 저작권 상태가 불명확 |
 | KLIPY | `GIF-02` 우선 후보 | 1천만+ catalog, 한국어 검색·지역화, 키보드 사례가 있으나 API key·attribution·partner 승인이 필요 |
@@ -967,8 +981,9 @@ Commons provider와 license parser는 보존하지만 기본 반응 GIF 화면�
 따라서 API key·production 승인 없이 새 상용 공급자를 추가하지 않는다. GIPHY query는 확장하거나
 재정렬하지 않고, 한국어 검색 품질 보강은 KLIPY와 기기 내 Noto 검색에만 적용한다.
 
-Commons tab을 구현할 때는 기존 MediaWiki MIME·license allowlist·restriction 필터를 그대로 유지하고,
-다른 provider 결과와 같은 grid에 섞지 않는다.
+Commons source는 기존 MediaWiki MIME·license allowlist·restriction 필터를 유지하고, 다른 provider
+결과와 같은 grid에 섞지 않는다. Settings의 source 선택은 `기본`, `공개 미디어`, `GIPHY` 세 가지이며,
+Commons를 고르면 setup CTA 없이 그 source만 검색한다.
 
 ### 7.9 KLIPY 실사용 catalog 공급자
 
@@ -1351,8 +1366,10 @@ token을 추출해 비공식 endpoint를 호출하거나 표준 API 사용량으
 사용한다. 일반 배포의 backend ephemeral token·WebRTC 전환은 production hardening gate로 유지한다.
 
 `VOICE-03`은 Realtime과 분리된 명시적 파일 작업이다. Android system document picker에서 사용자가
-고른 `content://` audio만 허용하고, FLAC·MP3/MP4/M4A·MPEG/MPGA·OGG·WAV·WebM 중 metadata와
-확장자를 교차 검증한다. 선언 size가 없더라도 stream 도중 24MiB를 넘으면 즉시 중단하며 최대 duration은
+고른 `content://` audio만 허용하고, FLAC·MP3/MP4/M4A·MPEG/MPGA·OGG·WAV·WebM 중 MIME과
+확장자가 모두 인식되면 canonical type이 같을 때만 허용한다. `audio/x-wav`와 `application/ogg`는
+canonicalize하고 한쪽이 인식되지 않을 때만 반대쪽 fallback을 쓴다. 선언 size가 없더라도 stream 도중
+24MiB를 넘으면 즉시 중단하며 최대 duration은
 60분이다. 요청은 `gpt-4o-transcribe-diarize`, `response_format=diarized_json`,
 `chunking_strategy=auto`, `language=ko`로 제한한다. 표준 OpenAI profile이 아니면 capability를 추정하지
 않고 fail-closed한다. 결과는 화자·시작/종료 timestamp를 preview하고 사용자가 체크한 segment만
@@ -1503,6 +1520,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | AI·로컬·음성·GIF 기능을 이 문서의 통합 backlog로 관리 |
 | 2026-07-26 | GIF MVP 기본 provider는 Wikimedia Commons, GIPHY는 별도 optional provider |
 | 2026-07-26 | 실사용 실패를 근거로 GIF 검색을 인라인 한글·영문 자판으로 교체하고 기본 provider를 Animated Noto Emoji로 변경. Commons는 별도 공개 미디어 tab backlog로 이동 |
+| 2026-07-28 | Commons를 기본 자동 fallback으로 되돌리지 않고, license·attribution을 보존하는 명시적 `공개 미디어` source로 구현. 다른 provider 결과와 grid를 혼합하지 않음 |
 | 2026-07-26 | Animated Noto의 밈·리액션 부족을 근거로 KLIPY를 실사용 catalog로 구현. key 없는 공개 build는 Noto fallback을 유지하고 production key·partner 승인은 별도 gate로 둠 |
 | 2026-07-26 | KLIPY key의 Gradle·BuildConfig 주입을 제거하고 Android Keystore·noBackup 전용 저장소와 명시적 설정 UX를 유일한 key 경로로 확정 |
 | 2026-07-26 | 앱별 profile은 package별 layout·theme·toolbar·transport·network·AI 정책만 저장하며 private editor와 전역 offline hard deny가 항상 우선 |
