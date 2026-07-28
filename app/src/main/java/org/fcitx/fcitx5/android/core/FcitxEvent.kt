@@ -250,6 +250,48 @@ sealed class FcitxEvent<T>(open val data: T) {
         }
     }
 
+    /**
+     * JVM-only fence emitted after all earlier Fcitx work before an IME-owned prompt begins.
+     *
+     * It deliberately uses [EventType.Unknown]: native event type ordinals are part of the JNI
+     * contract and must not change for an internal Kotlin-only marker.
+     */
+    data class InternalPromptStartBarrier(override val data: Long) : FcitxEvent<Long>(data) {
+        override val eventType = EventType.Unknown
+    }
+
+    /**
+     * JVM-only fence emitted after an IME-owned prompt resets Fcitx on its main dispatcher.
+     *
+     * It deliberately uses [EventType.Unknown]: native event type ordinals are part of the JNI
+     * contract and must not change for an internal Kotlin-only marker.
+     */
+    data class InternalPromptDrainBarrier(override val data: Long) : FcitxEvent<Long>(data) {
+        override val eventType = EventType.Unknown
+    }
+
+    /**
+     * JVM-only fence emitted after all earlier Fcitx work for an internal prompt.
+     *
+     * Search/Run snapshots its prompt only after this marker reaches the IME event collector, so
+     * a just-tapped virtual key or candidate cannot be lost to the following drain.
+     */
+    data class InternalPromptSubmitBarrier(override val data: Long) : FcitxEvent<Long>(data) {
+        override val eventType = EventType.Unknown
+    }
+
+    /**
+     * JVM-only marker for a picker/emoji commit that must follow Fcitx's pending composition.
+     *
+     * It is emitted by the Fcitx dispatcher after `select`/`reset`, so earlier native commit
+     * callbacks reach the IME service before the direct text is appended to its prompt buffer.
+     */
+    data class InternalPromptDirectCommitBarrier(override val data: Data) : FcitxEvent<InternalPromptDirectCommitBarrier.Data>(data) {
+        override val eventType = EventType.Unknown
+
+        data class Data(val token: Long, val sequence: Long, val text: String)
+    }
+
     enum class EventType {
         Candidate,
         Commit,

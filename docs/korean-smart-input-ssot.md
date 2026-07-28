@@ -126,7 +126,7 @@ posture처럼 emulator가 재현할 수 없는 항목만 실기기 gate로 유�
 
 | ID | 기능 | 상태 | 가치 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `GIF-01` | GIF 검색·링크·첨부 파이프라인 | `DONE` | 키보드 이탈 없이 GIF 검색·전달 | L |
+| `GIF-01` | GIF 검색·링크·첨부 파이프라인 | `DONE` | 현재 Fcitx 키보드로 검색·링크·첨부 전달 | L |
 | `GIF-02` | 실사용 리액션 GIF 공급자 | `IN_PROGRESS` | Noto fallback의 정직한 반응 chip·GIF 설정 CTA와 KLIPY 한국어 검색 구현, production key·승인 gate 남음 | M |
 | `GIF-03` | 선택형 GIPHY 공급자 | `IN_PROGRESS` | 비혼합·branding·analytics·안전등급 구현, production/media-copy 승인 gate | M |
 | `VOICE-01` | GPT 실시간 받아쓰기 안정화 | `IN_PROGRESS` | timeout·서버 오류 복구와 stale editor의 capture·연결 시작 차단 구현, 실제 STT key 한국어 품질 gate 남음 | L |
@@ -774,7 +774,7 @@ KLIPY production key·partner 승인과 별도로 유지한다.
 
 음성 runtime은 start 직전 editor가 stale이면 microphone capture와 인증 WebSocket 연결을 시작하지
 않고, capture 뒤 editor가 바뀌면 upload 없이 memory audio를 지운다. 구간 전사는 cancel에서 활성
-HTTP 연결을 끊고, Realtime은 ready와 recorder 등록 사이의 terminal failure를 다시 확인한다. 현재
+HTTP 연결을 끊고, Realtime은 ready와 recorder 등록 사이의 terminal failure를 다시 확인한다. 해당 checkpoint 당시
 통합 검증은 app JVM 76 suites·363 tests, failure/error/skipped 0, `git diff --check`, x86_64 app·Hangul
 plugin debug assemble 통과와 emulator 최신 APK 설치까지다. 실제 한국어 STT 품질, production GIF
 공급자 승인, 실기기 생체 센서는 이 checkpoint의 완료 증거가 아니라 owner/hardware gate로 남긴다.
@@ -793,6 +793,35 @@ Settings 검색 원문 `hello world`를 한국어 번역해 `안녕, 세상` pre
 emulator와 Z Fold6에 동일 `0.1.2-148-g54817146`을 설치했다. A35의 실제 OpenAI STT 한국어 품질은
 기기와 사용자 STT key가 필요한 별도 최종 gate로 유지한다.
 
+2026-07-28 GIF 검색 입력 회귀 수정에서는 기존 GIF surface의 독립 두벌식·QWERTY 자판과 별도
+query state를 제거했다. AI 직접 지시와 GIF 검색은 `InternalPromptCapture`라는 같은 내부 buffer
+계약을 쓰되, AI는 AI policy와 빈 제출 차단을 유지하고 GIF는 network policy·빈 인기 검색·공급자별
+50/80자 한도를 적용한다. API 34 x86_64 emulator의 Google Messages에서 GIF 검색 → 현재 Fcitx
+영문 keyboard → 한글 표면 전환 → `Awkward축하` query 입력 → 검색 → 재진입 → 취소를 확인했고,
+원 메시지 입력칸은 전 과정에서 `Text message` placeholder로 남아 query가 한 번도 새지 않았다.
+전체 app JVM 76 suites·362 tests, failure/error/skipped 0, `git diff --check`, x86_64 app·Hangul
+plugin debug assemble을 이 변경과 함께 다시 통과했다.
+
+2026-07-28 내부 prompt·Fcitx engine 재시작 회귀에서는 native dispatcher가 완전히 멈춘
+`ON_STOPPED`에서만 단조 증가하는 engine generation을 만들고, service event collector는 해당 세대가
+`READY`가 된 뒤에만 다시 구독하게 했다. 세대가 달라지면 starting·active·draining prompt, pending
+submit·direct marker와 InputView prompt를 모두 폐기해 이전 callback이 새 editor 또는 원 editor로
+fallback하지 않는다. daemon-only restart는 Android의 bind/start callback을 다시 받지 않는다는 점도
+반영해, 현재 binding·editor session/field/type·selected IM·capability·keyboard paging snapshot이
+같은 경우에만 `activate → activateIme → paging → capability → focus` 순서로 native InputContext를
+재수화한다. view 단계에서 EditorInfo가 바뀌면 최신 snapshot을 다시 확인하고, stale·stopping·실패한
+restore는 collector를 열지 않은 채 fail-closed 재시도 또는 다음 generation에 맡긴다. 재시작 전
+Java-side preedit/candidate cache와 buffered Hangul·물리키 상태는 commit 없이 폐기한다.
+
+이 checkpoint의 통합 app JVM은 81 suites·387 tests, failure/error/skipped 0이며 `git diff --check`,
+x86_64 app·Hangul plugin debug assemble을 통과했다. 최신 APK는 `emulator-5556`에만 설치했다.
+Google Messages의 같은 `Text message` editor에서 단일 restart와 70ms 간격 연속 두 번 restart 뒤에도
+virtual key가 실제로 입력되고, 시험 글자를 삭제한 뒤 editor가 비어 있음을 확인했다. 또한 최종 APK의
+GIF 검색 prompt에서 `q`는 내부 query에만 나타나고 원 editor는 계속 `Text message` placeholder로
+남았으며, 이 상태에서 restart하면 prompt는 닫히고 GIF 결과 surface로 fail-closed 복귀하며 원 editor에
+`q`가 입력되지 않았다. Fcitx debug IME는 bound·visible·input shown 상태를 유지했다. 실제 GIF content
+attachment의 provider/editor compatibility는 별도 GIF-01 gate로 유지한다.
+
 ## 7. GIF-01 상세 계약
 
 ### 7.1 핵심 UX
@@ -800,13 +829,26 @@ emulator와 Z Fold6에 동일 `0.1.2-148-g54817146`을 설치했다. A35의 실�
 1. 키보드 toolbar의 GIF 버튼으로 `GifSearchWindow`를 연다.
 2. 승인된 KLIPY key가 있으면 첫 화면에 KLIPY 인기 결과와 한국어 query 결과를 grid로 표시한다.
    key가 없는 공개 build에서는 Animated Noto Emoji를 fallback으로 사용한다.
-3. 검색창은 IME가 자기 자신을 다시 호출하는 `AlertDialog/EditText`가 아니라 GIF surface 안의
-   독립 한글·영문 인라인 자판을 사용한다. query는 대상 editor의 `InputConnection`에 쓰지 않는다.
+3. 검색창은 IME가 자기 자신을 다시 호출하는 `AlertDialog/EditText`도, GIF 전용 한글·영문
+   복제 자판도 만들지 않는다. `InternalPromptCapture`가 현재 `KeyboardWindow`와 Fcitx 조합·후보·
+   한글 표면·숫자·기호·theme·높이를 그대로 사용해 IME 내부 query buffer만 갱신한다. query는
+   대상 editor의 `InputConnection`에 쓰지 않는다.
+   Search/Run은 즉시 buffer를 닫지 않고 Fcitx FIFO의 token-bound submit barrier 뒤에서 snapshot한다.
+   따라서 직전 virtual key·candidate 선택·picker marker의 commit/preedit가 먼저 query에 반영된다.
+   snapshot 뒤 reset drain barrier가 확인되기 전까지는 callback·다음 window·editor commit을 열지 않는다.
+   취소·detach·editor 변경 또는 stale token의 marker는 버리며 대상 editor로 fallback하지 않는다.
+   start marker는 현재 Fcitx engine 세대에 실제로 구독된 service collector가 확인된 뒤에만 enqueue한다.
+   marker 앞 callback은 같은 Android input session의 원 editor에서만 끝낼 수 있고, editor/session 변경이면
+   collector 세대 전체를 버려 새 field로 전달하지 않는다. Fcitx native dispatcher가 완전히 멈춘 뒤
+   누적 engine generation을 올리므로
+   `STOPPING → STOPPED → READY`가 StateFlow에서 합쳐져도 starting·active·draining prompt와 취소된
+   drain marker를 모두 fail-closed reset한 뒤 새 collector를 만든다.
 4. thumbnail을 탭하면 해당 카드 자체 위에 반투명 selection overlay를 표시한다.
 5. overlay에는 `링크 넣기`와 `GIF 첨부`를 동시에 표시한다.
 6. 선택된 카드를 다시 탭하거나 바깥을 탭하면 overlay를 닫는다.
 7. 다른 카드를 탭하면 overlay가 그 카드로 이동한다.
-8. `링크 넣기`는 provider의 canonical page URL을 `commitText()`로 정확히 한 번 삽입한다.
+8. `링크 넣기`는 provider의 canonical page URL을 editor 전용 `commitToEditor()`로 정확히 한 번 삽입한다.
+   prompt capture/drain 중에는 성공으로 가장하지 않고 실패로 남긴다.
 9. `GIF 첨부`는 실제 animated `image/gif` 파일을 Android Commit Content API로 전달한다.
 10. 성공 뒤 일반 keyboard로 돌아간다. 실패 뒤에는 현재 결과와 선택을 보존하고 retry를 제공한다.
 
@@ -817,7 +859,8 @@ emulator와 Z Fold6에 동일 `0.1.2-148-g54817146`을 설치했다. A35의 실�
 | 상태 | 표시 | 허용 동작 |
 | --- | --- | --- |
 | `Initial` | 검색창과 기본 결과 | 검색 편집 진입, 결과 선택, 닫기 |
-| `EditingQuery` | 독립 두벌식·QWERTY 검색 자판 | 한/영, shift, 삭제, 지우기, 검색 |
+| `EditingQuery` | 현재 `KeyboardWindow` 위 내부 prompt strip | 현재 한글/영문 표면, 후보, 숫자·기호, 삭제, 검색 |
+| `SettlingQuery` | Search 비활성 prompt strip | submit fence·direct marker·reset drain 대기, 취소/새 입력 차단 |
 | `Loading` | 진행 표시 | 취소 또는 query 교체 |
 | `Results` | 결과 grid | 선택, 새 검색 |
 | `Selected` | 카드 overlay와 attribution | 링크, 첨부, 선택 해제 |
@@ -826,6 +869,8 @@ emulator와 Z Fold6에 동일 `0.1.2-148-g54817146`을 설치했다. A35의 실�
 | `Committed` | 짧은 성공 상태 | 일반 keyboard 복귀 |
 
 stale search response가 최신 query 결과를 덮지 않도록 request generation을 비교한다.
+빈 GIF query는 인기 결과 검색으로 제출할 수 있다. AI 직접 지시문만 빈 제출을 계속 막는다. GIF query는
+KLIPY·Noto에서 최대 80자, GIPHY 및 GIPHY unavailable surface에서 최대 50자로 trim 뒤 전달한다.
 
 ### 7.3 링크 삽입 계약
 
@@ -1509,3 +1554,6 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-28 | IME 소유 설정 Activity 왕복은 원 editor identity에 묶인 one-shot software-keyboard resume로 복구한다. 전역 virtual 강제는 금지하고 자체 설정 editor는 예약을 소비하지 않는다. |
 | 2026-07-28 | 재부팅 첫 잠금 해제 전에는 device-protected 기본 키보드만 허용한다. credential-encrypted app profile·snippet·dynamic phrase·clipboard suggestion·AI·GIF·OCR·voice는 읽거나 노출하지 않고, `ACTION_USER_UNLOCKED` 뒤 프로세스를 재기동해 일반 기능을 복원한다. |
 | 2026-07-28 | `AI 글쓰기`는 첫 진입 즉시 별도 복제 자판이 아닌 현재 Fcitx `KeyboardWindow`와 내부 직접 지시문 target을 정확히 한 번 연다. `취소`는 action panel로 복귀하며 같은 window session에서 prompt를 자동 재개하지 않는다. |
+| 2026-07-28 | GIF 검색어도 별도 두벌식·QWERTY 자판을 만들지 않고 현재 Fcitx `KeyboardWindow`와 내부 prompt buffer로만 입력한다. AI와 GIF는 같은 capture lifecycle을 쓰되 privacy policy, 빈 제출, provider별 query 한도는 feature별로 분리한다. |
+| 2026-07-28 | 내부 prompt 종료는 Fcitx reset 완료만으로 capture를 풀지 않는다. 같은 event stream의 token barrier 전까지 late commit·preedit·key·delete와 직접 삽입을 버려 query가 원 editor로 새는 경로를 차단한다. |
+| 2026-07-28 | 내부 prompt의 start·submit·drain marker는 실제 service event collector 구독 확인 뒤에만 사용한다. Fcitx native dispatcher가 완전히 멈춘 뒤의 누적 engine generation이 바뀌면 StateFlow lifecycle 상태가 합쳐져도 기존 collector·prompt·drain을 폐기하고 새 engine READY 이후에만 다음 prompt를 허용한다. |

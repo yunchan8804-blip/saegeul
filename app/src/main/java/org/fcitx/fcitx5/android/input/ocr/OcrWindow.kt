@@ -256,7 +256,7 @@ class OcrWindow(
         val reviewed = OcrTextContract.format(blocks, selectedIds) ?: return
         if (!commitGate.claim()) return
         if (!validateTarget(boundTarget, showError = true)) return
-        if (!service.commitText(reviewed)) {
+        if (!service.commitToEditor(reviewed)) {
             ui.showRecognitionError(R.string.ocr_commit_failed, canRetry = false)
             return
         }

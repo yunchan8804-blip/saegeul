@@ -99,10 +99,24 @@ class CandidatesView(
 
     private val candidatesUi = PagedCandidatesUi(
         ctx, theme, setupTextView,
-        onCandidateClick = { index -> fcitx.launchOnReady { it.select(index) } },
+        onCandidateClick = { index -> service.selectCandidate(index) },
         onCandidateAction = { index, text, view -> showCandidateActionMenu(index, text, view) },
-        onPrevPage = { fcitx.launchOnReady { it.offsetCandidatePage(-1) } },
-        onNextPage = { fcitx.launchOnReady { it.offsetCandidatePage(1) } }
+        onPrevPage = {
+            if (!service.isInternalPromptCaptureStarting &&
+                !service.isInternalPromptCaptureDraining &&
+                !service.isInternalPromptSubmissionPending
+            ) {
+                fcitx.launchOnReady { it.offsetCandidatePage(-1) }
+            }
+        },
+        onNextPage = {
+            if (!service.isInternalPromptCaptureStarting &&
+                !service.isInternalPromptCaptureDraining &&
+                !service.isInternalPromptSubmissionPending
+            ) {
+                fcitx.launchOnReady { it.offsetCandidatePage(1) }
+            }
+        }
     )
 
     override fun onStartHandleFcitxEvent() {

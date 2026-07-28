@@ -9,7 +9,9 @@ data class AiEditorTarget(
     val fieldId: Int,
     val inputType: Int,
     val selectionStart: Int,
-    val selectionEnd: Int
+    val selectionEnd: Int,
+    /** The Android input session that captured this target; stale async replies must fail closed. */
+    val inputSessionEpoch: Long = Long.MIN_VALUE
 )
 
 enum class AiSourceKind {

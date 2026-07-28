@@ -49,7 +49,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
@@ -89,7 +91,6 @@ import org.fcitx.fcitx5.android.input.ai.AiAppliedEdit
 import org.fcitx.fcitx5.android.input.ai.AiApplyMode
 import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
 import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
-import org.fcitx.fcitx5.android.input.ai.AiPromptCaptureSession
 import org.fcitx.fcitx5.android.input.ai.AiSourceKind
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
 import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
@@ -121,6 +122,8 @@ import splitties.dimensions.dp
 import splitties.resources.styledColor
 import timber.log.Timber
 import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
 
 class FcitxInputMethodService : LifecycleInputMethodService() {
@@ -129,6 +132,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         get() = FcitxApplication.getInstance().isDirectBootMode
 
     private lateinit var fcitx: FcitxConnection
+    private var fcitxEventCollectorJob: Job? = null
+    private var fcitxEventCollectorRestartJob: Job? = null
+    private var fcitxEventCollectorGeneration = 0L
+    private var fcitxEventCollectorRestartRequest = 0L
+    private var fcitxEventCollectorEngineGeneration = Long.MIN_VALUE
+    private var readyFcitxEventCollectorGeneration = Long.MIN_VALUE
+    private var observedFcitxEngineGeneration = Long.MIN_VALUE
+    private val engineRestartEditorRehydrationGate = EngineRestartEditorRehydrationGate()
 
     private var jobs = Channel<Job>(capacity = Channel.UNLIMITED)
 
@@ -205,25 +216,143 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var snippetCatalog = SnippetCatalog.builtIns()
     private var snippetRefreshJob: Job? = null
 
-    private data class ActiveAiPromptCapture(
-        val session: AiPromptCaptureSession,
-        val onChanged: (committed: String, preedit: String) -> Unit,
-        val packageName: String?,
-        val fieldId: Int,
-        val inputType: Int
+    private data class ActiveInternalPromptCapture(
+        val token: Long,
+        val engineGeneration: Long,
+        val spec: InternalPromptSpec,
+        val session: InternalPromptCaptureSession,
+        val onStarted: (token: Long) -> Unit,
+        val onChanged: (token: Long, committed: String, preedit: String) -> Unit,
+        val target: InternalPromptEditorTarget,
+        val directCommits: InternalPromptDirectCommitQueue = InternalPromptDirectCommitQueue()
     )
 
-    private var activeAiPromptCapture: ActiveAiPromptCapture? = null
+    /** A reviewed prompt that may open its next IME window only after the reset drain finishes. */
+    private data class PendingInternalPromptSubmission(
+        val token: Long,
+        val text: String,
+        val target: InternalPromptEditorTarget
+    )
 
-    val isAiPromptCaptureActive: Boolean
-        get() = activeAiPromptCapture != null
+    private val internalPromptCaptureGate = InternalPromptCaptureGate()
+    private var activeInternalPromptCapture: ActiveInternalPromptCapture? = null
+    private var pendingInternalPromptSubmission: PendingInternalPromptSubmission? = null
+    private var inputSessionEpoch = 0L
 
-    fun shouldRetainAiPromptCapture(info: EditorInfo): Boolean =
-        activeAiPromptCapture?.let { capture ->
-            capture.packageName == info.packageName &&
-                capture.fieldId == info.fieldId &&
-                capture.inputType == info.inputType
+    /** A prompt is scoped to the exact Fcitx engine instance that accepted its start marker. */
+    private fun ActiveInternalPromptCapture.belongsToCurrentEngine(): Boolean =
+        engineGeneration == fcitx.engineGeneration.value
+
+    /** Fails closed before any stale prompt callback can cross into a replacement engine. */
+    private fun invalidateStaleInternalPromptEngine(capture: ActiveInternalPromptCapture): Boolean {
+        if (capture.belongsToCurrentEngine()) return false
+        discardFcitxEventGenerationForPromptSafety(engineRestart = true)
+        return true
+    }
+
+    val isInternalPromptCaptureActive: Boolean
+        get() = activeInternalPromptCapture?.let { capture ->
+            capture.belongsToCurrentEngine() && internalPromptCaptureGate.isActive(capture.token)
         } == true
+
+    /** Lets delayed UI posts verify that their exact capture is still the current destination. */
+    fun isInternalPromptCaptureActive(token: Long): Boolean =
+        activeInternalPromptCapture?.let { capture ->
+            capture.token == token && capture.belongsToCurrentEngine() &&
+                internalPromptCaptureGate.isActive(token)
+        } == true
+
+    val isInternalPromptCaptureDraining: Boolean
+        get() = internalPromptCaptureGate.isDraining
+
+    /** True whenever a prompt is starting, active, or draining and blocks new editor actions. */
+    val isInternalPromptInputOwned: Boolean
+        get() = internalPromptCaptureGate.blocksNewInput
+
+    /** True before the FIFO start marker activates prompt capture. */
+    val isInternalPromptCaptureStarting: Boolean
+        get() = internalPromptCaptureGate.isStarting
+
+    /** Monotonically changes at every Android editor-session boundary. */
+    val currentInputSessionEpoch: Long
+        get() = inputSessionEpoch
+
+    val isInternalPromptSubmissionPending: Boolean
+        get() = activeInternalPromptCapture?.let { capture ->
+            capture.belongsToCurrentEngine() && internalPromptCaptureGate.isActive(capture.token) &&
+                capture.directCommits.isSubmissionPending
+        } == true
+
+    /**
+     * Queues IME-owned picker/clipboard text behind the prompt's existing Fcitx composition.
+     *
+     * This is deliberately separate from [commitToEditor]: while an internal prompt is active,
+     * direct UI text belongs to that prompt, never to the app editor that opened the keyboard.
+     */
+    internal fun insertInternalPromptDirectText(text: String): InternalPromptDirectCommitResult {
+        val capture = activeInternalPromptCapture
+        if (capture != null && invalidateStaleInternalPromptEngine(capture)) {
+            return InternalPromptDirectCommitResult.ConsumedClosing
+        }
+        if (capture != null && internalPromptCaptureGate.isActive(capture.token)) {
+            val reservation = capture.directCommits.reserve()?.let { sequence ->
+                InternalPromptDirectCommitResult.Reserved(capture.token, sequence)
+            } ?: return InternalPromptDirectCommitResult.ConsumedClosing
+            postInternalPromptDirectCommit(reservation, text)
+            return reservation
+        }
+        return if (isInternalPromptInputOwned) {
+            InternalPromptDirectCommitResult.ConsumedClosing
+        } else {
+            InternalPromptDirectCommitResult.NotPrompt
+        }
+    }
+
+    /** Serializes candidate selection with virtual-key input and prompt submit fences. */
+    fun selectCandidate(index: Int) {
+        activeInternalPromptCapture?.let { capture ->
+            if (invalidateStaleInternalPromptEngine(capture)) return
+        }
+        if (isInternalPromptCaptureStarting || isInternalPromptCaptureDraining ||
+            isInternalPromptSubmissionPending
+        ) return
+        postFcitxJob { select(index) }
+    }
+
+    fun shouldRetainInternalPromptCapture(info: EditorInfo): Boolean =
+        activeInternalPromptCapture?.let { capture ->
+            capture.belongsToCurrentEngine() && internalPromptCaptureGate.isActive(capture.token) &&
+                matchesCurrentInternalPromptTarget(capture.target, info)
+        } == true
+
+    private fun captureCurrentInternalPromptTarget(
+        info: EditorInfo = currentInputEditorInfo
+    ): InternalPromptEditorTarget {
+        val selection = currentInputSelection
+        return InternalPromptEditorTarget(
+            packageName = info.packageName,
+            fieldId = info.fieldId,
+            inputType = info.inputType,
+            selectionStart = selection.start,
+            selectionEnd = selection.end,
+            inputSessionEpoch = inputSessionEpoch
+        )
+    }
+
+    private fun matchesCurrentInternalPromptTarget(
+        target: InternalPromptEditorTarget,
+        info: EditorInfo = currentInputEditorInfo
+    ): Boolean {
+        val selection = currentInputSelection
+        return target.matches(
+            packageName = info.packageName,
+            fieldId = info.fieldId,
+            inputType = info.inputType,
+            selectionStart = selection.start,
+            selectionEnd = selection.end,
+            inputSessionEpoch = inputSessionEpoch
+        )
+    }
 
     /** Prepares a deterministic keyboard return path before an IME-owned settings activity. */
     fun prepareForSettingsActivity() {
@@ -303,11 +432,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Keep
     private val bufferedHangulInputListener = ManagedPreference.OnChangeListener<Boolean> { _, enabled ->
-        // Finish any editor-owned composing span before changing where preedit is rendered.
-        currentInputConnection?.finishComposingText()
-        resetComposingState()
-        if (!enabled && bufferedHangulSessionActive) {
-            submitBufferedHangul()
+        if (isInternalPromptInputOwned) {
+            // A settings change must not flush a stale buffered segment into the editor while an
+            // internal prompt owns the keyboard. The prompt drain will reset Fcitx separately.
+            discardBufferedHangulForInternalPrompt()
+        } else {
+            // Finish any editor-owned composing span before changing where preedit is rendered.
+            currentInputConnection?.finishComposingText()
+            resetComposingState()
+            if (!enabled && bufferedHangulSessionActive) {
+                submitBufferedHangul()
+            }
         }
         bufferedHangulSessionActive = bufferedHangulModeActive(
             fcitx.runImmediately { inputMethodEntryCached }
@@ -333,14 +468,167 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return job
     }
 
+    /** Starts a fresh, replay-free event subscription for the current Fcitx engine generation. */
+    private fun startFcitxEventCollector() {
+        if (fcitxEventCollectorJob?.isActive == true) return
+        val generation = ++fcitxEventCollectorGeneration
+        val engineGeneration = fcitx.engineGeneration.value
+        fcitxEventCollectorEngineGeneration = engineGeneration
+        readyFcitxEventCollectorGeneration = Long.MIN_VALUE
+        fcitxEventCollectorJob = lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            fcitx.runImmediately { eventFlow }.onSubscription {
+                if (generation == fcitxEventCollectorGeneration &&
+                    engineGeneration == fcitx.engineGeneration.value
+                ) {
+                    readyFcitxEventCollectorGeneration = generation
+                }
+            }.collect {
+                if (generation != fcitxEventCollectorGeneration) return@collect
+                if (engineGeneration != fcitx.engineGeneration.value) {
+                    // A restart can move STOPPING -> STOPPED -> READY before StateFlow collectors
+                    // run. Never route a new-engine event through an old prompt/collector epoch.
+                    discardFcitxEventGenerationForPromptSafety(engineRestart = true)
+                    return@collect
+                }
+                handleFcitxEvent(it)
+            }
+        }
+    }
+
+    private val isFcitxEventCollectorReady: Boolean
+        get() = fcitxEventCollectorJob?.isActive == true &&
+            readyFcitxEventCollectorGeneration == fcitxEventCollectorGeneration &&
+            fcitxEventCollectorEngineGeneration == fcitx.engineGeneration.value
+
+    /**
+     * Subscribes only once the current engine has fully reached READY.
+     *
+     * The engine generation advances only after Fcitx.stop() returned from its native dispatcher.
+     * Re-subscribing earlier could give an old native callback a new collector epoch.
+     */
+    private fun restartFcitxEventCollectorWhenReady() {
+        val request = ++fcitxEventCollectorRestartRequest
+        val engineGeneration = fcitx.engineGeneration.value
+        fcitxEventCollectorRestartJob?.cancel()
+        fcitxEventCollectorRestartJob = lifecycleScope.launch {
+            fcitx.runOnReady { }
+            if (request == fcitxEventCollectorRestartRequest &&
+                engineGeneration == fcitx.engineGeneration.value
+            ) {
+                val restored = restoreEditorAfterFcitxEngineRestart(
+                    engineRestartEditorRehydrationGate.claimReady(engineGeneration)
+                )
+                if (restored && request == fcitxEventCollectorRestartRequest &&
+                    engineGeneration == fcitx.engineGeneration.value
+                ) {
+                    startFcitxEventCollector()
+                }
+            }
+        }
+    }
+
+    /**
+     * A daemon-only engine restart creates a fresh native AndroidFrontend without another Android
+     * bind/start callback. Recreate its InputContext before events or keys are allowed through.
+     */
+    private suspend fun restoreEditorAfterFcitxEngineRestart(
+        plan: EngineRestartEditorRehydrationGate.Plan?
+    ): Boolean {
+        val engineStillReady = {
+            fcitx.runImmediately { isReady }
+        }
+        if (plan == null) return engineStillReady()
+        if (plan.engineGeneration != fcitx.engineGeneration.value || !engineStillReady()) {
+            return false
+        }
+        // A start-input-view callback may refine EditorInfo without issuing a second bind/start.
+        // Resolve the claim again so its native restore targets that latest same-generation field.
+        val currentPlan = engineRestartEditorRehydrationGate.refreshClaimedPlan(plan) ?: return true
+        val failure = AtomicReference<Throwable?>()
+        val appliedPlan = AtomicReference<EngineRestartEditorRehydrationGate.Plan?>()
+        val restoreJob = postFcitxJob {
+            // The Android editor may have changed while this job waited behind another operation.
+            val latestPlan = engineRestartEditorRehydrationGate.refreshClaimedPlan(currentPlan)
+                ?: return@postFcitxJob
+            if (!isReady || latestPlan.engineGeneration != fcitx.engineGeneration.value
+            ) return@postFcitxJob
+            appliedPlan.set(latestPlan)
+            activate(latestPlan.uid, latestPlan.packageName)
+            latestPlan.inputMethodUniqueName?.takeIf { it.isNotBlank() }?.let { activateIme(it) }
+            setCandidatePagingMode(if (latestPlan.isVirtualKeyboard) 0 else 1)
+            setCapFlags(effectiveCapabilityFlags(latestPlan.capabilityFlags, inputMethodEntryCached))
+            if (latestPlan.shouldFocus) focus(true)
+        }
+        restoreJob.invokeOnCompletion { cause -> failure.set(cause) }
+        restoreJob.join()
+        if (plan.engineGeneration != fcitx.engineGeneration.value || !engineStillReady()) {
+            return false
+        }
+        val cause = failure.get()
+        if (cause == null) return true
+        Timber.w(cause, "Fcitx editor rehydration did not complete")
+        if (engineRestartEditorRehydrationGate.retryAfterFailedRestore(appliedPlan.get() ?: currentPlan)) {
+            restartFcitxEventCollectorWhenReady()
+        }
+        return false
+    }
+
+    /**
+     * Drops the old event subscription before releasing a prompt gate.
+     *
+     * Once the collector is cancelled, any callback that predates a failed marker or a restart is
+     * deliberately never routed through a later editor. Replacement collection waits for the
+     * current engine's READY boundary, where its replay-free SharedFlow is safe to subscribe.
+     */
+    private fun discardFcitxEventGenerationForPromptSafety(engineRestart: Boolean = false) {
+        // Invalidate before cancellation: an in-flight collector callback must not write after
+        // the prompt gate becomes idle.
+        val engineGeneration = fcitx.engineGeneration.value
+        observedFcitxEngineGeneration = engineGeneration
+        if (engineRestart) {
+            engineRestartEditorRehydrationGate.requestForEngineGeneration(engineGeneration)
+            discardLocalInputStateForFcitxEngineRestart()
+        }
+        fcitxEventCollectorGeneration += 1
+        fcitxEventCollectorRestartJob?.cancel()
+        fcitxEventCollectorRestartJob = null
+        fcitxEventCollectorEngineGeneration = Long.MIN_VALUE
+        readyFcitxEventCollectorGeneration = Long.MIN_VALUE
+        fcitxEventCollectorJob?.cancel()
+        fcitxEventCollectorJob = null
+        pendingInternalPromptSubmission = null
+        activeInternalPromptCapture = null
+        internalPromptCaptureGate.resetForEngineRestart()
+        inputView?.abortInternalPromptInput()
+        restartFcitxEventCollectorWhenReady()
+    }
+
+    /** Never submit a composition that belonged to an engine instance that no longer exists. */
+    private fun discardLocalInputStateForFcitxEngineRestart() {
+        bufferedHangul.clear()
+        bufferedHangulEngineResetPending = false
+        resetComposingState()
+        cachedKeyEvents.evictAll()
+        cachedKeyEventIndex = 0
+        consumedPhysicalKeysDown.clear()
+        cursorUpdateIndex = 0
+    }
+
     override fun onCreate() {
         fcitx = FcitxDaemon.connect(javaClass.name)
+        observedFcitxEngineGeneration = fcitx.engineGeneration.value
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }
         }
+        restartFcitxEventCollectorWhenReady()
         lifecycleScope.launch {
-            fcitx.runImmediately { eventFlow }.collect {
-                handleFcitxEvent(it)
+            fcitx.engineGeneration.collect { generation ->
+                if (generation != observedFcitxEngineGeneration) {
+                    observedFcitxEngineGeneration = generation
+                    // The monotonically increasing boundary survives StateFlow state conflation,
+                    // so active, starting, and draining prompts all die with their old engine.
+                    discardFcitxEventGenerationForPromptSafety(engineRestart = true)
+                }
             }
         }
         pkgNameCache = PackageNameCache(this)
@@ -364,10 +652,33 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
+            is FcitxEvent.InternalPromptStartBarrier -> {
+                deliverInternalPromptStartFence(event.data)
+            }
+            is FcitxEvent.InternalPromptDrainBarrier -> {
+                if (internalPromptCaptureGate.releaseDrain(event.data)) {
+                    deliverSettledInternalPromptSubmission(event.data)
+                }
+            }
+            is FcitxEvent.InternalPromptSubmitBarrier -> {
+                deliverInternalPromptSubmitFence(event.data)
+            }
+            is FcitxEvent.InternalPromptDirectCommitBarrier -> {
+                deliverInternalPromptDirectCommit(
+                    event.data.token,
+                    event.data.sequence,
+                    event.data.text
+                )
+            }
             is FcitxEvent.CommitStringEvent -> {
                 val snippetBoundary = boundaryForText(event.data.text)
-                if (captureAiPromptCommit(event.data.text)) {
-                    // AI prompt capture owns this commit; never forward it to the target editor.
+                if (captureInternalPromptCommit(event.data.text)) {
+                    // Internal prompt capture owns this commit; never forward it to the target editor.
+                } else if (isInternalPromptCaptureStarting) {
+                    // This callback was already ahead of the start marker. It belongs to the
+                    // original editor, but must bypass normal direct-UI gates that freeze new
+                    // input while the prompt is waiting for that marker.
+                    commitFcitxEventToEditor(event.data.text, event.data.cursor)
                 } else if (snippetBoundary != null && tryExpandSnippet(snippetBoundary)) {
                     // The boundary is part of the atomic snippet replacement.
                 } else if (beginDynamicPhrasePreview(event.data.text)) {
@@ -375,11 +686,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 } else if (bufferedHangulSessionActive) {
                     bufferedHangul.capture(event.data.text)
                 } else {
-                    commitText(event.data.text, event.data.cursor)
+                    commitToEditor(event.data.text, event.data.cursor)
                 }
             }
             is FcitxEvent.KeyEvent -> event.data.let event@{
-                if (handleAiPromptForwardedKey(it)) return@event
+                if (handleInternalPromptForwardedKey(it)) return@event
                 if (handleBufferedHangulForwardedKey(it)) return@event
                 if (it.states.virtual) {
                     // KeyEvent from virtual keyboard
@@ -392,9 +703,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(KeyEvent.KEYCODE_DPAD_RIGHT)
                         else -> if (it.unicode > 0) {
                             val text = Character.toString(it.unicode)
-                            val boundary = boundaryForText(text)
-                            if (boundary == null || !tryExpandSnippet(boundary)) {
-                                commitText(text)
+                            if (isInternalPromptCaptureStarting) {
+                                commitFcitxEventToEditor(text)
+                            } else {
+                                val boundary = boundaryForText(text)
+                                if (boundary == null || !tryExpandSnippet(boundary)) {
+                                    commitToEditor(text)
+                                }
                             }
                         } else {
                             Timber.w("Unhandled Virtual KeyEvent: $it")
@@ -477,7 +792,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     } else {
                         // no matching keyCode, commit character once on key down
                         if (!it.up && it.unicode > 0) {
-                            commitText(Character.toString(it.unicode))
+                            val text = Character.toString(it.unicode)
+                            if (isInternalPromptCaptureStarting) {
+                                commitFcitxEventToEditor(text)
+                            } else {
+                                commitToEditor(text)
+                            }
                         } else {
                             Timber.w("Unhandled Fcitx KeyEvent: $it")
                         }
@@ -485,22 +805,23 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
             }
             is FcitxEvent.ClientPreeditEvent -> {
-                if (!updateAiPromptPreedit(event.data.toString())) {
+                if (!updateInternalPromptPreedit(event.data.toString())) {
                     updateComposingText(event.data)
                 }
             }
             is FcitxEvent.DeleteSurroundingEvent -> {
                 val (before, after) = event.data
-                if (!deleteAiPromptBeforeCursor(before)) {
+                if (!deleteInternalPromptBeforeCursor(before)) {
                     handleDeleteSurrounding(before, after)
                 }
             }
             is FcitxEvent.InputPanelEvent -> {
-                if (isAiPromptCaptureActive && bufferedHangulSessionActive) {
-                    updateAiPromptPreedit(event.data.preedit.toString())
+                if (isInternalPromptCaptureActive && bufferedHangulSessionActive) {
+                    updateInternalPromptPreedit(event.data.preedit.toString())
                 }
             }
             is FcitxEvent.IMChangeEvent -> {
+                engineRestartEditorRehydrationGate.onInputMethodChanged(event.data.uniqueName)
                 val wasBufferedHangul = bufferedHangulSessionActive
                 val isBufferedHangul = bufferedHangulModeActive(event.data)
                 if (wasBufferedHangul && !isBufferedHangul) {
@@ -551,7 +872,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleBackspaceKey() {
-        if (deleteAiPromptBeforeCursor(1)) return
+        if (deleteInternalPromptBeforeCursor(1)) return
         val lastSelection = selection.latest
         if (lastSelection.isNotEmpty()) {
             selection.predict(lastSelection.start)
@@ -583,8 +904,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleReturnKey() {
-        if (isAiPromptCaptureActive) {
-            inputView?.submitAiPromptInput()
+        if (isInternalPromptCaptureActive) {
+            inputView?.submitInternalPromptInput()
             return
         }
         currentInputEditorInfo.run {
@@ -674,7 +995,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun tryExpandSnippet(boundary: SnippetBoundary): Boolean {
-        if (!autoSnippetExpansion || !allowsTextInspectionFeatures() ||
+        // A boundary ahead of an internal-prompt start marker is historical editor input. Do not
+        // let it become a deferred direct action while starting freezes new editor writes.
+        if (isInternalPromptCaptureStarting || !autoSnippetExpansion || !allowsTextInspectionFeatures() ||
             currentInputSelection.isNotEmpty()
         ) return false
         return if (bufferedHangulSessionActive) {
@@ -758,96 +1081,389 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return boundary.consumeOnFailure
     }
 
-    fun commitText(text: String, cursor: Int = -1): Boolean {
-        if (captureAiPromptCommit(text)) return true
+    /**
+     * Commits reviewed output to the app editor that opened this IME.
+     *
+     * Native Fcitx events are captured separately by [captureInternalPromptCommit]. Returning
+     * false while a prompt owns input is intentional: an editor-targeted action must never look
+     * successful when its target is being isolated or drained.
+     */
+    fun commitToEditor(text: String, cursor: Int = -1): Boolean {
+        if (isInternalPromptInputOwned) return false
         // Clipboard entries, emoji, and toolbar actions bypass Fcitx's CommitString event. Flush
         // the internal Hangul segment first so those direct inserts cannot overtake it.
         if (bufferedHangulSessionActive && !submitBufferedHangul()) return false
         return commitTextToEditor(text, cursor)
     }
 
+    /**
+     * Delivers an already ordered Fcitx callback that predates a prompt's start marker.
+     *
+     * Starting intentionally freezes *new* UI and hardware input. It must not retroactively
+     * drop an engine callback that was queued before the marker, so this is the sole path that
+     * may write while starting. Active and draining prompts remain fail-closed.
+     */
+    private fun commitFcitxEventToEditor(text: String, cursor: Int = -1): Boolean {
+        if (internalPromptCaptureGate.ownsInput) return false
+        if (bufferedHangulSessionActive) {
+            bufferedHangul.capture(text)
+            return submitBufferedHangul(allowPromptStart = isInternalPromptCaptureStarting)
+        }
+        return commitTextToEditor(
+            text = text,
+            cursor = cursor,
+            allowPromptStart = isInternalPromptCaptureStarting
+        )
+    }
+
+    /** Inserts IME-window text into the app editor; it never crosses an active prompt boundary. */
+    fun insertImeText(text: String, cursor: Int = -1): Boolean = commitToEditor(text, cursor)
+
     /** Starts an internal text target while leaving the real keyboard and Fcitx engine active. */
-    fun beginAiPromptCapture(
+    fun beginInternalPromptCapture(
+        spec: InternalPromptSpec,
         initialText: String,
-        onChanged: (committed: String, preedit: String) -> Unit
-    ): Boolean {
-        if (!allowsAiInputFeatures()) return false
-        cancelAiPromptCapture()
-        if (!finishCompositionForDirectAction()) return false
+        onStarted: (token: Long) -> Unit,
+        onChanged: (token: Long, committed: String, preedit: String) -> Unit
+    ): Long? {
+        if (!allowsInternalPromptFeature(spec.feature)) return null
+        // SharedFlow has replay=0. Do not enqueue a control marker until this service has an
+        // active subscription for the current Fcitx generation to observe it.
+        if (!isFcitxEventCollectorReady) return null
+        // A collector can subscribe while the daemon is stopped between restart phases. Its
+        // marker would wait behind a new engine boundary, so only start a capture on a ready
+        // engine instance.
+        if (!fcitx.runImmediately { isReady }) return null
+        // A prior prompt may still have Fcitx callbacks queued. Wait for its in-stream barrier
+        // instead of treating the next prompt as the destination for those callbacks.
+        if (activeInternalPromptCapture != null || internalPromptCaptureGate.ownsInput) return null
+        if (!finishCompositionForDirectAction()) return null
         clearBufferedHangul()
         val info = currentInputEditorInfo
-        val capture = ActiveAiPromptCapture(
-            session = AiPromptCaptureSession(initialText),
+        val promptEngineGeneration = fcitx.engineGeneration.value
+        if (promptEngineGeneration != fcitxEventCollectorEngineGeneration ||
+            !fcitx.runImmediately { isReady }
+        ) return null
+        val token = internalPromptCaptureGate.beginStarting() ?: return null
+        val capture = ActiveInternalPromptCapture(
+            token = token,
+            engineGeneration = promptEngineGeneration,
+            spec = spec,
+            session = InternalPromptCaptureSession(initialText, spec.maxCharacters),
+            onStarted = onStarted,
             onChanged = onChanged,
-            packageName = info.packageName,
-            fieldId = info.fieldId,
-            inputType = info.inputType
+            target = captureCurrentInternalPromptTarget(info)
         )
-        activeAiPromptCapture = capture
-        notifyAiPromptChanged(capture)
-        postFcitxJob { reset() }
+        activeInternalPromptCapture = capture
+        val startMarkerEmitted = AtomicBoolean(false)
+        postFcitxJob {
+            // This marker is behind every Fcitx action that existed before opening the prompt.
+            // Their commits still belong to the original editor; only events after the marker may
+            // enter the internal prompt session.
+            reset()
+            emitInternalPromptStartBarrier(token)
+            startMarkerEmitted.set(true)
+        }.invokeOnCompletion { cause ->
+            if (cause != null && !startMarkerEmitted.get()) {
+                lifecycleScope.launch { abandonInternalPromptStartFence(token) }
+            }
+        }
+        return token
+    }
+
+    /** Starts a FIFO submit fence; the final callback is released only after the reset drain. */
+    internal fun finishInternalPromptCapture(): InternalPromptFinishResult {
+        val capture = activeInternalPromptCapture ?: return InternalPromptFinishResult.Rejected
+        if (invalidateStaleInternalPromptEngine(capture)) {
+            return InternalPromptFinishResult.Rejected
+        }
+        if (!internalPromptCaptureGate.isActive(capture.token)) {
+            return InternalPromptFinishResult.Rejected
+        }
+        return when (capture.directCommits.requestSubmit()) {
+            InternalPromptDirectCommitQueue.SubmissionRequest.AlreadyPending -> {
+                InternalPromptFinishResult.Pending
+            }
+            InternalPromptDirectCommitQueue.SubmissionRequest.Started -> {
+                val submitMarkerEmitted = AtomicBoolean(false)
+                postFcitxJob {
+                    if (!flushInternalPromptDirectComposition()) {
+                        lifecycleScope.launch { abandonInternalPromptSubmitFence(capture.token) }
+                        return@postFcitxJob
+                    }
+                    emitInternalPromptSubmitBarrier(capture.token)
+                    submitMarkerEmitted.set(true)
+                }
+                    .invokeOnCompletion { cause ->
+                        if (cause != null && !submitMarkerEmitted.get()) {
+                            lifecycleScope.launch {
+                                abandonInternalPromptSubmitFence(capture.token)
+                            }
+                        }
+                    }
+                InternalPromptFinishResult.Pending
+            }
+        }
+    }
+
+    /**
+     * Cancels the current prompt.
+     *
+     * A user cancellation can still let callbacks already ahead of the start marker finish in the
+     * same editor. Lifecycle/editor changes instead set [discardPreStartCallbacks] so those
+     * callbacks are quarantined until their marker and cannot leak into a new InputConnection.
+     */
+    fun cancelInternalPromptCapture(discardPreStartCallbacks: Boolean = false) {
+        // A detached/restarted InputView must also suppress a submission that is waiting for its
+        // drain barrier. The callback can never reopen a tool against a changed editor.
+        pendingInternalPromptSubmission = null
+        val capture = activeInternalPromptCapture
+        if (capture == null) {
+            // A user may have cancelled while the start marker was still pending. Keep enough
+            // state to quarantine those old callbacks if Android immediately changes editors.
+            if (discardPreStartCallbacks) {
+                internalPromptCaptureGate.discardPendingStart()
+            }
+            return
+        }
+        if (invalidateStaleInternalPromptEngine(capture)) return
+        val cancelledStart = if (discardPreStartCallbacks) {
+            internalPromptCaptureGate.discardStart(capture.token)
+        } else {
+            internalPromptCaptureGate.cancelStart(capture.token)
+        }
+        if (cancelledStart) {
+            activeInternalPromptCapture = null
+            return
+        }
+        if (!internalPromptCaptureGate.isActive(capture.token)) return
+        capture.directCommits.discard()
+        beginInternalPromptDrain(capture)
+    }
+
+    private fun beginInternalPromptDrain(capture: ActiveInternalPromptCapture) {
+        if (invalidateStaleInternalPromptEngine(capture)) return
+        if (!internalPromptCaptureGate.beginDrain(capture.token)) return
+        activeInternalPromptCapture = null
+        resetComposingState()
+        val drainMarkerEmitted = AtomicBoolean(false)
+        postFcitxJob {
+            resetForInternalPromptDrain(capture.token)
+            drainMarkerEmitted.set(true)
+        }.invokeOnCompletion { cause ->
+            if (cause != null && !drainMarkerEmitted.get()) {
+                lifecycleScope.launch { abandonInternalPromptDrainFence(capture.token) }
+            }
+        }
+    }
+
+    /** Enables capture only after all older Fcitx callbacks have crossed the start marker. */
+    private fun deliverInternalPromptStartFence(token: Long) {
+        if (internalPromptCaptureGate.releaseDiscardedStart(token)) return
+        if (internalPromptCaptureGate.releaseCancelledStart(token)) return
+        val capture = activeInternalPromptCapture ?: return
+        if (invalidateStaleInternalPromptEngine(capture)) return
+        if (capture.token != token || !internalPromptCaptureGate.activateStart(token)) return
+        capture.onStarted(token)
+        notifyInternalPromptChanged(capture)
+    }
+
+    /**
+     * Fails a start fence without ever reopening its queued event generation to an editor.
+     *
+     * A worker error says nothing about callbacks already buffered ahead of the marker. Drop the
+     * service subscription first, then create a replay-free replacement before allowing input.
+     */
+    private fun abandonInternalPromptStartFence(token: Long) {
+        if (!internalPromptCaptureGate.hasPendingStart(token)) return
+        discardFcitxEventGenerationForPromptSafety()
+    }
+
+    /** A cancelled drain marker can never release its gate against a possibly restarted engine. */
+    private fun abandonInternalPromptDrainFence(token: Long) {
+        if (!internalPromptCaptureGate.isDraining(token)) return
+        discardFcitxEventGenerationForPromptSafety()
+    }
+
+    /** Schedules the picker/clipboard marker only after Fcitx flushes the preceding preedit. */
+    private fun postInternalPromptDirectCommit(
+        reservation: InternalPromptDirectCommitResult.Reserved,
+        text: String
+    ) {
+        val directMarkerEmitted = AtomicBoolean(false)
+        postFcitxJob {
+            if (!flushInternalPromptDirectComposition()) {
+                lifecycleScope.launch { abandonInternalPromptDirectCommit(reservation) }
+                return@postFcitxJob
+            }
+            emitInternalPromptDirectCommitBarrier(reservation.token, reservation.sequence, text)
+            directMarkerEmitted.set(true)
+        }.invokeOnCompletion { cause ->
+            if (cause != null && !directMarkerEmitted.get()) {
+                lifecycleScope.launch { abandonInternalPromptDirectCommit(reservation) }
+            }
+        }
+    }
+
+    /**
+     * Finalizes the engine-owned segment before a direct IME insert.
+     *
+     * Chinese must select a real candidate. If that fails, resetting would silently discard the
+     * raw preedit, so the caller leaves the prompt open and restores its Search/Run button.
+     */
+    private suspend fun FcitxAPI.flushInternalPromptDirectComposition(): Boolean {
+        if (inputMethodEntryCached.languageCode.startsWith("zh")) {
+            if (clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()) {
+                if (!select(0)) return false
+            }
+        } else {
+            withContext(Dispatchers.Main.immediate) { finishComposing() }
+        }
+        reset()
         return true
     }
 
-    /** Returns the reviewed instruction and closes capture; a blank prompt stays open. */
-    fun finishAiPromptCapture(): String? {
-        val capture = activeAiPromptCapture ?: return null
-        val instruction = capture.session.submission()
-        if (instruction.isBlank()) return null
-        activeAiPromptCapture = null
-        resetComposingState()
-        postFcitxJob { reset() }
-        return instruction
+    private fun allowsInternalPromptFeature(feature: InternalPromptFeature): Boolean = when (feature) {
+        InternalPromptFeature.Ai -> allowsAiInputFeatures()
+        InternalPromptFeature.GifSearch -> allowsNetworkInputFeatures()
     }
 
-    fun cancelAiPromptCapture() {
-        if (activeAiPromptCapture == null) return
-        activeAiPromptCapture = null
-        resetComposingState()
-        postFcitxJob { reset() }
+    private fun captureInternalPromptCommit(text: String): Boolean {
+        val capture = activeInternalPromptCapture
+        if (capture != null && internalPromptCaptureGate.isActive(capture.token)) {
+            if (invalidateStaleInternalPromptEngine(capture)) return true
+            capture.session.commit(text)
+            notifyInternalPromptChanged(capture)
+            return true
+        }
+        return internalPromptCaptureGate.ownsInput
     }
 
-    private fun captureAiPromptCommit(text: String): Boolean {
-        val capture = activeAiPromptCapture ?: return false
+    /** Resolves a generic Search/Run fence after all earlier Fcitx callbacks reached this IME. */
+    private fun deliverInternalPromptSubmitFence(token: Long) {
+        val capture = activeInternalPromptCapture
+        if (capture == null || capture.token != token || !internalPromptCaptureGate.isActive(token)) {
+            return
+        }
+        if (invalidateStaleInternalPromptEngine(capture)) return
+        if (capture.directCommits.reachSubmitFence() ==
+            InternalPromptDirectCommitQueue.Completion.SubmitReady
+        ) {
+            settleInternalPromptSubmission(capture)
+        }
+    }
+
+    /** Appends a picker result only when its original prompt is still the active destination. */
+    private fun deliverInternalPromptDirectCommit(token: Long, sequence: Long, text: String) {
+        val capture = activeInternalPromptCapture
+        if (capture == null || capture.token != token || !internalPromptCaptureGate.isActive(token)) {
+            // Prompt closed, changed editors, or a newer prompt owns the keyboard. The marker is
+            // deliberately dropped; a stale picker action must never fall through to the editor.
+            return
+        }
+        if (invalidateStaleInternalPromptEngine(capture)) return
+        val completion = capture.directCommits.complete(sequence)
+        if (completion == InternalPromptDirectCommitQueue.Completion.Ignored) return
         capture.session.commit(text)
-        notifyAiPromptChanged(capture)
-        return true
+        notifyInternalPromptChanged(capture)
+        if (completion == InternalPromptDirectCommitQueue.Completion.SubmitReady) {
+            settleInternalPromptSubmission(capture)
+        }
     }
 
-    private fun updateAiPromptPreedit(text: String): Boolean {
-        val capture = activeAiPromptCapture ?: return false
-        capture.session.updatePreedit(text)
-        notifyAiPromptChanged(capture)
-        return true
+    /** Snapshots a fenced prompt, then waits for reset callbacks before opening the next surface. */
+    private fun settleInternalPromptSubmission(capture: ActiveInternalPromptCapture) {
+        if (invalidateStaleInternalPromptEngine(capture)) return
+        val prompt = capture.session.submission()
+        if (prompt.isBlank() && !capture.spec.allowBlankSubmission) {
+            inputView?.restoreInternalPromptSubmission(capture.token)
+            return
+        }
+        pendingInternalPromptSubmission = PendingInternalPromptSubmission(
+            token = capture.token,
+            text = prompt,
+            target = capture.target
+        )
+        beginInternalPromptDrain(capture)
     }
 
-    private fun deleteAiPromptBeforeCursor(codePoints: Int): Boolean {
-        val capture = activeAiPromptCapture ?: return false
-        capture.session.deleteBeforeCursor(codePoints)
-        notifyAiPromptChanged(capture)
-        return true
+    /** Opens the next IME-owned surface only after the matching reset drain released the gate. */
+    private fun deliverSettledInternalPromptSubmission(token: Long) {
+        val pending = pendingInternalPromptSubmission ?: return
+        if (pending.token != token) return
+        pendingInternalPromptSubmission = null
+        if (!matchesCurrentInternalPromptTarget(pending.target)) return
+        inputView?.completeInternalPromptSubmission(pending.token, pending.text)
     }
 
-    private fun notifyAiPromptChanged(capture: ActiveAiPromptCapture) {
-        capture.onChanged(capture.session.committedText, capture.session.preeditText)
+    /** Releases a failed Fcitx picker job so Search/Run never remains permanently disabled. */
+    internal fun abandonInternalPromptDirectCommit(
+        reservation: InternalPromptDirectCommitResult.Reserved
+    ) {
+        val capture = activeInternalPromptCapture ?: return
+        if (capture.token != reservation.token || !internalPromptCaptureGate.isActive(capture.token)) {
+            return
+        }
+        if (invalidateStaleInternalPromptEngine(capture)) return
+        if (capture.directCommits.abandon(reservation.sequence)) {
+            inputView?.restoreInternalPromptSubmission(capture.token)
+        }
+    }
+
+    /** Restores an active prompt after its generic submit-fence worker cannot run. */
+    private fun abandonInternalPromptSubmitFence(token: Long) {
+        val capture = activeInternalPromptCapture ?: return
+        if (capture.token != token || !internalPromptCaptureGate.isActive(token)) return
+        if (invalidateStaleInternalPromptEngine(capture)) return
+        if (capture.directCommits.abortSubmission()) {
+            inputView?.restoreInternalPromptSubmission(token)
+        }
+    }
+
+    private fun updateInternalPromptPreedit(text: String): Boolean {
+        val capture = activeInternalPromptCapture
+        if (capture != null && internalPromptCaptureGate.isActive(capture.token)) {
+            if (invalidateStaleInternalPromptEngine(capture)) return true
+            capture.session.updatePreedit(text)
+            notifyInternalPromptChanged(capture)
+            return true
+        }
+        return internalPromptCaptureGate.ownsInput
+    }
+
+    private fun deleteInternalPromptBeforeCursor(codePoints: Int): Boolean {
+        val capture = activeInternalPromptCapture
+        if (capture != null && internalPromptCaptureGate.isActive(capture.token)) {
+            if (invalidateStaleInternalPromptEngine(capture)) return true
+            capture.session.deleteBeforeCursor(codePoints)
+            notifyInternalPromptChanged(capture)
+            return true
+        }
+        return internalPromptCaptureGate.ownsInput
+    }
+
+    private fun notifyInternalPromptChanged(capture: ActiveInternalPromptCapture) {
+        capture.onChanged(capture.token, capture.session.committedText, capture.session.preeditText)
     }
 
     /** Consumes only keys that Fcitx chose to forward; engine-owned composition stays untouched. */
-    private fun handleAiPromptForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
-        if (!isAiPromptCaptureActive) return false
+    private fun handleInternalPromptForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
+        if (!internalPromptCaptureGate.ownsInput) return false
         if (!data.states.virtual) cachedKeyEvents.remove(data.timestamp)
+        if (internalPromptCaptureGate.isDraining) return true
+        if (isInternalPromptSubmissionPending) return true
         if (data.up) return true
         val hasShortcutModifier = data.states.ctrl || data.states.alt || data.states.meta ||
             data.states.has(KeyState.Super) || data.states.has(KeyState.Super2) ||
             data.states.has(KeyState.Hyper)
         if (hasShortcutModifier) return true
         when (data.sym.sym) {
-            FcitxKeyMapping.FcitxKey_BackSpace -> deleteAiPromptBeforeCursor(1)
-            FcitxKeyMapping.FcitxKey_Return -> inputView?.submitAiPromptInput()
+            FcitxKeyMapping.FcitxKey_BackSpace -> deleteInternalPromptBeforeCursor(1)
+            FcitxKeyMapping.FcitxKey_Return -> inputView?.submitInternalPromptInput()
             FcitxKeyMapping.FcitxKey_Left,
             FcitxKeyMapping.FcitxKey_Right -> Unit // The internal target intentionally uses an end cursor.
             else -> if (data.unicode > 0) {
-                captureAiPromptCommit(Character.toString(data.unicode))
+                captureInternalPromptCommit(Character.toString(data.unicode))
             }
         }
         return true
@@ -996,7 +1612,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 info.fieldId,
                 info.inputType,
                 range.start,
-                range.end
+                range.end,
+                inputSessionEpoch
             ),
             source,
             sourceKind
@@ -1103,19 +1720,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         currentInputEditorInfo.packageName == target.packageName &&
             currentInputEditorInfo.fieldId == target.fieldId &&
             currentInputEditorInfo.inputType == target.inputType &&
-            currentInputSelection.rangeEquals(target.selectionStart, target.selectionEnd)
+            currentInputSelection.rangeEquals(target.selectionStart, target.selectionEnd) &&
+            inputSessionEpoch == target.inputSessionEpoch
 
     fun matchesCurrentEditor(
         packageName: String,
         fieldId: Int,
         inputType: Int,
         selectionStart: Int,
-        selectionEnd: Int
+        selectionEnd: Int,
+        expectedInputSessionEpoch: Long? = null
     ): Boolean =
         currentInputEditorInfo.packageName == packageName &&
             currentInputEditorInfo.fieldId == fieldId &&
             currentInputEditorInfo.inputType == inputType &&
-            currentInputSelection.rangeEquals(selectionStart, selectionEnd)
+            currentInputSelection.rangeEquals(selectionStart, selectionEnd) &&
+            (expectedInputSessionEpoch == null || inputSessionEpoch == expectedInputSessionEpoch)
 
     /**
      * Commit the current Hangul/composing segment before a rich-content transaction. Returning
@@ -1235,6 +1855,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun finishCompositionForDirectAction(): Boolean {
+        // Reviewed editor actions must wait until an internal prompt has either completed its
+        // drain or been cancelled. Otherwise a visible success state could hide a dropped write.
+        if (isInternalPromptInputOwned) return false
         val ic = currentInputConnection ?: return false
         if (bufferedHangulSessionActive) {
             if (!submitBufferedHangul()) return false
@@ -1247,7 +1870,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return true
     }
 
-    private fun commitTextToEditor(text: String, cursor: Int = -1): Boolean {
+    private fun commitTextToEditor(
+        text: String,
+        cursor: Int = -1,
+        allowPromptStart: Boolean = false
+    ): Boolean {
+        if (isInternalPromptInputOwned && !allowPromptStart) return false
         val ic = currentInputConnection ?: return false
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
@@ -1284,7 +1912,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleBufferedHangulForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
-        if (isAiPromptCaptureActive) return false
+        // A callback before the start marker must take the normal original-editor route below.
+        // The buffered path would otherwise see the temporary UI freeze and discard it.
+        if (isInternalPromptCaptureStarting) return false
+        if (isInternalPromptCaptureActive) return false
         if (!data.states.virtual && data.up && consumedPhysicalKeysDown.remove(data.sym.sym)) {
             cachedKeyEvents.remove(data.timestamp)
             return true
@@ -1409,7 +2040,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    private fun submitBufferedHangul(forcedTransport: BufferedInputTransport? = null): Boolean {
+    private fun submitBufferedHangul(
+        forcedTransport: BufferedInputTransport? = null,
+        allowPromptStart: Boolean = false
+    ): Boolean {
+        if (isInternalPromptInputOwned && !allowPromptStart) {
+            discardBufferedHangulForInternalPrompt()
+            return false
+        }
         val currentPreedit = if (bufferedHangulEngineResetPending) {
             ""
         } else {
@@ -1417,7 +2055,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         val text = bufferedHangul.snapshot(currentPreedit)
         if (text.isEmpty()) return true
-        val dispatched = dispatchBufferedText(text, forcedTransport)
+        val dispatched = dispatchBufferedText(text, forcedTransport, allowPromptStart)
         if (dispatched) {
             bufferedHangul.clear()
         } else if (currentPreedit.isNotEmpty()) {
@@ -1431,8 +2069,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun dispatchBufferedText(
         text: String,
-        forcedTransport: BufferedInputTransport? = null
+        forcedTransport: BufferedInputTransport? = null,
+        allowPromptStart: Boolean = false
     ): Boolean {
+        if (isInternalPromptInputOwned && !allowPromptStart) {
+            discardBufferedHangulForInternalPrompt()
+            return false
+        }
         if (currentInputConnection == null) return false
         val transport = if (BufferedHangulMode.mustAvoidClipboard(capabilityFlags)) {
             BufferedInputTransport.DirectCommit
@@ -1441,7 +2084,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         return when (transport) {
             BufferedInputTransport.DirectCommit -> {
-                commitTextToEditor(text)
+                commitTextToEditor(text, allowPromptStart = allowPromptStart)
             }
             BufferedInputTransport.SystemPaste -> {
                 if (!setBufferedClipboard(text)) return false
@@ -1459,7 +2102,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             BufferedInputTransport.CtrlV -> {
                 if (!setBufferedClipboard(text)) return false
-                val dispatched = sendCombinationKeyEvents(KeyEvent.KEYCODE_V, ctrl = true)
+                val dispatched = sendCombinationKeyEventsInternal(
+                    keyEventCode = KeyEvent.KEYCODE_V,
+                    ctrl = true,
+                    allowPromptStart = allowPromptStart
+                )
                 if (dispatched) predictBufferedInsertion(text)
                 dispatched
             }
@@ -1468,6 +2115,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun predictBufferedInsertion(text: String) {
         selection.predict(selection.latest.start + text.length)
+    }
+
+    /** Drops a stale buffered segment instead of dispatching it into an internal prompt's editor. */
+    private fun discardBufferedHangulForInternalPrompt() {
+        bufferedHangul.clear()
+        inputView?.refreshBufferedHangulPreedit()
     }
 
     private fun setBufferedClipboard(text: String): Boolean {
@@ -1531,6 +2184,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         ) == true
 
     fun deleteSelection() {
+        if (isInternalPromptInputOwned) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         selection.predict(lastSelection.start)
@@ -1542,7 +2196,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         alt: Boolean = false,
         ctrl: Boolean = false,
         shift: Boolean = false
+    ): Boolean = sendCombinationKeyEventsInternal(keyEventCode, alt, ctrl, shift)
+
+    private fun sendCombinationKeyEventsInternal(
+        keyEventCode: Int,
+        alt: Boolean = false,
+        ctrl: Boolean = false,
+        shift: Boolean = false,
+        allowPromptStart: Boolean = false
     ): Boolean {
+        if (isInternalPromptInputOwned && !allowPromptStart) return false
         var metaState = 0
         if (alt) metaState = KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
         if (ctrl) metaState = metaState or KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
@@ -1561,7 +2224,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return mainKeyDispatched
     }
 
+    /** Sends an editor-directed key pair only while no internal prompt owns the input target. */
+    fun sendEditorKeyEvents(keyEventCode: Int): Boolean {
+        if (isInternalPromptInputOwned) return false
+        sendDownUpKeyEvents(keyEventCode)
+        return true
+    }
+
+    /** Performs an editor context-menu action without bypassing the prompt isolation gate. */
+    fun performEditorContextMenuAction(action: Int): Boolean {
+        if (isInternalPromptInputOwned) return false
+        return currentInputConnection?.performContextMenuAction(action) == true
+    }
+
     fun applySelectionOffset(offsetStart: Int, offsetEnd: Int = 0) {
+        if (isInternalPromptInputOwned) return
         val lastSelection = selection.latest
         currentInputConnection?.also {
             val start = max(lastSelection.start + offsetStart, 0)
@@ -1573,6 +2250,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun cancelSelection() {
+        if (isInternalPromptInputOwned) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         val end = lastSelection.end
@@ -1676,24 +2354,32 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onEvaluateFullscreenMode() = false
 
     private fun forwardKeyEvent(event: KeyEvent): Boolean {
+        // Search/Run already placed its FIFO fence. Physical keys arriving after that point must
+        // not slip behind the fence and mutate a prompt that is about to be finalized.
+        if (isInternalPromptCaptureStarting || isInternalPromptCaptureDraining ||
+            isInternalPromptSubmissionPending
+        ) return true
+        val sym = KeySym.fromKeyEvent(event)
+        if (sym == null) {
+            Timber.d("Skipped KeyEvent: $event")
+            // An unsupported hardware/dead/shortcut key must not fall through to the app while
+            // the internal prompt owns the keyboard target.
+            return isInternalPromptInputOwned
+        }
         // reason to use a self increment index rather than timestamp:
         // KeyUp and KeyDown events actually can happen on the same time
         val timestamp = cachedKeyEventIndex++
         cachedKeyEvents.put(timestamp, event)
-        val sym = KeySym.fromKeyEvent(event)
-        if (sym != null) {
-            val states = KeyStates.fromKeyEvent(event)
-            val up = event.action == KeyEvent.ACTION_UP
-            postFcitxJob {
-                sendKey(sym, states, event.scanCode, up, timestamp)
-            }
-            return true
+        val states = KeyStates.fromKeyEvent(event)
+        val up = event.action == KeyEvent.ACTION_UP
+        postFcitxJob {
+            sendKey(sym, states, event.scanCode, up, timestamp)
         }
-        Timber.d("Skipped KeyEvent: $event")
-        return false
+        return true
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (isInternalPromptInputOwned) return forwardKeyEvent(event)
         // request to show floating CandidatesView when pressing physical keyboard
         if (inputDeviceMgr.evaluateOnKeyDown(event, this)) {
             postFcitxJob {
@@ -1705,6 +2391,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (isInternalPromptInputOwned) return forwardKeyEvent(event)
         return forwardKeyEvent(event) || super.onKeyUp(keyCode, event)
     }
 
@@ -1728,6 +2415,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val uid = currentInputBinding.uid
         val pkgName = pkgNameCache.forUid(uid)
         Timber.d("onBindInput: uid=$uid pkg=$pkgName")
+        engineRestartEditorRehydrationGate.onBindInput(uid, pkgName)
         postFcitxJob {
             // ensure InputContext has been created before focusing it
             activate(uid, pkgName)
@@ -1776,6 +2464,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        // Android can reuse identical EditorInfo metadata for a different text field. An internal
+        // prompt therefore never survives a new input-session boundary, even for a same-app
+        // restart: dropping a draft is safer than sending a later GIF/AI action to the wrong field.
+        inputSessionEpoch += 1
+        cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.onEditorChanged(
             DynamicPhraseEditorTarget(
                 packageName = attribute.packageName,
@@ -1818,6 +2511,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
         val isNullType = attribute.isTypeNull()
+        val inputMethodUniqueName = fcitx.runImmediately { inputMethodEntryCached.uniqueName }
+            .takeUnless { it.isBlank() || it == getString(R.string._not_available_) }
+        engineRestartEditorRehydrationGate.onStartInput(
+            inputSessionEpoch = inputSessionEpoch,
+            editorPackageName = attribute.packageName,
+            fieldId = attribute.fieldId,
+            inputType = attribute.inputType,
+            capabilityFlags = flags,
+            shouldFocus = !isNullType,
+            isVirtualKeyboard = inputDeviceMgr.isVirtualKeyboard,
+            inputMethodUniqueName = inputMethodUniqueName
+        )
         // wait until InputContext created/activated
         postFcitxJob {
             if (restarting) {
@@ -1838,6 +2543,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
+        engineRestartEditorRehydrationGate.onStartInputView(
+            inputSessionEpoch = inputSessionEpoch,
+            editorPackageName = info.packageName,
+            fieldId = info.fieldId,
+            inputType = info.inputType,
+            capabilityFlags = CapabilityFlags.fromEditorInfo(info),
+            shouldFocus = !info.isTypeNull()
+        )
         SensitivePhraseSession.onEditorChanged(
             DynamicPhraseEditorTarget(
                 packageName = info.packageName,
@@ -1963,6 +2676,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         newComposingEnd: Int,
         updateIndex: Int
     ) {
+        // Prompt composition lives exclusively in Fcitx and its internal buffer. A delayed editor
+        // selection callback must not restore a composing span or reset/focus the real editor, but
+        // it must still update our identity snapshot so a pending tool action fails closed.
+        if (internalPromptCaptureGate.ownsInput) {
+            selection.resetTo(newSelStart, newSelEnd)
+            return
+        }
         if (bufferedHangulSessionActive) {
             if (!selection.consume(newSelStart, newSelEnd)) {
                 val engineHasPreedit = !bufferedHangulEngineResetPending &&
@@ -2040,7 +2760,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // because of https://android.googlesource.com/platform/frameworks/base.git/+/refs/tags/android-11.0.0_r45/core/java/android/view/inputmethod/BaseInputConnection.java#851
     // it's not possible to set cursor inside composing text
     private fun updateComposingText(text: FormattedText) {
-        if (updateAiPromptPreedit(text.toString())) return
+        if (updateInternalPromptPreedit(text.toString())) return
         // A stale empty ClientPreeditEvent can race the capability change. In buffered mode the
         // engine renders preedit in Fcitx's own input panel, never in the target InputConnection.
         if (bufferedHangulSessionActive) return
@@ -2100,11 +2820,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Also updates internal composing state of [FcitxInputMethodService].
      */
     fun finishComposing() {
-        activeAiPromptCapture?.let { capture ->
-            capture.session.commitPreedit()
-            notifyAiPromptChanged(capture)
-            return
+        activeInternalPromptCapture?.let { capture ->
+            if (internalPromptCaptureGate.isActive(capture.token)) {
+                if (invalidateStaleInternalPromptEngine(capture)) return
+                capture.session.commitPreedit()
+                notifyInternalPromptChanged(capture)
+                return
+            }
         }
+        // A queued keyboard action may call this after the prompt has submitted. Do not turn the
+        // old composing span into editor text until its reset barrier has reached this service.
+        if (internalPromptCaptureGate.ownsInput) return
         if (bufferedHangulSessionActive) {
             submitBufferedHangul()
             return
@@ -2120,7 +2846,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreateInlineSuggestionsRequest(uiExtras: Bundle): InlineSuggestionsRequest? {
         // ignore inline suggestion when disabled by user || using physical keyboard with floating candidates view
-        if (!inlineSuggestions || !inputDeviceMgr.isVirtualKeyboard) return null
+        if (!inlineSuggestions || !inputDeviceMgr.isVirtualKeyboard || isInternalPromptInputOwned) {
+            return null
+        }
         val theme = ThemeManager.activeTheme
         val chipDrawable =
             if (theme.isDark) R.drawable.bkg_inline_suggestion_dark else R.drawable.bkg_inline_suggestion_light
@@ -2177,11 +2905,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onInlineSuggestionsResponse(response: InlineSuggestionsResponse): Boolean {
         if (!inlineSuggestions || !inputDeviceMgr.isVirtualKeyboard) return false
+        if (isInternalPromptInputOwned) {
+            inputView?.handleInlineSuggestions(response)
+            return true
+        }
         return inputView?.handleInlineSuggestions(response) == true
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        cancelInternalPromptCapture(discardPreStartCallbacks = true)
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
         val wasBufferedHangul = bufferedHangulSessionActive
@@ -2208,6 +2941,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         Timber.d("onFinishInput")
+        engineRestartEditorRehydrationGate.onFinishInput()
+        cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()
         val wasBufferedHangul = bufferedHangulSessionActive
         if (wasBufferedHangul) {
@@ -2223,6 +2958,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUnbindInput() {
+        engineRestartEditorRehydrationGate.onUnbindInput()
+        cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()
         bufferedHangulSessionActive = false
         bufferedHangul.clear()

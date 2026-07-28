@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
@@ -30,7 +29,7 @@ import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateM
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.NeverFillWidth
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
-import org.fcitx.fcitx5.android.input.dependency.fcitx
+import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.mechdancer.dependency.manager.must
@@ -41,7 +40,7 @@ class HorizontalCandidateComponent :
     UniqueViewComponent<HorizontalCandidateComponent, RecyclerView>(), InputBroadcastReceiver {
 
     private val context by manager.context()
-    private val fcitx by manager.fcitx()
+    private val service by manager.inputMethodService()
     private val theme by manager.theme()
     private val inputView by manager.inputView()
     private val bar: KawaiiBarComponent by manager.must()
@@ -94,7 +93,7 @@ class HorizontalCandidateComponent :
                     flexGrow = layoutFlexGrow
                 }
                 holder.itemView.setOnClickListener {
-                    fcitx.launchOnReady { it.select(holder.idx) }
+                    service.selectCandidate(holder.idx)
                 }
                 holder.itemView.setOnLongClickListener {
                     inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)

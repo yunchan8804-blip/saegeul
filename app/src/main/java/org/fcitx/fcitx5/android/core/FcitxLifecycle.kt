@@ -12,14 +12,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 
 class FcitxLifecycleRegistry : FcitxLifecycle {
 
     private val internalStateFlow = MutableStateFlow(FcitxLifecycle.State.STOPPED)
+    private val internalEngineGeneration = MutableStateFlow(0L)
 
     override val stateFlow = internalStateFlow.asStateFlow()
+    override val engineGeneration = internalEngineGeneration.asStateFlow()
 
     override val currentState: FcitxLifecycle.State
         get() = internalStateFlow.value
@@ -49,6 +52,13 @@ class FcitxLifecycleRegistry : FcitxLifecycle {
                 }
             }
         }
+        // StateFlow intentionally conflates rapid STOPPING -> STOPPED -> READY transitions. A
+        // monotonically increasing *completed* stop boundary lets consumers invalidate work even
+        // when they only observe the final READY state after a restart. This must happen after
+        // the native dispatcher stopped, otherwise an old callback could enter a new collector.
+        if (event == FcitxLifecycle.Event.ON_STOPPED) {
+            internalEngineGeneration.update { it + 1L }
+        }
         if (newState >= FcitxLifecycle.State.STOPPING) {
             job.cancelChildren()
         }
@@ -63,6 +73,10 @@ class FcitxLifecycleRegistry : FcitxLifecycle {
 
 interface FcitxLifecycle {
     val stateFlow: StateFlow<State>
+
+    /** Advances once after every engine stop completes and never rolls back across a later READY. */
+    val engineGeneration: StateFlow<Long>
+
     val currentState: State
     val lifecycleScope: CoroutineScope
 

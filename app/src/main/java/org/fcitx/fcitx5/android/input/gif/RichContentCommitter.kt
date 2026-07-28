@@ -17,15 +17,26 @@ data class GifEditorTarget(
     val fieldId: Int,
     val inputType: Int,
     val selectionStart: Int,
-    val selectionEnd: Int
+    val selectionEnd: Int,
+    /**
+     * Input sessions may be recreated without changing EditorInfo identity. Keep the GIF
+     * action bound to the exact session that opened its window so delayed downloads fail closed.
+     */
+    val inputSessionEpoch: Long
 ) {
     companion object {
-        fun from(info: EditorInfo, selectionStart: Int, selectionEnd: Int) = GifEditorTarget(
+        fun from(
+            info: EditorInfo,
+            selectionStart: Int,
+            selectionEnd: Int,
+            inputSessionEpoch: Long
+        ) = GifEditorTarget(
             info.packageName,
             info.fieldId,
             info.inputType,
             selectionStart,
-            selectionEnd
+            selectionEnd,
+            inputSessionEpoch
         )
     }
 }
@@ -58,7 +69,8 @@ class RichContentCommitter(private val service: FcitxInputMethodService) {
                 target.fieldId,
                 target.inputType,
                 target.selectionStart,
-                target.selectionEnd
+                target.selectionEnd,
+                expectedInputSessionEpoch = target.inputSessionEpoch
             )
         ) {
             return GifCommitResult.StaleEditor

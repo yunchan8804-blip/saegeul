@@ -225,7 +225,7 @@ class MeetingTranscriptionWindow(
         ) ?: return
         if (!commitGate.claim()) return
         if (!validateTarget(boundTarget, showError = true)) return
-        if (!service.commitText(reviewed)) {
+        if (!service.commitToEditor(reviewed)) {
             ui.showError(
                 local("선택한 전사를 입력하지 못했어.", "Could not insert the selected transcript."),
                 canRetry = false

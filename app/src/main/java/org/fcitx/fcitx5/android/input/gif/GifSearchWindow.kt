@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
@@ -28,6 +29,7 @@ import timber.log.Timber
 class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
+    private val inputView by manager.inputView()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
     private val effectiveProvider: EffectiveGifProvider by lazy { GifProviderResolver.resolve(context) }
@@ -41,7 +43,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     private val giphyAnalytics by lazy { GiphyAnalyticsTracker(context) }
     private lateinit var target: GifEditorTarget
     private var currentQuery = ""
-    private var queryState = GifSearchQueryState()
+    private var pendingPromptQuery: String? = null
     private var searchJob: Job? = null
     private var actionJob: Job? = null
     private var retryAction: (() -> Unit)? = null
@@ -99,38 +101,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         ui.setMoreGifSettingsVisible(providerPresentation.showsMoreGifSettings)
         ui.onQueryClick = ::beginQueryEditing
         ui.onMoreGifSettings = ::openMoreGifSettings
-        ui.onKeyword = { query ->
-            queryState = GifSearchQueryState(query)
-            search(query)
-        }
-        ui.onQueryCharacter = { key ->
-            queryState.type(key)
-            ui.renderQueryEditor(queryState)
-        }
-        ui.onQueryBackspace = {
-            queryState.backspace()
-            ui.renderQueryEditor(queryState)
-        }
-        ui.onQuerySpace = {
-            queryState.space()
-            ui.renderQueryEditor(queryState)
-        }
-        ui.onQueryClear = {
-            queryState.clear()
-            ui.renderQueryEditor(queryState)
-        }
-        ui.onQueryLanguage = {
-            queryState.toggleLanguage()
-            ui.renderQueryEditor(queryState)
-        }
-        ui.onQueryShift = {
-            queryState.toggleShift()
-            ui.renderQueryEditor(queryState)
-        }
-        ui.onQuerySubmit = {
-            val query = queryState.submit()
-            search(query)
-        }
+        ui.onKeyword = ::search
         ui.onRetry = { retryAction?.invoke() }
         return ui.root
     }
@@ -138,7 +109,16 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     override fun onAttached() {
         val info = service.currentInputEditorInfo
         val selection = service.currentInputSelection
-        target = GifEditorTarget.from(info, selection.start, selection.end)
+        target = GifEditorTarget.from(
+            info,
+            selection.start,
+            selection.end,
+            service.currentInputSessionEpoch
+        )
+        // Submission crosses a window detach/attach boundary. Consume it before every early
+        // return so a query typed under an old policy can never run later after a policy change.
+        val query = pendingPromptQuery ?: currentQuery
+        pendingPromptQuery = null
         cache.cleanupExpired()
         val networkInputAllowed = service.allowsNetworkInputFeatures()
         ui.setMoreGifSettingsVisible(
@@ -155,7 +135,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
             return
         }
         adapter.setAttachSupported(committer.supportsGif(info))
-        search(currentQuery)
+        search(query)
     }
 
     override fun onDetached() {
@@ -172,12 +152,10 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
             return
         }
         searchJob?.cancel()
-        currentQuery = query.trim()
+        currentQuery = GifSearchQueryPolicy.normalize(query, effectiveProvider.kind)
         currentPage = 0
         hasNextPage = false
         val generation = ++searchGeneration
-        queryState = GifSearchQueryState(currentQuery)
-        ui.hideQueryEditor()
         ui.setQuery(currentQuery)
         val allowed = service.allowsNetworkInputFeatures()
         if (allowed) ui.showLoading()
@@ -254,8 +232,23 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
             return
         }
         searchJob?.cancel()
-        queryState = GifSearchQueryState(currentQuery)
-        ui.showQueryEditor(queryState)
+        val started = inputView.beginGifSearchPromptInput(
+            initialText = currentQuery,
+            maxCharacters = GifSearchQueryPolicy.maxCharacters(effectiveProvider.kind),
+            onSubmit = { query ->
+                pendingPromptQuery = GifSearchQueryPolicy.normalize(query, effectiveProvider.kind)
+                windowManager.attachWindow(this)
+            },
+            onCancel = {
+                windowManager.attachWindow(this)
+            }
+        )
+        if (!started) {
+            // This can fail after the network policy gate above when the editor changed
+            // or a composing session cannot be safely retained. Do not mislabel it as
+            // a private-editor policy block.
+            ui.showActionStatus(context.getString(R.string.gif_editor_changed), isError = true)
+        }
     }
 
     private fun openMoreGifSettings() {
@@ -270,13 +263,15 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
 
     private fun insertLink(result: GifResult) {
         if (actionJob?.isActive == true) return
+        val linkTarget = target
         adapter.setActionLocked(true)
         if (!service.matchesCurrentEditor(
-                target.packageName,
-                target.fieldId,
-                target.inputType,
-                target.selectionStart,
-                target.selectionEnd
+                linkTarget.packageName,
+                linkTarget.fieldId,
+                linkTarget.inputType,
+                linkTarget.selectionStart,
+                linkTarget.selectionEnd,
+                expectedInputSessionEpoch = linkTarget.inputSessionEpoch
             )
         ) {
             adapter.setActionLocked(false)
@@ -284,7 +279,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
             return
         }
         // Exactly one direct commit. Failure never triggers a second attempt or attachment fallback.
-        val committed = service.commitText(result.canonicalUrl)
+        val committed = service.commitToEditor(result.canonicalUrl)
         adapter.setActionLocked(false)
         if (committed) {
             trackGiphyAction(result, GifAnalyticsEvent.Send)
@@ -296,6 +291,9 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
 
     private fun attachGif(result: GifResult) {
         if (actionJob?.isActive == true) return
+        // Keep an immutable target from the user action. A later window attach must not make a
+        // delayed download eligible for the new editor/session merely by replacing [target].
+        val attachmentTarget = target
         if (!result.attachmentDownloadAllowed) {
             ui.showActionStatus(
                 context.getString(R.string.gif_giphy_attach_approval_required),
@@ -313,7 +311,7 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         actionJob = service.lifecycleScope.launch {
             try {
                 val file = cache.getOrDownload(result)
-                when (committer.commit(result, file, target)) {
+                when (committer.commit(result, file, attachmentTarget)) {
                     GifCommitResult.Success -> {
                         trackGiphyAction(result, GifAnalyticsEvent.Send)
                         Toast.makeText(context, R.string.gif_attached, Toast.LENGTH_SHORT).show()

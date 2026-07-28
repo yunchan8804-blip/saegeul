@@ -7,7 +7,9 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -18,6 +20,7 @@ import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dialog.AddMoreInputMethodsPrompt
 import org.fcitx.fcitx5.android.input.dialog.InputMethodPickerDialog
+import org.fcitx.fcitx5.android.input.InternalPromptDirectCommitResult
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Reset
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Selection
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Stopped
@@ -65,18 +68,21 @@ class CommonKeyActionListener :
     private var backspaceSwipeState = Stopped
 
     // there should be a new fcitx API for this
-    private suspend fun FcitxAPI.commitAndReset() {
+    private suspend fun FcitxAPI.commitAndReset(): Boolean {
         if (inputMethodEntryCached.languageCode.startsWith("zh")) {
             // Chinese: select 1st candidate, except prediction candidates
             if (clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()) {
                 // preedit not empty, maybe there are candidates to select ...
-                select(0)
+                if (!select(0)) return false
             }
         } else {
             // Other languages: commit preedit as-is
-            service.finishComposing()
+            // Prompt state is main-thread confined. Do not let the Fcitx worker race prompt
+            // submit/cancel while it finalizes the mirrored preedit.
+            withContext(Dispatchers.Main.immediate) { service.finishComposing() }
         }
         reset()
+        return true
     }
 
     private fun showInputMethodPicker() {
@@ -87,8 +93,29 @@ class CommonKeyActionListener :
         }
     }
 
+    private fun commitTextAction(text: String) {
+        if (service.isBufferedHangulSessionActive) {
+            // The buffered path snapshots and resets the engine itself. Running commitAndReset
+            // first can race its CommitString event with this insert.
+            service.commitToEditor(text)
+        } else {
+            service.postFcitxJob {
+                if (!commitAndReset()) return@postFcitxJob
+                service.lifecycleScope.launch { service.commitToEditor(text) }
+            }
+        }
+    }
+
     val listener by lazy {
         KeyActionListener { action, _ ->
+            // A prompt has already submitted or cancelled, but its final Fcitx callbacks have
+            // not passed the in-stream reset barrier yet. Never schedule a new action into the
+            // editor during that narrow hand-off.
+            if (service.isInternalPromptCaptureStarting ||
+                service.isInternalPromptCaptureDraining || service.isInternalPromptSubmissionPending
+            ) {
+                return@KeyActionListener
+            }
             when (action) {
                 is FcitxKeyAction -> service.postFcitxJob {
                     sendKey(action.act, action.states.states, action.code)
@@ -96,26 +123,16 @@ class CommonKeyActionListener :
                 is SymAction -> service.postFcitxJob {
                     sendKey(action.sym, action.states)
                 }
-                is CommitAction -> if (service.isAiPromptCaptureActive) {
-                    service.postFcitxJob {
-                        commitAndReset()
-                        service.lifecycleScope.launch { service.commitText(action.text) }
-                    }
-                } else if (service.isBufferedHangulSessionActive) {
-                    // The buffered path snapshots and resets the engine itself. Running
-                    // commitAndReset first can race its CommitString event with this insert.
-                    service.commitText(action.text)
-                } else service.postFcitxJob {
-                    commitAndReset()
-                    service.lifecycleScope.launch { service.commitText(action.text) }
+                is CommitAction -> when (service.insertInternalPromptDirectText(action.text)) {
+                    is InternalPromptDirectCommitResult.Reserved -> Unit
+                    InternalPromptDirectCommitResult.ConsumedClosing -> Unit
+                    InternalPromptDirectCommitResult.NotPrompt -> commitTextAction(action.text)
                 }
                 is QuickPhraseAction -> service.postFcitxJob {
-                    commitAndReset()
-                    triggerQuickPhrase()
+                    if (commitAndReset()) triggerQuickPhrase()
                 }
                 is UnicodeAction -> service.postFcitxJob {
-                    commitAndReset()
-                    triggerUnicode()
+                    if (commitAndReset()) triggerUnicode()
                 }
                 is LangSwitchAction -> {
                     when (langSwitchKeyBehavior) {
@@ -142,8 +159,8 @@ class CommonKeyActionListener :
                 }
                 is ShowInputMethodPickerAction -> showInputMethodPicker()
                 is MoveSelectionAction -> {
-                    if (service.isAiPromptCaptureActive) {
-                        // The internal AI prompt intentionally has an end cursor and must never
+                    if (service.isInternalPromptCaptureActive) {
+                        // The internal prompt intentionally has an end cursor and must never
                         // move the selection in the app that opened the keyboard.
                         backspaceSwipeState = Reset
                     } else when (backspaceSwipeState) {
@@ -165,7 +182,7 @@ class CommonKeyActionListener :
                     }
                 }
                 is DeleteSelectionAction -> {
-                    if (service.isAiPromptCaptureActive) {
+                    if (service.isInternalPromptCaptureActive) {
                         backspaceSwipeState = Stopped
                     } else when (backspaceSwipeState) {
                         Stopped -> {}

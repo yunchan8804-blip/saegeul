@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input.ai
+package org.fcitx.fcitx5.android.input
 
 import android.content.Context
 import android.content.res.ColorStateList
@@ -16,16 +16,19 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 
-/** Prompt strip shown above the app's existing keyboard while input is captured internally. */
-class AiPromptInputBar(
+/** Prompt strip shown above the existing Fcitx keyboard while text is captured internally. */
+class InternalPromptInputBar(
     context: Context,
     private val theme: Theme
 ) : LinearLayout(context) {
     var onCancel: (() -> Unit)? = null
     var onSubmit: (() -> Unit)? = null
+
+    private var spec = InternalPromptSpecs.Ai
+    private var submitPending = false
+    private var hasInput = false
 
     private val prompt = TextView(context).apply {
         gravity = Gravity.CENTER_VERTICAL
@@ -41,7 +44,7 @@ class AiPromptInputBar(
         setOnClickListener { onCancel?.invoke() }
     }
 
-    private val submit = compactButton(R.string.ai_direct_prompt_run, active = true).apply {
+    private val submit = compactButton(spec.submitRes, active = true).apply {
         setOnClickListener { onSubmit?.invoke() }
     }
 
@@ -56,10 +59,17 @@ class AiPromptInputBar(
         addView(submit, LayoutParams(dp(66), dp(44)).apply { marginStart = dp(4) })
     }
 
+    fun configure(spec: InternalPromptSpec) {
+        this.spec = spec
+        submit.setText(spec.submitRes)
+        render(committed = "", preedit = "")
+    }
+
     fun render(committed: String, preedit: String) {
         val combined = committed + preedit
+        hasInput = combined.isNotBlank()
         prompt.text = if (combined.isBlank()) {
-            context.getString(R.string.ai_direct_prompt_hint)
+            context.getString(spec.hintRes)
         } else {
             SpannableString(combined).apply {
                 if (preedit.isNotEmpty()) {
@@ -73,9 +83,18 @@ class AiPromptInputBar(
             }
         }
         prompt.alpha = if (combined.isBlank()) 0.65f else 1f
-        submit.isEnabled = combined.isNotBlank()
+        submit.isEnabled = !submitPending && (spec.allowBlankSubmission || hasInput)
         submit.alpha = if (submit.isEnabled) 1f else 0.45f
-        contentDescription = context.getString(R.string.ai_direct_prompt_hint) + ": " + combined
+        contentDescription = context.getString(spec.hintRes) + ": " + combined
+    }
+
+    /** Locks prompt actions while its FIFO submit fence and reset drain are settling. */
+    fun setSubmitPending(pending: Boolean) {
+        submitPending = pending
+        cancel.isEnabled = !pending
+        cancel.alpha = if (cancel.isEnabled) 1f else 0.45f
+        submit.isEnabled = !pending && (spec.allowBlankSubmission || hasInput)
+        submit.alpha = if (submit.isEnabled) 1f else 0.45f
     }
 
     private fun compactButton(textRes: Int, active: Boolean) = Button(context).apply {

@@ -164,7 +164,7 @@ class SensitivePhraseWindow(
                 ui.showError(context.getString(R.string.secret_vault_editor_changed))
                 return@commitOnce false
             }
-            service.commitText(item.value, 1).also { committed ->
+            service.insertImeText(item.value, 1).also { committed ->
                 if (!committed) {
                     ui.showError(context.getString(R.string.secret_vault_insert_failed))
                 }

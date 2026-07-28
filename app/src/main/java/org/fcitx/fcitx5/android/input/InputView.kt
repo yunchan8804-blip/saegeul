@@ -25,7 +25,6 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
-import org.fcitx.fcitx5.android.input.ai.AiPromptInputBar
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
@@ -114,7 +113,7 @@ class InputView(
     private val kawaiiBar = KawaiiBarComponent()
     private val horizontalCandidate = HorizontalCandidateComponent()
     private val keyboardWindow = KeyboardWindow()
-    private val aiPromptInputBar = AiPromptInputBar(themedContext, theme)
+    private val promptInputBar = InternalPromptInputBar(themedContext, theme)
     private val symbolPicker = symbolPicker()
     private val emojiPicker = emojiPicker()
     private val emoticonPicker = emoticonPicker()
@@ -199,8 +198,9 @@ class InputView(
         }
 
     private var assistantContentExpanded = false
-    private var aiPromptOnSubmit: ((String) -> Unit)? = null
-    private var aiPromptOnCancel: (() -> Unit)? = null
+    private var promptOnSubmit: ((String) -> Unit)? = null
+    private var promptOnCancel: (() -> Unit)? = null
+    private var promptCaptureToken: Long? = null
     private val promptInputBarLocation = IntArray(2)
 
     private val inputContentHeightPx: Int
@@ -283,10 +283,10 @@ class InputView(
         updateKeyboardSize()
 
         add(preedit.ui.root, lParams(matchParent, wrapContent) {
-            above(aiPromptInputBar)
+            above(promptInputBar)
             centerHorizontally()
         })
-        add(aiPromptInputBar, lParams(matchParent, dp(56)) {
+        add(promptInputBar, lParams(matchParent, dp(56)) {
             above(keyboardView)
             centerHorizontally()
         })
@@ -301,8 +301,8 @@ class InputView(
 
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
 
-        aiPromptInputBar.onCancel = { finishAiPromptInput(submit = false) }
-        aiPromptInputBar.onSubmit = { finishAiPromptInput(submit = true) }
+        promptInputBar.onCancel = { finishInternalPromptInput(submit = false) }
+        promptInputBar.onSubmit = { finishInternalPromptInput(submit = true) }
     }
 
     private fun updateKeyboardSize() {
@@ -355,7 +355,7 @@ class InputView(
 
     /** Clears transient IME surfaces before launching an IME-owned settings activity. */
     fun prepareForSettingsActivity() {
-        discardAiPromptInput()
+        discardInternalPromptInput()
         setAssistantContentExpanded(false)
         windowManager.attachWindow(KeyboardWindow)
         requestLayout()
@@ -368,8 +368,8 @@ class InputView(
      */
     fun getTouchableTopLocationInWindow(outLocation: IntArray) {
         keyboardView.getLocationInWindow(outLocation)
-        if (aiPromptInputBar.visibility != VISIBLE) return
-        aiPromptInputBar.getLocationInWindow(promptInputBarLocation)
+        if (promptInputBar.visibility != VISIBLE) return
+        promptInputBar.getLocationInWindow(promptInputBarLocation)
         outLocation[1] = ImeTouchableTopPolicy.resolve(
             keyboardTop = outLocation[1],
             promptTop = promptInputBarLocation[1],
@@ -385,50 +385,137 @@ class InputView(
         initialText: String,
         onSubmit: (String) -> Unit,
         onCancel: () -> Unit
+    ): Boolean = beginInternalPromptInput(
+        spec = InternalPromptSpecs.Ai,
+        initialText = initialText,
+        onSubmit = onSubmit,
+        onCancel = onCancel
+    )
+
+    /** Opens the canonical keyboard for a GIF query without letting it touch the target editor. */
+    fun beginGifSearchPromptInput(
+        initialText: String,
+        maxCharacters: Int,
+        onSubmit: (String) -> Unit,
+        onCancel: () -> Unit
+    ): Boolean = beginInternalPromptInput(
+        spec = InternalPromptSpecs.gifSearch(maxCharacters),
+        initialText = initialText,
+        onSubmit = onSubmit,
+        onCancel = onCancel
+    )
+
+    private fun beginInternalPromptInput(
+        spec: InternalPromptSpec,
+        initialText: String,
+        onSubmit: (String) -> Unit,
+        onCancel: () -> Unit
     ): Boolean {
-        aiPromptOnSubmit = onSubmit
-        aiPromptOnCancel = onCancel
-        val started = service.beginAiPromptCapture(initialText) { committed, preeditText ->
-            aiPromptInputBar.post {
-                aiPromptInputBar.render(committed, preeditText)
+        promptOnSubmit = onSubmit
+        promptOnCancel = onCancel
+        promptCaptureToken = null
+        promptInputBar.configure(spec)
+        promptInputBar.setSubmitPending(false)
+        val token = service.beginInternalPromptCapture(
+            spec = spec,
+            initialText = initialText,
+            onStarted = { startedToken ->
+                promptInputBar.post {
+                    if (promptCaptureToken != startedToken ||
+                        !service.isInternalPromptCaptureActive(startedToken)
+                    ) {
+                        return@post
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        kawaiiBar.clearInlineSuggestions()
+                    }
+                    setAssistantContentExpanded(false)
+                    promptInputBar.visibility = VISIBLE
+                    windowManager.attachWindow(KeyboardWindow)
+                    requestLayout()
+                }
+            },
+            onChanged = { changedToken, committed, preeditText ->
+                promptInputBar.post {
+                    if (promptCaptureToken != changedToken ||
+                        !service.isInternalPromptCaptureActive(changedToken)
+                    ) return@post
+                    promptInputBar.render(committed, preeditText)
+                }
             }
-        }
-        if (!started) {
-            aiPromptOnSubmit = null
-            aiPromptOnCancel = null
+        )
+        if (token == null) {
+            promptOnSubmit = null
+            promptOnCancel = null
             return false
         }
-        setAssistantContentExpanded(false)
-        aiPromptInputBar.visibility = VISIBLE
-        windowManager.attachWindow(KeyboardWindow)
-        requestLayout()
+        promptCaptureToken = token
         return true
     }
 
-    fun submitAiPromptInput() {
-        finishAiPromptInput(submit = true)
+    fun submitInternalPromptInput() {
+        finishInternalPromptInput(submit = true)
     }
 
-    private fun finishAiPromptInput(submit: Boolean) {
-        val text = if (submit) service.finishAiPromptCapture() else {
-            service.cancelAiPromptCapture()
-            null
+    private fun finishInternalPromptInput(submit: Boolean) {
+        if (submit) {
+            when (val result = service.finishInternalPromptCapture()) {
+                InternalPromptFinishResult.Pending -> {
+                    promptInputBar.setSubmitPending(true)
+                    requestLayout()
+                }
+                InternalPromptFinishResult.Rejected -> promptInputBar.setSubmitPending(false)
+            }
+        } else {
+            service.cancelInternalPromptCapture()
+            finishInternalPromptInput(null)
         }
-        if (submit && text.isNullOrBlank()) return
-        aiPromptInputBar.visibility = GONE
-        val submitted = aiPromptOnSubmit
-        val cancelled = aiPromptOnCancel
-        aiPromptOnSubmit = null
-        aiPromptOnCancel = null
+    }
+
+    /** Completes a prompt only after its service-side text ordering contract has settled. */
+    private fun finishInternalPromptInput(text: String?) {
+        promptInputBar.visibility = GONE
+        promptInputBar.setSubmitPending(false)
+        promptCaptureToken = null
+        val submitted = promptOnSubmit
+        val cancelled = promptOnCancel
+        promptOnSubmit = null
+        promptOnCancel = null
         requestLayout()
         if (text != null) submitted?.invoke(text) else cancelled?.invoke()
     }
 
-    private fun discardAiPromptInput() {
-        service.cancelAiPromptCapture()
-        aiPromptInputBar.visibility = GONE
-        aiPromptOnSubmit = null
-        aiPromptOnCancel = null
+    /** Delivers a fenced submission only to the InputView that still owns its capture token. */
+    fun completeInternalPromptSubmission(token: Long, text: String) {
+        if (promptCaptureToken != token) return
+        finishInternalPromptInput(text)
+    }
+
+    /** Restores the Run/Search button when a submit or direct-insert worker cannot complete. */
+    fun restoreInternalPromptSubmission(token: Long) {
+        if (promptCaptureToken != token) return
+        promptInputBar.setSubmitPending(false)
+        requestLayout()
+    }
+
+    /** Returns to the source tool if a prompt could not cross its Fcitx start fence. */
+    fun rejectInternalPromptStart(token: Long) {
+        if (promptCaptureToken != token) return
+        finishInternalPromptInput(null)
+    }
+
+    /** Fcitx restarted, so this prompt can no longer receive its ordered completion marker. */
+    fun abortInternalPromptInput() {
+        if (promptCaptureToken != null) finishInternalPromptInput(null)
+    }
+
+    private fun discardInternalPromptInput() {
+        service.cancelInternalPromptCapture()
+        promptInputBar.visibility = GONE
+        promptInputBar.setSubmitPending(false)
+        promptCaptureToken = null
+        promptOnSubmit = null
+        promptOnCancel = null
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
@@ -442,9 +529,10 @@ class InputView(
      * called when [InputView] is about to show, or restart
      */
     fun startInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean = false) {
-        // Dialogs such as the Hangul surface picker can restart the same editor. Keep the
-        // internal target in that case, but fail closed as soon as editor identity changes.
-        if (!service.shouldRetainAiPromptCapture(info)) discardAiPromptInput()
+        // Android may reuse identical EditorInfo metadata for another field. An internal prompt
+        // fails closed across every new input session instead of risking a later tool action on
+        // the wrong editor.
+        if (!service.shouldRetainInternalPromptCapture(info)) discardInternalPromptInput()
         broadcaster.onStartInput(info, capFlags, restarting)
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
         if (focusChangeResetKeyboard || !restarting) {
@@ -541,11 +629,15 @@ class InputView(
 
     @RequiresApi(Build.VERSION_CODES.R)
     fun handleInlineSuggestions(response: InlineSuggestionsResponse): Boolean {
+        if (service.isInternalPromptInputOwned) {
+            kawaiiBar.clearInlineSuggestions()
+            return true
+        }
         return kawaiiBar.handleInlineSuggestions(response)
     }
 
     override fun onDetachedFromWindow() {
-        discardAiPromptInput()
+        discardInternalPromptInput()
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         // clear DynamicScope, implies that InputView should not be attached again after detached.
         scope.clear()

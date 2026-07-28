@@ -74,6 +74,9 @@ object FcitxDaemon {
         override val lifecycleScope: CoroutineScope
             get() = realFcitx.lifecycle.lifecycleScope
 
+        override val engineGeneration
+            get() = realFcitx.lifecycle.engineGeneration
+
     }
 
     private val lock = ReentrantLock()

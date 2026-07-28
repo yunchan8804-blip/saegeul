@@ -105,6 +105,29 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun select(idx: Int): Boolean = withFcitxContext { selectCandidate(idx) }
     override suspend fun isEmpty(): Boolean = withFcitxContext { isInputPanelEmpty() }
     override suspend fun reset() = withFcitxContext { resetInputContext() }
+    override suspend fun emitInternalPromptStartBarrier(token: Long) = withFcitxContext {
+        eventFlow_.emit(FcitxEvent.InternalPromptStartBarrier(token))
+    }
+    override suspend fun resetForInternalPromptDrain(token: Long) = withFcitxContext {
+        resetInputContext()
+        // Native callbacks from reset are emitted on this same dispatcher first. The IME service
+        // releases its prompt drain only after it observes this marker in the shared event stream.
+        eventFlow_.emit(FcitxEvent.InternalPromptDrainBarrier(token))
+    }
+    override suspend fun emitInternalPromptSubmitBarrier(token: Long) = withFcitxContext {
+        eventFlow_.emit(FcitxEvent.InternalPromptSubmitBarrier(token))
+    }
+    override suspend fun emitInternalPromptDirectCommitBarrier(
+        token: Long,
+        sequence: Long,
+        text: String
+    ) = withFcitxContext {
+        eventFlow_.emit(
+            FcitxEvent.InternalPromptDirectCommitBarrier(
+                FcitxEvent.InternalPromptDirectCommitBarrier.Data(token, sequence, text)
+            )
+        )
+    }
     override suspend fun moveCursor(position: Int) = withFcitxContext { repositionCursor(position) }
     override suspend fun availableIme() =
         withFcitxContext { availableInputMethods() ?: emptyArray() }
@@ -221,7 +244,10 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         private val eventFlow_ =
             MutableSharedFlow<FcitxEvent<*>>(
                 extraBufferCapacity = 15,
-                onBufferOverflow = BufferOverflow.DROP_OLDEST
+                // Native callbacks use tryEmit and may be coalesced under an extreme burst. FIFO
+                // control barriers use emit instead: SUSPEND makes those markers wait for the
+                // service instead of being silently evicted and leaving prompt input locked.
+                onBufferOverflow = BufferOverflow.SUSPEND
             )
 
         // we may need to modify the list during iteration
@@ -562,6 +588,17 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             if (it.isNotEmpty())
                 Timber.w("${it.size} job(s) didn't get a chance to run!")
         }
+        // The native Instance and AndroidFrontend have gone away. Clear Java-side presentation
+        // state before the completed-stop generation becomes visible, so a restarted engine never
+        // leaves an old preedit or candidate row rendered while it waits for its new InputContext.
+        clientPreeditCached = FormattedText.Empty
+        inputPanelCached = FcitxEvent.InputPanelEvent.Data()
+        eventFlow_.tryEmit(FcitxEvent.ClientPreeditEvent(clientPreeditCached))
+        eventFlow_.tryEmit(FcitxEvent.InputPanelEvent(inputPanelCached))
+        eventFlow_.tryEmit(FcitxEvent.CandidateListEvent(FcitxEvent.CandidateListEvent.Data()))
+        eventFlow_.tryEmit(
+            FcitxEvent.PagedCandidateEvent(FcitxEvent.PagedCandidateEvent.Data.Empty)
+        )
         lifecycleRegistry.postEvent(FcitxLifecycle.Event.ON_STOPPED)
         unregisterFcitxEventHandler(::handleFcitxEvent)
         // clear addon graph

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.daemon
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.StateFlow
 import org.fcitx.fcitx5.android.core.FcitxAPI
 
 /**
@@ -37,4 +38,10 @@ interface FcitxConnection {
     fun runIfReady(block: suspend FcitxAPI.() -> Unit)
 
     val lifecycleScope: CoroutineScope
+
+    /**
+     * A monotonic engine boundary. A changed value means all Fcitx event-stream work created by
+     * the prior engine instance must be discarded, even if lifecycle state transitions conflated.
+     */
+    val engineGeneration: StateFlow<Long>
 }

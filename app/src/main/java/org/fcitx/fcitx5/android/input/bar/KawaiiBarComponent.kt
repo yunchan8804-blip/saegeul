@@ -120,6 +120,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private var isClipboardFresh: Boolean = false
     private var isInlineSuggestionPresent: Boolean = false
+    private var inlineSuggestionGeneration = 0L
     private var isCapabilityFlagsPassword: Boolean = false
     private var isKeyboardLayoutNumber: Boolean = false
     private var isToolbarManuallyToggled: Boolean = false
@@ -335,6 +336,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 onGestureListener = swipeHideKeyboardCallback
             }
             buttonsUi.apply {
+                fun canOpenEditorTool() = !service.isInternalPromptInputOwned
+
                 onNeedsSecondRowChanged = {
                     toolbarNeedsSecondRow = it
                     toolbarHeightSession = toolbarHeightSession.onToolbarRowsChanged(
@@ -347,24 +350,30 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     view.post { updateBarHeight() }
                 }
                 undoButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
                 }
                 redoButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
                 }
                 cursorMoveButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(TextEditingWindow())
                 }
                 clipboardButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(ClipboardWindow())
                 }
                 quickPhraseButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     service.postFcitxJob {
                         reset()
                         triggerQuickPhrase()
                     }
                 }
                 quickPhraseButton.setOnLongClickListener {
+                    if (!canOpenEditorTool()) return@setOnLongClickListener true
                     val info = service.currentInputEditorInfo
                     val selection = service.currentInputSelection
                     windowManager.attachWindow(SensitivePhraseWindow(
@@ -379,32 +388,38 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     true
                 }
                 koreanSearchButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(KoreanSearchWindow())
                 }
                 typoRecoveryButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(TypoRecoveryWindow())
                 }
                 aiAssistantButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(AiAssistantWindow())
                 }
                 precisionDictationButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(VoiceTranscriptionWindow())
                 }
                 ocrButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(OcrWindow())
                 }
                 gifButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(GifSearchWindow())
                 }
                 moreButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(StatusAreaWindow())
                 }
             }
             clipboardUi.suggestionView.apply {
                 setOnClickListener {
-                    ClipboardManager.lastEntry?.let {
-                        service.commitText(it.text)
-                    }
+                    val entry = ClipboardManager.lastEntry ?: return@setOnClickListener
+                    if (!service.insertImeText(entry.text)) return@setOnClickListener
                     clipboardTimeoutJob?.cancel()
                     clipboardTimeoutJob = null
                     isClipboardFresh = false
@@ -598,6 +613,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             isEnabled = allowsTextInspection
             alpha = if (isEnabled) 1f else 0.35f
         }
+        inlineSuggestionGeneration += 1
         isInlineSuggestionPresent = false
         numberRowState = NumberRowState.Auto
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -648,14 +664,21 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
+    fun clearInlineSuggestions() {
+        inlineSuggestionGeneration += 1
+        isInlineSuggestionPresent = false
+        idleUi.inlineSuggestionsBar.clear()
+        evalIdleUiState()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
     fun handleInlineSuggestions(response: InlineSuggestionsResponse): Boolean {
         val suggestions = response.inlineSuggestions
         if (suggestions.isEmpty()) {
-            isInlineSuggestionPresent = false
-            evalIdleUiState()
-            idleUi.inlineSuggestionsBar.clear()
+            clearInlineSuggestions()
             return true
         }
+        val generation = ++inlineSuggestionGeneration
         var pinned: InlineSuggestion? = null
         val scrollable = mutableListOf<InlineSuggestion>()
         var extraPinnedCount = 0
@@ -671,9 +694,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
         service.lifecycleScope.launch {
-            idleUi.inlineSuggestionsBar.setPinnedView(
-                pinned?.let { inflateInlineContentView(it) }
-            )
+            val view = pinned?.let { inflateInlineContentView(it) }
+            if (generation != inlineSuggestionGeneration || service.isInternalPromptInputOwned) {
+                return@launch
+            }
+            idleUi.inlineSuggestionsBar.setPinnedView(view)
         }
         service.lifecycleScope.launch {
             val views = scrollable.map { s ->
@@ -681,6 +706,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     inflateInlineContentView(s)
                 }
             }.awaitAll()
+            if (generation != inlineSuggestionGeneration || service.isInternalPromptInputOwned) {
+                return@launch
+            }
             idleUi.inlineSuggestionsBar.setScrollableViews(views)
         }
         isInlineSuggestionPresent = true

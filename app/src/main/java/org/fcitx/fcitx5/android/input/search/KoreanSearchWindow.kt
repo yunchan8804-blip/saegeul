@@ -250,7 +250,7 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
         )
         if (result.entry.source == KoreanSearchSource.Emotion) {
             val outcome = emotionCommitGate.commit(allowed, sameEditor) {
-                service.commitText(result.entry.commitText)
+                service.insertImeText(result.entry.commitText)
             }
             actionLocked = false
             adapter.setActionLocked(false)
@@ -275,7 +275,7 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
             ui.showActionStatus(context.getString(R.string.korean_search_editor_changed), true)
             return
         }
-        val committed = service.commitText(result.entry.commitText)
+        val committed = service.insertImeText(result.entry.commitText)
         actionLocked = false
         adapter.setActionLocked(false)
         if (committed) {

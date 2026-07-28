@@ -378,7 +378,7 @@ class VoiceTranscriptionWindow(
     private fun insertTranscript() {
         when (reviewSession.insert(
             matchesCurrentEditor = { validateTarget(it, showError = true) },
-            commitText = service::commitText
+            commitText = service::commitToEditor
         )) {
             VoiceReviewedCommitResult.Inserted -> {
                 Toast.makeText(context, R.string.voice_inserted, Toast.LENGTH_SHORT).show()

@@ -83,7 +83,7 @@ class DynamicPhraseWindow(
             ui.showError(context.getString(R.string.dynamic_phrase_editor_changed))
             return
         }
-        if (!service.commitText(result.text, 1)) {
+        if (!service.insertImeText(result.text, 1)) {
             ui.showError(context.getString(R.string.dynamic_phrase_insert_failed))
             return
         }

@@ -435,7 +435,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         if (!service.allowsAiInputFeatures() || text.isBlank()) return null
         if (!matchesCurrentEditor(source.editor)) return null
         if (source.editor.selectionStart != source.editor.selectionEnd) return null
-        if (!service.commitText(text)) return null
+        if (!service.commitToEditor(text)) return null
         val end = source.editor.selectionStart + text.length
         return AiAppliedEdit(
             editor = source.editor.copy(selectionStart = end, selectionEnd = end),
@@ -464,7 +464,8 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             fieldId = info.fieldId,
             inputType = info.inputType,
             selectionStart = selection.start,
-            selectionEnd = selection.end
+            selectionEnd = selection.end,
+            inputSessionEpoch = service.currentInputSessionEpoch
         )
     }
 
@@ -474,7 +475,8 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             target.fieldId,
             target.inputType,
             target.selectionStart,
-            target.selectionEnd
+            target.selectionEnd,
+            expectedInputSessionEpoch = target.inputSessionEpoch
         )
 
     private fun setClipboardBarAvailable(available: Boolean) {

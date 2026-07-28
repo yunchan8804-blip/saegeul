@@ -296,7 +296,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             )
             return
         }
-        val committed = service.commitText(text, 1)
+        val committed = service.insertImeText(text, 1)
         if (!committed) {
             actionLocked = false
             showCommitError(

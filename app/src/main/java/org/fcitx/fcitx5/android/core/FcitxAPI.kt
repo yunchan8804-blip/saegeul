@@ -55,6 +55,29 @@ interface FcitxAPI {
     suspend fun select(idx: Int): Boolean
     suspend fun isEmpty(): Boolean
     suspend fun reset()
+
+    /**
+     * Emit a JVM-only marker after Fcitx work queued before an IME-owned prompt starts.
+     */
+    suspend fun emitInternalPromptStartBarrier(token: Long)
+
+    /**
+     * Reset Fcitx and enqueue a JVM-only barrier after all callbacks caused by that reset.
+     * Used to drain IME-owned prompt input without letting queued text reach the target editor.
+     */
+    suspend fun resetForInternalPromptDrain(token: Long)
+
+    /**
+     * Emit a JVM-only marker after all Fcitx work queued before an IME-owned prompt submission.
+     */
+    suspend fun emitInternalPromptSubmitBarrier(token: Long)
+
+    /**
+     * Emit a JVM-only marker after Fcitx finishes the composition preceding a prompt picker
+     * selection. The IME service uses the marker to preserve `preedit + picker text` ordering.
+     */
+    suspend fun emitInternalPromptDirectCommitBarrier(token: Long, sequence: Long, text: String)
+
     suspend fun moveCursor(position: Int)
 
     suspend fun availableIme(): Array<InputMethodEntry>
