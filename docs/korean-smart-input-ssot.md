@@ -443,7 +443,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `AI-05` | 키보드 번역 | `DONE` | 한↔영·일·중 action·preview·정확히 1회 교체와 emulator 실제 OAuth companion 번역 통과 | M |
 | `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
 | `AI-07` | 원격 호환 endpoint OAuth | `DONE` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인; PC CLI companion과 두 기기 live 통과 | L |
-| `AI-08` | 일반 사용자 AI 연결 안내 | `DONE` | 미연결·OAuth 만료 상태에 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
+| `AI-08` | 일반 사용자 AI 연결 안내 | `DONE` | 미연결·OAuth profile만 남고 암호화 session이 없는 상태·OAuth 만료 상태에 prompt 전 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
 | `AI-09` | 내 컴퓨터 자동 발견·연결 | `DONE` | mDNS 발견, Tailscale HTTPS manifest 검증, 연결 확인, AppAuth login과 PC 재시작 후 DPAPI grant 복구; A35·Z Fold6 통과 | L |
 | `AI-10` | 직접 지시 터치 안전·인증 복구 | `DONE` | prompt 상단까지 IME touchable inset으로 보고해 뒤 editor touch 관통을 차단하고 API key 401은 사용자용 `설정하기` 상태로 복구 | S |
 
@@ -832,6 +832,13 @@ placeholder로 남아 검색 결과가 입력으로 새지 않았다. `MeetingAu
 서로 다른 실제 format을 가리키면 upload 전에 거부하고 WAV/MP3와 MPEG/M4A 모순, MIME alias, 한쪽만
 인식되는 fallback 회귀를 테스트한다. 전체 단일 build/test는 app JVM 81 suites·391 tests,
 failure/error/skipped 0과 x86_64 app·Hangul plugin debug assemble을 통과했다.
+
+같은 날 OAuth entry readiness checkpoint에서는 유효한 OAuth profile이더라도 암호화 AppAuth session이 없거나
+손상됐으면 source capture·AI prompt보다 먼저 `ai_oauth_reauth_required`의 기존 `설정하기` CTA로 전환했다.
+API key profile은 OAuth session 없이도 ready이며 private editor·offline/network policy가 credential store 접근보다
+앞선다는 기존 순서를 유지한다. pure policy 회귀와 전체 app JVM 81 suites·393 tests,
+failure/error/skipped 0을 통과했고 최신 x86_64 app·Hangul plugin APK `0.1.2-160-ga1b617c8`을
+`emulator-5556`에만 재설치했다.
 
 ## 7. GIF-01 상세 계약
 
@@ -1383,7 +1390,8 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
 | OAuth public client | `PASS` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현; AppCompat dialog theme와 Android 11+ browser query 회귀 수정 |
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
-| Android 통합 build/test | `PASS` | 2026-07-28 최종 `:app:testDebugUnitTest` 68 suites·319 tests failure/error/skipped 0, x86_64·arm64 debug assemble, debug merged manifest redirect scheme 일치 |
+| OAuth entry readiness | `PASS` | 구조적으로 유효한 OAuth profile도 암호화 AppAuth session이 없으면 prompt·source capture 전에 재로그인 `설정하기` CTA로 전환. API key profile은 session 없이 ready이며 private/offline 차단이 우선 |
+| Android 통합 build/test | `PASS` | 2026-07-28 최종 `:app:testDebugUnitTest` 81 suites·393 tests failure/error/skipped 0, x86_64 app·Hangul plugin debug assemble, debug merged manifest redirect scheme 일치 |
 | OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과. Pixel 7·QA tablet API 34 emulator도 임시 HTTPS `--public-origin`의 manifest 확인·browser 승인·token 교환·암호화 session 저장 뒤 우리 키보드로 직접 지시문을 입력해 후보 3개·정확히 1회 삽입·undo를 통과했다. 시험 session은 두 emulator에서 revoke·삭제했고 PC 재시작용 companion grant는 Windows DPAPI로 보존한다. |
 | public-origin startup | `PASS` | 새 Quick Tunnel의 route 전파 중 404·502 뒤 정상 manifest를 제한 재시도로 수용하고, 잘못된 manifest 계약은 sleep 없이 즉시 거부하는 Python test를 고정했다. companion Python 11 tests와 실제 Cloudflare tunnel OAuth 왕복을 통과했다. |
 | 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |
@@ -1538,6 +1546,7 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-26 | 한국어 다음 단어는 실제 공백 경계 뒤의 project-curated 로컬 후보만 기본 미선택으로 표시하고 사용자 입력을 학습·저장하지 않음 |
 | 2026-07-27 | 툴바는 기본 1행 가로 스크롤, 고정 48dp control의 명시적 펼침만 2행 6열로 전환하며 자동 후보는 1행을 유지하고 editor 높이는 해당 세션 envelope로 고정 |
 | 2026-07-26 | 일반 사용자용 AI 미연결·재로그인 상태에만 `설정하기`를 제공하며 private/offline/policy 차단은 CTA 없이 fail-closed |
+| 2026-07-28 | OAuth profile만 저장되고 암호화 AppAuth session이 없으면 AI prompt를 열지 않고 entry 시점에 기존 재로그인 `설정하기` CTA로 전환 |
 | 2026-07-26 | GIPHY exact query 계약은 보존하고 한국 밈 query fallback은 성공한 empty KLIPY 첫 page와 로컬 Noto에만 적용 |
 | 2026-07-26 | OCR은 proprietary ML SDK 대신 Apache-2.0 Tesseract 계열과 pinned 한국어 best model을 사용하며 원본·결과를 저장하지 않음 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
