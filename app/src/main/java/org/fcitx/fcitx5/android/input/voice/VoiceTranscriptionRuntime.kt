@@ -34,6 +34,8 @@ internal class SegmentTranscriptionRuntime(
         onProgress: (Long) -> Unit,
         onTranscribing: () -> Unit
     ): VoiceTranscriptionResult? {
+        // Do not open the microphone after the editor that authorized this action disappeared.
+        if (!canContinue()) return null
         var recording: WavMemoryRecording? = null
         return try {
             val captured = recorder.record(onProgress)
@@ -87,26 +89,30 @@ internal class RealtimeTranscriptionRuntime(
         onConnected: () -> Unit,
         onProgress: (Long) -> Unit,
         onFinalizing: () -> Unit
-    ): VoiceTranscriptionResult? = try {
-        session.connect()
-        terminalFailure.throwIfPresent()
+    ): VoiceTranscriptionResult? {
+        // Do not create an authenticated socket for an editor that is no longer active.
         if (!canContinue()) return null
-        onConnected()
-        terminalFailure.throwIfPresent()
-        try {
-            recorder.record(session::append, onProgress)
-        } catch (exception: Exception) {
+        return try {
+            session.connect()
             terminalFailure.throwIfPresent()
-            throw exception
+            if (!canContinue()) return null
+            onConnected()
+            terminalFailure.throwIfPresent()
+            try {
+                recorder.record(session::append, onProgress)
+            } catch (exception: Exception) {
+                terminalFailure.throwIfPresent()
+                throw exception
+            }
+            terminalFailure.throwIfPresent()
+            if (!canContinue()) return null
+            onFinalizing()
+            val result = session.finish()
+            terminalFailure.throwIfPresent()
+            result.takeIf { canContinue() }
+        } finally {
+            session.close()
         }
-        terminalFailure.throwIfPresent()
-        if (!canContinue()) return null
-        onFinalizing()
-        val result = session.finish()
-        terminalFailure.throwIfPresent()
-        result.takeIf { canContinue() }
-    } finally {
-        session.close()
     }
 
     fun stopRecording() = recorder.stop()

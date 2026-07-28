@@ -53,9 +53,33 @@ class VoiceTranscriptionRuntimeTest {
     }
 
     @Test
-    fun `segment editor change wipes audio and makes zero provider calls`() = runBlocking {
+    fun `segment editor change after capture wipes audio and makes zero provider calls`() = runBlocking {
         val audio = byteArrayOf(9, 8, 7)
         val recorder = FakeSegmentRecorder(audio)
+        var providerCalls = 0
+        var targetChecks = 0
+        val runtime = SegmentTranscriptionRuntime(
+            recorder,
+            FakeSegmentTranscriber {
+                providerCalls += 1
+                VoiceTranscriptionResult("사용하면 안 됨", "model")
+            }
+        )
+
+        val result = runtime.run(
+            canContinue = { targetChecks++ == 0 },
+            onProgress = {},
+            onTranscribing = { fail("stale editor must not enter transcription") }
+        )
+
+        assertNull(result)
+        assertEquals(0, providerCalls)
+        assertTrue(audio.all { it == 0.toByte() })
+    }
+
+    @Test
+    fun `stale editor before segment capture skips microphone and provider`() = runBlocking {
+        val recorder = FakeSegmentRecorder(byteArrayOf(9, 8, 7))
         var providerCalls = 0
         val runtime = SegmentTranscriptionRuntime(
             recorder,
@@ -67,13 +91,13 @@ class VoiceTranscriptionRuntimeTest {
 
         val result = runtime.run(
             canContinue = { false },
-            onProgress = {},
+            onProgress = { fail("stale editor must not start capture") },
             onTranscribing = { fail("stale editor must not enter transcription") }
         )
 
         assertNull(result)
+        assertEquals(0, recorder.recordCalls)
         assertEquals(0, providerCalls)
-        assertTrue(audio.all { it == 0.toByte() })
     }
 
     @Test
@@ -125,6 +149,28 @@ class VoiceTranscriptionRuntimeTest {
             events
         )
         assertEquals(1, session.finishCalls)
+    }
+
+    @Test
+    fun `stale editor before realtime connection skips socket and microphone`() = runBlocking {
+        val events = mutableListOf<String>()
+        val recorder = FakeRealtimeRecorder()
+        lateinit var session: FakeRealtimeSession
+        val runtime = RealtimeTranscriptionRuntime(recorder) { _ ->
+            FakeRealtimeSession(events).also { session = it }
+        }
+
+        val result = runtime.run(
+            canContinue = { false },
+            onConnected = { fail("stale editor must not connect") },
+            onProgress = { fail("stale editor must not start capture") },
+            onFinalizing = { fail("stale editor must not finalize") }
+        )
+
+        assertNull(result)
+        assertEquals(0, session.connectCalls)
+        assertEquals(0, recorder.recordCalls)
+        assertTrue(events.isEmpty())
     }
 
     @Test
@@ -194,9 +240,11 @@ class VoiceTranscriptionRuntimeTest {
         private val audio: ByteArray,
         private val beforeReturn: () -> Unit = {}
     ) : VoiceSegmentRecorder {
+        var recordCalls = 0
         var cancelCalls = 0
 
         override suspend fun record(onProgress: (Long) -> Unit): WavMemoryRecording {
+            recordCalls += 1
             beforeReturn()
             onProgress(250L)
             return WavMemoryRecording(audio, 250L)
@@ -249,9 +297,11 @@ class VoiceTranscriptionRuntimeTest {
     private class FakeRealtimeSession(
         private val events: MutableList<String>
     ) : VoiceRealtimeSession {
+        var connectCalls = 0
         var finishCalls = 0
 
         override suspend fun connect() {
+            connectCalls += 1
             events += "connect"
         }
 
