@@ -302,13 +302,14 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val gifProvider = GifProviderResolver.resolve(ctx)
         gifSelectionPreference.summary = when (gifProvider.selection) {
             GifProviderSelection.Standard -> getString(R.string.gif_provider_selection_standard)
+            GifProviderSelection.Commons -> getString(R.string.gif_provider_selection_commons)
             GifProviderSelection.Giphy -> getString(R.string.gif_provider_selection_giphy)
         }
         gifProviderPreference.summary = when {
             gifProvider.credentialState == GifProviderCredentialState.Unreadable -> {
                 getString(R.string.gif_provider_status_unreadable)
             }
-            gifProvider.kind == GifProviderKind.Klipy -> {
+            gifProvider.credentialState == GifProviderCredentialState.Configured -> {
                 getString(R.string.gif_provider_status_klipy)
             }
             else -> getString(R.string.gif_provider_status_noto)
@@ -867,10 +868,13 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val ctx = requireContext()
         val store = GifProviderSelectionStore(ctx)
         val values = GifProviderSelection.entries
-        val labels = arrayOf(
-            getString(R.string.gif_provider_selection_standard),
-            getString(R.string.gif_provider_selection_giphy)
-        )
+        val labels = values.map { selection ->
+            when (selection) {
+                GifProviderSelection.Standard -> getString(R.string.gif_provider_selection_standard)
+                GifProviderSelection.Commons -> getString(R.string.gif_provider_selection_commons)
+                GifProviderSelection.Giphy -> getString(R.string.gif_provider_selection_giphy)
+            }
+        }.toTypedArray()
         var selected = values.indexOf(store.load()).coerceAtLeast(0)
         AlertDialog.Builder(ctx)
             .setTitle(R.string.gif_provider_selection_title)

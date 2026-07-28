@@ -56,6 +56,8 @@ class GiphyProviderCredentialStoreTest {
             assertEquals(GifProviderSelection.Standard, store.load())
             store.save(GifProviderSelection.Giphy)
             assertEquals(GifProviderSelection.Giphy, store.load())
+            store.save(GifProviderSelection.Commons)
+            assertEquals(GifProviderSelection.Commons, store.load())
             store.save(GifProviderSelection.Standard)
             assertEquals(GifProviderSelection.Standard, store.load())
         } finally {

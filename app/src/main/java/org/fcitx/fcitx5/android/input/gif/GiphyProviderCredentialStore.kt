@@ -237,7 +237,13 @@ private class AndroidKeystoreGiphyCredentialCipher : GifCredentialCipher {
     }
 }
 
-enum class GifProviderSelection { Standard, Giphy }
+/**
+ * A single explicit source per GIF grid. The resolver never merges provider results.
+ *
+ * `Standard` keeps the existing KLIPY-or-Noto behavior. `Commons` is keyless open media;
+ * `Giphy` remains approval-gated.
+ */
+enum class GifProviderSelection { Standard, Commons, Giphy }
 
 /** Explicit provider choice; no key presence may silently switch a GIPHY-selected grid. */
 class GifProviderSelectionStore internal constructor(private val file: File) {

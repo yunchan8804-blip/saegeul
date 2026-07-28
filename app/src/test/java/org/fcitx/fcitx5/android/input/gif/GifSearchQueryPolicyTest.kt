@@ -34,6 +34,10 @@ class GifSearchQueryPolicyTest {
             "x".repeat(GifSearchQueryPolicy.DEFAULT_MAX_CHARACTERS),
             GifSearchQueryPolicy.normalize(query, GifProviderKind.AnimatedNoto)
         )
+        assertEquals(
+            "x".repeat(GifSearchQueryPolicy.DEFAULT_MAX_CHARACTERS),
+            GifSearchQueryPolicy.normalize(query, GifProviderKind.Commons)
+        )
         assertEquals("", GifSearchQueryPolicy.normalize("   ", GifProviderKind.Klipy))
     }
 }

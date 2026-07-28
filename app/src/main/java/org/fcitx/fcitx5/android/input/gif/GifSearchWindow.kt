@@ -93,6 +93,8 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 GifProviderKind.Klipy -> provider.displayName
                 GifProviderKind.AnimatedNoto ->
                     context.getString(R.string.gif_powered_by_noto)
+                GifProviderKind.Commons ->
+                    context.getString(R.string.gif_powered_by_commons)
                 GifProviderKind.Giphy,
                 GifProviderKind.GiphyUnavailable -> GiphyGifProvider.POWERED_BY_GIPHY
             }

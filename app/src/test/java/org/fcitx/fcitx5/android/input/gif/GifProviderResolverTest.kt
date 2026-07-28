@@ -43,6 +43,28 @@ class GifProviderResolverTest {
     }
 
     @Test
+    fun selectedCommonsUsesTheKeylessOpenMediaProviderWithoutMixingConfiguredPartners() {
+        val effective = GifProviderResolver.resolve(
+            selection = GifProviderSelection.Commons,
+            klipyApiKey = "configured-klipy-key",
+            klipyState = GifProviderCredentialState.Configured,
+            giphyConfiguration = GiphyProviderConfiguration("giphy-key", true, true),
+            giphyState = GiphyCredentialState.Ready
+        )
+
+        assertEquals(GifProviderKind.Commons, effective.kind)
+        assertEquals(GifProviderSelection.Commons, effective.selection)
+        assertTrue(effective.provider is WikimediaCommonsGifProvider)
+        assertTrue(effective.networkReady)
+        assertFalse(effective.productionPartnerApprovalRequired)
+        assertEquals(GifProviderCredentialState.Configured, effective.credentialState)
+        assertEquals(GiphyCredentialState.Ready, effective.giphyCredentialState)
+        assertTrue(effective.giphyMediaCachingApproved)
+        assertFalse(effective.provider is KlipyGifProvider)
+        assertFalse(effective.provider is GiphyGifProvider)
+    }
+
+    @Test
     fun selectedGiphyWithoutApprovedKeyDoesNotFallBackOrEnableNetwork() {
         val effective = GifProviderResolver.resolve(
             selection = GifProviderSelection.Giphy,

@@ -25,9 +25,11 @@ internal enum class GifQuickSuggestion {
 /**
  * Keeps the fallback surface honest about what its small open catalog can answer.
  *
- * Animated Noto Emoji is useful for reaction emoji, not a broad meme catalog. Its quick actions
- * therefore intentionally omit meme, commuting, and workday queries rather than advertising a
- * search experience that it cannot provide. The rich providers retain the full chip set.
+ * Animated Noto Emoji is useful for reaction emoji, not a broad meme catalog. Wikimedia Commons
+ * is searchable open media, but likewise is not a curated reaction/meme catalog. Their quick
+ * actions therefore intentionally omit meme, commuting, and workday queries rather than
+ * advertising a search experience that they cannot provide. The rich providers retain the full
+ * chip set.
  */
 internal data class GifProviderPresentation(
     val quickSuggestions: List<GifQuickSuggestion>,
@@ -37,8 +39,13 @@ internal data class GifProviderPresentation(
 internal object GifProviderPresentationPolicy {
     fun forProvider(kind: GifProviderKind): GifProviderPresentation = when (kind) {
         GifProviderKind.AnimatedNoto -> GifProviderPresentation(
-            quickSuggestions = NOTO_REACTION_SUGGESTIONS,
+            quickSuggestions = REACTION_SUGGESTIONS,
             showsMoreGifSettings = true
+        )
+        GifProviderKind.Commons -> GifProviderPresentation(
+            quickSuggestions = REACTION_SUGGESTIONS,
+            // Commons is an explicit keyless source; no setup CTA is needed.
+            showsMoreGifSettings = false
         )
         GifProviderKind.Klipy,
         GifProviderKind.Giphy,
@@ -65,7 +72,7 @@ internal object GifProviderPresentationPolicy {
         GifQuickSuggestion.Sad
     )
 
-    private val NOTO_REACTION_SUGGESTIONS = listOf(
+    private val REACTION_SUGGESTIONS = listOf(
         GifQuickSuggestion.Trending,
         GifQuickSuggestion.Laugh,
         GifQuickSuggestion.Awkward,

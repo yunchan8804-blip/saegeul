@@ -27,6 +27,20 @@ class GifProviderPresentationPolicyTest {
     }
 
     @Test
+    fun explicitCommonsSourceKeepsAnHonestOpenMediaReactionSetWithoutASetupCta() {
+        val presentation = GifProviderPresentationPolicy.forProvider(GifProviderKind.Commons)
+
+        assertFalse(presentation.showsMoreGifSettings)
+        assertEquals(GifQuickSuggestion.Trending, presentation.quickSuggestions.first())
+        assertTrue(GifQuickSuggestion.Laugh in presentation.quickSuggestions)
+        assertTrue(GifQuickSuggestion.Celebrate in presentation.quickSuggestions)
+        assertTrue(GifQuickSuggestion.Thanks in presentation.quickSuggestions)
+        assertFalse(GifQuickSuggestion.Meme in presentation.quickSuggestions)
+        assertFalse(GifQuickSuggestion.LeaveWork in presentation.quickSuggestions)
+        assertFalse(GifQuickSuggestion.Monday in presentation.quickSuggestions)
+    }
+
+    @Test
     fun richAndUnavailableProviderSurfacesKeepTheExistingFullChipSet() {
         listOf(
             GifProviderKind.Klipy,

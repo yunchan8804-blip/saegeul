@@ -13,7 +13,8 @@ object GifSearchQueryPolicy {
         GifProviderKind.Giphy,
         GifProviderKind.GiphyUnavailable -> GIPHY_MAX_CHARACTERS
         GifProviderKind.Klipy,
-        GifProviderKind.AnimatedNoto -> DEFAULT_MAX_CHARACTERS
+        GifProviderKind.AnimatedNoto,
+        GifProviderKind.Commons -> DEFAULT_MAX_CHARACTERS
     }
 
     fun normalize(query: String, provider: GifProviderKind): String =

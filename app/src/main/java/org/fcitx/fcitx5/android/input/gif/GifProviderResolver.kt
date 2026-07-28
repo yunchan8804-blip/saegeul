@@ -9,6 +9,7 @@ import android.content.Context
 enum class GifProviderKind {
     Klipy,
     AnimatedNoto,
+    Commons,
     Giphy,
     GiphyUnavailable
 }
@@ -69,6 +70,17 @@ object GifProviderResolver {
         giphyConfiguration: GiphyProviderConfiguration?,
         giphyState: GiphyCredentialState
     ): EffectiveGifProvider {
+        if (selection == GifProviderSelection.Commons) {
+            return EffectiveGifProvider(
+                provider = WikimediaCommonsGifProvider(),
+                kind = GifProviderKind.Commons,
+                credentialState = klipyState,
+                selection = selection,
+                giphyCredentialState = giphyState,
+                giphyMediaCachingApproved = giphyConfiguration?.mediaCachingApproved == true,
+                productionPartnerApprovalRequired = false
+            )
+        }
         if (selection == GifProviderSelection.Giphy) {
             val configuration = giphyConfiguration
             val ready = giphyState == GiphyCredentialState.Ready &&

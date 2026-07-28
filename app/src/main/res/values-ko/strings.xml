@@ -639,11 +639,12 @@
     <string name="gif_provider_settings">GIF 공급자</string>
     <string name="gif_provider_selection_title">GIF 소스</string>
     <string name="gif_provider_selection_standard">기본 · KLIPY 키가 있으면 KLIPY, 없으면 Animated Noto Emoji</string>
+    <string name="gif_provider_selection_commons">공개 미디어 · Wikimedia Commons (공개 라이선스 별도 격자)</string>
     <string name="gif_provider_selection_giphy">GIPHY · 별도 공급자 격자</string>
     <string name="gif_provider_selection_failed">GIF 소스를 저장하지 못했어</string>
     <string name="gif_klipy_settings">KLIPY API 키</string>
     <string name="gif_provider_status_klipy">Powered by KLIPY · 암호화 키 설정됨 · 프로덕션 파트너 승인은 외부 GATE</string>
-    <string name="gif_provider_status_noto">Animated Noto Emoji 대체 공급자 · 다양한 GIF·밈 검색에는 승인된 KLIPY 키가 필요함</string>
+    <string name="gif_provider_status_noto">KLIPY 키 없음 · 기본 소스는 Animated Noto Emoji를 사용함 · 공개 라이선스 GIF는 Wikimedia Commons를 선택해</string>
     <string name="gif_provider_status_unreadable">KLIPY 키를 복호화할 수 없어 Animated Noto Emoji를 사용 중 · 키를 교체하거나 삭제해</string>
     <string name="gif_provider_key_hint">승인된 KLIPY API 키</string>
     <string name="gif_provider_key_unchanged_hint">KLIPY API 키 (비워두면 유지)</string>
