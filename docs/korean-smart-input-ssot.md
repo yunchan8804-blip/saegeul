@@ -127,18 +127,19 @@ posture처럼 emulator가 재현할 수 없는 항목만 실기기 gate로 유�
 | ID | 기능 | 상태 | 가치 | 난이도 |
 | --- | --- | --- | --- | --- |
 | `GIF-01` | GIF 검색·링크·첨부 파이프라인 | `DONE` | 키보드 이탈 없이 GIF 검색·전달 | L |
-| `GIF-02` | 실사용 리액션 GIF 공급자 | `IN_PROGRESS` | KLIPY 한국어 검색·밈 catalog 구현 완료, production key·승인 gate 남음 | M |
+| `GIF-02` | 실사용 리액션 GIF 공급자 | `IN_PROGRESS` | Noto fallback의 정직한 반응 chip·GIF 설정 CTA와 KLIPY 한국어 검색 구현, production key·승인 gate 남음 | M |
 | `GIF-03` | 선택형 GIPHY 공급자 | `IN_PROGRESS` | 비혼합·branding·analytics·안전등급 구현, production/media-copy 승인 gate | M |
-| `VOICE-01` | GPT 실시간 받아쓰기 안정화 | `IN_PROGRESS` | timeout·서버 오류 즉시 복구 구현, 실제 STT key 한국어 품질 gate 남음 | L |
-| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | push-to-stop·preview 구현, 실제 STT key·Z Fold6 품질 gate 남음 | L |
+| `VOICE-01` | GPT 실시간 받아쓰기 안정화 | `IN_PROGRESS` | timeout·서버 오류 복구와 stale editor의 capture·연결 시작 차단 구현, 실제 STT key 한국어 품질 gate 남음 | L |
+| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | push-to-stop·preview·취소 시 전송 중단 구현, 실제 STT key·Z Fold6 품질 gate 남음 | L |
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 파일 선택·화자 구간 preview·선택 삽입 구현, 실제 STT key·회의 음원 품질 gate 남음 | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | 공개 CLI·HTTP audio 계약이 없어 비공식 OAuth token 역이용 금지 | L |
 | `UX-03` | 흔들리지 않는 기능 툴바 | `DONE` | 기본 1행·명시적 2행, 입력 중 높이 변화 차단 | M |
-| `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 저장·세션 구현, 생체 실기기 gate 남음 | L |
+| `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | Activity 소유 인증·60초 실제 세션 만료·allowlist 구현, 생체 실기기 gate 남음 | L |
 
 `GIF-01`의 전송 파이프라인 계약과 `GIF-02`의 공급자 계약은 7절에 있다. 사용자 실사용 결과
 Animated Noto Emoji는 움직이는 이모지 fallback으로는 유효하지만 리액션 GIF catalog로는 현저히
-부족했다. KLIPY 공급자를 별도 source와 cache namespace로 구현하고 A35·Z Fold6에서 실사용 catalog를
+부족했다. 그래서 Noto fallback에는 실제 반응 가능한 chip만 노출하고 `더 많은 GIF 설정` CTA를 둔다.
+KLIPY 공급자를 별도 source와 cache namespace로 구현하고 A35·Z Fold6에서 실사용 catalog를
 검증했다. 다만 저장소에 test key를 넣지 않으며 production key와 partner 승인이 끝날 때까지
 `GIF-02`의 배포 상태는 `IN_PROGRESS`로 유지한다.
 
@@ -447,8 +448,8 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | 24 kHz PCM streaming·item별 partial/final 조정·한국어 hint·최종 preview·exactly-once commit과 연결/마무리 timeout·준비 후 서버 오류의 즉시 녹음 중단 구현, 실제 key 한국어 품질 gate | L |
-| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, preview와 최초 권한 복귀 구현; 실제 STT key 품질·Z Fold6 gate 남음 | L |
+| `VOICE-01` | GPT 실시간 받아쓰기 | `IN_PROGRESS` | 24 kHz PCM streaming·item별 partial/final 조정·한국어 hint·최종 preview·exactly-once commit과 연결/마무리 timeout·준비 후 서버 오류의 즉시 녹음 중단 구현. stale editor면 capture·인증 WebSocket을 시작하지 않으며, 실제 key 한국어 품질 gate | L |
+| `VOICE-02` | 고정밀 녹음 전사 | `IN_PROGRESS` | 시간 제안 없는 push-to-stop, 5분 memory safety boundary, preview와 최초 권한 복귀·활성 전송 취소 구현; 실제 STT key 품질·Z Fold6 gate 남음 | L |
 | `VOICE-03` | 화자 분리 회의·메모 | `IN_PROGRESS` | 명시 선택 파일·화자/timestamp preview·선택 삽입 구현, 실시간·정밀 모드가 같은 독립 STT profile을 재사용한다. picker가 IME를 detach해도 같은 editor에 새 회의 window를 복원하고, STT 401은 `설정하기`로 복구; 실제 OpenAI key·음원 품질 gate | L |
 | `VOICE-04` | Codex 구독 OAuth 음성 bridge | `BLOCK` | Codex/ChatGPT desktop Voice를 Android 전사 결과로 반환할 공개 CLI·HTTP 계약이 없음. 비공식 OAuth token/API 역이용 금지 | L |
 | `VOICE-05` | 휴대폰 받아쓰기 기본 모드 | `DONE` | 글쓰기 AI 연결 여부와 무관한 기본 음성 모드다. system voice IME가 있으면 즉시 전환하고, 없으면 Android 음성 입력 설정 안내를 제공한다 | S |
@@ -462,7 +463,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `UX-01` | Smart clipboard action | `DONE` | 명시 선택·서식 제거·합치기·전화/계좌 형식화·PII 마스킹, emulator 미리보기·1회 삽입·민감 editor 차단 통과 | M |
 | `UX-02` | Fold·tablet 분할 키보드 | `DONE` | compact/expanded·세로/가로 profile, 초기 복원, 중앙 non-touch gap, 두벌식 자음·모음 손 경계와 모바일 표면·숫자판 왕복을 API 34 phone/tablet emulator에서 검증 | L |
 | `UX-03` | 안정형 기능 툴바 | `DONE` | 열린 툴바는 기본 1행 가로 스크롤이며 고정 펼침 버튼을 명시적으로 누를 때만 2행 6열이 된다. 자동 제안은 1행을 유지하고, 명시적으로 펼친 세션만 96dp envelope를 이어받아 입력 중 editor가 요동하지 않는다 | M |
-| `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | 인증 결합 Keystore·60초 package 세션·allowlist 구현, 생체 실기기 gate | L |
+| `SEC-01` | 민감 빠른 문구 금고 | `IN_PROGRESS` | Activity 소유 BiometricPrompt/기기 인증·인증 결합 Keystore·60초 실제 package 세션·allowlist 구현, 생체 실기기 gate | L |
 | `SEC-02` | Privacy dashboard | `DONE` | 기능별 전송 범위, provider, 집계 사용량, 즉시 삭제 | M |
 | `SEC-03` | 완전 offline mode | `DONE` | AI·OpenAI 전사·GIF toolbar를 fail-closed로 비활성화하고 API 34 emulator의 Fcitx UID BPF 통계로 3개 동작 전후 network 0 byte·0 packet 검증 | S |
 
@@ -756,6 +757,27 @@ editor를 변경하지 않고 명시적 insert에서만 정확히 한 번 commit
 실패·commit 실패에서는 자동 fallback이나 중복 입력이 0회임을 고정했다. 통합 app JVM은 72 suites·348
 tests, failure/error/skipped 0이고 x86_64·arm64 debug assemble이 모두 통과했다. 이 자동화는 실제 API
 품질을 대체하지 않으므로 A35·잠금 해제 Fold·실제 STT key gate는 그대로 유지한다.
+
+2026-07-28 보안·GIF·음성 회귀 checkpoint에서는 민감 문구 금고의 인증을 IME service가 아닌 내부
+Activity 소유 prompt로 옮기고 강한 생체 또는 기기 인증만 허용했다. 인증 handoff는 claim 한 번만
+소비하며, editor 변경·private/disallowed 전환·detach·60초 만료에서 session과 preview·선택 item을 즉시
+비운다. API 34 emulator에서 allowlist editor의 unlock·명시적 `Insert once` 1회 입력·IME process 재시작
+후 재잠금·62초 경과 뒤 preview와 삽입 버튼 제거를 확인했다. 임시 vault record와 시험 기기 인증은
+검증 직후 제거했다. 이는 기기 인증 경로의 Android gate를 닫지만 실제 생체 센서 관찰은 별도 실기기
+gate로 남긴다.
+
+같은 checkpoint에서 Animated Noto fallback은 결과가 없는 `밈`·`퇴근`·`월요일` chip을 노출하지 않고
+실제 반응 가능한 curated chip만 보여 준다. provider attribution 옆 `더 많은 GIF 설정` CTA는 private/offline
+editor에서는 숨기며, 일반 editor에서는 기존 개인정보·AI의 GIF 공급자·KLIPY·GIPHY 설정으로 정확히
+이동한다. API 34 emulator에서 이 노출 정책과 CTA route를 확인했다. 넓은 리액션 catalog의 live 품질은
+KLIPY production key·partner 승인과 별도로 유지한다.
+
+음성 runtime은 start 직전 editor가 stale이면 microphone capture와 인증 WebSocket 연결을 시작하지
+않고, capture 뒤 editor가 바뀌면 upload 없이 memory audio를 지운다. 구간 전사는 cancel에서 활성
+HTTP 연결을 끊고, Realtime은 ready와 recorder 등록 사이의 terminal failure를 다시 확인한다. 현재
+통합 검증은 app JVM 76 suites·363 tests, failure/error/skipped 0, `git diff --check`, x86_64 app·Hangul
+plugin debug assemble 통과와 emulator 최신 APK 설치까지다. 실제 한국어 STT 품질, production GIF
+공급자 승인, 실기기 생체 센서는 이 checkpoint의 완료 증거가 아니라 owner/hardware gate로 남긴다.
 
 2026-07-28 최종 OAuth 실동작 감사에서는 Pixel 7 API 34 emulator가 임시 HTTPS manifest를 직접
 검증하고 외부 browser의 Authorization Code + PKCE 승인을 거쳐 PC CLI companion에 연결됐다.
@@ -1386,8 +1408,8 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 ### 단계 4 — 음성
 
 1. push-to-talk audio capture와 permission UX. (`DONE`: A35와 API 34 emulator 최초 권한 자동 복귀·AudioRecord·중지·401 복구 PASS)
-2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview와 deterministic 성공/취소/1회 삽입 runtime PASS, 실제 key live 품질 gate)
-3. `VOICE-01` realtime partial transcript. (`IN_PROGRESS`: WebSocket·partial/final·terminal race·deterministic stream/finalize 상태와 emulator 401 UX PASS, 실제 key 한국어 품질과 production ephemeral token/WebRTC gate)
+2. `VOICE-02` 고정밀 구간 전사. (`IN_PROGRESS`: 독립 STT profile·elapsed-only 5분 safety capture·preview와 deterministic 성공/취소/1회 삽입 runtime PASS, 취소 시 활성 전송 단절 PASS, 실제 key live 품질 gate)
+3. `VOICE-01` realtime partial transcript. (`IN_PROGRESS`: WebSocket·partial/final·terminal race·deterministic stream/finalize 상태, stale editor의 capture/연결 시작 차단과 emulator 401 UX PASS, 실제 key 한국어 품질과 production ephemeral token/WebRTC gate)
 4. `VOICE-03` diarization과 회의 UI. (`IN_PROGRESS`: 독립 STT profile 재사용, deterministic diarization·선택 1회 삽입 runtime PASS, API 34 x86_64 phone·tablet emulator에서 system picker 진입·WAV 선택·동일 editor 복원·요청 실행·조기 401 설정 CTA·landscape 무잘림 PASS; 실제 OpenAI key·회의 음원 품질 gate)
 5. `VOICE-04` Codex 구독 OAuth voice bridge. (`BLOCK`: desktop UI 외 공개 CLI·HTTP audio 계약 없음)
 
@@ -1395,7 +1417,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 
 1. `KO-05` 한자 음훈, `KO-05A` 국어사전 정의·`KO-05B` 색인 성능, `KO-06` 개인 단어장. (`DONE`: emulator 기능·cold-load gate 통과)
 2. `UX-01` smart clipboard action. (`DONE`: emulator 명시 선택·mask·합치기·1회 삽입·private editor 차단 통과)
-3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: 코드 완료, 생체 인증 실기기 gate)
+3. `SEC-01` 민감 문구 금고. (`IN_PROGRESS`: Activity 소유 인증, allowlist·exactly-once·process 재잠금·60초 UI/session 실제 만료를 API 34 emulator에서 PASS; 생체 인증 실기기 gate)
 4. `UX-02` Fold·tablet 분할 layout. (`DONE`: 펼친 Fold6 한글·영문 손 경계와 API 34 tablet emulator 초기 복원·회전·모바일·중앙 무입력·숫자판 왕복 통과)
 5. `KO-07` 조사 MVP와 `KO-08` 감정 후보. (`DONE`: emulator 조사 받침·ㄹ 예외, 감정 강·약 chip, 후보·1회 삽입 통과)
 6. `KO-07` 다음 어절과 `MM-01` 로컬 OCR. (`DONE`: emulator 공백 후보·선택·취소·1회 삽입, OCR picker 복원·정방향·90도 회전·저화질 인식·줄 선택·1회 삽입, 공개 native source build·라이선스 export 통과)
