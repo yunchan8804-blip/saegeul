@@ -44,15 +44,15 @@ object MeetingAudioPolicy {
         "webm" to "audio/webm"
     )
 
-    private val normalizedTypes = setOf(
-        "audio/flac",
-        "audio/mpeg",
-        "audio/mp4",
-        "audio/ogg",
-        "application/ogg",
-        "audio/wav",
-        "audio/x-wav",
-        "audio/webm"
+    private val canonicalTypesByMime = mapOf(
+        "audio/flac" to "audio/flac",
+        "audio/mpeg" to "audio/mpeg",
+        "audio/mp4" to "audio/mp4",
+        "audio/ogg" to "audio/ogg",
+        "application/ogg" to "audio/ogg",
+        "audio/wav" to "audio/wav",
+        "audio/x-wav" to "audio/wav",
+        "audio/webm" to "audio/webm"
     )
 
     fun validate(
@@ -64,18 +64,23 @@ object MeetingAudioPolicy {
         val extension = displayName.orEmpty().substringAfterLast('.', "")
             .lowercase(Locale.ROOT)
             .takeIf(typesByExtension::containsKey)
+        val extensionType = extension?.let(typesByExtension::getValue)
         val normalizedMime = mimeType?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)
+        val mimeTypeCanonical = normalizedMime?.let(canonicalTypesByMime::get)
+        if (mimeTypeCanonical != null && extensionType != null && mimeTypeCanonical != extensionType) {
+            return null
+        }
         val contentType = when {
-            normalizedMime != null && normalizedMime in normalizedTypes -> normalizedMime
-            extension != null -> typesByExtension.getValue(extension)
+            mimeTypeCanonical != null -> mimeTypeCanonical
+            extensionType != null -> extensionType
             else -> return null
         }
         val safeExtension = extension ?: when (contentType) {
             "audio/flac" -> "flac"
             "audio/mpeg" -> "mp3"
             "audio/mp4" -> "m4a"
-            "audio/ogg", "application/ogg" -> "ogg"
-            "audio/wav", "audio/x-wav" -> "wav"
+            "audio/ogg" -> "ogg"
+            "audio/wav" -> "wav"
             "audio/webm" -> "webm"
             else -> return null
         }

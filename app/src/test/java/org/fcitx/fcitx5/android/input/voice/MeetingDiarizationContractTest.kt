@@ -41,6 +41,39 @@ class MeetingDiarizationContractTest {
     }
 
     @Test
+    fun `audio policy rejects conflicting recognized MIME and file extension`() {
+        assertNull(MeetingAudioPolicy.validate("audio/wav", "record.mp3", 100L, 1_000L))
+        assertNull(MeetingAudioPolicy.validate("audio/mpeg", "record.m4a", 100L, 1_000L))
+    }
+
+    @Test
+    fun `audio policy canonicalizes supported MIME aliases`() {
+        val wav = MeetingAudioPolicy.validate("audio/x-wav", "record.wav", 100L, 1_000L)
+        val ogg = MeetingAudioPolicy.validate("application/ogg", "record.ogg", 100L, 1_000L)
+        val extensionFallback = MeetingAudioPolicy.validate(
+            "application/octet-stream",
+            "record.m4a",
+            100L,
+            1_000L
+        )
+        val mimeFallback = MeetingAudioPolicy.validate(
+            "audio/x-wav",
+            "record.unknown",
+            100L,
+            1_000L
+        )
+
+        assertEquals("audio/wav", wav?.contentType)
+        assertEquals("meeting.wav", wav?.uploadFileName)
+        assertEquals("audio/ogg", ogg?.contentType)
+        assertEquals("meeting.ogg", ogg?.uploadFileName)
+        assertEquals("audio/mp4", extensionFallback?.contentType)
+        assertEquals("meeting.m4a", extensionFallback?.uploadFileName)
+        assertEquals("audio/wav", mimeFallback?.contentType)
+        assertEquals("meeting.wav", mimeFallback?.uploadFileName)
+    }
+
+    @Test
     fun `capability fails closed outside the standard OpenAI endpoint`() {
         val standard = VoiceProviderProfile(apiKey = "key")
         val unsupportedModel = standard.copy(diarizationModel = "custom-diarize")
