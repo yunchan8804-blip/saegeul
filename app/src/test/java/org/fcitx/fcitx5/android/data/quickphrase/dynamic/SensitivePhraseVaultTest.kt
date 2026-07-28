@@ -56,6 +56,8 @@ class SensitivePhraseVaultTest {
         val state = SensitivePhraseUnlockState(ttlMillis = 60_000L) { now }
         state.unlockFor("com.kakao.talk")
         assertTrue(state.isUnlockedFor("com.kakao.talk"))
+        now += 1_234L
+        assertEquals(58_766L, state.remainingMillisFor("com.kakao.talk"))
 
         state.onEditorPackageChanged("com.slack")
         assertFalse(state.isUnlockedFor("com.kakao.talk"))
@@ -63,6 +65,7 @@ class SensitivePhraseVaultTest {
         state.unlockFor("com.kakao.talk")
         now += 60_000L
         assertFalse(state.isUnlockedFor("com.kakao.talk"))
+        assertEquals(null, state.remainingMillisFor("com.kakao.talk"))
     }
 
     @Test

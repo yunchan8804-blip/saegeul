@@ -145,6 +145,12 @@ class SensitivePhraseUnlockState(
     }
 
     @Synchronized
+    fun remainingMillisFor(packageName: String): Long? {
+        if (!isUnlockedFor(packageName)) return null
+        return (unlockedUntil - elapsedRealtime()).coerceAtLeast(0L)
+    }
+
+    @Synchronized
     fun onEditorPackageChanged(packageName: String) {
         if (this.packageName != null && this.packageName != packageName) lock()
     }

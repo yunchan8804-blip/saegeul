@@ -33,6 +33,8 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
 import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseWindow
+import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseAuthCoordinator
+import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.ocr.OcrDocumentCoordinator
@@ -447,6 +449,18 @@ class InputView(
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
         if (focusChangeResetKeyboard || !restarting) {
             windowManager.attachWindow(KeyboardWindow)
+        }
+        val sensitivePhraseResume = SensitivePhraseAuthCoordinator.consumeForEditor(
+            info.packageName,
+            info.fieldId,
+            info.inputType
+        )
+        if (sensitivePhraseResume != null) {
+            windowManager.attachWindow(SensitivePhraseWindow(
+                sensitivePhraseResume.target,
+                sensitivePhraseResume
+            ))
+            return
         }
         val ocrResume = OcrDocumentCoordinator.consumeForEditor(
             info.packageName,

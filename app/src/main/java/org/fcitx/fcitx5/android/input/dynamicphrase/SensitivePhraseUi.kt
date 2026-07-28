@@ -79,26 +79,23 @@ class SensitivePhraseUi(private val context: Context, private val theme: Theme) 
     }
 
     fun showLocked(authenticationAvailable: Boolean) {
+        clearSensitiveContent()
         status.setText(
             if (authenticationAvailable) R.string.secret_vault_locked
             else R.string.secret_vault_auth_unavailable
         )
         status.setTextColor(theme.keyTextColor)
-        items.removeAllViews()
-        preview.visibility = View.GONE
-        insertButton.visibility = View.GONE
         unlockButton.visibility = if (authenticationAvailable) View.VISIBLE else View.GONE
     }
 
     fun showItems(phrases: List<SensitivePhrase>) {
+        clearSensitiveContent()
         status.setText(
             if (phrases.isEmpty()) R.string.secret_vault_no_allowed_items
             else R.string.secret_vault_choose_item
         )
         status.setTextColor(theme.keyTextColor)
         unlockButton.visibility = View.GONE
-        insertButton.visibility = View.GONE
-        preview.visibility = View.GONE
         items.removeAllViews()
         phrases.forEach { phrase ->
             items.addView(Button(context).apply {
@@ -122,9 +119,18 @@ class SensitivePhraseUi(private val context: Context, private val theme: Theme) 
     }
 
     fun showError(message: CharSequence) {
+        clearSensitiveContent()
         status.text = message
         status.setTextColor(Color.rgb(220, 85, 85))
         unlockButton.visibility = View.GONE
+    }
+
+    /** Drops every UI-held reference to a decrypted phrase before changing state. */
+    fun clearSensitiveContent() {
+        items.removeAllViews()
+        preview.text = ""
+        preview.visibility = View.GONE
+        insertButton.visibility = View.GONE
         insertButton.isEnabled = false
         insertButton.alpha = 0.35f
     }

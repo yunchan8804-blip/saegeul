@@ -150,6 +150,15 @@
             android:taskAffinity=""
             android:theme="@style/Theme.VoicePermission" />
 
+        <!-- BiometricPrompt must be owned by an Activity, not the detachable IME window. -->
+        <activity
+            android:name=".input.dynamicphrase.SensitivePhraseAuthActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.VoicePermission" />
+
         <!-- One-shot system image picker for local OCR. The selected URI is never persisted. -->
         <activity
             android:name=".input.ocr.OcrDocumentActivity"

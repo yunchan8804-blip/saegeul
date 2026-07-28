@@ -1776,7 +1776,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
-        SensitivePhraseSession.onEditorPackageChanged(attribute.packageName)
+        SensitivePhraseSession.onEditorChanged(
+            DynamicPhraseEditorTarget(
+                packageName = attribute.packageName,
+                fieldId = attribute.fieldId,
+                inputType = attribute.inputType,
+                selectionStart = attribute.initialSelStart,
+                selectionEnd = attribute.initialSelEnd
+            )
+        )
         refreshSnippetCatalog()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         val restartTransport = if (
@@ -1830,7 +1838,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
-        SensitivePhraseSession.onEditorPackageChanged(info.packageName)
+        SensitivePhraseSession.onEditorChanged(
+            DynamicPhraseEditorTarget(
+                packageName = info.packageName,
+                fieldId = info.fieldId,
+                inputType = info.inputType,
+                selectionStart = info.initialSelStart,
+                selectionEnd = info.initialSelEnd
+            )
+        )
         // Browsers may replace EditorInfo between onStartInput and onStartInputView.
         resolveAndApplyAppKeyboardProfile(info, CapabilityFlags.fromEditorInfo(info))
         postFcitxJob {
@@ -1861,6 +1877,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesStart: Int,
         candidatesEnd: Int
     ) {
+        currentInputEditorInfo.let { info ->
+            SensitivePhraseSession.onEditorChanged(
+                DynamicPhraseEditorTarget(
+                    packageName = info.packageName,
+                    fieldId = info.fieldId,
+                    inputType = info.inputType,
+                    selectionStart = newSelStart,
+                    selectionEnd = newSelEnd
+                )
+            )
+        }
         // onUpdateSelection can left behind when user types quickly enough, eg. long press backspace
         cursorUpdateIndex += 1
         Timber.d("onUpdateSelection: old=[$oldSelStart,$oldSelEnd] new=[$newSelStart,$newSelEnd] cand=[$candidatesStart,$candidatesEnd]")
