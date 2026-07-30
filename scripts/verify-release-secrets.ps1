@@ -71,9 +71,9 @@ try {
             $entry.FullName -match "^(?:classes\d*\.dex|resources\.arsc|AndroidManifest\.xml)$" -or
             $entry.FullName -match "^base/(?:dex/classes\d*\.dex|manifest/AndroidManifest\.xml|resources\.pb)$" -or
             $entry.FullName.StartsWith("assets/", [StringComparison]::Ordinal) -or
-            $entry.FullName.StartsWith("res/raw/", [StringComparison]::Ordinal) -or
+            $entry.FullName.StartsWith("res/", [StringComparison]::Ordinal) -or
             $entry.FullName.StartsWith("base/assets/", [StringComparison]::Ordinal) -or
-            $entry.FullName.StartsWith("base/res/raw/", [StringComparison]::Ordinal)
+            $entry.FullName.StartsWith("base/res/", [StringComparison]::Ordinal)
         if (-not $isRuntimeConfiguration -or $entry.Length -eq 0 -or $entry.Length -gt 32MB) {
             continue
         }

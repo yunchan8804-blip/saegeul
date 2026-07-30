@@ -121,9 +121,38 @@ if ($buildMetadata.commitHash -ne $sourceManifest.commit) {
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $apkArchive = [IO.Compression.ZipFile]::OpenRead($resolvedApkPath)
 try {
-    $licenseEntry = $apkArchive.GetEntry("res/raw/aboutlibraries.json")
+    $licenseEntryName = "res/raw/aboutlibraries.json"
+    $licenseEntry = $apkArchive.GetEntry($licenseEntryName)
     if ($null -eq $licenseEntry) {
-        throw "aboutlibraries.json is missing from the APK."
+        $sdkRoot = if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_SDK_ROOT)) {
+            $env:ANDROID_SDK_ROOT
+        } elseif (-not [string]::IsNullOrWhiteSpace($env:ANDROID_HOME)) {
+            $env:ANDROID_HOME
+        } else {
+            throw "ANDROID_SDK_ROOT or ANDROID_HOME is required to resolve optimized resources."
+        }
+        $apkAnalyzer = Join-Path $sdkRoot "cmdline-tools/latest/bin/apkanalyzer.bat"
+        if (-not (Test-Path -LiteralPath $apkAnalyzer -PathType Leaf)) {
+            throw "apkanalyzer was not found at '$apkAnalyzer'."
+        }
+        $resourcePath = @(
+            & $apkAnalyzer resources value `
+                --config default `
+                --type raw `
+                --name aboutlibraries `
+                $resolvedApkPath 2>&1
+        )
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to resolve the optimized AboutLibraries resource:`n$($resourcePath -join "`n")"
+        }
+        $licenseEntryName = ($resourcePath -join "`n").Trim()
+        if ($licenseEntryName -notmatch "^res/[^/]+\.json$") {
+            throw "Unexpected AboutLibraries resource path '$licenseEntryName'."
+        }
+        $licenseEntry = $apkArchive.GetEntry($licenseEntryName)
+    }
+    if ($null -eq $licenseEntry -or $licenseEntry.Length -eq 0) {
+        throw "aboutlibraries.json is missing or empty in the APK."
     }
     $reader = [IO.StreamReader]::new($licenseEntry.Open())
     try {
