@@ -17,15 +17,19 @@ open class NativeBaseConventionPlugin : Plugin<Project> {
         val isBuildingBundle = target.rootProject.gradle.startParameter.taskNames.any {
             it.substringAfterLast(':').startsWith("bundle")
         }
+        val usesApkSplits =
+            target.pluginManager.hasPlugin("com.android.application") && !isBuildingBundle
         target.extensions.configure<CommonExtension> {
             ndkVersion = target.ndkVersion
             defaultConfig.apply {
                 minSdk = Versions.minSdk
-                target.buildAbiOverride
-                    ?.split(",")
-                    ?.map(String::trim)
-                    ?.filter(String::isNotEmpty)
-                    ?.let { ndk.abiFilters.addAll(it) }
+                if (!usesApkSplits) {
+                    target.buildAbiOverride
+                        ?.split(",")
+                        ?.map(String::trim)
+                        ?.filter(String::isNotEmpty)
+                        ?.let { ndk.abiFilters.addAll(it) }
+                }
                 @Suppress("UnstableApiUsage")
                 externalNativeBuild {
                     cmake {
@@ -45,7 +49,7 @@ open class NativeBaseConventionPlugin : Plugin<Project> {
             }
             // split apks should be disabled when building bundle
             // https://issuetracker.google.com/issues/402800800
-            if (!isBuildingBundle) {
+            if (usesApkSplits) {
                 splits.abi {
                     isEnable = true
                     isUniversalApk = false

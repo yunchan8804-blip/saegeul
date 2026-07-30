@@ -5,14 +5,19 @@
 package org.fcitx.fcitx5.android
 
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.RawConfig
@@ -92,6 +97,41 @@ class FcitxTest {
         Assert.assertFalse(available.contains("shuangpin"))
         Assert.assertFalse(available.contains("wbx"))
         Assert.assertFalse(available.contains("wbpy"))
+    }
+
+    @Test
+    fun testInstalledHangulPluginComposesTwoSetText(): Unit = runBlocking {
+        val available = fcitx.availableIme().map { it.uniqueName }.toSet()
+        Assert.assertTrue(
+            "The separately installed Hangul plugin was not discovered.",
+            available.contains("hangul")
+        )
+
+        fcitx.setEnabledIme(arrayOf("hangul", "keyboard-us"))
+        fcitx.activateIme("hangul")
+        fcitx.focus(true)
+        fcitx.reset()
+        try {
+            val committedText = async(start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(5_000) {
+                    fcitx.eventFlow
+                        .filterIsInstance<FcitxEvent.CommitStringEvent>()
+                        .first { it.data.text.contains("가") }
+                        .data.text
+                }
+            }
+            fcitx.sendKey('r')
+            fcitx.sendKey('k')
+            fcitx.sendKey(' ')
+            val actual = committedText.await()
+            Assert.assertTrue(
+                "Two-set Hangul input did not commit '가': '$actual'.",
+                actual.contains("가")
+            )
+        } finally {
+            fcitx.reset()
+            fcitx.focus(false)
+        }
     }
 
 }

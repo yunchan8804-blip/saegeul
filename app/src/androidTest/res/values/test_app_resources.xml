@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-License-Identifier: LGPL-2.1-or-later
+SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+-->
+<resources>
+    <!--
+    Build-type resValue aliases are also generated for the standalone instrumentation APK.
+    Give that APK local targets without copying the product launcher artwork into test outputs.
+    -->
+    <item name="ic_launcher_debug" type="mipmap">@android:drawable/sym_def_app_icon</item>
+    <item name="ic_launcher_round_debug" type="mipmap">@android:drawable/sym_def_app_icon</item>
+    <string name="app_name_debug" translatable="false">Release device verification</string>
+</resources>

@@ -198,6 +198,25 @@ provider authority, 플러그인 action/metadata, 공식 앱의 배포·스토�
 실패한다. 내부 Kotlin namespace와 원 구성요소의 저작권·소스 링크는 귀속과 호환성을
 위해 허용한다.
 
+실기기 게이트는 공식 `bundletool` JAR과 같은 빌드의 APK/AAB/한글 플러그인 APK/
+instrumentation APK를 사용한다. AAB 설치와 APK 재설치 후 Android 패키지 관리자의
+플러그인 action 검색, Fcitx 엔진의 `hangul` 검색, 두벌식 `가` 조합·확정, 구
+`org.fcitx.fcitx5.android` 내보내기 데이터의 설정 이전과 클립보드 제외를 검사한다.
+
+```powershell
+.\scripts\verify-release-device.ps1 `
+  -Serial <adb-serial> `
+  -MainApkPath <main.apk> `
+  -MainAabPath <main.aab> `
+  -HangulApkPath <hangul.apk> `
+  -AndroidTestApkPath <app-debug-androidTest.apk> `
+  -BundletoolJarPath <bundletool-all.jar> `
+  -KeystorePath <release-keystore> `
+  -KeyAlias <release-key-alias> `
+  -KeystorePasswordFile <outside-repository-password-file> `
+  -KeyPasswordFile <outside-repository-password-file>
+```
+
 ## 8. 스토어 정책 게이트
 
 라이선스 준수와 Play 사용자 데이터 정책은 별도 게이트다. IME가 접근하거나 전송할
