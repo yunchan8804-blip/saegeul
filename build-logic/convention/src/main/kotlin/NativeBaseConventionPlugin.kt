@@ -15,12 +15,17 @@ open class NativeBaseConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         val prebuiltDir = target.rootProject.projectDir.resolve("lib/fcitx5/src/main/cpp/prebuilt")
         val isBuildingBundle = target.rootProject.gradle.startParameter.taskNames.any {
-            it.startsWith("${target.path}:bundle")
+            it.substringAfterLast(':').startsWith("bundle")
         }
         target.extensions.configure<CommonExtension> {
             ndkVersion = target.ndkVersion
             defaultConfig.apply {
                 minSdk = Versions.minSdk
+                target.buildAbiOverride
+                    ?.split(",")
+                    ?.map(String::trim)
+                    ?.filter(String::isNotEmpty)
+                    ?.let { ndk.abiFilters.addAll(it) }
                 @Suppress("UnstableApiUsage")
                 externalNativeBuild {
                     cmake {

@@ -10,6 +10,9 @@ param(
     [string]$MainApkPath,
 
     [Parameter(Mandatory = $true)]
+    [string]$MainAabPath,
+
+    [Parameter(Mandatory = $true)]
     [string]$HangulApkPath,
 
     [Parameter(Mandatory = $true)]
@@ -49,6 +52,7 @@ $ErrorActionPreference = "Stop"
 $resolvedReleaseDirectory = (Resolve-Path -LiteralPath $ReleaseDirectory).Path
 $resolvedInputs = [ordered]@{
     MainApk = (Resolve-Path -LiteralPath $MainApkPath).Path
+    MainAab = (Resolve-Path -LiteralPath $MainAabPath).Path
     HangulApk = (Resolve-Path -LiteralPath $HangulApkPath).Path
     BuildMetadata = (Resolve-Path -LiteralPath $BuildMetadataPath).Path
     SourceArchive = (Resolve-Path -LiteralPath $SourceArchivePath).Path
@@ -79,10 +83,22 @@ if ($LASTEXITCODE -ne 0) {
     throw "APK license verification failed."
 }
 
+& (Join-Path $PSScriptRoot "verify-release-aab.ps1") `
+    -AabPath $resolvedInputs.MainAab
+if ($LASTEXITCODE -ne 0) {
+    throw "AAB structure verification failed."
+}
+
 & (Join-Path $PSScriptRoot "verify-release-secrets.ps1") `
     -ApkPath $resolvedInputs.MainApk
 if ($LASTEXITCODE -ne 0) {
     throw "Main APK secret verification failed."
+}
+
+& (Join-Path $PSScriptRoot "verify-release-secrets.ps1") `
+    -PackagePath $resolvedInputs.MainAab
+if ($LASTEXITCODE -ne 0) {
+    throw "Main AAB secret verification failed."
 }
 
 & (Join-Path $PSScriptRoot "verify-release-secrets.ps1") `

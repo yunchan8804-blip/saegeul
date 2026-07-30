@@ -164,7 +164,12 @@ APK 검사는 Chinese Addons 라이선스 레코드, `pinyin.lua`, 관련 설정
 10. 명시적 내보내기/가져오기 데이터 이전
 11. 공개 개인정보처리방침·앱 내 고지·Data Safety 답변 일치
 
-릴리스 파일은 한 디렉터리에 APK, Hangul 플러그인 APK, `build-metadata.json`,
+APK split과 AAB는 같은 ABI 계약을 사용한다. `-PbuildABI=<abi>`를 주면 앱과 모든
+네이티브 하위 모듈의 `ndk.abiFilters`를 함께 제한하고, override 없이 bundle을 만들면
+지원 ABI 전체를 포함한다. 앱만 bundle 모드로 보고 하위 모듈은 split 모드로 남기는
+혼합 구성은 허용하지 않는다.
+
+릴리스 파일은 한 디렉터리에 APK, AAB, Hangul 플러그인 APK, `build-metadata.json`,
 같은 태그의 재귀 소스 아카이브와 SHA-256 sidecar를 먼저 배치한다. 다음 검사는
 소스 태그·바이너리 커밋 일치, 라이선스, 비밀값, 공개 식별자, 서명 인증서,
 소스 URL, 앱 내부 개인정보 고지, 마이크·네트워크 권한, 클립보드 백업 제외를
@@ -174,6 +179,7 @@ APK 검사는 Chinese Addons 라이선스 레코드, `pinyin.lua`, 관련 설정
 .\scripts\verify-release-bundle.ps1 `
   -ReleaseDirectory <release-directory> `
   -MainApkPath <release-directory>\<main>.apk `
+  -MainAabPath <release-directory>\<main>.aab `
   -HangulApkPath <release-directory>\<hangul>.apk `
   -BuildMetadataPath <release-directory>\build-metadata.json `
   -SourceArchivePath <release-directory>\<tag>-source.tar.gz `

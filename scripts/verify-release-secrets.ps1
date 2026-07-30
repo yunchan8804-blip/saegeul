@@ -4,7 +4,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$ApkPath
+    [Alias("ApkPath")]
+    [string]$PackagePath
 )
 
 Set-StrictMode -Version Latest
@@ -45,7 +46,7 @@ function Test-ContentForSecrets {
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$resolvedApkPath = (Resolve-Path -LiteralPath $ApkPath).Path
+$resolvedPackagePath = (Resolve-Path -LiteralPath $PackagePath).Path
 
 $trackedFiles = @(& git -C $repositoryRoot ls-files)
 if ($LASTEXITCODE -ne 0) {
@@ -63,13 +64,16 @@ if ($LASTEXITCODE -ne 1) {
 }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$archive = [IO.Compression.ZipFile]::OpenRead($resolvedApkPath)
+$archive = [IO.Compression.ZipFile]::OpenRead($resolvedPackagePath)
 try {
     foreach ($entry in $archive.Entries) {
         $isRuntimeConfiguration =
             $entry.FullName -match "^(?:classes\d*\.dex|resources\.arsc|AndroidManifest\.xml)$" -or
+            $entry.FullName -match "^base/(?:dex/classes\d*\.dex|manifest/AndroidManifest\.xml|resources\.pb)$" -or
             $entry.FullName.StartsWith("assets/", [StringComparison]::Ordinal) -or
-            $entry.FullName.StartsWith("res/raw/", [StringComparison]::Ordinal)
+            $entry.FullName.StartsWith("res/raw/", [StringComparison]::Ordinal) -or
+            $entry.FullName.StartsWith("base/assets/", [StringComparison]::Ordinal) -or
+            $entry.FullName.StartsWith("base/res/raw/", [StringComparison]::Ordinal)
         if (-not $isRuntimeConfiguration -or $entry.Length -eq 0 -or $entry.Length -gt 32MB) {
             continue
         }
@@ -82,7 +86,7 @@ try {
             $memory.Dispose()
             $stream.Dispose()
         }
-        Test-ContentForSecrets -Source "APK:$($entry.FullName)" -Content $content
+        Test-ContentForSecrets -Source "PACKAGE:$($entry.FullName)" -Content $content
     }
 } finally {
     $archive.Dispose()
@@ -90,4 +94,4 @@ try {
 
 Write-Output "Release secret audit: PASS"
 Write-Output "Tracked files scanned: $($trackedFiles.Count)"
-Write-Output "APK: $resolvedApkPath"
+Write-Output "Package: $resolvedPackagePath"
