@@ -95,6 +95,10 @@
 데이터 이전은 기존 공식 앱의 저장소를 몰래 읽지 않는다. 사용자가 명시적으로
 내보내고 새 앱에서 가져오는 버전 있는 이전 파일을 기본 경로로 삼는다. 민감한
 클립보드 기록은 Android 백업·기기 이전·새 ZIP 내보내기와 가져오기에서 제외한다.
+새 ZIP은 공개 applicationId와 독립적인 archive lineage version 2를 기록하며, 기존
+`org.fcitx.fcitx5.android` 및 debug 변형의 version 1 ZIP만 명시적 legacy 입력으로
+허용한다. 가져올 때 기본 SharedPreferences 파일을 새 package 이름으로 바꾸고
+클립보드 활성화 값은 제거해 새 앱에서 다시 직접 켜도록 한다.
 
 ## 5. 표시와 라이선스 계약
 

@@ -50,6 +50,7 @@
 - `DONE` GIF 검색 화면에 공급자별 전송 내용을 표시한다. GIPHY는 임의 식별자와 이벤트 전송까지 명시한다.
 - `DONE` GIPHY 설정 삭제 시 API 설정과 임의 분석 식별자를 함께 삭제한다.
 - `DONE` 클립보드 기록은 새 설치에서 기본으로 끄고, 클립보드 DB와 sidecar를 Android 클라우드 백업·기기 이전·새 ZIP 내보내기·ZIP 가져오기에서 제외한다.
+- `DONE` 구 패키지 ZIP을 새 applicationId로 가져오는 version 2 lineage를 두되, 클립보드 기록과 기존 활성화 값은 이전하지 않는다.
 - `DONE` 앱의 About 화면에서 오프라인으로 열리는 `개인정보·데이터 안내`를 제공한다.
 - `DONE` AI·음성·GIF 키와 OAuth 토큰은 Keystore 암호화 백업 제외 저장소에 두며 일반 사용자 데이터 ZIP에 넣지 않는다.
 

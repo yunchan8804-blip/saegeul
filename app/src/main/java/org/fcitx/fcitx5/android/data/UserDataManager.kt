@@ -20,9 +20,18 @@ import timber.log.Timber
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.StringReader
+import java.io.StringWriter
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.OutputKeys
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
+import org.w3c.dom.Element
+import org.xml.sax.InputSource
 
 object UserDataManager {
 
@@ -33,7 +42,9 @@ object UserDataManager {
         val packageName: String,
         val versionCode: Long,
         val versionName: String,
-        val exportTime: Long
+        val exportTime: Long,
+        val formatVersion: Int = UserDataMigrationPolicy.LEGACY_FORMAT_VERSION,
+        val lineageId: String? = null
     )
 
     private fun writeFileTree(
@@ -79,10 +90,12 @@ object UserDataManager {
             zipStream.putNextEntry(ZipEntry("metadata.json"))
             val pkgInfo = appContext.packageManager.getPackageInfo(appContext.packageName, 0)
             val metadata = Metadata(
-                pkgInfo.packageName,
-                pkgInfo.versionCodeCompat,
-                Const.versionName,
-                timestamp
+                packageName = pkgInfo.packageName,
+                versionCode = pkgInfo.versionCodeCompat,
+                versionName = Const.versionName,
+                exportTime = timestamp,
+                formatVersion = UserDataMigrationPolicy.CURRENT_FORMAT_VERSION,
+                lineageId = UserDataMigrationPolicy.LINEAGE_ID
             )
             json.encodeToStream(metadata, zipStream)
             zipStream.closeEntry()
@@ -106,8 +119,20 @@ object UserDataManager {
                 val metadataFile = extracted.find { it.name == "metadata.json" }
                     ?: errorRuntime(R.string.exception_user_data_metadata)
                 val metadata = json.decodeFromString<Metadata>(metadataFile.readText())
-                if (metadata.packageName != BuildConfig.APPLICATION_ID)
+                if (!UserDataMigrationPolicy.canImport(
+                        sourcePackage = metadata.packageName,
+                        currentPackage = BuildConfig.APPLICATION_ID,
+                        formatVersion = metadata.formatVersion,
+                        lineageId = metadata.lineageId
+                    )
+                ) {
                     errorRuntime(R.string.exception_user_data_package_name_mismatch)
+                }
+                UserDataMigrationPolicy.prepareSharedPreferences(
+                    directory = File(tempDir, "shared_prefs"),
+                    sourcePackage = metadata.packageName,
+                    currentPackage = BuildConfig.APPLICATION_ID
+                )
                 copyDir(File(tempDir, "shared_prefs"), sharedPrefsDir)
                 File(tempDir, "databases").listFiles()?.forEach { file ->
                     if (!UserDataExportPolicy.shouldIncludeDatabase(file.name)) {
@@ -128,4 +153,96 @@ object UserDataManager {
 internal object UserDataExportPolicy {
     fun shouldIncludeDatabase(name: String): Boolean =
         name != "clbdb" && !name.startsWith("clbdb-")
+}
+
+/**
+ * Versioned archive lineage that survives the public application-ID change.
+ *
+ * Legacy imports accept only the two historical package variants. Current archives use a stable
+ * internal lineage identifier, so later public rebrands do not need another package-name bypass.
+ */
+internal object UserDataMigrationPolicy {
+    const val LEGACY_FORMAT_VERSION = 1
+    const val CURRENT_FORMAT_VERSION = 2
+    const val LINEAGE_ID = "urn:uuid:3d643872-b0ef-446a-968a-f134f46e20bf"
+
+    private val AndroidPackageName =
+        Regex("[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+")
+    private val LegacyPackages = setOf(
+        "org.fcitx.fcitx5.android",
+        "org.fcitx.fcitx5.android.debug"
+    )
+
+    fun canImport(
+        sourcePackage: String,
+        currentPackage: String,
+        formatVersion: Int,
+        lineageId: String?
+    ): Boolean {
+        if (!AndroidPackageName.matches(sourcePackage) ||
+            !AndroidPackageName.matches(currentPackage)
+        ) {
+            return false
+        }
+        return when (formatVersion) {
+            LEGACY_FORMAT_VERSION ->
+                sourcePackage == currentPackage || sourcePackage in LegacyPackages
+            CURRENT_FORMAT_VERSION -> lineageId == LINEAGE_ID
+            else -> false
+        }
+    }
+
+    fun prepareSharedPreferences(
+        directory: File,
+        sourcePackage: String,
+        currentPackage: String
+    ) {
+        if (!directory.isDirectory) return
+        val source = File(directory, defaultPreferenceFileName(sourcePackage))
+        val target = File(directory, defaultPreferenceFileName(currentPackage))
+        if (source.isFile && source.canonicalFile != target.canonicalFile) {
+            target.parentFile?.mkdirs()
+            source.copyTo(target, overwrite = true)
+            source.delete()
+        }
+        if (target.isFile) {
+            target.writeText(sanitizeDefaultPreferences(target.readText()))
+        }
+    }
+
+    internal fun sanitizeDefaultPreferences(xml: String): String {
+        val factory = DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+        }
+        val document = factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
+        val root = document.documentElement
+        val children = root.childNodes
+        for (index in children.length - 1 downTo 0) {
+            val element = children.item(index) as? Element ?: continue
+            if (element.getAttribute("name") == "clipboard_enable") {
+                root.removeChild(element)
+            }
+        }
+        val transformer = TransformerFactory.newInstance().apply {
+            runCatching {
+                setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
+            }
+            runCatching {
+                setAttribute("http://javax.xml.XMLConstants/property/accessExternalStylesheet", "")
+            }
+        }.newTransformer().apply {
+            setOutputProperty(OutputKeys.ENCODING, Charsets.UTF_8.name())
+            setOutputProperty(OutputKeys.INDENT, "yes")
+        }
+        return StringWriter().also {
+            transformer.transform(DOMSource(document), StreamResult(it))
+        }.toString()
+    }
+
+    private fun defaultPreferenceFileName(packageName: String): String =
+        "${packageName}_preferences.xml"
 }
