@@ -108,7 +108,13 @@ foreach ($requiredText in @(
     "Clipboard history is off by default",
     "store=false",
     "separate just-in-time disclosure and consent",
-    "random app identifier"
+    "random app identifier",
+    "approximate location",
+    "in-app search history",
+    "other user-generated content",
+    "voice or sound recordings",
+    "device or other ID",
+    "app interactions"
 )) {
     if (-not $privacyNotice.Contains($requiredText, [StringComparison]::Ordinal)) {
         throw "Embedded privacy notice is missing required statement '$requiredText'."

@@ -408,10 +408,10 @@
     <string name="gif_query_inline_hint" tools:ignore="MissingTranslation">Type a GIF search</string>
     <string name="gif_query_clear" tools:ignore="MissingTranslation">Clear</string>
     <string name="gif_search_action" tools:ignore="MissingTranslation">Search</string>
-    <string name="gif_disclosure_noto" tools:ignore="MissingTranslation">The catalog and media are downloaded from Google Fonts. Search terms are matched only on this device.</string>
-    <string name="gif_disclosure_klipy" tools:ignore="MissingTranslation">Your search term and network information are sent to KLIPY; selected media is loaded from the provider’s media host.</string>
-    <string name="gif_disclosure_commons" tools:ignore="MissingTranslation">Your search term and network information are sent to Wikimedia Commons; selected media is loaded from Wikimedia.</string>
-    <string name="gif_disclosure_giphy" tools:ignore="MissingTranslation">Your search term, a random app identifier, and load, click, and send events are sent to GIPHY.</string>
+    <string name="gif_disclosure_noto" tools:ignore="MissingTranslation">The catalog and media are downloaded from Google Fonts. Search terms are matched only on this device, but connection information such as your IP address is visible to Google Fonts.</string>
+    <string name="gif_disclosure_klipy" tools:ignore="MissingTranslation">Your search term and connection information such as your IP address are sent to KLIPY; selected media is loaded from the provider’s media host.</string>
+    <string name="gif_disclosure_commons" tools:ignore="MissingTranslation">Your search term and connection information such as your IP address are sent to Wikimedia Commons; selected media is loaded from Wikimedia.</string>
+    <string name="gif_disclosure_giphy" tools:ignore="MissingTranslation">Your search term, connection information such as your IP address, a random app identifier, and load, click, and send events are sent to GIPHY.</string>
     <string name="gif_disclosure_unavailable" tools:ignore="MissingTranslation">GIPHY network access remains disabled until an approved production configuration is available.</string>
     <string name="gif_keyword_trending" tools:ignore="MissingTranslation">Trending</string>
     <string name="gif_keyword_meme" tools:ignore="MissingTranslation">Memes</string>
@@ -500,7 +500,7 @@
     <string name="ai_assistant_title" tools:ignore="MissingTranslation">AI writing</string>
     <string name="ai_back" tools:ignore="MissingTranslation">Keyboard</string>
     <string name="ai_source_label" tools:ignore="MissingTranslation">Text sent to AI</string>
-    <string name="ai_transmission_disclosure" tools:ignore="MissingTranslation">Tapping an action sends the text above and any custom instruction to %1$s to generate writing. This app requests store=false and does not save source text or results in usage history. Provider processing and retention follow that provider’s terms.</string>
+    <string name="ai_transmission_disclosure" tools:ignore="MissingTranslation">Tapping an action sends the text above, any custom instruction, and connection information such as your IP address to %1$s to generate writing. This app requests store=false and does not save source text or results in usage history. Provider processing and retention follow that provider’s terms.</string>
     <string name="ai_source_scope_selection" tools:ignore="MissingTranslation">Selected text</string>
     <string name="ai_source_scope_editor" tools:ignore="MissingTranslation">Current input</string>
     <string name="ai_source_scope_cursor_context" tools:ignore="MissingTranslation">Text around cursor</string>
@@ -827,10 +827,10 @@
     <string name="voice_permission_denied">Microphone permission was not granted. No audio was recorded or sent.</string>
     <string name="voice_permission_allow">Allow microphone</string>
     <string name="voice_microphone_disclosure_title" tools:ignore="MissingTranslation">Online speech transmission</string>
-    <string name="voice_microphone_disclosure_message" tools:ignore="MissingTranslation">To create a transcript, microphone audio is sent over encrypted HTTPS or WSS to OpenAI or the compatible online speech provider you configured. Precision mode sends the recording after you stop; realtime mode sends audio chunks while you speak. This app does not retain an audio file, and inserts text only after you review it. Provider processing and retention follow that provider’s terms. Continue to accept this transmission and proceed to Android’s microphone permission.</string>
+    <string name="voice_microphone_disclosure_message" tools:ignore="MissingTranslation">To create a transcript, microphone audio and connection information such as your IP address are sent over encrypted HTTPS or WSS to OpenAI or the compatible online speech provider you configured. Precision mode sends the recording after you stop; realtime mode sends audio chunks while you speak. This app does not retain an audio file, and inserts text only after you review it. Provider processing and retention follow that provider’s terms. Continue to accept this transmission and proceed to Android’s microphone permission.</string>
     <string name="voice_microphone_disclosure_continue" tools:ignore="MissingTranslation">Continue to permission</string>
     <string name="voice_meeting_disclosure_title" tools:ignore="MissingTranslation">Upload meeting audio for transcription</string>
-    <string name="voice_meeting_disclosure_message" tools:ignore="MissingTranslation">The audio file you choose (up to 24 MB and 60 minutes) is uploaded over encrypted HTTPS to OpenAI or the compatible online speech provider you configured to create a speaker-separated transcript. This app does not retain a copy of the file. Provider processing and retention follow that provider’s terms. Continue only if you have permission to upload every speaker’s voice.</string>
+    <string name="voice_meeting_disclosure_message" tools:ignore="MissingTranslation">The audio file you choose (up to 24 MB and 60 minutes) and connection information such as your IP address are sent over encrypted HTTPS to OpenAI or the compatible online speech provider you configured to create a speaker-separated transcript. This app does not retain a copy of the file. Provider processing and retention follow that provider’s terms. Continue only if you have permission to upload every speaker’s voice.</string>
     <string name="voice_meeting_disclosure_continue" tools:ignore="MissingTranslation">Choose audio file</string>
     <string name="voice_private_disabled">Dictation is disabled in password, sensitive, and no-personalized-learning fields</string>
     <string name="voice_policy_disabled">Dictation is blocked by offline mode or this app’s network policy</string>

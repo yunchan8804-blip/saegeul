@@ -12,6 +12,17 @@ on:
       - "settings.gradle.kts"
       - "build-logic/convention/src/main/kotlin/ProductIdentity.kt"
       - "scripts/verify-public-source-identity.ps1"
+      - "scripts/verify-play-data-safety-contract.ps1"
+      - "docs/independent-fork/privacy-data-safety.md"
+      - "docs/independent-fork/play-data-safety-declaration.json"
+      - "site/privacy/**"
+      - "app/src/main/AndroidManifest.xml"
+      - "app/src/main/assets/legal/DATA-PRIVACY.txt"
+      - "app/src/main/res/values/strings.xml"
+      - "app/src/main/res/values-ko/strings.xml"
+      - "app/src/main/java/**/input/ai/**"
+      - "app/src/main/java/**/input/gif/**"
+      - "app/src/main/java/**/input/voice/**"
       - ".github/workflows/**"
   pull_request:
     paths:
@@ -20,6 +31,17 @@ on:
       - "settings.gradle.kts"
       - "build-logic/convention/src/main/kotlin/ProductIdentity.kt"
       - "scripts/verify-public-source-identity.ps1"
+      - "scripts/verify-play-data-safety-contract.ps1"
+      - "docs/independent-fork/privacy-data-safety.md"
+      - "docs/independent-fork/play-data-safety-declaration.json"
+      - "site/privacy/**"
+      - "app/src/main/AndroidManifest.xml"
+      - "app/src/main/assets/legal/DATA-PRIVACY.txt"
+      - "app/src/main/res/values/strings.xml"
+      - "app/src/main/res/values-ko/strings.xml"
+      - "app/src/main/java/**/input/ai/**"
+      - "app/src/main/java/**/input/gif/**"
+      - "app/src/main/java/**/input/voice/**"
       - ".github/workflows/**"
   workflow_dispatch:
 
@@ -42,3 +64,6 @@ jobs:
             -ExpectedApplicationId "kr.twentyoz.saegeul" `
             -ExpectedRepositoryUrl "https://github.com/yunchan8804-blip/saegeul" `
             -ExpectedPrivacyPolicyUrl "https://saegeul.twentyoz.kr/privacy/"
+      - name: Verify Play Data Safety contract
+        shell: pwsh
+        run: ./scripts/verify-play-data-safety-contract.ps1

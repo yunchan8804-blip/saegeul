@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "spdxLicense": "LGPL-2.1-or-later",
+  "copyright": "Copyright 2026 Yun Chan",
+  "status": "READY_FOR_PLAY_CONSOLE_DRAFT",
+  "applicationId": "kr.twentyoz.saegeul",
+  "publisher": "Yun Chan",
+  "contactEmail": "yunchan@twentyoz.kr",
+  "privacyPolicyUrl": "https://saegeul.twentyoz.kr/privacy/",
+  "globalAnswers": {
+    "collectsOrSharesData": true,
+    "allCollectedDataEncryptedInTransit": true,
+    "deletionRequestMechanism": false,
+    "developerAccount": false,
+    "dataSale": false
+  },
+  "releaseProviderSet": [
+    {
+      "id": "openai-compatible-ai",
+      "data": ["approximate_location", "other_user_generated_content"],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": false
+    },
+    {
+      "id": "openai-compatible-speech",
+      "data": ["approximate_location", "voice_or_sound_recordings"],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": false
+    },
+    {
+      "id": "google-fonts",
+      "data": ["approximate_location"],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": false
+    },
+    {
+      "id": "klipy",
+      "data": ["approximate_location", "in_app_search_history"],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": true
+    },
+    {
+      "id": "wikimedia-commons",
+      "data": ["approximate_location", "in_app_search_history"],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": false
+    },
+    {
+      "id": "giphy",
+      "data": [
+        "approximate_location",
+        "in_app_search_history",
+        "app_interactions",
+        "device_or_other_ids"
+      ],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": true
+    },
+    {
+      "id": "github-raw-content",
+      "data": ["approximate_location"],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": false
+    },
+    {
+      "id": "oauth-provider",
+      "data": ["approximate_location"],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": false
+    }
+  ],
+  "dataTypes": [
+    {
+      "id": "approximate_location",
+      "playCategory": "Location",
+      "playType": "Approximate location",
+      "source": "Connection IP address visible to selected online providers",
+      "collected": true,
+      "shared": true,
+      "processedEphemerally": false,
+      "optional": true,
+      "purposes": ["App functionality"]
+    },
+    {
+      "id": "in_app_search_history",
+      "playCategory": "App activity",
+      "playType": "In-app search history",
+      "source": "Search terms sent to the selected network GIF provider",
+      "collected": true,
+      "shared": true,
+      "processedEphemerally": false,
+      "optional": true,
+      "purposes": ["App functionality"]
+    },
+    {
+      "id": "other_user_generated_content",
+      "playCategory": "App activity",
+      "playType": "Other user-generated content",
+      "source": "AI source text and custom instructions explicitly submitted by the user",
+      "collected": true,
+      "shared": true,
+      "processedEphemerally": false,
+      "optional": true,
+      "purposes": ["App functionality"]
+    },
+    {
+      "id": "voice_or_sound_recordings",
+      "playCategory": "Audio files",
+      "playType": "Voice or sound recordings",
+      "source": "Microphone audio or a meeting audio file explicitly submitted for transcription",
+      "collected": true,
+      "shared": true,
+      "processedEphemerally": false,
+      "optional": true,
+      "purposes": ["App functionality"]
+    },
+    {
+      "id": "app_interactions",
+      "playCategory": "App activity",
+      "playType": "App interactions",
+      "source": "GIPHY result load, click, and send events when an approved GIPHY configuration is used",
+      "collected": true,
+      "shared": true,
+      "processedEphemerally": false,
+      "optional": true,
+      "purposes": ["App functionality", "Analytics"]
+    },
+    {
+      "id": "device_or_other_ids",
+      "playCategory": "Device or other IDs",
+      "playType": "Device or other IDs",
+      "source": "Random app identifier used only by an approved GIPHY configuration",
+      "collected": true,
+      "shared": true,
+      "processedEphemerally": false,
+      "optional": true,
+      "purposes": ["App functionality", "Analytics"]
+    }
+  ],
+  "notCollectedOffDevice": [
+    "Ordinary typed text",
+    "Clipboard history",
+    "OCR photos and recognized text",
+    "Personal dictionary",
+    "Files and docs other than audio classified above",
+    "Crash logs",
+    "Diagnostics"
+  ],
+  "submissionRules": [
+    "Do not change shared to false without provider-role evidence for every shipped provider.",
+    "Do not change processedEphemerally to true based only on store=false or local non-retention.",
+    "Do not submit until the public privacy policy URL is live and the provider approval gates are closed.",
+    "Re-run the contract verifier whenever permissions, providers, disclosures, or network data paths change."
+  ]
+}
