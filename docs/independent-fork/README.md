@@ -158,6 +158,33 @@ APK 검사는 Chinese Addons 라이선스 레코드, `pinyin.lua`, 관련 설정
 9. 두벌식 한글 조합·확정
 10. 명시적 내보내기/가져오기 데이터 이전
 
+릴리스 파일은 한 디렉터리에 APK, Hangul 플러그인 APK, `build-metadata.json`,
+같은 태그의 재귀 소스 아카이브와 SHA-256 sidecar를 먼저 배치한다. 다음 검사는
+소스 태그·바이너리 커밋 일치, 라이선스, 비밀값, 공개 식별자, 서명 인증서,
+소스 URL을 검사하고 CycloneDX 1.6 SBOM을 생성한다.
+
+```powershell
+.\scripts\verify-release-bundle.ps1 `
+  -ReleaseDirectory <release-directory> `
+  -MainApkPath <release-directory>\<main>.apk `
+  -HangulApkPath <release-directory>\<hangul>.apk `
+  -BuildMetadataPath <release-directory>\build-metadata.json `
+  -SourceArchivePath <release-directory>\<tag>-source.tar.gz `
+  -SourceTag <tag> `
+  -SbomOutputPath <release-directory>\<tag>.cdx.json `
+  -ProductName <product-name> `
+  -ApplicationId <kr.owned-domain.product> `
+  -SourceRepositoryUrl <owned-repository-url> `
+  -PrivacyPolicyUrl <owned-privacy-policy-url> `
+  -SourceArchiveUrl <same-download-location-source-url> `
+  -SigningCertificateSha256 <release-certificate-sha256>
+```
+
+`verify-release-identity.ps1`은 기존 Fcitx 공개 앱 ID, OAuth scheme, IPC permission,
+provider authority, 플러그인 action/metadata, 공식 앱의 배포·스토어 링크가 남아 있으면
+실패한다. 내부 Kotlin namespace와 원 구성요소의 저작권·소스 링크는 귀속과 호환성을
+위해 허용한다.
+
 ## 8. 스토어 정책 게이트
 
 라이선스 준수와 Play 사용자 데이터 정책은 별도 게이트다. IME가 접근하거나 전송할
