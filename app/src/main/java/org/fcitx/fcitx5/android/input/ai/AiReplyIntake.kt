@@ -168,7 +168,12 @@ object AiReplySourcePolicy {
     /** External source text is context, never editor text to replace. Bind only to a plain cursor. */
     fun bindToEditor(source: AiReplySource, editor: AiEditorTarget): AiInputSnapshot? {
         if (editor.selectionStart < 0 || editor.selectionStart != editor.selectionEnd) return null
-        return AiInputSnapshot(editor, source.text, AiSourceKind.BeforeCursor)
+        return AiInputSnapshot(
+            editor = editor,
+            source = source.text,
+            sourceKind = AiSourceKind.BeforeCursor,
+            scope = AiSourceScope.ExternalReply
+        )
     }
 }
 

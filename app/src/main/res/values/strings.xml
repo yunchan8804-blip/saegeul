@@ -483,8 +483,23 @@
     <string name="quickphrase" tools:ignore="MissingTranslation">Quick phrase</string>
     <string name="ai_assistant_title" tools:ignore="MissingTranslation">AI writing</string>
     <string name="ai_back" tools:ignore="MissingTranslation">Keyboard</string>
-    <string name="ai_source_label" tools:ignore="MissingTranslation">Text to send after you choose an action</string>
+    <string name="ai_source_label" tools:ignore="MissingTranslation">Text sent to AI</string>
+    <string name="ai_source_scope_selection" tools:ignore="MissingTranslation">Selected text</string>
+    <string name="ai_source_scope_editor" tools:ignore="MissingTranslation">Current input</string>
+    <string name="ai_source_scope_cursor_context" tools:ignore="MissingTranslation">Text around cursor</string>
+    <string name="ai_source_preview_more" tools:ignore="MissingTranslation">More</string>
+    <string name="ai_source_preview_collapse" tools:ignore="MissingTranslation">Less</string>
+    <string name="ai_source_preview_full" tools:ignore="MissingTranslation">View full text</string>
+    <string name="ai_source_preview_back" tools:ignore="MissingTranslation">Back to actions</string>
+    <string name="ai_result_source" tools:ignore="MissingTranslation">Original text</string>
     <string name="ai_direct_prompt_hint" tools:ignore="MissingTranslation">Type a custom writing request</string>
+    <string name="ai_direct_prompt_title" tools:ignore="MissingTranslation">AI request</string>
+    <string name="ai_direct_prompt_context" tools:ignore="MissingTranslation">Applies to the current input</string>
+    <string name="ai_direct_prompt_context_selection" tools:ignore="MissingTranslation">Applies to selected text</string>
+    <string name="ai_direct_prompt_context_editor" tools:ignore="MissingTranslation">Applies to the entire current input</string>
+    <string name="ai_direct_prompt_context_cursor" tools:ignore="MissingTranslation">Applies to text around the cursor</string>
+    <string name="ai_direct_prompt_context_shared" tools:ignore="MissingTranslation">Applies to the shared reply text</string>
+    <string name="ai_direct_prompt_context_clipboard" tools:ignore="MissingTranslation">Applies to clipboard text</string>
     <string name="ai_direct_prompt_run" tools:ignore="MissingTranslation">Run</string>
     <string name="ai_direct_prompt_clear" tools:ignore="MissingTranslation">Clear</string>
     <string name="ai_actions_writing" tools:ignore="MissingTranslation">Writing</string>
@@ -500,6 +515,7 @@
     <string name="voice_connection_label" tools:ignore="MissingTranslation">Voice connection: %1$s</string>
     <string name="ai_retry" tools:ignore="MissingTranslation">Retry</string>
     <string name="ai_undo" tools:ignore="MissingTranslation">Undo</string>
+    <string name="ai_undo_applied" tools:ignore="MissingTranslation">Applied · Undo</string>
     <string name="ai_error" tools:ignore="MissingTranslation">AI error: %1$s</string>
     <string name="ai_error_empty_result" tools:ignore="MissingTranslation">The provider returned no usable suggestion</string>
     <string name="ai_suggestion_contract_failed" tools:ignore="MissingTranslation">AI did not produce the requested number of distinct drafts. Please try again.</string>
@@ -515,6 +531,10 @@
     <string name="ai_diff_changes" tools:ignore="MissingTranslation">Choose corrections to apply</string>
     <string name="ai_diff_apply_selected" tools:ignore="MissingTranslation">Apply selected</string>
     <string name="ai_diff_no_changes" tools:ignore="MissingTranslation">No changes found</string>
+    <string name="ai_result_no_changes" tools:ignore="MissingTranslation">This result matches the original. Nothing to apply.</string>
+    <string name="ai_result_applied" tools:ignore="MissingTranslation">Applied · You can undo it.</string>
+    <string name="ai_results_ready" tools:ignore="MissingTranslation">AI suggestions are ready.</string>
+    <string name="ai_action_selected" tools:ignore="MissingTranslation">%1$s, selected</string>
     <string name="ai_diff_change" tools:ignore="MissingTranslation">%1$d. %2$s → %3$s</string>
     <string name="ai_diff_empty" tools:ignore="MissingTranslation">∅</string>
     <string name="ai_share_target" tools:ignore="MissingTranslation">Use as AI reply context</string>
@@ -535,9 +555,9 @@
     <string name="ai_action_business" tools:ignore="MissingTranslation">Business</string>
     <string name="ai_action_decline" tools:ignore="MissingTranslation">Decline</string>
     <string name="ai_action_apology" tools:ignore="MissingTranslation">Apology</string>
-    <string name="ai_action_customer_service" tools:ignore="MissingTranslation">Customer support</string>
+    <string name="ai_action_customer_service" tools:ignore="MissingTranslation">Customer care</string>
     <string name="ai_action_compose" tools:ignore="MissingTranslation">3 drafts</string>
-    <string name="ai_action_reply" tools:ignore="MissingTranslation">3 replies</string>
+    <string name="ai_action_reply" tools:ignore="MissingTranslation">Reply drafts</string>
     <string name="ai_action_custom" tools:ignore="MissingTranslation">Custom request</string>
     <string name="ai_action_translate_english" tools:ignore="MissingTranslation">English</string>
     <string name="ai_action_translate_korean" tools:ignore="MissingTranslation">Korean</string>
@@ -549,6 +569,7 @@
     <string name="ai_private_disabled" tools:ignore="MissingTranslation">AI is disabled in password and private fields</string>
     <string name="ai_offline_disabled" tools:ignore="MissingTranslation">Turn off completely offline mode to use AI</string>
     <string name="ai_no_source" tools:ignore="MissingTranslation">Select text or type an instruction immediately before the cursor</string>
+    <string name="ai_source_too_large" tools:ignore="MissingTranslation">The selected text is too long. Select 4,000 characters or fewer and try again.</string>
     <string name="ai_editor_changed" tools:ignore="MissingTranslation">The input field, text, or cursor changed. Open AI writing again.</string>
     <string name="ai_apply_failed" tools:ignore="MissingTranslation">Could not apply this suggestion. No fallback was attempted.</string>
     <string name="ai_undo_failed" tools:ignore="MissingTranslation">Could not undo because the text or cursor changed</string>
@@ -596,6 +617,7 @@
     <string name="ai_oauth_profile_missing" tools:ignore="MissingTranslation">The OAuth provider profile is missing</string>
     <string name="ai_oauth_pkce_unavailable" tools:ignore="MissingTranslation">Secure PKCE S256 is unavailable on this device</string>
     <string name="ai_oauth_browser_unavailable" tools:ignore="MissingTranslation">No supported browser is available for OAuth sign-in</string>
+    <string name="ai_oauth_start_failed" tools:ignore="MissingTranslation">Could not start OAuth sign-in. Try again shortly.</string>
     <string name="ai_oauth_authorization_failed" tools:ignore="MissingTranslation">OAuth authorization was canceled or failed</string>
     <string name="ai_oauth_state_mismatch" tools:ignore="MissingTranslation">OAuth state validation failed. Nothing was saved.</string>
     <string name="ai_oauth_profile_changed" tools:ignore="MissingTranslation">The OAuth provider changed during sign-in. Start again with the current profile.</string>
@@ -622,6 +644,11 @@
     <string name="ai_setup_manual_computer" tools:ignore="MissingTranslation">Computer entered manually</string>
     <string name="ai_setup_checking_connection" tools:ignore="MissingTranslation">Checking the secure connection…</string>
     <string name="ai_setup_connection_failed" tools:ignore="MissingTranslation">Could not verify this computer. Check its HTTPS certificate and connection helper.</string>
+    <string name="ai_setup_tailnet_address_unavailable" tools:ignore="MissingTranslation">Could not find this computer address. If you entered a Tailscale address, connect this device to Tailscale and try again.</string>
+    <string name="ai_setup_address_unavailable" tools:ignore="MissingTranslation">Could not find this computer address. Check the address and network connection, then try again.</string>
+    <string name="ai_setup_network_unavailable" tools:ignore="MissingTranslation">Could not connect to this computer. Check the network connection and computer connection helper, then try again.</string>
+    <string name="ai_setup_certificate_untrusted" tools:ignore="MissingTranslation">Could not verify this computer’s HTTPS certificate. Check the secure address shown by the computer connection helper.</string>
+    <string name="ai_setup_manifest_invalid" tools:ignore="MissingTranslation">The computer connection information is not valid. Update or restart the computer connection helper, then try again.</string>
     <string name="ai_setup_confirm_title" tools:ignore="MissingTranslation">Connect to this computer?</string>
     <string name="ai_setup_confirm_message" tools:ignore="MissingTranslation">Computer: %1$s\nAI service: %2$s\nSecure address: %3$s\n\nNo API key or client secret will be saved on this phone. Continue in the browser to sign in.</string>
     <string name="ai_setup_connect" tools:ignore="MissingTranslation">Connect</string>

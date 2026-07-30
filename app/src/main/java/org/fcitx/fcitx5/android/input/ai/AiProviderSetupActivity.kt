@@ -31,6 +31,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import timber.log.Timber
 import java.net.URI
 
 /** General-user setup: discover a computer, verify its HTTPS manifest, then launch PKCE login. */
@@ -236,10 +237,26 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
                     refresh.isEnabled = true
                     showConnectionConfirmation(computerName, manifest)
                 }
-                .onFailure {
+                .onFailure { error ->
+                    val failure = AiProviderManifestFailure.classify(manifestUrl, error)
+                    Timber.w("AI provider manifest verification failed: ${failure.name}")
                     progress.visibility = View.GONE
                     refresh.isEnabled = true
-                    status.setText(R.string.ai_setup_connection_failed)
+                    status.setText(
+                        when (failure) {
+                            AiProviderManifestFailure.TailnetAddressUnavailable ->
+                                R.string.ai_setup_tailnet_address_unavailable
+                            AiProviderManifestFailure.AddressUnavailable ->
+                                R.string.ai_setup_address_unavailable
+                            AiProviderManifestFailure.NetworkUnavailable ->
+                                R.string.ai_setup_network_unavailable
+                            AiProviderManifestFailure.CertificateUntrusted ->
+                                R.string.ai_setup_certificate_untrusted
+                            AiProviderManifestFailure.InvalidManifest ->
+                                R.string.ai_setup_manifest_invalid
+                            AiProviderManifestFailure.Unknown -> R.string.ai_setup_connection_failed
+                        }
+                    )
                 }
         }
     }

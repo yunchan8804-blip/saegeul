@@ -23,6 +23,7 @@ import net.openid.appauth.AuthorizationServiceConfiguration
 import net.openid.appauth.NoClientAuthentication
 import net.openid.appauth.ResponseTypeValues
 import org.fcitx.fcitx5.android.R
+import timber.log.Timber
 
 /** Browser-based public-client Authorization Code flow. WebView and client secrets are forbidden. */
 class AiOAuthLoginActivity : AppCompatActivity() {
@@ -82,11 +83,30 @@ class AiOAuthLoginActivity : AppCompatActivity() {
             fail(R.string.ai_oauth_pkce_unavailable)
             return
         }
-        runCatching {
-            authorizationLauncher.launch(
-                authorizationService.getAuthorizationRequestIntent(request)
-            )
-        }.onFailure { fail(R.string.ai_oauth_browser_unavailable) }
+        val authorizationIntent = try {
+            authorizationService.getAuthorizationRequestIntent(request)
+        } catch (error: Exception) {
+            failAuthorizationStart(AiOAuthStartFailure.fromAuthorizationIntentError(error))
+            return
+        }
+        try {
+            authorizationLauncher.launch(authorizationIntent)
+        } catch (error: Exception) {
+            // This is no longer AppAuth browser selection. A missing activity or lifecycle error
+            // must not tell a user to install a browser they already have.
+            Timber.w("AI OAuth authorization activity launch failed: ${error.javaClass.simpleName}")
+            failAuthorizationStart(AiOAuthStartFailure.UnableToStart)
+        }
+    }
+
+    private fun failAuthorizationStart(failure: AiOAuthStartFailure) {
+        Timber.w("AI OAuth authorization start failed: ${failure.name}")
+        fail(
+            when (failure) {
+                AiOAuthStartFailure.BrowserUnavailable -> R.string.ai_oauth_browser_unavailable
+                AiOAuthStartFailure.UnableToStart -> R.string.ai_oauth_start_failed
+            }
+        )
     }
 
     private fun handleAuthorizationResult(data: Intent?) {

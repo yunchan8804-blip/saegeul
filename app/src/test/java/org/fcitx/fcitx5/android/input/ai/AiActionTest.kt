@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -46,18 +48,85 @@ class AiActionTest {
     }
 
     @Test
-    fun `writing menu starts focused and expanding preserves every action`() {
-        assertEquals(
-            listOf(AiAction.Proofread, AiAction.Compose, AiAction.Reply, AiAction.Custom),
-            AiActionMenuPolicy.visibleButtons(secondaryExpanded = false)
-        )
-        assertEquals(14, AiActionMenuPolicy.visibleButtons(secondaryExpanded = true).size)
+    fun `source review shows every action while direct prompt is intentionally singular`() {
+        assertEquals(14, AiActionMenuPolicy.sourceButtons().size)
+        assertEquals(listOf(AiAction.Custom), AiActionMenuPolicy.directPromptButtons())
         assertEquals(AiAction.entries.toSet(), AiActionMenuPolicy.allEntryPoints())
         assertEquals(
-            AiActionMenuPolicy.visibleButtons(secondaryExpanded = true).size,
-            AiActionMenuPolicy.visibleButtons(secondaryExpanded = true).distinct().size
+            AiActionMenuPolicy.sourceButtons().size,
+            AiActionMenuPolicy.sourceButtons().distinct().size
         )
         assertEquals(setOf(AiAction.Custom), AiActionMenuPolicy.enabledActions(hasSource = false))
         assertEquals(AiAction.entries.toSet(), AiActionMenuPolicy.enabledActions(hasSource = true))
+    }
+
+    @Test
+    fun `action catalog remains visible through request result and error states`() {
+        assertTrue(AiActionCatalogPolicy.isVisible(AiActionCatalogState.Source))
+        assertTrue(AiActionCatalogPolicy.isVisible(AiActionCatalogState.Loading))
+        assertTrue(AiActionCatalogPolicy.isVisible(AiActionCatalogState.Results))
+        assertTrue(AiActionCatalogPolicy.isVisible(AiActionCatalogState.Error))
+
+        assertFalse(AiActionCatalogPolicy.isVisible(AiActionCatalogState.DirectPrompt))
+    }
+
+    @Test
+    fun `custom prompt names the exact reviewed source scope`() {
+        assertEquals(
+            R.string.ai_direct_prompt_context_selection,
+            AiDirectPromptContext.labelRes(null, AiSourceScope.Selection)
+        )
+        assertEquals(
+            R.string.ai_direct_prompt_context_editor,
+            AiDirectPromptContext.labelRes(null, AiSourceScope.EntireEditor)
+        )
+        assertEquals(
+            R.string.ai_direct_prompt_context_cursor,
+            AiDirectPromptContext.labelRes(null, AiSourceScope.CursorContext)
+        )
+        assertEquals(
+            R.string.ai_direct_prompt_context_shared,
+            AiDirectPromptContext.labelRes(AiReplySourceOrigin.Shared, AiSourceScope.Selection)
+        )
+        assertEquals(
+            R.string.ai_direct_prompt_context_clipboard,
+            AiDirectPromptContext.labelRes(AiReplySourceOrigin.Clipboard, AiSourceScope.EntireEditor)
+        )
+    }
+
+    @Test
+    fun `identical editor result never offers a no op apply`() {
+        assertFalse(AiResultApplyPolicy.canApply("맞춤법이 이미 맞습니다.", "맞춤법이 이미 맞습니다.", false))
+        assertTrue(AiResultApplyPolicy.canApply("", "새 문장", false))
+        assertTrue(AiResultApplyPolicy.canApply("공유 원문", "공유 원문", true))
+        assertTrue(AiResultApplyPolicy.canApply("원문", "수정본", false))
+    }
+
+    @Test
+    fun `no change result gives the action catalog back its viewport`() {
+        assertEquals(
+            AiResultPresentation.NoChanges,
+            AiResultPresentationPolicy.decide(
+                source = "수정할 내용이 없습니다.",
+                suggestions = listOf("수정할 내용이 없습니다."),
+                hasExternalReplySource = false
+            )
+        )
+        assertEquals(
+            AiResultPresentation.ApplyDecision,
+            AiResultPresentationPolicy.decide(
+                source = "원문",
+                suggestions = listOf("수정본", "원문"),
+                hasExternalReplySource = false
+            )
+        )
+        assertEquals(
+            AiResultPresentation.ApplyDecision,
+            AiResultPresentationPolicy.decide(
+                source = "공유 원문",
+                suggestions = listOf("공유 원문"),
+                hasExternalReplySource = true
+            )
+        )
     }
 }

@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
@@ -48,10 +50,10 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     private lateinit var clipboardBarButton: ToolButton
     private var clipboardBarAvailable = false
     private var clipboardBarInteractionEnabled = true
-    private var pendingCustomInstruction: String? = null
+    private var pendingCustomRequest: AiPendingCustomRequest? = null
+    private var promptReturnRequest = 0L
     private var clipboardCandidates: List<AiClipboardCandidate> = emptyList()
     private var clipboardTarget: AiEditorTarget? = null
-    private val promptEntryPolicy = AiPromptEntryPolicy()
 
     override val title: String by lazy { context.getString(R.string.ai_assistant_title) }
     override val showTitle: Boolean = true
@@ -89,14 +91,19 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     }
 
     override fun onAttached() {
-        inputView.setAssistantContentExpanded(true)
+        // Source review needs enough height to expose the full action catalog. Other states
+        // keep their compact or purpose-built layout below.
+        inputView.setAssistantContentExpanded(false)
         setClipboardBarAvailable(false)
         val allowsTextInspection = service.allowsTextInspectionFeatures()
         val allowsAiInput = service.allowsAiInputFeatures()
         // Do not even open the local credential store in an editor that is already denied by
         // privacy or network policy.
         val resolved = if (allowsTextInspection && allowsAiInput) {
-            AiProviderResolver.resolve(context).profile
+            // The bridge is inert in release builds and unarmed for ordinary debug use. It lets
+            // the debug-only E2E host exercise this exact window and its Replace callback without
+            // configuring a provider, storing a key, or making a network request.
+            AiDebugE2eBridge.profileForArmedRequest() ?: AiProviderResolver.resolve(context).profile
         } else null
         // A structurally valid OAuth profile without its encrypted AppAuth session cannot make a
         // request. Surface the existing reauthentication CTA before the user spends time typing
@@ -114,14 +121,17 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             hasConfiguredProfile = profileReady
         )) {
             AiFeatureEntryGate.PrivateEditor -> {
+                pendingCustomRequest = null
                 ui.showError(context.getString(R.string.ai_private_disabled), canRetry = false)
                 return
             }
             AiFeatureEntryGate.NetworkPolicyBlocked -> {
+                pendingCustomRequest = null
                 ui.showError(context.getString(R.string.ai_network_policy_disabled), canRetry = false)
                 return
             }
             AiFeatureEntryGate.SetupRequired -> {
+                pendingCustomRequest = null
                 ui.showSetupRequired(context.getString(
                     if (resolved?.authMode == AiAuthMode.OAuthPkce) {
                         R.string.ai_oauth_reauth_required
@@ -133,23 +143,70 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             }
             AiFeatureEntryGate.Ready -> Unit
         }
-        resolved ?: return
+        if (resolved == null) {
+            pendingCustomRequest = null
+            return
+        }
         profile = resolved
         ui.setIntakeAvailable(true)
         setClipboardBarAvailable(true)
+        // A direct request is bound to the exact preview the user saw before the prompt opened.
+        // Reattaching this window must never silently recapture a newer editor value and send it
+        // without another review step.
+        pendingCustomRequest?.let { pending ->
+            pendingCustomRequest = null
+            val resumed = AiDirectPromptContinuation.resumeIfSnapshotCurrent(pending) {
+                service.isAiSnapshotCurrent(it)
+            } ?: run {
+                ui.showError(
+                    context.getString(R.string.ai_editor_changed),
+                    profile?.displayName,
+                    canRetry = false
+                )
+                return
+            }
+            snapshot = resumed.snapshot
+            replySourceOrigin = resumed.replySourceOrigin
+            inputView.setAssistantContentExpanded(true)
+            generate(AiAction.Custom, resumed.instruction)
+            return
+        }
         // Reuse the established capture boundary to finish any composing span before binding an
         // external source. The captured editor text is ignored when an explicit source is present.
-        val capturedEditorSource = service.captureAiInputSnapshot()
+        val capturedEditorSource = when (val capture = service.captureAiInputSnapshot()) {
+            is AiInputCaptureResult.Captured -> capture.snapshot
+            AiInputCaptureResult.SelectionTooLarge -> {
+                ui.showError(
+                    context.getString(R.string.ai_source_too_large),
+                    resolved.displayName,
+                    canRetry = false
+                )
+                return
+            }
+            AiInputCaptureResult.EditorStateChanged -> {
+                ui.showError(
+                    context.getString(R.string.ai_editor_changed),
+                    resolved.displayName,
+                    canRetry = false
+                )
+                return
+            }
+            AiInputCaptureResult.NoText -> null
+        }
         val replyTarget = captureReplyTarget()
         val shared = AiReplyIntake.consumeSharedText(allowed = replyTarget != null)
         if (shared != null && replyTarget != null) {
             adoptReplySource(shared, replyTarget)
-            presentEntryPromptIfNeeded()
             return
         }
         replySourceOrigin = null
         snapshot = capturedEditorSource ?: captureReplyTarget()?.let { target ->
-            AiInputSnapshot(target, "", AiSourceKind.BeforeCursor)
+            AiInputSnapshot(
+                editor = target,
+                source = "",
+                sourceKind = AiSourceKind.BeforeCursor,
+                scope = AiSourceScope.CursorContext
+            )
         }
         val captured = snapshot
         if (captured == null) {
@@ -160,12 +217,17 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             )
             return
         }
-        ui.showSourcePreview(captured.source, resolved.displayName)
-        consumePendingCustomInstruction()
-        presentEntryPromptIfNeeded()
+        inputView.setAssistantContentExpanded(true)
+        ui.showSourcePreview(
+            source = captured.source,
+            providerLabel = resolved.displayName,
+            origin = replySourceOrigin,
+            scope = captured.scope
+        )
     }
 
     override fun onDetached() {
+        promptReturnRequest += 1
         requestJob?.cancel()
         intakeJob?.cancel()
         clearClipboardSourcePicker()
@@ -177,14 +239,29 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             ui.showError(context.getString(R.string.ai_network_policy_disabled), canRetry = false)
             return
         }
+        val source = snapshot ?: run {
+            ui.showError(context.getString(R.string.ai_no_source), profile?.displayName, canRetry = false)
+            return
+        }
+        // The capture start marker is asynchronous. Starting a second prompt before the first
+        // one owns it would overwrite InputView's callbacks while the first capture stays live.
+        if (service.isInternalPromptInputOwned) return
         val started = inputView.beginAiPromptInput(
             initialText = initialText,
+            contextLabel = context.getString(
+                AiDirectPromptContext.labelRes(replySourceOrigin, source.scope)
+            ),
             onSubmit = { instruction ->
-                pendingCustomInstruction = instruction
+                pendingCustomRequest = AiDirectPromptContinuation.bind(
+                    instruction = instruction,
+                    snapshot = source,
+                    replySourceOrigin = replySourceOrigin
+                )
                 windowManager.attachWindow(this)
             },
             onCancel = {
-                windowManager.attachWindow(this)
+                pendingCustomRequest = null
+                reattachAfterPromptDrain()
             }
         )
         if (!started) {
@@ -192,29 +269,32 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         }
     }
 
-    private fun presentEntryPromptIfNeeded() {
-        if (!promptEntryPolicy.consumeShouldOpen(
-                featureReady = profile != null && service.allowsAiInputFeatures(),
-                editorTargetBound = snapshot != null
-            )
-        ) return
-        // InputWindowManager assigns this window as current after onAttached returns. Defer the
-        // transition so the first AI surface becomes the canonical Fcitx prompt keyboard instead
-        // of leaving a keyboard-sized action panel on screen.
-        ui.root.post {
-            if (windowManager.isAttached(this) && service.allowsAiInputFeatures()) {
-                openPromptKeyboard("")
+    /** Reopens source review only after the internal prompt input releases its capture gate. */
+    private fun reattachAfterPromptDrain() {
+        val request = ++promptReturnRequest
+        fun reattachWhenSettled() {
+            if (request != promptReturnRequest) return
+            if (service.isInternalPromptInputOwned) {
+                inputView.postDelayed({ reattachWhenSettled() }, PROMPT_DRAIN_POLL_MILLIS)
+                return
+            }
+            // Cancellation may finish after the user intentionally switched to another tool or
+            // editor. Never pull the AI surface back over that newer choice.
+            if (!isPromptKeyboardActive() || snapshot?.let { !matchesCurrentEditorSession(it.editor) } == true) {
+                return
+            }
+            if (!windowManager.isAttached(this)) {
+                windowManager.attachWindow(this)
             }
         }
-    }
-
-    private fun consumePendingCustomInstruction() {
-        val instruction = pendingCustomInstruction ?: return
-        pendingCustomInstruction = null
-        generate(AiAction.Custom, instruction)
+        inputView.post { reattachWhenSettled() }
     }
 
     private fun generate(action: AiAction, customInstruction: String? = null) {
+        // beginInternalPromptCapture becomes active asynchronously. Reject a competing action
+        // during that hand-off instead of letting it send editor content while prompt input owns
+        // the keyboard transition.
+        if (service.isInternalPromptInputOwned) return
         val source = snapshot ?: return
         val provider = profile ?: return
         if (!validateCurrentSource(source)) return
@@ -223,14 +303,23 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         lastCustomInstruction = customInstruction
         renderedSuggestions = emptyList()
         applyGate.resetForReviewedResult()
+        inputView.setAssistantContentExpanded(true)
         ui.showLoading(action, provider.displayName)
         setClipboardBarInteractionEnabled(false)
         requestJob = service.lifecycleScope.launch {
             try {
-                val result = OpenAiResponsesClient(
-                    provider,
-                    authorizationProvider = authorizationProvider
-                ).generate(action, source.source, customInstruction)
+                val debugResponse = AiDebugE2eBridge.consumeIfArmed(provider, action, source.source)
+                // A debug-only, already-local result may deliberately suspend here so headed E2E
+                // can inspect this production loading UI. The responder is consumed before the
+                // delay, so cancelling the window cannot leak an armed fake response to a later
+                // request. In release builds debugResponse is always null and this is a no-op.
+                if (debugResponse != null && debugResponse.delayMillis > 0L) {
+                    delay(debugResponse.delayMillis)
+                }
+                val result = debugResponse?.result ?: OpenAiResponsesClient(
+                        provider,
+                        authorizationProvider = authorizationProvider
+                    ).generate(action, source.source, customInstruction)
                 usageStore.recordSuccess(
                     action,
                     provider.kind,
@@ -315,22 +404,28 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     private fun applyReviewedText(text: String, mode: AiApplyMode) {
         val source = snapshot ?: return
         if (!applyGate.claim()) return
-        val edit = if (replySourceOrigin == null) {
+        val result = if (replySourceOrigin == null) {
             service.applyAiSuggestion(source, text, mode)
         } else {
             insertExternalReply(source, text)
         }
-        if (edit == null) {
-            ui.showError(
+        when (result) {
+            is AiSuggestionApplyResult.Applied -> {
+                appliedEdit = result.edit
+                ui.setUndoAvailable(true)
+                ui.setIntakeInteractionEnabled(false)
+            }
+            AiSuggestionApplyResult.EditorChanged -> ui.showError(
                 context.getString(R.string.ai_editor_changed),
                 profile?.displayName,
                 canRetry = false
             )
-            return
+            AiSuggestionApplyResult.NotApplied -> ui.showError(
+                context.getString(R.string.ai_apply_failed),
+                profile?.displayName,
+                canRetry = false
+            )
         }
-        appliedEdit = edit
-        ui.setUndoAvailable(true)
-        ui.setIntakeInteractionEnabled(false)
     }
 
     private fun undo() {
@@ -398,6 +493,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
                 }
                 clipboardCandidates = AiClipboardIntakePolicy.choices(candidates)
                 clipboardTarget = target
+                inputView.setAssistantContentExpanded(true)
                 ui.showClipboardSourceChoices(items)
             } catch (exception: CancellationException) {
                 throw exception
@@ -446,7 +542,13 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         clearClipboardSourcePicker()
         if (!windowManager.isAttached(this)) return
         val current = snapshot ?: return
-        ui.showSourcePreview(current.source, profile?.displayName, replySourceOrigin)
+        inputView.setAssistantContentExpanded(true)
+        ui.showSourcePreview(
+            source = current.source,
+            providerLabel = profile?.displayName,
+            origin = replySourceOrigin,
+            scope = current.scope
+        )
     }
 
     private fun clearClipboardSourcePicker() {
@@ -473,28 +575,24 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         applyGate.resetForReviewedResult()
         appliedEdit = null
         ui.setUndoAvailable(false)
-        ui.showSourcePreview(bound.source, profile?.displayName, source.origin)
+        inputView.setAssistantContentExpanded(true)
+        ui.showSourcePreview(
+            source = bound.source,
+            providerLabel = profile?.displayName,
+            origin = source.origin,
+            scope = bound.scope
+        )
     }
 
     /** Inserts a reviewed reply at the bound cursor; source context is never target text to replace. */
-    private fun insertExternalReply(source: AiInputSnapshot, text: String): AiAppliedEdit? {
-        if (!service.allowsAiInputFeatures() || text.isBlank()) return null
-        if (!matchesCurrentEditor(source.editor)) return null
-        if (source.editor.selectionStart != source.editor.selectionEnd) return null
-        if (!service.commitToEditor(text)) return null
-        val end = source.editor.selectionStart + text.length
-        return AiAppliedEdit(
-            editor = source.editor.copy(selectionStart = end, selectionEnd = end),
-            inserted = text,
-            restore = ""
-        )
-    }
+    private fun insertExternalReply(source: AiInputSnapshot, text: String): AiSuggestionApplyResult =
+        service.applyAiReplyAtCursor(source, text)
 
     private fun validateCurrentSource(source: AiInputSnapshot): Boolean {
         val error = when {
             !service.allowsTextInspectionFeatures() -> R.string.ai_private_disabled
             !service.allowsAiInputFeatures() -> R.string.ai_network_policy_disabled
-            !matchesCurrentEditor(source.editor) -> R.string.ai_editor_changed
+            !service.isAiSnapshotCurrent(source) -> R.string.ai_editor_changed
             else -> return true
         }
         ui.showError(context.getString(error), profile?.displayName, canRetry = false)
@@ -525,6 +623,19 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             expectedInputSessionEpoch = target.inputSessionEpoch
         )
 
+    /** Prompt cancellation may update cursor tracking, but it must not cross an editor session. */
+    private fun matchesCurrentEditorSession(target: AiEditorTarget): Boolean {
+        val info = service.currentInputEditorInfo
+        return info.packageName == target.packageName &&
+            info.fieldId == target.fieldId &&
+            info.inputType == target.inputType &&
+            service.currentInputSessionEpoch == target.inputSessionEpoch
+    }
+
+    private fun isPromptKeyboardActive(): Boolean = windowManager.isAttached(
+        windowManager.getEssentialWindow(KeyboardWindow)
+    )
+
     private fun setClipboardBarAvailable(available: Boolean) {
         clipboardBarAvailable = available
         renderClipboardBarButton()
@@ -543,5 +654,9 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
     }
 
     private fun Int.dp(): Int = (this * context.resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val PROMPT_DRAIN_POLL_MILLIS = 16L
+    }
 
 }

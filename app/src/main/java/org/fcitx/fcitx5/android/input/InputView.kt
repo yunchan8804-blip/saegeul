@@ -286,7 +286,7 @@ class InputView(
             above(promptInputBar)
             centerHorizontally()
         })
-        add(promptInputBar, lParams(matchParent, dp(56)) {
+        add(promptInputBar, lParams(matchParent, promptInputBar.preferredHeightPx) {
             above(keyboardView)
             centerHorizontally()
         })
@@ -383,11 +383,13 @@ class InputView(
      */
     fun beginAiPromptInput(
         initialText: String,
+        contextLabel: CharSequence,
         onSubmit: (String) -> Unit,
         onCancel: () -> Unit
     ): Boolean = beginInternalPromptInput(
         spec = InternalPromptSpecs.Ai,
         initialText = initialText,
+        aiContext = contextLabel,
         onSubmit = onSubmit,
         onCancel = onCancel
     )
@@ -401,6 +403,7 @@ class InputView(
     ): Boolean = beginInternalPromptInput(
         spec = InternalPromptSpecs.gifSearch(maxCharacters),
         initialText = initialText,
+        aiContext = null,
         onSubmit = onSubmit,
         onCancel = onCancel
     )
@@ -408,13 +411,17 @@ class InputView(
     private fun beginInternalPromptInput(
         spec: InternalPromptSpec,
         initialText: String,
+        aiContext: CharSequence?,
         onSubmit: (String) -> Unit,
         onCancel: () -> Unit
     ): Boolean {
         promptOnSubmit = onSubmit
         promptOnCancel = onCancel
         promptCaptureToken = null
-        promptInputBar.configure(spec)
+        promptInputBar.configure(spec, aiContext)
+        promptInputBar.updateLayoutParams<LayoutParams> {
+            height = promptInputBar.preferredHeightPx
+        }
         promptInputBar.setSubmitPending(false)
         val token = service.beginInternalPromptCapture(
             spec = spec,

@@ -29,6 +29,7 @@ import android.view.Window
 import android.view.WindowManager
 import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputMethodSubtype
@@ -89,9 +90,13 @@ import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
 import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseSession
 import org.fcitx.fcitx5.android.input.ai.AiAppliedEdit
 import org.fcitx.fcitx5.android.input.ai.AiApplyMode
+import org.fcitx.fcitx5.android.input.ai.AiEditorTransaction
 import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
+import org.fcitx.fcitx5.android.input.ai.AiInputCaptureResult
 import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
 import org.fcitx.fcitx5.android.input.ai.AiSourceKind
+import org.fcitx.fcitx5.android.input.ai.AiSourceScope
+import org.fcitx.fcitx5.android.input.ai.AiSuggestionApplyResult
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
 import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
@@ -1592,31 +1597,121 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    /** Captures only an explicit selection or the current paragraph before the cursor. No network runs here. */
-    fun captureAiInputSnapshot(): AiInputSnapshot? {
-        if (!allowsAiInputFeatures()) return null
-        if (!finishCompositionForDirectAction()) return null
+    /**
+     * Captures an explicit selection or the current editor text before any network request runs.
+     *
+     * A complete [android.view.inputmethod.ExtractedText] is preferred. Editors that cannot
+     * provide it fall back to a bounded cursor context; both sides of the cursor are retained so
+     * a reviewed replacement can be revalidated and restored without touching unseen text.
+     */
+    fun captureAiInputSnapshot(): AiInputCaptureResult {
+        if (!allowsAiInputFeatures()) return AiInputCaptureResult.NoText
+        if (!finishCompositionForDirectAction()) return AiInputCaptureResult.NoText
         val info = currentInputEditorInfo
-        val range = currentInputSelection
-        val connection = currentInputConnection ?: return null
-        val selected = if (range.isNotEmpty()) {
-            connection.getSelectedText(0)?.toString()?.takeIf(String::isNotBlank)
-        } else null
-        val sourceKind = if (selected != null) AiSourceKind.Selection else AiSourceKind.BeforeCursor
-        val source = selected ?: AiTextSource.beforeCursor(
-            connection.getTextBeforeCursor(AiTextSource.MAX_CHARACTERS, 0)?.toString().orEmpty()
-        ) ?: return null
-        return AiInputSnapshot(
-            AiEditorTarget(
-                info.packageName,
-                info.fieldId,
-                info.inputType,
-                range.start,
-                range.end,
-                inputSessionEpoch
-            ),
-            source,
-            sourceKind
+        // CursorTracker exposes a mutable range. Freeze its scalar values before any remote
+        // InputConnection call, because an asynchronous onUpdateSelection can otherwise mutate
+        // the same backing array underneath this capture.
+        val capturedSelectionStart = currentInputSelection.start
+        val capturedSelectionEnd = currentInputSelection.end
+        val connection = currentInputConnection ?: return AiInputCaptureResult.NoText
+        if (capturedSelectionStart != capturedSelectionEnd) {
+            val selectionLength = maxOf(capturedSelectionStart, capturedSelectionEnd) -
+                minOf(capturedSelectionStart, capturedSelectionEnd)
+            if (selectionLength > AiTextSource.MAX_CHARACTERS) {
+                return AiInputCaptureResult.SelectionTooLarge
+            }
+            val selected = connection.getSelectedText(0)?.toString()
+            // A remote editor may move the selection while answering getSelectedText(). Never
+            // attach a request to text that no longer belongs to the reviewed range.
+            if (!currentInputSelection.rangeEquals(capturedSelectionStart, capturedSelectionEnd)) {
+                return AiInputCaptureResult.EditorStateChanged
+            }
+            if (selected != null && selected.length > AiTextSource.MAX_CHARACTERS) {
+                return AiInputCaptureResult.SelectionTooLarge
+            }
+            return AiTextSource.selectedText(selected)?.let { source ->
+                AiInputCaptureResult.Captured(
+                    AiInputSnapshot(
+                        AiEditorTarget(
+                            info.packageName,
+                            info.fieldId,
+                            info.inputType,
+                            capturedSelectionStart,
+                            capturedSelectionEnd,
+                            inputSessionEpoch
+                        ),
+                        source,
+                        AiSourceKind.Selection,
+                        scope = AiSourceScope.Selection
+                    )
+                )
+            } ?: AiInputCaptureResult.NoText
+        }
+        val extracted = runCatching {
+            connection.getExtractedText(ExtractedTextRequest(), 0)
+        }.getOrNull()
+        if (!currentInputSelection.rangeEquals(capturedSelectionStart, capturedSelectionEnd)) {
+            return AiInputCaptureResult.EditorStateChanged
+        }
+        // If an extract reports another selection, the CursorTracker has not caught up with the
+        // editor yet. Do not fall back to before/after text from one cursor while retaining a
+        // target bound to another; wait for the selection callback and let the user reopen AI.
+        if (extracted != null && !AiTextSource.matchesExtractedSelection(
+                startOffset = extracted.startOffset,
+                capturedSelectionStart = capturedSelectionStart,
+                capturedSelectionEnd = capturedSelectionEnd,
+                extractedSelectionStart = extracted.selectionStart,
+                extractedSelectionEnd = extracted.selectionEnd
+            )
+        ) {
+            return AiInputCaptureResult.EditorStateChanged
+        }
+        val completeEditor = extracted?.let {
+            AiTextSource.completeEditor(
+                text = it.text?.toString().orEmpty(),
+                startOffset = it.startOffset,
+                partialStartOffset = it.partialStartOffset,
+                cursorOffset = capturedSelectionStart,
+                extractedSelectionStart = it.selectionStart,
+                extractedSelectionEnd = it.selectionEnd
+            )
+        }
+        // An extract can be unavailable or incomplete even for a stable editor. Cursor-context
+        // fallback is safe only while the local selection remains the frozen one above.
+        if (!currentInputSelection.rangeEquals(capturedSelectionStart, capturedSelectionEnd)) {
+            return AiInputCaptureResult.EditorStateChanged
+        }
+        val context = completeEditor ?: run {
+            val beforeCursor = connection.getTextBeforeCursor(AiTextSource.MAX_CHARACTERS, 0)
+                ?.toString().orEmpty()
+            val afterCursor = connection.getTextAfterCursor(AiTextSource.MAX_CHARACTERS, 0)
+                ?.toString().orEmpty()
+            // Do not splice before/after text from different cursor positions into one request.
+            if (!currentInputSelection.rangeEquals(capturedSelectionStart, capturedSelectionEnd)) {
+                return AiInputCaptureResult.EditorStateChanged
+            }
+            AiTextSource.cursorContext(beforeCursor, afterCursor)
+        } ?: return AiInputCaptureResult.NoText
+        return AiInputCaptureResult.Captured(
+            AiInputSnapshot(
+                AiEditorTarget(
+                    info.packageName,
+                    info.fieldId,
+                    info.inputType,
+                    capturedSelectionStart,
+                    capturedSelectionEnd,
+                    inputSessionEpoch
+                ),
+                context.text,
+                AiSourceKind.SurroundingEditor,
+                beforeCursor = context.beforeCursor,
+                afterCursor = context.afterCursor,
+                scope = if (completeEditor != null) {
+                    AiSourceScope.EntireEditor
+                } else {
+                    AiSourceScope.CursorContext
+                }
+            )
         )
     }
 
@@ -1625,76 +1720,141 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         snapshot: AiInputSnapshot,
         suggestion: String,
         mode: AiApplyMode
-    ): AiAppliedEdit? {
-        if (!allowsAiInputFeatures() || suggestion.isBlank()) return null
-        if (!matchesCurrentEditor(snapshot.editor)) return null
-        if (!finishCompositionForDirectAction()) return null
-        val connection = currentInputConnection ?: return null
-        val cursorBefore = currentInputSelection.start
+    ): AiSuggestionApplyResult {
+        if (!allowsAiInputFeatures() || suggestion.isBlank()) {
+            return AiSuggestionApplyResult.NotApplied
+        }
+        if (!matchesCurrentEditor(snapshot.editor)) return AiSuggestionApplyResult.EditorChanged
+        if (!finishCompositionForDirectAction()) return AiSuggestionApplyResult.NotApplied
+        val connection = currentInputConnection ?: return AiSuggestionApplyResult.NotApplied
+        val selectionBeforeStart = currentInputSelection.start
+        val selectionBeforeEnd = currentInputSelection.end
+        val cursorBefore = selectionBeforeStart
         return when (mode) {
             AiApplyMode.Replace -> {
-                val dispatched = when (snapshot.sourceKind) {
-                    AiSourceKind.Selection -> {
-                        if (connection.getSelectedText(0)?.toString() != snapshot.source) {
-                            return null
-                        }
-                        connection.commitText(suggestion, 1)
-                    }
-                    AiSourceKind.BeforeCursor -> {
-                        if (snapshot.source.isEmpty()) {
-                            connection.commitText(suggestion, 1)
-                        } else {
-                            if (connection.getTextBeforeCursor(snapshot.source.length, 0)
-                                    ?.toString() != snapshot.source
-                            ) {
-                                return null
-                            }
-                            var success = true
-                            connection.withBatchEdit {
-                                success = deleteSurroundingText(snapshot.source.length, 0) && success
-                                if (success) success = commitText(suggestion, 1)
-                            }
-                            success
-                        }
-                    }
+                if (!matchesAiSnapshotSource(connection, snapshot)) {
+                    return AiSuggestionApplyResult.EditorChanged
                 }
-                if (!dispatched) return null
-                val start = if (snapshot.sourceKind == AiSourceKind.Selection) {
-                    snapshot.editor.selectionStart
-                } else {
-                    cursorBefore - snapshot.source.length
+                val replaceStart = when (snapshot.sourceKind) {
+                    AiSourceKind.Selection -> minOf(
+                        snapshot.editor.selectionStart,
+                        snapshot.editor.selectionEnd
+                    )
+                    AiSourceKind.BeforeCursor -> cursorBefore - snapshot.source.length
+                    AiSourceKind.SurroundingEditor -> cursorBefore - snapshot.beforeCursor.length
                 }
-                selection.predict(start + suggestion.length)
-                AiAppliedEdit(
-                    editor = snapshot.editor.copy(
-                        selectionStart = start + suggestion.length,
-                        selectionEnd = start + suggestion.length
-                    ),
-                    inserted = suggestion,
-                    restore = snapshot.source
+                val replaceEnd = when (snapshot.sourceKind) {
+                    AiSourceKind.Selection -> maxOf(
+                        snapshot.editor.selectionStart,
+                        snapshot.editor.selectionEnd
+                    )
+                    AiSourceKind.BeforeCursor -> cursorBefore
+                    AiSourceKind.SurroundingEditor -> cursorBefore + snapshot.afterCursor.length
+                }
+                val dispatched = replaceAiRange(
+                    connection = connection,
+                    start = replaceStart,
+                    end = replaceEnd,
+                    replacement = suggestion,
+                    restoreStart = selectionBeforeStart,
+                    restoreEnd = selectionBeforeEnd
+                )
+                if (!dispatched) return AiSuggestionApplyResult.NotApplied
+                selection.predict(replaceStart + suggestion.length)
+                AiSuggestionApplyResult.Applied(
+                    AiAppliedEdit(
+                        editor = snapshot.editor.copy(
+                            selectionStart = replaceStart + suggestion.length,
+                            selectionEnd = replaceStart + suggestion.length
+                        ),
+                        inserted = suggestion,
+                        restore = snapshot.source,
+                        restoreCursorOffset = when (snapshot.sourceKind) {
+                            AiSourceKind.Selection -> snapshot.source.length
+                            AiSourceKind.BeforeCursor -> snapshot.source.length
+                            AiSourceKind.SurroundingEditor -> snapshot.beforeCursor.length
+                        }
+                    )
                 )
             }
             AiApplyMode.Append -> {
+                if (!matchesAiSnapshotSource(connection, snapshot)) {
+                    return AiSuggestionApplyResult.EditorChanged
+                }
                 val start = when (snapshot.sourceKind) {
                     AiSourceKind.Selection -> snapshot.editor.selectionEnd
                     AiSourceKind.BeforeCursor -> cursorBefore
+                    AiSourceKind.SurroundingEditor -> cursorBefore + snapshot.afterCursor.length
                 }
-                if (snapshot.sourceKind == AiSourceKind.Selection &&
-                    !connection.setSelection(start, start)
-                ) return null
                 val inserted = "\n$suggestion"
-                if (!connection.commitText(inserted, 1)) return null
+                if (!commitAiTextAtCursor(
+                        connection = connection,
+                        cursor = start,
+                        text = inserted,
+                        restoreStart = selectionBeforeStart,
+                        restoreEnd = selectionBeforeEnd
+                    )
+                ) return AiSuggestionApplyResult.NotApplied
                 selection.predict(start + inserted.length)
-                AiAppliedEdit(
-                    editor = snapshot.editor.copy(
-                        selectionStart = start + inserted.length,
-                        selectionEnd = start + inserted.length
-                    ),
-                    inserted = inserted,
-                    restore = ""
+                AiSuggestionApplyResult.Applied(
+                    AiAppliedEdit(
+                        editor = snapshot.editor.copy(
+                            selectionStart = start + inserted.length,
+                            selectionEnd = start + inserted.length
+                        ),
+                        inserted = inserted,
+                        restore = ""
+                    )
                 )
             }
         }
+    }
+
+    /**
+     * Inserts an AI reply whose source came from outside the app editor (for example, a reviewed
+     * clipboard message). This still binds to the exact original cursor and uses the same visible
+     * postcondition as a normal AI suggestion; [commitToEditor] alone is not a success signal.
+     */
+    fun applyAiReplyAtCursor(
+        snapshot: AiInputSnapshot,
+        reply: String
+    ): AiSuggestionApplyResult {
+        if (!allowsAiInputFeatures() || reply.isBlank()) {
+            return AiSuggestionApplyResult.NotApplied
+        }
+        if (!matchesCurrentEditor(snapshot.editor) ||
+            snapshot.editor.selectionStart != snapshot.editor.selectionEnd
+        ) {
+            return AiSuggestionApplyResult.EditorChanged
+        }
+        if (!finishCompositionForDirectAction()) return AiSuggestionApplyResult.NotApplied
+        val currentSelection = currentInputSelection
+        if (currentSelection.start != snapshot.editor.selectionStart ||
+            currentSelection.end != snapshot.editor.selectionEnd
+        ) {
+            return AiSuggestionApplyResult.EditorChanged
+        }
+        val connection = currentInputConnection ?: return AiSuggestionApplyResult.NotApplied
+        val cursor = currentSelection.start
+        if (!commitAiTextAtCursor(
+                connection = connection,
+                cursor = cursor,
+                text = reply,
+                restoreStart = currentSelection.start,
+                restoreEnd = currentSelection.end
+            )
+        ) {
+            return AiSuggestionApplyResult.NotApplied
+        }
+        val end = cursor + reply.length
+        selection.predict(end)
+        return AiSuggestionApplyResult.Applied(
+            AiAppliedEdit(
+                editor = snapshot.editor.copy(selectionStart = end, selectionEnd = end),
+                inserted = reply,
+                restore = ""
+            )
+        )
     }
 
     fun undoAiEdit(edit: AiAppliedEdit): Boolean {
@@ -1705,15 +1865,137 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             return false
         }
         val cursorBefore = currentInputSelection.start
-        var dispatched = true
-        connection.withBatchEdit {
-            dispatched = deleteSurroundingText(edit.inserted.length, 0) && dispatched
-            if (dispatched && edit.restore.isNotEmpty()) {
-                dispatched = commitText(edit.restore, 1)
+        val restoreStart = cursorBefore - edit.inserted.length
+        val dispatched = replaceAiRange(
+            connection = connection,
+            start = restoreStart,
+            end = cursorBefore,
+            replacement = edit.restore,
+            restoreStart = cursorBefore,
+            restoreEnd = cursorBefore
+        )
+        if (dispatched) {
+            val restoreCursor = restoreStart + edit.restoreCursorOffset
+            if (connection.setSelection(restoreCursor, restoreCursor)) {
+                selection.predict(restoreCursor)
+            } else {
+                selection.predict(restoreStart + edit.restore.length)
             }
         }
-        if (dispatched) selection.predict(cursorBefore - edit.inserted.length + edit.restore.length)
         return dispatched
+    }
+
+    /** Uses native selection replacement so a failed commit cannot first delete the source. */
+    private fun replaceAiRange(
+        connection: android.view.inputmethod.InputConnection,
+        start: Int,
+        end: Int,
+        replacement: String,
+        restoreStart: Int,
+        restoreEnd: Int
+    ): Boolean = AiEditorTransaction.replaceRange(
+        start = start,
+        end = end,
+        replacement = replacement,
+        restoreStart = restoreStart,
+        restoreEnd = restoreEnd,
+        setSelection = connection::setSelection,
+        commitText = { text -> connection.commitText(text, 1) },
+        confirmCommit = { text ->
+            confirmsAiTextCommit(
+                connection = connection,
+                expectedText = text,
+                expectedCursor = start + text.length
+            )
+        }
+    )
+
+    private fun commitAiTextAtCursor(
+        connection: android.view.inputmethod.InputConnection,
+        cursor: Int,
+        text: String,
+        restoreStart: Int,
+        restoreEnd: Int
+    ): Boolean = AiEditorTransaction.commitAtCursor(
+        cursor = cursor,
+        text = text,
+        restoreStart = restoreStart,
+        restoreEnd = restoreEnd,
+        setSelection = connection::setSelection,
+        commitText = { committed -> connection.commitText(committed, 1) },
+        confirmCommit = { committed ->
+            confirmsAiTextCommit(
+                connection = connection,
+                expectedText = committed,
+                expectedCursor = cursor + committed.length
+            )
+        }
+    )
+
+    /**
+     * Confirms that the asynchronous editor command changed the currently visible input before
+     * exposing Undo. Android's remote InputConnection returns true when Binder accepted a command
+     * even when the target editor later rejects it, so transport acknowledgement alone is unsafe.
+     *
+     * The check reads at most the same 4k character bound allowed for AI capture. A non-empty
+     * insertion must appear as the exact visible tail. A deletion has no tail to compare, so it
+     * instead requires its selected range to collapse at the exact cursor. Editors with complete
+     * extraction must report that cursor; other editors must expose no remaining selected text.
+     * Any unconfirmable state is deliberately treated as a failed apply rather than falling back
+     * to clipboard.
+     */
+    private fun confirmsAiTextCommit(
+        connection: android.view.inputmethod.InputConnection,
+        expectedText: String,
+        expectedCursor: Int
+    ): Boolean {
+        if (expectedText.length > AiTextSource.MAX_CHARACTERS) {
+            return false
+        }
+        if (expectedText.isNotEmpty()) {
+            val visibleTail = runCatching {
+                connection.getTextBeforeCursor(expectedText.length, 0)?.toString()
+            }.getOrNull()
+            if (visibleTail != expectedText) return false
+        }
+
+        val extracted = runCatching {
+            connection.getExtractedText(ExtractedTextRequest(), 0)
+        }.getOrNull()
+        if (extracted != null && extracted.startOffset == 0 && extracted.partialStartOffset == -1) {
+            return extracted.selectionStart == expectedCursor && extracted.selectionEnd == expectedCursor
+        }
+
+        val selected = runCatching { connection.getSelectedText(0)?.toString() }
+        return selected.isSuccess && selected.getOrNull().isNullOrEmpty()
+    }
+
+    /** Revalidates every byte of the reviewed range before it can move or mutate the editor. */
+    private fun matchesAiSnapshotSource(
+        connection: android.view.inputmethod.InputConnection,
+        snapshot: AiInputSnapshot
+    ): Boolean = when (snapshot.sourceKind) {
+        AiSourceKind.Selection -> connection.getSelectedText(0)?.toString() == snapshot.source
+        AiSourceKind.BeforeCursor -> snapshot.source.isEmpty() ||
+            connection.getTextBeforeCursor(snapshot.source.length, 0)?.toString() == snapshot.source
+        AiSourceKind.SurroundingEditor ->
+            snapshot.source == snapshot.beforeCursor + snapshot.afterCursor &&
+                (snapshot.beforeCursor.isEmpty() ||
+                    connection.getTextBeforeCursor(snapshot.beforeCursor.length, 0)
+                        ?.toString() == snapshot.beforeCursor) &&
+                (snapshot.afterCursor.isEmpty() ||
+                    connection.getTextAfterCursor(snapshot.afterCursor.length, 0)
+                        ?.toString() == snapshot.afterCursor)
+    }
+
+    /**
+     * Verifies that a reviewed source still belongs to the same editor, selection and visible
+     * text before any provider request is allowed to leave the device.
+     */
+    fun isAiSnapshotCurrent(snapshot: AiInputSnapshot): Boolean {
+        if (!matchesCurrentEditor(snapshot.editor)) return false
+        val connection = currentInputConnection ?: return false
+        return matchesAiSnapshotSource(connection, snapshot)
     }
 
     private fun matchesCurrentEditor(target: AiEditorTarget): Boolean =

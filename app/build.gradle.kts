@@ -1,3 +1,16 @@
+import com.android.build.api.artifact.SingleArtifact
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import javax.xml.parsers.DocumentBuilderFactory
+import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.TaskAction
+import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.register
+import org.w3c.dom.Element
+import org.w3c.dom.Node
+
 plugins {
     id("org.fcitx.fcitx5.android.app-convention")
     id("org.fcitx.fcitx5.android.native-app-convention")
@@ -11,6 +24,66 @@ plugins {
 
 fun String.asBuildConfigString(): String =
     "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+/**
+ * Verifies the final manifest instead of the source manifest because a manifest-merger directive
+ * can remove a valid source `<queries>` block. AppAuth discovers browsers through the exact
+ * `VIEW` + `BROWSABLE` + `http` query below on Android 11 and newer.
+ */
+abstract class VerifyOAuthBrowserVisibilityTask : DefaultTask() {
+    @get:InputFile
+    abstract val mergedManifest: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val document = DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+        }.newDocumentBuilder().parse(mergedManifest.get().asFile)
+
+        val queries = document.documentElement.childElements("queries")
+        val hasBrowserVisibilityQuery = queries.any { query ->
+            query.childElements("intent").any { intent ->
+                intent.hasAndroidName("action", "android.intent.action.VIEW") &&
+                    intent.hasAndroidName("category", "android.intent.category.BROWSABLE") &&
+                    intent.hasAndroidName("data", "http", attribute = "scheme")
+            }
+        }
+
+        if (!hasBrowserVisibilityQuery) {
+            throw GradleException(
+                "Merged manifest ${mergedManifest.get().asFile} is missing the Android 11+ browser " +
+                    "visibility query required by AppAuth (VIEW + BROWSABLE + http). Check <queries> " +
+                    "merge directives before shipping OAuth."
+            )
+        }
+    }
+
+    private fun Element.childElements(name: String): List<Element> = buildList {
+        for (index in 0 until childNodes.length) {
+            val child = childNodes.item(index)
+            if (child.nodeType == Node.ELEMENT_NODE && child.nodeName == name) {
+                add(child as Element)
+            }
+        }
+    }
+
+    private fun Element.hasAndroidName(
+        childName: String,
+        expected: String,
+        attribute: String = "name"
+    ): Boolean = childElements(childName).any {
+        it.getAttributeNS(ANDROID_NAMESPACE, attribute) == expected
+    }
+
+    private companion object {
+        const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
+    }
+}
 
 val debugAiProviderName = providers.gradleProperty("AI_PROVIDER_NAME").orElse("OpenAI")
 val debugAiProviderBaseUrl = providers.gradleProperty("AI_PROVIDER_BASE_URL")
@@ -102,6 +175,27 @@ android {
     androidResources {
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = true
+    }
+}
+
+extensions.configure<ApplicationAndroidComponentsExtension> {
+    onVariants { variant ->
+        val variantName = variant.name.replaceFirstChar { it.uppercase() }
+        val verifyTask = tasks.register<VerifyOAuthBrowserVisibilityTask>(
+            "verify${variantName}OAuthBrowserVisibility"
+        ) {
+            group = "verification"
+            description = "Verifies AppAuth browser visibility in the merged $variantName manifest."
+            mergedManifest.set(variant.artifacts.get(SingleArtifact.MERGED_MANIFEST))
+        }
+
+        // Keep ordinary CI checks and every installable APK build covered. The artifact provider
+        // establishes the dependency on manifest merging without relying on an AGP output path.
+        tasks.matching { task ->
+            task.name == "check" || task.name == "assemble$variantName"
+        }.configureEach {
+            dependsOn(verifyTask)
+        }
     }
 }
 

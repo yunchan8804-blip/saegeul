@@ -11,9 +11,9 @@
 - 같은 정책을 여러 문서에 복사하지 않는다. 하위 문서는 이 문서를 링크하고 세부 증거만 유지한다.
 - 실제 구현 상태와 문서 상태가 다르면 실제 동작을 재검증한 뒤 둘을 함께 수정한다.
 
-최종 갱신일: 2026-07-28
+최종 갱신일: 2026-07-30
 기준 브랜치: `feat/hangul-buffered-input`
-현재 활성 구현 마일스톤: `AI/STT 분리 마감·전체 기능 회귀·실기기 외부 게이트 폐쇄`
+현재 활성 구현 마일스톤: `AI source review UX·전체 editor 교체 안전성·headed emulator E2E`
 
 ## 2. 상태 표기
 
@@ -110,8 +110,11 @@ posture처럼 emulator가 재현할 수 없는 항목만 실기기 gate로 유�
 3. password, sensitive, `IME_FLAG_NO_PERSONALIZED_LEARNING` editor에서는 네트워크 검색,
    AI, 개인화, clipboard 기록, rich content 다운로드를 실행하지 않는다.
 4. editor 또는 selection identity가 바뀐 뒤 이전 결과를 자동 제출하지 않는다.
-5. AI와 검색 기능은 현재 입력 전체를 암묵적으로 읽지 않는다. 사용자가 선택·복사·입력한 범위만
-   명시적 action으로 처리한다.
+5. AI는 사용자가 AI 툴바를 명시적으로 연 뒤에만 editor 원문을 capture한다. 선택이 있으면 선택을
+   우선하고, 없으면 complete `ExtractedText`의 전체 editor를 우선 사용한다. 전체 추출이 불가·null·partial·
+   stale이면 최대 4,000자의 커서 주변 문단으로 fail-closed fallback한다. private/sensitive/
+   `IME_FLAG_NO_PERSONALIZED_LEARNING`/offline editor는 원문 capture·network 모두 0회이며, 원문은
+   preview·요청 외 저장하거나 로그에 남기지 않는다.
 6. 실제 입력 원문, API key, clipboard 원문, 음성, 다운로드 URL query를 일반 로그에 남기지 않는다.
 7. 공급자별 결과, attribution, API key, 캐시 정책을 한 그리드나 저장소에 무단 혼합하지 않는다.
 8. 지원하지 않는 editor나 engine을 지원한다고 표시하지 않는다.
@@ -439,10 +442,10 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 | `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `DONE` | Unicode-safe diff·선택 적용·정확히 1회 교체·undo와 emulator 실제 Codex 교정 통과 | M |
 | `AI-02` | 존댓말·말투 변환 | `DONE` | 존댓말·카톡·업무·거절·사과·고객응대 action과 실제 Codex/Claude 결과 matrix 통과 | M |
 | `AI-03` | 빠른 문장 생성 | `DONE` | 프리셋·활성 키보드 직접 지시·빈 입력창 생성, 서로 다른 후보 정확히 3개, 실제 Codex/Claude 생성·교체·undo 통과 | M |
-| `AI-04` | 답장 초안 | `DONE` | 선택·문단·명시적 clipboard·Sharesheet intake, TTL·privacy·정확히 1회 입력과 실제 답장 생성 통과 | M |
+| `AI-04` | 답장 초안 | `DONE` | 선택·명시적 AI 진입 뒤 전체 editor source(불가 시 bounded cursor fallback)·명시적 clipboard·Sharesheet intake, TTL·privacy·정확히 1회 입력과 실제 답장 생성 통과 | M |
 | `AI-05` | 키보드 번역 | `DONE` | 한↔영·일·중 action·preview·정확히 1회 교체와 emulator 실제 OAuth companion 번역 통과 | M |
 | `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
-| `AI-07` | 원격 호환 endpoint OAuth | `DONE` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인; PC CLI companion과 두 기기 live 통과 | L |
+| `AI-07` | 원격 호환 endpoint OAuth | `DONE` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인. 2026-07-29 매니페스트 병합이 browser query를 지운 회귀를 수정했고, 최신 arm64 debug APK를 Z Fold6에 설치했다. 실제 Samsung Internet Custom Tab, 사용자 승인·callback 뒤 암호화 session metadata 존재와 live action result/replace/undo를 확인했다. credential·token 내용은 읽지 않았다 | L |
 | `AI-08` | 일반 사용자 AI 연결 안내 | `DONE` | 미연결·OAuth profile만 남고 암호화 session이 없는 상태·OAuth 만료 상태에 prompt 전 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
 | `AI-09` | 내 컴퓨터 자동 발견·연결 | `DONE` | mDNS 발견, Tailscale HTTPS manifest 검증, 연결 확인, AppAuth login과 PC 재시작 후 DPAPI grant 복구; A35·Z Fold6 통과 | L |
 | `AI-10` | 직접 지시 터치 안전·인증 복구 | `DONE` | prompt 상단까지 IME touchable inset으로 보고해 뒤 editor touch 관통을 차단하고 API key 401은 사용자용 `설정하기` 상태로 복구 | S |
@@ -626,18 +629,76 @@ SHA-256 `f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff`와 OC
 | `UX-03` | 툴바를 열면 고정 48dp 펼침/접힘 control과 기존 12개 도구의 1행 가로 스크롤을 먼저 표시한다. 사용자가 control을 누른 경우에만 도구를 실제 2행 6열 grid·96dp로 배치한다. Candidate·Clipboard·NumberRow·InlineSuggestion·Title은 해당 editor의 명시적 펼침 envelope를 이어받되 자동 후보 내용은 1행 `NOWRAP`을 유지한다. 새 editor는 48dp로 시작하고 Android same-editor restart만 명시적 펼침을 보존한다. 폭 측정이나 타이핑 자체는 높이 변경 원인이 아니다. | `ToolbarLayoutPolicyTest`, `ToolbarHeightSessionTest`, 전체 68 suites·318 tests 실패 0, API 34 x86_64 emulator에서 IME frame `y=1405→1279`, 실제 1행→2행 6열→1행 후보 전환 중 `y=1279` 유지·접기 후 `y=1405`, OOM·GridLayout count 회귀 실동작 수정. Z Fold6 cover의 `0.1.2-141-g89b5f79e`에서도 touchable top `y=1566→1458`, 실제 2행 6열, `hellp` 1행 후보 중 `y=1458` 유지, 접기 뒤 `y=1566`을 확인했다. | 제품 완료 gate 없음. Z Fold6 unfolded 전환과 A35 최신 APK 확인은 제조사·posture 회귀 관찰로 별도 추적 |
 | `AI-08` | AI 글쓰기·음성 받아쓰기·회의 전사의 미연결 또는 OAuth 만료 상태만 `설정하기`를 제공한다. 글쓰기 AI는 `SettingsRoute.PrivacyAi`로 이동한 뒤 `내 컴퓨터 자동으로 찾기 / OpenAI API 키 사용 / 고급 연결 설정` chooser를 정확히 한 번 바로 열고, STT 미연결 상태는 같은 route의 `OpenAI 음성 전사` 입력 dialog를 정확히 한 번 바로 연다. private editor, offline mode, app policy 차단은 credential 저장소를 열거나 CTA를 노출하지 않는다. 기본 휴대폰 받아쓰기에서는 OpenAI STT를 미연결 경고가 아닌 선택 사항으로 표시하고, OpenAI 모드를 실제 선택한 경우에만 별도 키를 요구한다. | 공통 gate 우선순위 테스트와 AI·voice JVM test, API 34 x86_64 emulator의 글쓰기 chooser·STT dialog 직행·선택 모드 summary·취소 후 휴대폰 모드 유지 PASS | A35 최신 APK 재확인 |
 | `AI-10` | AI 직접 지시 strip처럼 `keyboardView` 위에 놓인 상호작용 surface는 그 최상단부터 IME의 content·visible·touchable inset으로 보고한다. 화면에 보이는 `실행`·`취소`가 뒤 editor의 전송·검색·navigation control로 관통하면 안 된다. API key 401은 provider 원문 오류나 재시도만 노출하지 않고 사용자용 설명과 `설정하기`를 제공한다. | `ImeTouchableTopPolicyTest`, API key 401 typed-state test, Pixel 7 API 34에서 WindowManager touchable region이 prompt 상단과 일치하고 `실행` 뒤 target activity 유지·`개인정보·AI` CTA 이동 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
-| `AI-11` | AI 글쓰기 첫 화면은 맞춤법·문장 3개·답장 3개·직접 지시와 화면 안에 고정된 `더보기`만 1행으로 표시한다. `더보기`를 명시적으로 누를 때만 말투와 번역 2행을 추가하고, 가짜 지시문 행을 두지 않는다. `직접 지시`는 원문이 비어 있어도 기존 Fcitx 키보드 입력으로 열리며, 미연결 상태는 비활성 기능 미리보기와 일반 사용자용 `설정하기`를 함께 표시한다. | `AiActionMenuPolicy`의 전체 14 action·중복 0·빈 원문 Custom 단독 활성 테스트, 전체 68 suites·323 tests 실패 0, API 34 x86_64에서 미연결 1행 preview·CTA, 고정 `더보기`·3행 펼침, 빈 Chrome editor의 Custom 단독 활성과 실제 Fcitx prompt keyboard 진입 PASS | 실제 공급자 결과 품질 matrix만 별도 유지 |
-| `AI-12` | AI 답장 원문은 Fcitx의 non-sensitive·non-deleted clipboard history만 명시적으로 선택해 사용한다. 선택 목록은 `AlertDialog`가 아니라 IME가 소유한 화면 안 패널로 렌더하며, 선택 시 행 ID·현재 창·현재 editor를 다시 확인한다. 창이나 editor가 바뀌면 원문을 삽입하지 않는다. 오류는 실제 실패 원인을 사용자에게 잘못 귀속하지 않고, 앱 문구는 정중한 제품 문장으로 표시한다. clipboard 원문은 일반 로그에 남기지 않는다. | `AiReplyIntakeTest`의 hidden/sensitive/deleted 제외·한 줄 80자 label·행 ID selection 검증, 전체 app JVM 81 suites·394 tests failure/error/skipped 0, arm64 app·Hangul plugin assemble PASS. Z Fold6에서 Room schema v4·integrity·검색 가능 non-sensitive record 9개와 최신 WAL을 확인했고, 기존 실패가 DB가 아니라 attached dialog 생성 직후의 `Invalid resource ID 0x00000000`임을 확인했다. | 새 app/plugin `0.1.2-162-g2ea054a4`는 Z Fold6에 설치 완료. 사용자가 실제 답장 원문 선택을 한 번 탭해 UX 인수만 확인하면 된다. |
+| `AI-11` | AI 글쓰기 진입은 source review다. source는 `선택한 텍스트`·`현재 입력칸 전체`·`커서 주변 내용` 중 실제 capture scope를 그대로 표시한다. action-capable `Source`·`Loading`·`Results`·`Error` 상태는 쓰기 4·말투 6·번역 4의 14 action catalog를 유지한다. 첫 `Source` 화면은 가로 잘림·`더보기` 없이 14개를 모두 보이고, `Results`에서는 catalog를 84dp scroll cap으로 제한해 첫 결과의 `교체`·`뒤에 넣기`가 우선 보이게 한다. `직접 요청`만 catalog를 prompt와 현재 Fcitx `KeyboardWindow`로 교체하며, strip에는 실제 scope에 맞는 적용 대상을 표시한다. `설정 필요`, clipboard 선택, 전체 원문 보기는 집중 utility state라 catalog 예외다. no-op 결과는 apply control을 비활성/숨김 처리하고, 성공 적용 뒤에는 같은 결과의 재적용을 막은 `적용됨 · 실행 취소` footer만 제공한다. 취소는 내부 prompt drain 뒤 같은 원문·scope·14개 action으로 복귀하며, editor/tool이 바뀌면 AI 화면을 되살리지 않는다. `commitText=false`면 선택 범위·커서를 복구하고, 실패 결과를 clipboard나 다른 입력으로 대체하지 않는다. | `AiActionMenuPolicy`의 action-capable 4 state/utility exception, `AiTextSourceTest`의 complete editor·partial extract 거부·bounded fallback, `AiEditorTransactionTest`의 selection replace·append 실패 복구, `AiResultApplyPolicy`의 no-op apply 억제를 자동 검증한다. `PASS/EMULATOR`: final unified x86 headed run에서 Source·8초 Loading·Results·Error 모두 source와 14 action을 유지하고, normal/selection non-noop replace→disabled card→undo, no-op apply control 부재, no-extract cursor fallback, reject commit 원문·cursor 보존, direct prompt의 전체/selection/cursor scope strip을 fresh 화면·host text로 확인했다. 세부 증거는 아래 2026-07-30 기록으로 분리한다. | `PASS/EMULATOR`: AI-11 Android UI/editor gate를 통과했다. Fold unfolded posture는 `UX-03`의 별도 관찰 항목이며 AI-11 완료 gate에 포함하지 않는다. |
+| `AI-12` | AI 답장 원문은 Fcitx의 non-sensitive·non-deleted clipboard history만 명시적으로 선택해 사용한다. 선택 목록은 `AlertDialog`가 아니라 IME가 소유한 화면 안 패널로 렌더하며, 선택 시 행 ID·현재 창·현재 editor를 다시 확인한다. 창이나 editor가 바뀌면 원문을 삽입하지 않는다. 오류는 실제 실패 원인을 사용자에게 잘못 귀속하지 않고, 앱 문구는 정중한 제품 문장으로 표시한다. clipboard 원문은 일반 로그에 남기지 않는다. | `AiReplyIntakeTest`의 hidden/sensitive/deleted 제외·한 줄 80자 label·행 ID selection 검증, 최신 `:app:testDebugUnitTest`와 arm64 app·Hangul plugin assemble PASS. Z Fold6에서 Room schema v4·integrity·검색 가능 non-sensitive record 9개와 최신 WAL을 확인했고, 기존 실패가 DB가 아니라 attached dialog 생성 직후의 `Invalid resource ID 0x00000000`임을 확인했다. | 새 app/plugin `0.1.2-163-gbe796c39`는 Z Fold6 Taildrop으로 전송 완료. 사용자가 실제 답장 원문 선택을 한 번 탭해 UX 인수만 확인하면 된다. |
 | `UX-04` | IME가 소유한 AI·STT 설정 Activity를 열 때 원 editor identity를 대상으로 software-keyboard resume를 1회 예약한다. 자체 설정 text field나 다른 editor가 이를 소비하면 안 되며, 복귀 전 transient AI·음성 surface와 확장 높이는 KeyboardWindow로 정리한다. 모든 입력 종료의 전역 virtual 강제는 물리 키보드 사용자를 깨뜨리므로 금지한다. | `VirtualKeyboardResumeGateTest`의 exact editor·one-shot·self-settings non-consume 3개, 전체 69 suites·326 tests 실패 0. API 34 x86_64에서 AI 설정→API key ADB physical text→Settings root→원 editor 복귀 후 실제 QWERTY와 inset 1342, 빈 editor Custom→Fcitx prompt→`qw`·Run 활성 PASS | A35에서 실제 Bluetooth/DeX 물리 키보드와 설정 왕복 시 floating candidates 정책을 보존하는지 확인 |
 | `VOICE-07` | 빠른 받아쓰기 모드와 회의·메모 파일 전사 진입을 독립시킨다. `휴대폰 받아쓰기`가 선택돼 있어도 별도 STT profile 파일이 있고 privacy·network gate가 허용되면 회의 버튼을 표시한다. 표시 단계에서는 파일 존재만 확인하고, 사용자가 회의 창을 명시적으로 연 뒤에만 profile을 복호화한다. | mode를 입력받지 않는 `MeetingVoiceProfileResolver`, 차단 시 credential loader 0회, private/network/setup/ready와 회의 버튼 visibility 계약 테스트, 전체 68 suites·323 tests 실패 0 | 실제 OpenAI key·다화자 음원의 한국어 화자 분리 품질 |
 
 실기기 캡처 전 `dumpsys input_method`의 `mCurId`가 debug Fcitx service인지 확인한다. 삼성
 HoneyBoard가 활성인 화면을 이 앱의 숫자판이나 툴바 증거로 사용하지 않는다.
 
+#### AI-11 최종 unified headed emulator 증거 (2026-07-30)
+
+API 34 x86_64 headed emulator의 Korean locale debug Fcitx에서 complete editor 원문 87자·선택 없음으로
+AI 글쓰기를 열었다. 첫 화면은 `AI에 보낼 내용 · 현재 입력칸 전체`를 표시했고, 쓰기 4·말투 6·번역 4의
+14 action이 한 화면에 보였다. `직접 요청` 전에는 prompt가 자동으로 열리지 않았고, 명시 tap 뒤에는
+`현재 입력칸 전체에 적용` strip과 현재 Fcitx keyboard가 표시됐다. 실제 key touch로 입력한 `hi`는 prompt
+buffer에만 남고 host editor의 87자 원문은 변하지 않았으며, 취소 뒤에는 같은 14 action으로 복귀했다.
+
+`PASS/EMULATOR` — final ordinary result는 `.tmp-ai-final-business-ux-5558.png`에서 첫 결과 card의
+`교체`·`뒤에 넣기`를 즉시 표시했다. debug local responder의 non-noop `교체` 뒤 host editor는 87자에서
+marker 포함 109자로 한 번만 바뀌었다. 새 build의
+`.tmp-ai-undo-applied-new-5558.png`는 disabled result card와 `적용됨 · 실행 취소` footer를 보이며,
+`.tmp-ai-undo-restored-new-5558.png`는 undo 뒤 109자→87자 복귀와 재활성화된 result control을 보인다.
+
+`PASS/EMULATOR` — final 8초 debug-only Loading은 source 전체·14 action·spinner를 첫 화면에 함께
+표시했다(`.tmp-ai-final-loading-5558.png`). final no-change는 host `chars=87`, `selection=87..87`를
+보존하고 14 action 전체와 `원문과 같은 결과입니다. 적용할 내용이 없습니다.`를 표시했으며 apply button은
+없었다(`.tmp-ai-final-nochange-ux-5558.png`). 위 둘은 현행 UI와 editor transaction의 headed 증거이며
+live provider 품질 증거가 아니다.
+
+`PASS/EMULATOR` — normal editor 87자에서 selection `30..52`를 만든 source 화면은 `선택한 텍스트`와
+정확한 `SELECT_THIS_EXACT_TEXT` preview를 표시했다. `.tmp-ai-selection-applied-5558.png`에서 그 selection의
+non-noop `교체` 뒤 editor는 87자→109자, collapsed selection은 `74..74`가 됐다. `getExtractedText()`가
+null인 no-extract host에서도 원문 78자·cursor `38`을 유지하면서 `커서 주변 내용`과 sentinel preview를
+표시했다(`.tmp-ai-selection-source-5558.png`, `.tmp-ai-cursor-source-5558.png`).
+
+`PASS/EMULATOR` — final reject-commit host의 `교체`는 `mode=reject-commit`, `chars=56`,
+`selection=56..56`을 그대로 보존했고 14 action 전체와 `제안을 적용하지 못했습니다. 입력 내용은
+변경되지 않았습니다.`를 표시했다(`.tmp-ai-final-reject-ux-5558.png`). 자동 fallback 삽입은 없었다.
+
+`PASS/EMULATOR` — direct prompt는 action catalog를 현재 Fcitx keyboard와 prompt strip으로 교체했다.
+selection `30..52`·87자 host에서는 `AI 요청 선택한 텍스트에 적용`, no-extract cursor `38`·78자 host에서는
+`AI 요청 커서 주변 내용에 적용`이 각각 표시됐다(`.tmp-ai-direct-selection-prompt-5558.png`,
+`.tmp-ai-direct-cursor-prompt-5558.png`).
+
+`PASS/EMULATOR` — rebuilt x86_64 debug APK의 후속 headed run은 stale content와 stale selection을
+각각 responder 진입 전에 차단했다. Source preview 뒤 원문을 변경하거나 cursor를 이동하면 결과를 만들거나
+적용하지 않았다. direct prompt도 현재 Fcitx keyboard만 소유하고 action catalog는 숨긴 상태였으며, 정상
+direct submit은 result card를 만들었지만 prompt를 연 뒤 원문을 변경한 stale mutation은 전송 전에 막혔다.
+같은 rebuilt run에서 말투 action의 `교체`는 host 87자→109자를 정확히 한 번 반영했고 `실행 취소`는
+87자로 복원했다. 이 검증은 debug responder의 deterministic transaction/UI gate이며 live provider 품질
+판정으로 대체하지 않는다.
+
+`PASS/EMULATOR` — frozen selection capture와 non-null `ExtractedText` selection mismatch도
+fail-closed한다. debug-only `Stale extract` host는 `입력란, 내용 또는 커서 위치가 변경되었습니다. AI
+글쓰기를 다시 열어 주세요.`를 표시하고 result를 만들지 않았다. 그 뒤 settled `Normal` editor로 바꾸면
+`현재 입력칸 전체`와 14 action이 다시 표시됐고, 앞서 arm한 `[E2E_LOCAL_REPLACE_1]` responder가 그대로
+result를 반환했다. 따라서 stale extract는 provider 호출을 소비하거나 다른 cursor의 원문·target을 섞지
+않는다.
+
+위 final unified run으로 action-capable `Source`·`Loading`·`Results`·`Error`의 Android UI/editor gate는
+`PASS/EMULATOR`다.
+
 2026-07-29 AI 답장 원문 선택 회귀에서는 Z Fold6에서 DB·권한·검색 행이 정상임에도,
 일반 attached dialog의 theme attribute 해석 실패가 `클립보드 기록을 읽지 못했어`로 잘못 표시되는 것을
 확인했다. 이 경로는 키보드 내부 선택 패널로 교체했고, 공통 IME dialog의 dim amount도 안전한 기본값으로
 복구한다. 따라서 실제 DB read 실패만 해당 오류 상태로 표시하며, clipboard 값은 로그에 기록하지 않는다.
+
+2026-07-29 AI 적용 실패 안전성 감사에서는 `commitText()`가 false일 때 선택문 교체가 선택 시작점으로
+접히고, append가 임시 append 위치에 커서를 남기는 두 경로를 발견했다. 이제 둘 다 원래의
+`selectionStart..selectionEnd`를 복구하고, selection 범위 자체도 4,000자 상한을 먼저 검증한다.
+`AiEditorTransactionTest`가 failed replace와 failed append의 정확한 selection 복구를 고정한다.
 
 2026-07-26 checkpoint에서 A35 `SM-A356N`과 Z Fold6 `SM-F956N`에 동일 arm64 app/plugin을
 설치하고 매 캡처 전 debug Fcitx `mCurId`를 확인했다. 두 cover 폭에서 툴바 12개 action이 6×2로
@@ -1329,10 +1390,18 @@ HTTPS computer origin 하나만 받는다.
 ### 8.3 text 읽기와 교체
 
 - IME가 임의의 chat bubble이나 화면 전체를 읽을 수 있다고 가정하지 않는다.
-- `InputConnection.getSelectedText()`와 surrounding text는 null 또는 stale일 수 있다.
+- 사용자가 AI 툴바를 연 뒤에만 `InputConnection`을 읽는다. 선택이 있으면 선택문을 사용한다.
+- 선택이 없으면 `getExtractedText()`가 `startOffset=0`, `partialStartOffset=-1`, 4,000자 이하인
+  complete editor를 제공할 때만 전체 입력칸을 source로 사용한다. null, partial, oversized 또는 stale
+  extract는 전체 입력칸으로 표시하지 않는다.
+- 전체 추출 fallback은 커서 전·후 값을 각각 보존한 최대 4,000자 cursor context다. 긴 editor에서는
+  현재 문단을 우선하며, 교체 직전 양쪽 값을 다시 비교한다. 어느 한쪽이라도 다르면 network 결과를
+  입력하지 않는다.
 - 상대 메시지 기반 답장은 사용자가 선택, 복사 또는 share한 텍스트만 사용한다.
 - AI 결과는 원문, diff, 후보를 보여주고 `교체`, `뒤에 넣기`, `복사`, `취소`를 구분한다.
-- 교체 뒤 최소 한 번의 undo 경로를 제공한다.
+- 전체/주변 source 교체는 `deleteSurroundingText(before, after)`와 `commitText()`를 같은 batch에서
+  정확히 한 번 수행하고, undo는 원문과 capture 당시 cursor split을 복원한다. 실패 시 clipboard 또는
+  다른 삽입 방식으로 fallback하지 않는다.
 
 `AI-04` 답장 intake는 IME가 다른 앱 화면을 임의로 읽는 방식으로 만들지 않는다. 사용자가 Android
 Sharesheet로 `text/plain`을 명시적으로 공유하거나 clipboard 목록의 특정 행을 직접 누른 경우만 받는다.
@@ -1394,11 +1463,12 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | --- | --- | --- |
 | 공급자 profile | `PASS` | OpenAI·OpenAI-compatible HTTPS endpoint, Fast/Balanced/Quality model tier를 pure model로 검증; 평문 HTTP는 loopback·private·Tailscale도 차단 |
 | API key vault | `PASS` | Android Keystore AES-GCM과 `noBackupFilesDir/ai/provider.bin`; SharedPreferences·user ZIP·log에 key를 저장하지 않음 |
-| OAuth public client | `PASS` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현; AppCompat dialog theme와 Android 11+ browser query 회귀 수정 |
+| OAuth public client | `PASS/ZFOLD` | AppAuth external browser, Authorization Code, state, PKCE S256, 고정 redirect, client secret 없음, 암호화 AuthState·refresh·revoke 구현. 2026-07-29 매니페스트 병합 감사에서 `tools:node="removeAll"`이 `<queries>` 전체를 제거해 Fold가 browser를 못 찾는 회귀를 확인했다. marker를 제거했고, merged manifest 검증 task가 `VIEW+BROWSABLE+http` query가 사라지면 APK build를 실패시킨다. fresh API 34 headed emulator에서는 credential-free HTTPS fixture로 `AiOAuthLoginActivity → AppAuth → Chrome` 실제 전환을 확인했다. 같은 arm64 debug APK를 Z Fold6에 재설치했고, 자동 발견·확인 뒤 Samsung Internet Custom Tab 전환, 사용자 승인·callback 뒤 Keystore 암호화 OAuth session의 존재(metadata만 확인)를 실제로 확인했다. credential 내용·token은 읽거나 기록하지 않았다. |
 | OAuth request contract | `PASS` | API key/OAuth 혼합·HTTP endpoint 거부, `.ts.net` HTTPS profile, callback profile 불일치 차단, applicationId redirect, Bearer 1회 사용, 401 무재시도·명시적 재로그인 unit test |
 | OAuth entry readiness | `PASS` | 구조적으로 유효한 OAuth profile도 암호화 AppAuth session이 없으면 prompt·source capture 전에 재로그인 `설정하기` CTA로 전환. API key profile은 session 없이 ready이며 private/offline 차단이 우선 |
-| Android 통합 build/test | `PASS` | 2026-07-28 최종 `:app:testDebugUnitTest` 81 suites·393 tests failure/error/skipped 0, x86_64 app·Hangul plugin debug assemble, debug merged manifest redirect scheme 일치 |
-| OAuth live provider | `PASS` | `alpaca-home` CLI companion을 A35·Z Fold6가 각각 발견하고 외부 browser 승인·PKCE token 교환·암호화 session 저장 통과. Pixel 7·QA tablet API 34 emulator도 임시 HTTPS `--public-origin`의 manifest 확인·browser 승인·token 교환·암호화 session 저장 뒤 우리 키보드로 직접 지시문을 입력해 후보 3개·정확히 1회 삽입·undo를 통과했다. 시험 session은 두 emulator에서 revoke·삭제했고 PC 재시작용 companion grant는 Windows DPAPI로 보존한다. |
+| Android 통합 build/test | `PASS` | 2026-07-29 최신 source로 `:app:testDebugUnitTest`, x86_64 app·Hangul plugin debug assemble, arm64 app·Hangul plugin debug assemble와 release merged-manifest browser visibility guard를 통과했다. |
+| Release assemble workstation | `GATE (environment)` | release Kotlin·manifest와 OAuth browser visibility guard는 arm64에서 통과했다. 다만 이 워크스테이션의 native CMake release 단계는 Gettext `msgmerge`/`msgfmt` 부재로 멈춘다. source regression으로 분류하지 않으며, 도구 설치 또는 CI 환경에서 별도 release artifact gate가 필요하다. |
+| OAuth live provider | `PASS/ZFOLD` | 최신 arm64 debug APK의 Z Fold6 전용 고정 문장 편집기에서 실제 사용자 OAuth session으로 선택 텍스트 `맞춤법` 요청을 보냈고, 결과 card 수신 → `교체` 1회 → selection 확정 → `실행 취소` 표시·소멸을 확인했다. 해당 맞춤법 결과는 원문과 동일한 no-op이었으므로, 실제 내용이 달라지는 postcondition은 emulator non-noop test와 함께 판정한다. token·원문 외 사용자 데이터는 다루지 않았다. |
 | public-origin startup | `PASS` | 새 Quick Tunnel의 route 전파 중 404·502 뒤 정상 manifest를 제한 재시도로 수용하고, 잘못된 manifest 계약은 sleep 없이 즉시 거부하는 Python test를 고정했다. companion Python 11 tests와 실제 Cloudflare tunnel OAuth 왕복을 통과했다. |
 | 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |
 | PC 유료 CLI 실행 | `PASS` | Codex CLI `exec`는 ChatGPT 로그인, Claude Code `-p`는 Max 로그인으로 실행; API/token 환경 변수 제거, tool·web·write·session persistence 차단, A35에서 Codex 맞춤법과 Claude 존댓말 실제 생성 성공, Fold에서 Codex 생성 성공 |
@@ -1410,8 +1480,9 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | A35 생성 결과 | `PASS` | `meeting 30 minutes late polite` 선택 범위로 한국어 지각 안내 초안 생성, 결과 card와 공급자 표시 확인 |
 | 교체 exactly-once·undo | `PASS` | Chrome URL editor에서 결과를 한 번 교체한 뒤 `실행 취소`로 원문이 정확히 복원됨 |
 | Z Fold6 UI | `PASS` | cover 화면에서 AI toolbar, 원문 preview와 전체 action group이 잘림 없이 표시됨 |
-| AI 결과 우선 UI | `PASS/EMULATOR` | 결과 상태에서 보이지 않는 `weight=1` status container와 가짜 지시문 행을 제거하고 공급자 표기를 숨김; 원문은 한 줄로 축소, 클립보드 선택은 `AI 글쓰기` 제목 우측 버튼으로 유지, 기본 action은 1행·말투/번역은 명시적 펼침으로 분리해 결과 card가 전체 가용 높이를 사용 |
-| AI 직접 지시문 | `PASS/ZFOLD` | 기능별 두벌식 복제판 제거. `AI 글쓰기` 첫 진입 즉시 현재 `KeyboardWindow`·Fcitx 조합·후보·한/영·숫자·기호·천지인/세벌식·theme과 직접 지시문 strip을 열고, `취소`했을 때만 전체 action panel로 돌아간다. output은 내부 최대 300자 buffer로 격리; A35의 영문 입력·후보·숫자판·천지인 picker·target editor 무변경과 Z Fold6의 entry-time prompt keyboard 표시, pure buffer·entry exactly-once 회귀 테스트 통과 |
+| AI 결과 우선 UI | `PASS/EMULATOR (result/loading/error interaction)` | `Source`·`Loading`·`Results`·`Error`는 action catalog를 계속 렌더한다. 결과 상태만 84dp catalog cap과 scroll을 사용해 첫 결과 card와 `교체`·`뒤에 넣기`를 우선 표시한다. final unified headed emulator에서 8초 Loading의 source 전체·14 action·spinner, normal·selection non-noop `교체` 87자→109자 exactly-once, disabled card·`적용됨 · 실행 취소`, undo 109자→87자와 control 재활성화, no-op의 `원문과 같은 결과입니다. 적용할 내용이 없습니다.`·apply control 부재, reject Error의 56자/selection 보존·14 action·Korean failure를 확인했다. |
+| AI 직접 지시문 | `PASS/EMULATOR` | 첫 진입 자동 prompt open을 금지한다. `직접 요청`만 catalog를 대체하고 현재 Fcitx `KeyboardWindow`·내부 최대 300자 prompt buffer를 연다. prompt strip은 선택/전체 editor/cursor context의 실제 적용 대상을 표시하며, input은 host editor로 새지 않아야 한다. current-editor typed input·취소 복귀와 selection `30..52`의 `선택한 텍스트에 적용`, no-extract cursor `38`의 `커서 주변 내용에 적용`을 headed emulator로 확인했다. |
+| AI source review shell | `PASS/EMULATOR (source scope)` | complete editor 우선·partial extract 거부·bounded cursor fallback, 14 action grid, product copy, manual Custom transition을 구현했다. headed emulator에서 normal complete-editor, selection `30..52`의 exact preview, no-extract cursor `38`의 sentinel preview가 각각 올바른 Korean scope label과 함께 표시됐다. final Loading·no-change·reject에서도 source/action catalog가 14개로 유지됐다. `설정 필요`, clipboard 선택, 전체 원문 보기의 catalog 비노출은 집중 utility state라는 의도된 예외다. |
 | AI 직접 지시 터치 경계 | `PASS/EMULATOR` | prompt strip 상단을 IME content·visible·touchable inset으로 사용해 뒤 editor의 전송/검색 버튼 touch 관통을 차단. API 34 WindowManager region·target activity 유지와 실제 `실행` -> 401 설정 안내 전이를 검증 |
 | API key 거부 UX | `PASS/EMULATOR` | API key 401을 typed failure로 분리해 provider 영문 원문과 의미 없는 재시도를 숨기고 한국어 설명·`설정하기`를 표시; CTA의 `개인정보·AI` 직행과 test credential 삭제 확인 |
 | 완전 offline zero-request | `PASS/EMULATOR` | API 34 x86_64에서 offline mode와 `OpenAI API 정밀 전사`를 선택하고 확장 toolbar의 AI·전사·GIF를 각각 실제 tap. 모든 동작 뒤 host가 Settings `SearchActivity`로 유지됐고 Fcitx UID 10191 BPF 통계가 `rx=4,595,372 / tx=49,121 / rxPackets=3,157 / txPackets=1,078`로 동일해 delta가 모두 0. 종료 후 offline OFF·`휴대폰 받아쓰기 (추천)`으로 복구하고 `no_backup/voice`·AI credential 부재 확인 |
@@ -1423,7 +1494,9 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | OpenAI 실제 전사 품질 | `GATE` | dummy key로 녹음·요청·401 오류 경계만 검증했다. 실제 STT key를 저장하지 않은 상태이며 한국어 정확도·preview·1회 입력은 사용자 key로 별도 검증 필요 |
 | 두 기기 최종 설치 | `PASS` | 2026-07-27 A35 `01:02:42`, Z Fold6 `01:02:50`에 음성 fallback 커밋 `6526f823`의 동일 `0.1.2-109-g6526f823` arm64 debug APK 재설치 후 debug Fcitx IME 재선택 |
 | 재부팅 첫 잠금 해제 키보드 | `PASS/EMULATOR+ZFOLD_INSTALL` | API 34 emulator에 실제 암호를 설정하고 완전 재부팅한 뒤 `isDirectBootMode=true`의 SystemUI password editor에서 Fcitx InputMethod surface·touch region 표시, 8글자 입력, 잠금 해제 후 normal-mode 재기동을 확인. 잠금 해제 전에는 CE app profile·snippet·dynamic phrase·clipboard suggestion·AI·GIF·OCR·voice를 fail-closed하고 기본 문자·숫자·기호 입력만 유지. 전체 73 suites·350 tests 실패 0, x86_64·arm64 app 및 arm64 Hangul plugin assemble 통과, 동일 arm64 APK를 Z Fold6에 설치하고 Fcitx bound/input shown 확인 |
+| Z Fold6 최신 arm64 설치 | `PASS/ZFOLD_INSTALL` | 2026-07-30 wireless ADB의 `SM-F956N`에 최신 arm64 debug app(00:01:24)과 Hangul debug plugin(00:01:34)을 각각 `adb install -r`로 `Success` 설치했다. 이어 `org.fcitx.fcitx5.android.debug/org.fcitx.fcitx5.android.input.FcitxInputMethodService`를 `default_input_method`로 다시 지정했다. 이는 최신 package deployment·IME 선택의 실기기 증거이며, 별도 UI/E2E 또는 Fold unfolded posture gate를 대신하지 않는다. |
 | AI-01 diff·부분 적용 | `PASS/EMULATOR+ZFOLD` | bounded LCS·대형 입력 fallback·Unicode code-point 범위·stale source/미검토 target 거부와 선택 checkbox UI. emulator의 부분 적용에 더해 Z Fold6 cover에서 기존 OAuth CLI companion으로 `안녕하세욕`을 전송해 `안녕하세요`, `욕 → 요` 결과를 받고 `교체` 정확히 1회·`실행 취소` 시 뒤 공백까지 원문 복원을 실측; 문자는 전송하지 않고 draft 삭제 |
+| AI apply postcondition | `PASS/EMULATOR+ZFOLD` | Android 14/15 remote `InputConnection` transport 성공은 host editor 수락을 뜻하지 않으므로, AI 교체/외부 답장 모두 예상 visible text와 selection postcondition을 확인한 뒤에만 성공·undo를 표시한다. reject host에서는 원문 selection을 복원하고 fallback 삽입을 하지 않는 emulator proof를 고정했다. Z Fold6의 실제 OAuth no-op 결과도 same transaction과 undo lifecycle으로 확인했다. |
 | AI-04 명시적 intake | `PASS` | Sharesheet text/plain·clipboard 행·4,000자·5분 TTL·private/offline/app gate·stale editor·exactly-once 테스트와 A35 실제 답장 생성 통과 |
 | AI 3개 후보 계약 | `PASS/EMULATOR` | Compose·Reply·Custom은 Responses `text.format` strict JSON Schema의 `minItems=maxItems=3`을 전송한다. Android parser와 PC CLI companion도 공백·중복 제거 후 정확히 3개가 아니면 성공 card 대신 한국어 재시도 상태로 fail-closed. Pixel 7·QA tablet API 34 emulator에서 OAuth companion의 실제 custom prompt가 서로 다른 한국어 후보 3개를 반환했고 첫 후보 교체·원문 undo 통과. Android 66 suites·299 tests, companion Python 11 tests와 x86_64 app assembly 통과 |
 | AI-05 번역 matrix | `PASS/EMULATOR` | OAuth companion으로 `안녕하세요 → Hello`, `Hello → 안녕하세요`, `Hello → こんにちは`, `Hello → 你好`를 각 action에서 실제 생성하고 preview card를 확인 |
@@ -1470,7 +1543,7 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 ### 단계 3 — AI 기반과 text 기능
 
 1. `AI-00`, `AI-06`, `SEC-02` 공급자·Keystore·privacy/usage 기반. (`DONE`)
-2. `AI-07` endpoint OAuth public-client flow와 token lifecycle. (`DONE`: PC CLI companion·두 기기 login·generation 통과)
+2. `AI-07` endpoint OAuth public-client flow와 token lifecycle. (`DONE`: PC CLI companion·기존 두 기기 login 증거와 2026-07-29 최신 Z Fold6 browser approval/session metadata·actual action/replace/undo smoke 통과)
 3. `AI-08` 일반 사용자용 AI 연결·재로그인 CTA. (`DONE`: 코드·테스트·두 기기 미연결 안내와 설정 직행 통과)
 4. `AI-09` 컴퓨터 자동 발견·검증·연결 마법사. (`DONE`: 두 기기 mDNS·Tailscale HTTPS·PKCE·DPAPI 재시작 복구 통과)
 5. `AI-10` 직접 지시 터치 안전·API key 인증 복구. (`DONE`: API 34 emulator touchable region·설정 CTA 통과)
@@ -1511,6 +1584,8 @@ property로만 주입하고 저장소·APK 산출물 이름·오류 출력에 �
 - 민감 editor에서 network·clipboard·파일 접근 호출 수 0.
 - 실패 뒤 자동 fallback 또는 중복 입력 수 0.
 - 사용자가 실제로 본 화면 또는 삽입 결과.
+- IME UI 변경은 headed emulator의 실제 화면·UI hierarchy·editor 값으로 source/action/result/prompt 상태와
+  viewport를 증명한다. ADB 논리값 또는 과거 screenshot만으로 current PASS를 선언하지 않는다.
 - 남은 `BLOCK`, owner가 필요한 외부 계약, 명시적 non-goal.
 
 최소 공통 명령은 다음과 같다.
@@ -1553,10 +1628,11 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | 툴바는 기본 1행 가로 스크롤, 고정 48dp control의 명시적 펼침만 2행 6열로 전환하며 자동 후보는 1행을 유지하고 editor 높이는 해당 세션 envelope로 고정 |
 | 2026-07-26 | 일반 사용자용 AI 미연결·재로그인 상태에만 `설정하기`를 제공하며 private/offline/policy 차단은 CTA 없이 fail-closed |
 | 2026-07-28 | OAuth profile만 저장되고 암호화 AppAuth session이 없으면 AI prompt를 열지 않고 entry 시점에 기존 재로그인 `설정하기` CTA로 전환 |
+| 2026-07-29 | Android manifest의 `<queries tools:node="removeAll" />`가 browser·Custom Tabs query까지 병합 결과에서 지우는 OAuth 회귀를 확인했다. marker를 제거하고 merged manifest browser-visibility guard를 build에 고정했다. fresh headed emulator의 AppAuth→Chrome 전환과 Z Fold6 arm64 APK 재설치 뒤 Samsung Internet Custom Tab 전환을 통과했고, 사용자 승인 PKCE callback 뒤 암호화 session의 metadata 존재와 실제 OAuth `맞춤법` result/교체/undo smoke를 Z Fold6 전용 고정 문장 editor에서 확인했다. credential·token 내용은 읽지 않았다 |
 | 2026-07-26 | GIPHY exact query 계약은 보존하고 한국 밈 query fallback은 성공한 empty KLIPY 첫 page와 로컬 Noto에만 적용 |
 | 2026-07-26 | OCR은 proprietary ML SDK 대신 Apache-2.0 Tesseract 계열과 pinned 한국어 best model을 사용하며 원본·결과를 저장하지 않음 |
 | 2026-07-26 | 표준 API key의 일반 mobile direct 저장은 기본 경로로 사용하지 않음 |
-| 2026-07-26 | AI text action은 선택/현재 문단 preview 후에만 network를 호출하고 결과 교체·추가·undo를 명시적 동작으로 제한 |
+| 2026-07-26 | `SUPERSEDED 2026-07-29`: AI text action은 선택/현재 문단 preview 후에만 network를 호출한다는 이전 source 범위 |
 | 2026-07-27 | 글쓰기 AI와 음성 STT profile/key를 분리하고 휴대폰 받아쓰기를 기본값으로 유지. 최초 마이크 권한 뒤에는 동일 editor에서만 음성 window와 녹음을 정확히 한 번 재개 |
 | 2026-07-26 | 동적 빠른 문구는 기존 `.mb` 형식을 유지하고, 명시적 미리보기 뒤 정확히 한 번 삽입 |
 | 2026-07-27 | AI·GIF·검색 등 IME 내부 text 입력은 활성 `KeyboardWindow`와 Fcitx 엔진을 재사용하며 기능별 두벌식 복제판을 금지 |
@@ -1582,11 +1658,13 @@ plugin lint와 assembly는 현재 task graph 제약 때문에 별도 invocation�
 | 2026-07-27 | Tailscale private network를 사용할 수 없는 emulator 검증에는 strict HTTPS origin-only `--public-origin`을 허용하되 임시 tunnel을 production 기본값으로 승격하지 않음 |
 | 2026-07-27 | 새 `--public-origin` route의 일시적 404·502는 bounded backoff로만 재검증하고 manifest 계약 오류는 즉시 fail-closed. Pixel 7·QA tablet에서 OAuth·직접 지시·후보 3개·삽입·undo 뒤 시험 grant와 tunnel을 모두 정리 |
 | 2026-07-27 | 전용 STT credential이 없는 온라인 받아쓰기 선택은 mode를 선저장하지 않는다. key 저장 성공과 mode 변경을 같은 사용자 완료 경로로 묶고, key dialog 취소 시 기존 휴대폰 받아쓰기를 보존한다. |
-| 2026-07-28 | AI 글쓰기는 기본 action 1행과 고정 `더보기`를 사용하고 말투·번역은 명시적 펼침에서만 표시한다. 가짜 prompt row를 금지하며 빈 editor의 `직접 지시`도 기존 Fcitx prompt keyboard로 연다. |
+| 2026-07-28 | `SUPERSEDED 2026-07-29`: AI 글쓰기는 기본 action 1행과 고정 `더보기`를 사용하고 말투·번역은 명시적 펼침에서만 표시한다는 이전 UI 계약 |
 | 2026-07-28 | 빠른 받아쓰기 mode는 회의·메모 파일 전사의 STT profile 선택을 숨기지 않는다. 회의 버튼 렌더는 암호화 파일 존재만 보고 실제 credential 복호화는 privacy·network 허용 상태의 명시적 회의 진입 뒤에만 수행한다. |
 | 2026-07-28 | IME 소유 설정 Activity 왕복은 원 editor identity에 묶인 one-shot software-keyboard resume로 복구한다. 전역 virtual 강제는 금지하고 자체 설정 editor는 예약을 소비하지 않는다. |
 | 2026-07-28 | 재부팅 첫 잠금 해제 전에는 device-protected 기본 키보드만 허용한다. credential-encrypted app profile·snippet·dynamic phrase·clipboard suggestion·AI·GIF·OCR·voice는 읽거나 노출하지 않고, `ACTION_USER_UNLOCKED` 뒤 프로세스를 재기동해 일반 기능을 복원한다. |
-| 2026-07-28 | `AI 글쓰기`는 첫 진입 즉시 별도 복제 자판이 아닌 현재 Fcitx `KeyboardWindow`와 내부 직접 지시문 target을 정확히 한 번 연다. `취소`는 action panel로 복귀하며 같은 window session에서 prompt를 자동 재개하지 않는다. |
+| 2026-07-28 | `SUPERSEDED 2026-07-29`: `AI 글쓰기` 첫 진입 즉시 현재 Fcitx `KeyboardWindow`와 내부 직접 지시문 target을 연다는 이전 entry 계약 |
+| 2026-07-30 | AI 글쓰기 진입은 source review부터 시작한다. 선택 우선, complete `ExtractedText` 전체 editor 우선, 불가·partial·oversized면 4,000자 bounded cursor context로 fallback하며 양쪽 text를 다시 확인한다. 실제 capture scope를 `선택한 텍스트`·`현재 입력칸 전체`·`커서 주변 내용`으로 표시한다. action-capable `Source`·`Loading`·`Results`·`Error`는 같은 14 action catalog를 유지하고, 첫 Source 화면은 모두 보이며 Results만 84dp scroll cap으로 첫 결과의 apply control을 우선한다. `직접 요청`만 catalog를 현재 Fcitx prompt keyboard로 교체한다. `설정 필요`, clipboard 선택, 전체 원문 보기는 집중 utility state 예외다. no-op은 apply를 비활성/숨김하고, 성공 적용은 재적용을 막은 `적용됨 · 실행 취소` footer로만 undo한다. final x86 headed run은 8초 Loading·no-change·reject·ordinary result에서 source와 14 action, visible control 또는 Korean failure, host text/selection postcondition을 모두 확인해 `PASS/EMULATOR`로 승격했다. |
+| 2026-07-29 | Android 14/15의 remote `InputConnection`은 transport 성공을 editor mutation 성공으로 돌려주지 않을 수 있다. AI replace/reply는 selected range transaction 뒤 expected visible text와 collapsed selection을 확인하고, 확인하지 못하면 원 selection을 복원해 실패로 끝낸다. reject host에는 자동 fallback 삽입을 하지 않으며 emulator non-noop·reject proof와 Z Fold6 real OAuth no-op transaction/undo로 분리 검증한다. |
 | 2026-07-28 | GIF 검색어도 별도 두벌식·QWERTY 자판을 만들지 않고 현재 Fcitx `KeyboardWindow`와 내부 prompt buffer로만 입력한다. AI와 GIF는 같은 capture lifecycle을 쓰되 privacy policy, 빈 제출, provider별 query 한도는 feature별로 분리한다. |
 | 2026-07-28 | 내부 prompt 종료는 Fcitx reset 완료만으로 capture를 풀지 않는다. 같은 event stream의 token barrier 전까지 late commit·preedit·key·delete와 직접 삽입을 버려 query가 원 editor로 새는 경로를 차단한다. |
 | 2026-07-28 | 내부 prompt의 start·submit·drain marker는 실제 service event collector 구독 확인 뒤에만 사용한다. Fcitx native dispatcher가 완전히 멈춘 뒤의 누적 engine generation이 바뀌면 StateFlow lifecycle 상태가 합쳐져도 기존 collector·prompt·drain을 폐기하고 새 engine READY 이후에만 다음 prompt를 허용한다. |
