@@ -89,6 +89,10 @@ val debugAiProviderName = providers.gradleProperty("AI_PROVIDER_NAME").orElse("O
 val debugAiProviderBaseUrl = providers.gradleProperty("AI_PROVIDER_BASE_URL")
     .orElse("https://api.openai.com/v1")
 val debugAiProviderApiKey = providers.gradleProperty("AI_PROVIDER_API_KEY").orElse("")
+val releaseDeviceGate = providers.gradleProperty("releaseDeviceGate")
+    .orElse(providers.environmentVariable("RELEASE_DEVICE_GATE"))
+    .map(String::toBoolean)
+    .orElse(false)
 val inferredSourceTag = providers.provider {
     val versionName = buildVersionName
     if (versionName.matches(Regex("""\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?"""))) {
@@ -119,6 +123,7 @@ val faqUrl = providers.gradleProperty("FAQ_URL").orElse(ProductIdentity.faqUrl)
 
 android {
     namespace = "org.fcitx.fcitx5.android"
+    testBuildType = if (releaseDeviceGate.get()) "release" else "debug"
 
     defaultConfig {
         applicationId = ProductIdentity.applicationId

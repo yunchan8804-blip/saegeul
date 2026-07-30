@@ -214,9 +214,25 @@ provider authority, 플러그인 action/metadata, 공식 앱의 배포·스토�
 허용하지 않는다. 첫 버전의 제품 빌드 그래프도 `plugin:hangul` 하나만 허용한다.
 
 실기기 게이트는 공식 `bundletool` JAR과 같은 빌드의 APK/AAB/한글 플러그인 APK/
-instrumentation APK를 사용한다. AAB 설치와 APK 재설치 후 Android 패키지 관리자의
-플러그인 action 검색, Fcitx 엔진의 `hangul` 검색, 두벌식 `가` 조합·확정, 구
-`org.fcitx.fcitx5.android` 내보내기 데이터의 설정 이전과 클립보드 제외를 검사한다.
+release 대상 instrumentation APK를 사용한다. instrumentation APK는 메인 APK와 같은
+인증서로 서명되고 `kr.twentyoz.saegeul`을 대상으로 해야 한다. AAB 설치와 APK 재설치 후
+Android 패키지 관리자의 플러그인 action 검색, Fcitx 엔진의 `hangul` 검색, 두벌식 `가`
+조합·확정, 구 `org.fcitx.fcitx5.android` 내보내기 데이터의 설정 이전과 클립보드 제외를
+검사한다.
+
+release 대상 instrumentation APK는 일반 개발용 debug 테스트와 분리해 생성한다.
+
+```powershell
+.\gradlew.bat :app:assembleReleaseAndroidTest `
+  '-PreleaseDeviceGate=true' `
+  '-PbuildVersionName=<release-version>'
+```
+
+이 작업에도 메인 Release와 같은 `SIGN_KEY_FILE`, `SIGN_KEY_PWD`, `SIGN_KEY_ALIAS`를
+제공해야 한다. `verify-release-device.ps1`은 실행 전에 test applicationId,
+instrumentation targetPackage, 메인 APK와의 서명 인증서 일치를 모두 확인한다.
+기기가 연결되기 전에는 같은 인수에 `-PreflightOnly`를 추가해 설치 입력의 정적 계약만
+검증할 수 있다. Preflight PASS는 실제 설치·한글 입력·이전 PASS를 대신하지 않는다.
 
 ```powershell
 .\scripts\verify-release-device.ps1 `
@@ -224,7 +240,7 @@ instrumentation APK를 사용한다. AAB 설치와 APK 재설치 후 Android 패
   -MainApkPath <main.apk> `
   -MainAabPath <main.aab> `
   -HangulApkPath <hangul.apk> `
-  -AndroidTestApkPath <app-debug-androidTest.apk> `
+  -AndroidTestApkPath <app-release-androidTest.apk> `
   -BundletoolJarPath <bundletool-all.jar> `
   -KeystorePath <release-keystore> `
   -KeyAlias <release-key-alias> `
