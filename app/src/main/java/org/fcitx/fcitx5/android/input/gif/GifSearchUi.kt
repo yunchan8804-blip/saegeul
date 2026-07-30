@@ -74,6 +74,12 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         gravity = Gravity.CENTER_VERTICAL
         setPadding(0, context.dp(1), 0, context.dp(3))
     }
+    private val providerDisclosure = TextView(context).apply {
+        setTextColor(theme.altKeyTextColor)
+        alpha = 0.82f
+        textSize = 10f
+        setPadding(context.dp(8), 0, context.dp(8), context.dp(3))
+    }
 
     private val moreGifSettingsButton = Button(context).apply {
         isAllCaps = false
@@ -182,6 +188,10 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
             LinearLayout.LayoutParams.MATCH_PARENT,
             context.dp(32)
         ))
+        column.addView(providerDisclosure, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
         column.addView(content, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
@@ -220,6 +230,11 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
 
     fun setProviderLabel(label: CharSequence) {
         providerLabel.text = label
+    }
+
+    fun setProviderDisclosure(disclosure: CharSequence) {
+        providerDisclosure.text = disclosure
+        providerDisclosure.contentDescription = disclosure
     }
 
     fun setQuery(query: String) {

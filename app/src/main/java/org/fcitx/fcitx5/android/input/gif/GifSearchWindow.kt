@@ -99,6 +99,17 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 GifProviderKind.GiphyUnavailable -> GiphyGifProvider.POWERED_BY_GIPHY
             }
         )
+        ui.setProviderDisclosure(
+            context.getString(
+                when (effectiveProvider.kind) {
+                    GifProviderKind.AnimatedNoto -> R.string.gif_disclosure_noto
+                    GifProviderKind.Klipy -> R.string.gif_disclosure_klipy
+                    GifProviderKind.Commons -> R.string.gif_disclosure_commons
+                    GifProviderKind.Giphy -> R.string.gif_disclosure_giphy
+                    GifProviderKind.GiphyUnavailable -> R.string.gif_disclosure_unavailable
+                }
+            )
+        )
         ui.setQuickSuggestions(providerPresentation.quickSuggestions)
         ui.setMoreGifSettingsVisible(providerPresentation.showsMoreGifSettings)
         ui.onQueryClick = ::beginQueryEditing

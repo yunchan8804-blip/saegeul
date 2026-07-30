@@ -12,4 +12,16 @@
     <exclude
         domain="file"
         path="README.md" />
+    <exclude
+        domain="database"
+        path="clbdb" />
+    <exclude
+        domain="database"
+        path="clbdb-shm" />
+    <exclude
+        domain="database"
+        path="clbdb-wal" />
+    <exclude
+        domain="database"
+        path="clbdb-journal" />
 </full-backup-content>

@@ -46,6 +46,7 @@ import org.fcitx.fcitx5.android.input.gif.GifProviderKind
 import org.fcitx.fcitx5.android.input.gif.GifProviderResolver
 import org.fcitx.fcitx5.android.input.gif.GifProviderSelection
 import org.fcitx.fcitx5.android.input.gif.GifProviderSelectionStore
+import org.fcitx.fcitx5.android.input.gif.GiphyCustomerIdStore
 import org.fcitx.fcitx5.android.input.gif.GiphyCredentialState
 import org.fcitx.fcitx5.android.input.gif.GiphyProviderConfiguration
 import org.fcitx.fcitx5.android.input.gif.GiphyProviderCredentialStore
@@ -1053,6 +1054,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .setMessage(R.string.gif_giphy_key_remove_confirm)
             .setPositiveButton(R.string.delete) { _, _ ->
                 GiphyProviderCredentialStore(ctx).clear()
+                GiphyCustomerIdStore(ctx).clear()
                 refreshSummaries()
                 Toast.makeText(ctx, R.string.gif_giphy_key_removed, Toast.LENGTH_SHORT).show()
             }

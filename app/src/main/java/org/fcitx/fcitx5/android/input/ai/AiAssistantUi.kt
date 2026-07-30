@@ -82,6 +82,12 @@ class AiAssistantUi(
         textSize = 11f
         setPadding(dp(2), 0, 0, dp(3))
     }
+    private val transmissionDisclosure = TextView(context).apply {
+        setTextColor(theme.altKeyTextColor)
+        textSize = 10f
+        setPadding(dp(2), dp(3), dp(2), 0)
+        visibility = View.GONE
+    }
     private val sourcePreviewToggle = TextView(context).apply {
         setTextColor(theme.genericActiveForegroundColor)
         textSize = 11f
@@ -104,6 +110,7 @@ class AiAssistantUi(
         orientation = LinearLayout.VERTICAL
         addView(sourceMetaRow, matchWrap())
         addView(sourceText, matchWrap())
+        addView(transmissionDisclosure, matchWrap())
     }
     private val sourceReviewTitle = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
@@ -280,7 +287,7 @@ class AiAssistantUi(
         } else {
             View.GONE
         }
-        sourceSection.visibility = sourceText.visibility
+        updateSourceSectionVisibility()
         sourceReviewScroll.visibility = View.GONE
         renderActionCatalog(AiActionCatalogState.Source)
         actionsScroll.post { actionsScroll.scrollTo(0, 0) }
@@ -308,7 +315,7 @@ class AiAssistantUi(
         useActionCatalogWithCompactStatus()
         setProvider(providerLabel)
         sourceText.visibility = if (sourceText.text.isNullOrBlank()) View.GONE else View.VISIBLE
-        sourceSection.visibility = sourceText.visibility
+        updateSourceSectionVisibility()
         sourcePreviewToggle.visibility = View.GONE
         sourceReviewScroll.visibility = View.GONE
         // Keep every action discoverable while the request is in flight.  The buttons become
@@ -412,7 +419,7 @@ class AiAssistantUi(
         // leaves the complete non-direct action catalog visible above it.
         useActionCatalogWithCompactStatus()
         sourceText.visibility = if (sourceText.text.isNullOrBlank()) View.GONE else View.VISIBLE
-        sourceSection.visibility = sourceText.visibility
+        updateSourceSectionVisibility()
         sourcePreviewToggle.visibility = View.GONE
         sourceReviewScroll.visibility = View.GONE
         // Network and provider errors should leave the next writing action immediately visible.
@@ -808,7 +815,27 @@ class AiAssistantUi(
         }
     }
 
-    private fun setProvider(label: String?) = Unit
+    private fun setProvider(label: String?) {
+        transmissionDisclosure.visibility = if (label.isNullOrBlank()) {
+            View.GONE
+        } else {
+            transmissionDisclosure.text =
+                context.getString(R.string.ai_transmission_disclosure, label)
+            View.VISIBLE
+        }
+        updateSourceSectionVisibility()
+    }
+
+    private fun updateSourceSectionVisibility() {
+        sourceSection.visibility =
+            if (sourceText.visibility == View.VISIBLE ||
+                transmissionDisclosure.visibility == View.VISIBLE
+            ) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+    }
 
     private fun toggleSourcePreview() {
         if (!sourcePreviewCanExpand || actionsScroll.visibility != View.VISIBLE) return
@@ -843,7 +870,7 @@ class AiAssistantUi(
     private fun hideSourceReview() {
         if (sourceReviewScroll.visibility != View.VISIBLE) return
         sourceReviewScroll.visibility = View.GONE
-        sourceSection.visibility = if (sourceText.text.isNullOrBlank()) View.GONE else View.VISIBLE
+        updateSourceSectionVisibility()
         if (sourceReviewReturnsToResults) {
             if (resultPresentation == AiResultPresentation.NoChanges) {
                 useNoOpResultLayout()
@@ -872,7 +899,7 @@ class AiAssistantUi(
         sourceMeta.text = context.getString(R.string.ai_result_source)
         sourceMeta.visibility = sourceText.visibility
         sourcePreviewToggle.visibility = if (hasSource && sourcePreviewCanExpand) View.VISIBLE else View.GONE
-        sourceSection.visibility = sourceText.visibility
+        updateSourceSectionVisibility()
     }
 
     private fun renderActionCatalog(state: AiActionCatalogState) {

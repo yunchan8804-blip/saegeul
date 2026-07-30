@@ -91,6 +91,12 @@ if ($LASTEXITCODE -ne 0) {
     throw "Hangul APK secret verification failed."
 }
 
+& (Join-Path $PSScriptRoot "verify-release-privacy.ps1") `
+    -ApkPath $resolvedInputs.MainApk
+if ($LASTEXITCODE -ne 0) {
+    throw "Main APK privacy verification failed."
+}
+
 & (Join-Path $PSScriptRoot "verify-release-identity.ps1") `
     -MainApkPath $resolvedInputs.MainApk `
     -HangulApkPath $resolvedInputs.HangulApk `

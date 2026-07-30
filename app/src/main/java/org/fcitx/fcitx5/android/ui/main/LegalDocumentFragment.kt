@@ -30,6 +30,7 @@ class LegalDocumentFragment : Fragment() {
         val horizontalPadding = (24 * resources.displayMetrics.density).toInt()
         val verticalPadding = (20 * resources.displayMetrics.density).toInt()
         val content = when (args.kind) {
+            LegalDocumentKind.DataPrivacy -> readAsset("legal/DATA-PRIVACY.txt")
             LegalDocumentKind.Notice -> readAsset("legal/NOTICE.txt")
             LegalDocumentKind.ForkNotice -> readAsset("legal/FORK-NOTICE.txt")
             LegalDocumentKind.Source -> sourceDisclosure()

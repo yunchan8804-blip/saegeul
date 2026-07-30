@@ -6,12 +6,14 @@ package org.fcitx.fcitx5.android.input.voice
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.core.content.ContextCompat
+import org.fcitx.fcitx5.android.R
 import java.util.concurrent.atomic.AtomicLong
 
 /** Process-memory callback bridge for the IME service, which cannot request runtime permissions. */
@@ -93,6 +95,10 @@ object VoiceAudioDocumentCoordinator {
 
 /** Internal, dialog-themed boundary for permission and one-shot document selection. */
 class VoicePermissionActivity : Activity() {
+    private val disclosureStore by lazy { VoiceDisclosureConsentStore(this) }
+    private var waitingForExternalResult = false
+    private var completed = false
+
     private val requestId: Long
         get() = intent?.getLongExtra(EXTRA_REQUEST_ID, INVALID_REQUEST_ID) ?: INVALID_REQUEST_ID
 
@@ -105,26 +111,19 @@ class VoicePermissionActivity : Activity() {
             finish()
             return
         }
+        waitingForExternalResult =
+            savedInstanceState?.getBoolean(STATE_WAITING_FOR_EXTERNAL_RESULT) == true
+        if (waitingForExternalResult) return
         when (mode) {
-            MODE_PERMISSION -> {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
-                    PackageManager.PERMISSION_GRANTED
-                ) {
-                    completePermission(granted = true)
-                } else if (savedInstanceState == null) {
-                    requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
-                }
-            }
-            MODE_AUDIO_DOCUMENT -> if (savedInstanceState == null) {
-                startActivityForResult(
-                    Intent(Intent.ACTION_OPEN_DOCUMENT)
-                        .addCategory(Intent.CATEGORY_OPENABLE)
-                        .setType("audio/*"),
-                    REQUEST_AUDIO_DOCUMENT
-                )
-            }
+            MODE_PERMISSION -> beginMicrophoneFlow()
+            MODE_AUDIO_DOCUMENT -> beginAudioDocumentFlow()
             else -> finish()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(STATE_WAITING_FOR_EXTERNAL_RESULT, waitingForExternalResult)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onRequestPermissionsResult(
@@ -134,6 +133,7 @@ class VoicePermissionActivity : Activity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != REQUEST_RECORD_AUDIO) return
+        waitingForExternalResult = false
         completePermission(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
     }
 
@@ -141,14 +141,92 @@ class VoicePermissionActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQUEST_AUDIO_DOCUMENT) return
+        waitingForExternalResult = false
         VoiceAudioDocumentCoordinator.deliver(
             requestId,
             data?.data?.takeIf { resultCode == RESULT_OK }
         )
+        completed = true
         finishBoundary()
     }
 
+    private fun beginMicrophoneFlow() {
+        if (!disclosureStore.hasAccepted(VoiceDisclosureKind.Microphone)) {
+            showDisclosure(
+                kind = VoiceDisclosureKind.Microphone,
+                title = R.string.voice_microphone_disclosure_title,
+                message = R.string.voice_microphone_disclosure_message,
+                positive = R.string.voice_microphone_disclosure_continue,
+                onDeclined = { completePermission(granted = false) },
+                onAccepted = ::continueMicrophoneFlow
+            )
+            return
+        }
+        continueMicrophoneFlow()
+    }
+
+    private fun continueMicrophoneFlow() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            completePermission(granted = true)
+            return
+        }
+        waitingForExternalResult = true
+        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
+    }
+
+    private fun beginAudioDocumentFlow() {
+        if (!disclosureStore.hasAccepted(VoiceDisclosureKind.MeetingAudioFile)) {
+            showDisclosure(
+                kind = VoiceDisclosureKind.MeetingAudioFile,
+                title = R.string.voice_meeting_disclosure_title,
+                message = R.string.voice_meeting_disclosure_message,
+                positive = R.string.voice_meeting_disclosure_continue,
+                onDeclined = {
+                    VoiceAudioDocumentCoordinator.deliver(requestId, null)
+                    completed = true
+                    finishBoundary()
+                },
+                onAccepted = ::continueAudioDocumentFlow
+            )
+            return
+        }
+        continueAudioDocumentFlow()
+    }
+
+    private fun continueAudioDocumentFlow() {
+        waitingForExternalResult = true
+        startActivityForResult(
+            Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("audio/*"),
+            REQUEST_AUDIO_DOCUMENT
+        )
+    }
+
+    private fun showDisclosure(
+        kind: VoiceDisclosureKind,
+        title: Int,
+        message: Int,
+        positive: Int,
+        onDeclined: () -> Unit,
+        onAccepted: () -> Unit
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(positive) { _, _ ->
+                if (disclosureStore.accept(kind)) onAccepted() else onDeclined()
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ -> onDeclined() }
+            .setCancelable(false)
+            .show()
+    }
+
     private fun completePermission(granted: Boolean) {
+        if (completed) return
+        completed = true
         VoicePermissionCoordinator.deliver(requestId, granted)
         finishBoundary()
     }
@@ -166,5 +244,6 @@ class VoicePermissionActivity : Activity() {
         private const val INVALID_REQUEST_ID = -1L
         private const val REQUEST_RECORD_AUDIO = 1
         private const val REQUEST_AUDIO_DOCUMENT = 2
+        private const val STATE_WAITING_FOR_EXTERNAL_RESULT = "waiting_for_external_result"
     }
 }

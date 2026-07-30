@@ -36,11 +36,16 @@ object UserDataManager {
         val exportTime: Long
     )
 
-    private fun writeFileTree(srcDir: File, destPrefix: String, dest: ZipOutputStream) {
+    private fun writeFileTree(
+        srcDir: File,
+        destPrefix: String,
+        dest: ZipOutputStream,
+        include: (File) -> Boolean = { true }
+    ) {
         dest.putNextEntry(ZipEntry("$destPrefix/"))
         srcDir.walkTopDown().forEach { f ->
             val related = f.relativeTo(srcDir)
-            if (related.path != "") {
+            if (related.path != "" && include(f)) {
                 if (f.isDirectory) {
                     dest.putNextEntry(ZipEntry("$destPrefix/${related.path}/"))
                 } else if (f.isFile) {
@@ -62,7 +67,11 @@ object UserDataManager {
             // shared_prefs
             writeFileTree(sharedPrefsDir, "shared_prefs", zipStream)
             // databases
-            writeFileTree(dataBasesDir, "databases", zipStream)
+            writeFileTree(
+                dataBasesDir,
+                "databases",
+                zipStream
+            ) { UserDataExportPolicy.shouldIncludeDatabase(it.name) }
             // external
             writeFileTree(externalDir, "external", zipStream)
             // recently_used moved to SharedPreference and shoud not be exported
@@ -100,6 +109,11 @@ object UserDataManager {
                 if (metadata.packageName != BuildConfig.APPLICATION_ID)
                     errorRuntime(R.string.exception_user_data_package_name_mismatch)
                 copyDir(File(tempDir, "shared_prefs"), sharedPrefsDir)
+                File(tempDir, "databases").listFiles()?.forEach { file ->
+                    if (!UserDataExportPolicy.shouldIncludeDatabase(file.name)) {
+                        file.deleteRecursively()
+                    }
+                }
                 copyDir(File(tempDir, "databases"), dataBasesDir)
                 copyDir(File(tempDir, "external"), externalDir)
                 // keep importing recently_used for backwords compatibility
@@ -108,4 +122,10 @@ object UserDataManager {
             }
         }
     }
+}
+
+/** Clipboard history is intentionally excluded from cloud backup, device transfer, and ZIP export. */
+internal object UserDataExportPolicy {
+    fun shouldIncludeDatabase(name: String): Boolean =
+        name != "clbdb" && !name.startsWith("clbdb-")
 }

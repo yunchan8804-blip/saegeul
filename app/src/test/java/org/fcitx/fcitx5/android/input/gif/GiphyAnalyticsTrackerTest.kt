@@ -9,6 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
 
 class GiphyAnalyticsTrackerTest {
     @Test
@@ -46,6 +47,22 @@ class GiphyAnalyticsTrackerTest {
             )
         )
         assertEquals(0, requests)
+    }
+
+    @Test
+    fun customerIdentifierCanBeDeletedLocally() {
+        val root = Files.createTempDirectory("giphy-customer-id").toFile()
+        try {
+            val file = root.resolve("customer-id")
+            val store = GiphyCustomerIdStore(file)
+
+            assertTrue(store.getOrCreate().isNotBlank())
+            assertTrue(file.isFile)
+            assertTrue(store.clear())
+            assertFalse(file.exists())
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     private fun result() = GifResult(

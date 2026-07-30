@@ -75,6 +75,8 @@
     <string name="build_git_hash">Build Git hash</string>
     <string name="source_code">Source code</string>
     <string name="privacy_policy">Privacy policy</string>
+    <string name="data_privacy_notice" tools:ignore="MissingTranslation">Privacy &amp; data in this app</string>
+    <string name="data_privacy_notice_summary" tools:ignore="MissingTranslation">Local storage, network recipients, retention, and controls</string>
     <string name="license">License</string>
     <string name="open_source_licenses">Open source licenses</string>
     <string name="licenses_of_third_party_libraries">Licenses of third-party libraries</string>
@@ -406,6 +408,11 @@
     <string name="gif_query_inline_hint" tools:ignore="MissingTranslation">Type a GIF search</string>
     <string name="gif_query_clear" tools:ignore="MissingTranslation">Clear</string>
     <string name="gif_search_action" tools:ignore="MissingTranslation">Search</string>
+    <string name="gif_disclosure_noto" tools:ignore="MissingTranslation">The catalog and media are downloaded from Google Fonts. Search terms are matched only on this device.</string>
+    <string name="gif_disclosure_klipy" tools:ignore="MissingTranslation">Your search term and network information are sent to KLIPY; selected media is loaded from the provider’s media host.</string>
+    <string name="gif_disclosure_commons" tools:ignore="MissingTranslation">Your search term and network information are sent to Wikimedia Commons; selected media is loaded from Wikimedia.</string>
+    <string name="gif_disclosure_giphy" tools:ignore="MissingTranslation">Your search term, a random app identifier, and load, click, and send events are sent to GIPHY.</string>
+    <string name="gif_disclosure_unavailable" tools:ignore="MissingTranslation">GIPHY network access remains disabled until an approved production configuration is available.</string>
     <string name="gif_keyword_trending" tools:ignore="MissingTranslation">Trending</string>
     <string name="gif_keyword_meme" tools:ignore="MissingTranslation">Memes</string>
     <string name="gif_keyword_leave_work" tools:ignore="MissingTranslation">Leaving work</string>
@@ -493,6 +500,7 @@
     <string name="ai_assistant_title" tools:ignore="MissingTranslation">AI writing</string>
     <string name="ai_back" tools:ignore="MissingTranslation">Keyboard</string>
     <string name="ai_source_label" tools:ignore="MissingTranslation">Text sent to AI</string>
+    <string name="ai_transmission_disclosure" tools:ignore="MissingTranslation">Tapping an action sends the text above and any custom instruction to %1$s to generate writing. This app requests store=false and does not save source text or results in usage history. Provider processing and retention follow that provider’s terms.</string>
     <string name="ai_source_scope_selection" tools:ignore="MissingTranslation">Selected text</string>
     <string name="ai_source_scope_editor" tools:ignore="MissingTranslation">Current input</string>
     <string name="ai_source_scope_cursor_context" tools:ignore="MissingTranslation">Text around cursor</string>
@@ -706,8 +714,8 @@
     <string name="gif_giphy_key_invalid" tools:ignore="MissingTranslation">Could not securely store this GIPHY configuration</string>
     <string name="gif_giphy_key_saved" tools:ignore="MissingTranslation">GIPHY configuration stored securely</string>
     <string name="gif_giphy_key_remove" tools:ignore="MissingTranslation">Remove GIPHY configuration</string>
-    <string name="gif_giphy_key_remove_confirm" tools:ignore="MissingTranslation">Remove the encrypted GIPHY key and its approval confirmations?</string>
-    <string name="gif_giphy_key_removed" tools:ignore="MissingTranslation">GIPHY configuration removed</string>
+    <string name="gif_giphy_key_remove_confirm" tools:ignore="MissingTranslation">Remove the encrypted GIPHY key, approval confirmations, and random analytics identifier?</string>
+    <string name="gif_giphy_key_removed" tools:ignore="MissingTranslation">GIPHY configuration and analytics identifier removed</string>
     <string name="gif_giphy_status_missing" tools:ignore="MissingTranslation">No key · zero GIPHY network requests</string>
     <string name="gif_giphy_status_key_only" tools:ignore="MissingTranslation">Key stored · production approval not confirmed · zero GIPHY network requests</string>
     <string name="gif_giphy_status_unreadable" tools:ignore="MissingTranslation">Encrypted configuration cannot be read · zero GIPHY network requests</string>
@@ -818,6 +826,12 @@
     <string name="voice_permission_required">Microphone permission is required. The keyboard opens a private system permission screen because an IME service cannot request it directly.</string>
     <string name="voice_permission_denied">Microphone permission was not granted. No audio was recorded or sent.</string>
     <string name="voice_permission_allow">Allow microphone</string>
+    <string name="voice_microphone_disclosure_title" tools:ignore="MissingTranslation">Online speech transmission</string>
+    <string name="voice_microphone_disclosure_message" tools:ignore="MissingTranslation">To create a transcript, microphone audio is sent over encrypted HTTPS or WSS to OpenAI or the compatible online speech provider you configured. Precision mode sends the recording after you stop; realtime mode sends audio chunks while you speak. This app does not retain an audio file, and inserts text only after you review it. Provider processing and retention follow that provider’s terms. Continue to accept this transmission and proceed to Android’s microphone permission.</string>
+    <string name="voice_microphone_disclosure_continue" tools:ignore="MissingTranslation">Continue to permission</string>
+    <string name="voice_meeting_disclosure_title" tools:ignore="MissingTranslation">Upload meeting audio for transcription</string>
+    <string name="voice_meeting_disclosure_message" tools:ignore="MissingTranslation">The audio file you choose (up to 24 MB and 60 minutes) is uploaded over encrypted HTTPS to OpenAI or the compatible online speech provider you configured to create a speaker-separated transcript. This app does not retain a copy of the file. Provider processing and retention follow that provider’s terms. Continue only if you have permission to upload every speaker’s voice.</string>
+    <string name="voice_meeting_disclosure_continue" tools:ignore="MissingTranslation">Choose audio file</string>
     <string name="voice_private_disabled">Dictation is disabled in password, sensitive, and no-personalized-learning fields</string>
     <string name="voice_policy_disabled">Dictation is blocked by offline mode or this app’s network policy</string>
     <string name="voice_cursor_required">Place a single cursor in the target input field before recording</string>

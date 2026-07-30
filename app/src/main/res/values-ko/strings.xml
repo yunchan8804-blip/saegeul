@@ -67,6 +67,8 @@
     <string name="build_git_hash">Git 해시 빌드</string>
     <string name="source_code">소스 코드</string>
     <string name="privacy_policy">개인 정보 정책</string>
+    <string name="data_privacy_notice">이 앱의 개인정보·데이터</string>
+    <string name="data_privacy_notice_summary">기기 내 저장, 네트워크 수신자, 보관, 제어 방법</string>
     <string name="license">라이선스</string>
     <string name="open_source_licenses">오픈 소스 라이선스</string>
     <string name="licenses_of_third_party_libraries">타사 라이브러리 라이선스</string>
@@ -405,6 +407,11 @@
     <string name="gif_query_inline_hint">검색어를 입력해</string>
     <string name="gif_query_clear">지우기</string>
     <string name="gif_search_action">검색</string>
+    <string name="gif_disclosure_noto">목록과 미디어를 Google Fonts에서 내려받아. 검색어 비교는 이 기기에서만 처리해.</string>
+    <string name="gif_disclosure_klipy">검색어와 네트워크 정보가 KLIPY에 전송되고 선택한 미디어는 공급자 미디어 호스트에서 내려받아.</string>
+    <string name="gif_disclosure_commons">검색어와 네트워크 정보가 Wikimedia Commons에 전송되고 선택한 미디어는 Wikimedia에서 내려받아.</string>
+    <string name="gif_disclosure_giphy">검색어, 임의 앱 식별자, 노출·클릭·전송 이벤트를 GIPHY에 보내.</string>
+    <string name="gif_disclosure_unavailable">승인된 프로덕션 설정이 준비될 때까지 GIPHY 네트워크 접근을 차단해.</string>
     <string name="gif_keyword_trending">인기</string>
     <string name="gif_keyword_meme">밈</string>
     <string name="gif_keyword_leave_work">퇴근</string>
@@ -492,6 +499,7 @@
     <string name="ai_assistant_title">AI 글쓰기</string>
     <string name="ai_back">키보드</string>
     <string name="ai_source_label">AI에 보낼 내용</string>
+    <string name="ai_transmission_disclosure">작업을 누르면 위 내용과 직접 요청을 문장 생성 목적으로 %1$s에 보내. 앱은 store=false로 요청하고 사용량 기록에 원문·결과를 저장하지 않아. 공급자의 처리·보관은 해당 공급자 약관을 따라.</string>
     <string name="ai_source_scope_selection">선택한 텍스트</string>
     <string name="ai_source_scope_editor">현재 입력칸 전체</string>
     <string name="ai_source_scope_cursor_context">커서 주변 내용</string>
@@ -704,8 +712,8 @@
     <string name="gif_giphy_key_invalid">GIPHY 설정을 안전하게 저장하지 못했어</string>
     <string name="gif_giphy_key_saved">GIPHY 설정을 안전하게 저장했어</string>
     <string name="gif_giphy_key_remove">GIPHY 설정 삭제</string>
-    <string name="gif_giphy_key_remove_confirm">암호화된 GIPHY 키와 승인 확인을 삭제할까?</string>
-    <string name="gif_giphy_key_removed">GIPHY 설정을 삭제했어</string>
+    <string name="gif_giphy_key_remove_confirm">암호화된 GIPHY 키, 승인 확인, 임의 분석 식별자를 모두 삭제할까?</string>
+    <string name="gif_giphy_key_removed">GIPHY 설정과 분석 식별자를 삭제했어</string>
     <string name="gif_giphy_status_missing">키 없음 · GIPHY 네트워크 요청 0회</string>
     <string name="gif_giphy_status_key_only">키 저장됨 · 프로덕션 승인 미확인 · GIPHY 네트워크 요청 0회</string>
     <string name="gif_giphy_status_unreadable">암호화 설정을 읽을 수 없음 · GIPHY 네트워크 요청 0회</string>
@@ -816,6 +824,12 @@
     <string name="voice_permission_required">마이크 권한이 필요해. IME 서비스는 권한을 직접 요청할 수 없어서 앱 내부의 투명 권한 화면을 열어.</string>
     <string name="voice_permission_denied">마이크 권한을 받지 못했어. 음성을 녹음하거나 전송하지 않았어.</string>
     <string name="voice_permission_allow">마이크 허용</string>
+    <string name="voice_microphone_disclosure_title">온라인 음성 전송</string>
+    <string name="voice_microphone_disclosure_message">전사문을 만들기 위해 마이크 음성을 암호화된 HTTPS 또는 WSS로 OpenAI나 사용자가 설정한 호환 온라인 음성 공급자에 보내. 정확도 우선 모드는 녹음을 멈춘 뒤 전체 녹음을 보내고, 실시간 모드는 말하는 동안 음성 조각을 보내. 이 앱은 녹음 파일을 보관하지 않으며 전사문을 확인한 뒤 직접 넣을 때만 입력해. 공급자의 처리·보관은 해당 공급자 약관을 따라. 계속하면 이 전송에 동의하고 Android 마이크 권한 요청으로 이동해.</string>
+    <string name="voice_microphone_disclosure_continue">권한 요청으로 계속</string>
+    <string name="voice_meeting_disclosure_title">회의 음성 파일 전송</string>
+    <string name="voice_meeting_disclosure_message">선택한 음성 파일(최대 24MB·60분)을 화자 분리 전사문 생성 목적으로 암호화된 HTTPS를 통해 OpenAI나 사용자가 설정한 호환 온라인 음성 공급자에 업로드해. 이 앱은 파일 사본을 보관하지 않아. 공급자의 처리·보관은 해당 공급자 약관을 따라. 모든 화자의 음성을 업로드할 권한이 있을 때만 계속해.</string>
+    <string name="voice_meeting_disclosure_continue">음성 파일 선택</string>
     <string name="voice_private_disabled">비밀번호·민감·개인화 학습 금지 입력창에서는 받아쓰기를 사용할 수 없어</string>
     <string name="voice_policy_disabled">오프라인 모드 또는 이 앱의 네트워크 정책이 받아쓰기를 차단했어</string>
     <string name="voice_cursor_required">녹음 전에 대상 입력창에 커서 하나를 놓아줘</string>

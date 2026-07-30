@@ -45,6 +45,7 @@ import kotlin.reflect.typeOf
 @Parcelize
 @Serializable
 enum class LegalDocumentKind : Parcelable {
+    DataPrivacy,
     Notice,
     ForkNotice,
     Source

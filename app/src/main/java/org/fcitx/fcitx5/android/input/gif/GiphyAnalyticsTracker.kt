@@ -86,6 +86,8 @@ internal class GiphyCustomerIdStore(private val file: File) {
         return generated
     }
 
+    fun clear(): Boolean = !file.exists() || file.delete()
+
     private companion object {
         const val RELATIVE_PATH = "gif/giphy-customer-id"
     }
