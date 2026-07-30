@@ -107,8 +107,8 @@ try {
     $forbiddenPattern = @(
         "(^|/)\.tmp-",
         "(^|/)\.codex-remote-attachments(/|$)",
-        "(^|/)(build|obj|test-results|captures|artifacts)(/|$)",
-        "\.(apk|aab|idsig|log|obj)$",
+        "^(build|obj|test-results|captures|artifacts)(/|$)",
+        "^[^/]+\.(apk|aab|idsig|log|obj)$",
         "(^|/)\.git(/|$)"
     ) -join "|"
     $forbiddenFiles = @(Get-ChildItem -LiteralPath $sourceRoot -Recurse -Force |
