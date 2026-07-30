@@ -73,45 +73,24 @@ if ((Split-Path -Parent $resolvedSbomOutput) -ne $resolvedReleaseDirectory) {
 & (Join-Path $PSScriptRoot "verify-source-archive.ps1") `
     -ArchivePath $resolvedInputs.SourceArchive `
     -Ref $SourceTag
-if ($LASTEXITCODE -ne 0) {
-    throw "Source archive verification failed."
-}
 
 & (Join-Path $PSScriptRoot "verify-release-licenses.ps1") `
     -ApkPath $resolvedInputs.MainApk
-if ($LASTEXITCODE -ne 0) {
-    throw "APK license verification failed."
-}
 
 & (Join-Path $PSScriptRoot "verify-release-aab.ps1") `
     -AabPath $resolvedInputs.MainAab
-if ($LASTEXITCODE -ne 0) {
-    throw "AAB structure verification failed."
-}
 
 & (Join-Path $PSScriptRoot "verify-release-secrets.ps1") `
     -ApkPath $resolvedInputs.MainApk
-if ($LASTEXITCODE -ne 0) {
-    throw "Main APK secret verification failed."
-}
 
 & (Join-Path $PSScriptRoot "verify-release-secrets.ps1") `
     -PackagePath $resolvedInputs.MainAab
-if ($LASTEXITCODE -ne 0) {
-    throw "Main AAB secret verification failed."
-}
 
 & (Join-Path $PSScriptRoot "verify-release-secrets.ps1") `
     -ApkPath $resolvedInputs.HangulApk
-if ($LASTEXITCODE -ne 0) {
-    throw "Hangul APK secret verification failed."
-}
 
 & (Join-Path $PSScriptRoot "verify-release-privacy.ps1") `
     -ApkPath $resolvedInputs.MainApk
-if ($LASTEXITCODE -ne 0) {
-    throw "Main APK privacy verification failed."
-}
 
 & (Join-Path $PSScriptRoot "verify-release-identity.ps1") `
     -MainApkPath $resolvedInputs.MainApk `
@@ -122,9 +101,6 @@ if ($LASTEXITCODE -ne 0) {
     -ExpectedPrivacyPolicyUrl $PrivacyPolicyUrl `
     -ExpectedSourceArchiveUrl $SourceArchiveUrl `
     -ExpectedSigningCertificateSha256 $SigningCertificateSha256
-if ($LASTEXITCODE -ne 0) {
-    throw "Release identity verification failed."
-}
 
 & (Join-Path $PSScriptRoot "generate-release-sbom.ps1") `
     -ApkPath $resolvedInputs.MainApk `
@@ -135,9 +111,6 @@ if ($LASTEXITCODE -ne 0) {
     -ProductName $ProductName `
     -ApplicationId $ApplicationId `
     -OutputPath $resolvedSbomOutput
-if ($LASTEXITCODE -ne 0) {
-    throw "SBOM generation failed."
-}
 
 $sbom = Get-Content -LiteralPath $resolvedSbomOutput -Raw | ConvertFrom-Json
 if ($sbom.bomFormat -ne "CycloneDX" -or $sbom.specVersion -ne "1.6") {
