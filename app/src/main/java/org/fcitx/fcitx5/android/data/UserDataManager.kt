@@ -211,12 +211,21 @@ internal object UserDataMigrationPolicy {
     }
 
     internal fun sanitizeDefaultPreferences(xml: String): String {
+        require(!xml.contains("<!DOCTYPE", ignoreCase = true)) {
+            "DOCTYPE is not allowed in imported preferences"
+        }
         val factory = DocumentBuilderFactory.newInstance().apply {
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            setFeature("http://xml.org/sax/features/external-general-entities", false)
-            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-            isXIncludeAware = false
-            isExpandEntityReferences = false
+            runCatching {
+                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            }
+            runCatching {
+                setFeature("http://xml.org/sax/features/external-general-entities", false)
+            }
+            runCatching {
+                setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            }
+            runCatching { isXIncludeAware = false }
+            runCatching { isExpandEntityReferences = false }
         }
         val document = factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
         val root = document.documentElement

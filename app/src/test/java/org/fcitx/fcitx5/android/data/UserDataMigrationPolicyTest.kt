@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -103,6 +104,18 @@ class UserDataMigrationPolicyTest {
             assertTrue(target.readText().contains("name=\"theme\""))
         } finally {
             root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsDoctypeInImportedPreferences() {
+        assertThrows(IllegalArgumentException::class.java) {
+            UserDataMigrationPolicy.sanitizeDefaultPreferences(
+                """
+                <!DOCTYPE map [<!ENTITY probe "unsafe">]>
+                <map><string name="theme">&probe;</string></map>
+                """.trimIndent()
+            )
         }
     }
 }
