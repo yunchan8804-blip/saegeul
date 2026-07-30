@@ -1,174 +1,94 @@
-# fcitx5-android
+# 새글 (Saegeul)
 
-[Fcitx5](https://github.com/fcitx/fcitx5) input method framework and engines ported to Android.
+<p align="center">
+  <img src="docs/brand/saegeul-icon.svg" width="144" alt="새글 앱 아이콘">
+</p>
 
-## Download
+새글은 Android용 독립 오픈소스 한국어 입력기다. 한글 입력을 중심으로 클립보드,
+음성 입력, OCR, GIF 검색, 선택형 AI 글쓰기 도구를 한 키보드 안에서 제공한다.
 
-[<img src="https://github.com/rubenpgrady/get-it-on-github/raw/refs/heads/main/get-it-on-github.png" alt="Git it on GitHub" width="207" height="80">](https://github.com/fcitx5-android/fcitx5-android/releases/latest)
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" width="207" height="80">](https://f-droid.org/packages/org.fcitx.fcitx5.android)
-[<img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" width="207" height="80">](https://play.google.com/store/apps/details?id=org.fcitx.fcitx5.android)
+> 새글은 Fcitx5를 기반으로 한 비공식 독립 포크이며, 원 프로젝트와 제휴하거나
+> 원 프로젝트의 보증을 받지 않는다.
 
-You can also download the **latest CI build** on our Jeninks server: [![build status](https://img.shields.io/jenkins/build.svg?jobUrl=https://jenkins.fcitx-im.org/job/android/job/fcitx5-android/)](https://jenkins.fcitx-im.org/job/android/job/fcitx5-android/)
+## 제품 계약
 
-> [!NOTE]
-> APKs downloaded from GitHub Release/F-Droid/Jenkins have the same signature, which means they're compatible when upgrading, but Google Play's do not.
-> <details>
-> <summary>(click here for detailed signature info)</summary>
-> <ul>
-> <li>Package Name: <code>org.fcitx.fcitx5.android</code></li>
-> <li>Certificate SHA-256 fingerprint:</li>
-> <ul>
-> <li>GitHub Release/Jenkins/F-Droid</li>
-> <code>E4:DB:1E:9E:DF:F1:36:29:D0:7D:E4:BB:F8:16:5F:E9:BD:85:57:AB:55:09:26:72:DA:8E:40:DB:E4:84:EC:D7</code>
-> <li>Google Play</li>
-> <code>06:53:6F:F6:E8:76:C0:14:E1:4B:44:6F:61:FA:2B:80:9E:06:67:39:A1:D1:17:0D:0A:7A:89:88:4C:48:00:33</code>
-> </ul>
-> </ul>
-> </details>
+| 항목 | 값 |
+| --- | --- |
+| 제품명 | 새글 (Saegeul) |
+| Android applicationId | `kr.twentyoz.saegeul` |
+| 한글 플러그인 applicationId | `kr.twentyoz.saegeul.plugin.hangul` |
+| 소스 저장소 | <https://github.com/yunchan8804-blip/saegeul> |
+| 릴리스와 대응 소스 | <https://github.com/yunchan8804-blip/saegeul/releases> |
+| 개인정보처리방침 | <https://saegeul.twentyoz.kr/privacy/> |
 
-In case you want Fcitx5 on other platforms: [macOS](https://github.com/fcitx-contrib/fcitx5-macos), [iOS](https://github.com/fcitx-contrib/fcitx5-ios), [HarmonyOS](https://github.com/fcitx-contrib/fcitx5-harmony), [ChromeOS](https://github.com/fcitx-contrib/fcitx5-chrome), [Windows](https://github.com/fcitx-contrib/fcitx5-windows); or [try Fcitx5 in the browser](https://fcitx-contrib.github.io/online/index.html)
+첫 독립 버전은 공개 앱 ID와 브랜드를 먼저 분리하고 내부 Kotlin namespace는
+호환성을 위해 유지한다. 제품 빌드에는 메인 앱과 libhangul 기반 한글 플러그인만
+포함하며, 중국어 애드온과 사용하지 않는 언어 플러그인은 APK/AAB에서 제외한다.
 
-## Project status
+## 다운로드와 설치
 
-### Supported Languages
+[GitHub Releases](https://github.com/yunchan8804-blip/saegeul/releases)에서 같은
+릴리스 태그의 다음 파일을 함께 받을 수 있다.
 
-- English (with spell check)
-- Chinese
-  - Pinyin, Shuangpin, Wubi, Cangjie and custom tables (built-in, powered by [fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons))
-  - Zhuyin/Bopomofo (via [Chewing Plugin](./plugin/chewing))
-  - Jyutping (via [Jyutping Plugin](./plugin/jyutping/), powered by [libime-jyutping](https://github.com/fcitx/libime-jyutping))
-- Vietnamese (via [UniKey Plugin](./plugin/unikey), supports Telex, VNI and VIQR)
-- Japanese (via [Anthy Plugin](./plugin/anthy))
-- Korean (via [Hangul Plugin](./plugin/hangul))
-- Sinhala (via [Sayura Plugin](./plugin/sayura))
-- Thai (via [Thai Plugin](./plugin/thai))
-- Generic (via [RIME Plugin](./plugin/rime), supports importing custom schemas)
+- 새글 메인 APK
+- 한글 플러그인 APK
+- Google Play 제출용 AAB
+- 최상위 저장소와 재귀 서브모듈을 포함한 전체 소스 아카이브
+- CycloneDX SBOM, 빌드 메타데이터, SHA-256 체크섬
 
-### Implemented Features
+첫 독립 버전에서는 메인 APK와 한글 플러그인 APK를 모두 설치해야 한다. 설치 뒤
+Android의 `설정 > 일반 관리 > 키보드 목록 및 기본값`에서 새글을 켜고 기본
+키보드로 선택한다. 출처를 확인할 수 없는 APK나 다른 인증서로 서명된 변형은
+설치하지 않는 것을 권한다.
 
-- Virtual Keyboard (layout not customizable yet)
-- Expandable candidate view
-- Clipboard management (plain text only)
-- Theming (custom color scheme, background image and dynamic color aka monet color after Android 12)
-- Popup preview on key press
-- Long press popup keyboard for convenient symbol input
-- Symbol and Emoji picker
-- Plugin System for loading addons from other installed apk
-- Floating candidates panel when using physical keyboard
+## 개인정보와 네트워크 기능
 
-### Planned Features
+새글은 IME이므로 사용자가 입력하는 텍스트를 처리한다. 기본 한글 조합은 기기에서
+동작한다. 인터넷, 마이크, 클립보드, 선택형 AI 기능은 각각 사용자가 해당 기능을
+설정하고 실행할 때만 사용하며, 외부 전송 전 앱 안에서 대상과 제공자를 고지한다.
+API 키와 OAuth 토큰은 Android Keystore로 보호되는 백업 제외 저장소에 둔다.
 
-- Customizable keyboard layout
-- More input methods (via plugin)
+실제 데이터 처리 범위와 삭제·문의 방법은
+[개인정보처리방침](https://saegeul.twentyoz.kr/privacy/)에서 확인할 수 있다.
 
-## Screenshots
-
-|拼音, Material Light theme, key border enabled|自然码双拼, Pixel Dark theme, key border disabled|
-|:-:|:-:|
-|<img src="https://github.com/fcitx5-android/fcitx5-android/assets/13914967/bd429247-62d9-4c78-bab8-70ef3ce47588" width="360px">|<img src="https://github.com/fcitx5-android/fcitx5-android/assets/13914967/3ae969c1-7ed0-4f92-a5df-19dc8c90a8c3" width="360px">|
-
-|Emoji picker, Pixel Light theme, key border enabled|Symbol picker, Material Dark theme, key border disabled|
-|:-:|:-:|
-|<img src="https://user-images.githubusercontent.com/13914967/202181845-6a5f6bb2-a877-468c-851a-fd7e66e64ed4.png" width="360px">|<img src="https://user-images.githubusercontent.com/13914967/202181861-dd253439-1d5e-4f5f-9535-934f28796a6b.png" width="360px">|
-
-## Get involved
-
-Trello kanban: https://trello.com/b/gftk6ZdV/kanban
-
-Matrix Room: https://matrix.to/#/#fcitx5-android:mozilla.org
-
-Discuss on Telegram: [@fcitx5_android_group](https://t.me/fcitx5_android_group) ([@fcitx5_android](https://t.me/fcitx5_android) originally)
-
-## Build
-
-### Dependencies
-
-- JDK 17 (the Android bytecode target remains Java 11).
-- Android SDK Platform 36 & Build-Tools 36.1.0.
-- Android NDK (Side by side) 28.0.13004108 & CMake 3.31.6. They can be installed using SDK Manager in Android Studio or the `sdkmanager` command line.
-- [KDE/extra-cmake-modules](https://github.com/KDE/extra-cmake-modules)
-- GNU Gettext >= 0.20 (for `msgfmt` binary; or install `appstream` if you really have to use gettext <= 0.19.)
-
-The exact Android toolchain versions are defined in [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt).
-
-### How to set up development environment
-
-<details>
-<summary>Prerequisites for Windows</summary>
-
-- Enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development) so that symlinks can be created without administrator privilege.
-
-- Enable symlink support for `git`:
-
-    ```shell
-    git config --global core.symlinks true
-    ```
-
-</details>
-
-First, clone this repository and fetch all submodules:
+## 소스와 빌드
 
 ```shell
-git clone git@github.com:fcitx5-android/fcitx5-android.git
-git submodule update --init --recursive
+git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git
+cd saegeul
+./gradlew :app:assembleRelease :plugin:hangul:assembleRelease
 ```
 
-Install `extra-cmake-modules` and `gettext` with your system package manager:
+정확한 Android SDK, NDK, CMake, JDK 버전은
+[`Versions.kt`](build-logic/convention/src/main/kotlin/Versions.kt)에 고정돼 있다.
+서명된 배포물 재현 절차와 필요한 환경 값은
+[`docs/independent-fork/signing.md`](docs/independent-fork/signing.md), 독립 포크의
+전체 배포 계약과 검증 명령은
+[`docs/independent-fork/README.md`](docs/independent-fork/README.md)를 따른다.
 
-```shell
-# For Arch Linux (Arch has gettext in it's base meta package)
-sudo pacman -S extra-cmake-modules
+## 라이선스와 소스 제공
 
-# For Debian/Ubuntu
-sudo apt install extra-cmake-modules gettext
+저장소의 기존 저작권 표시는 유지한다. 새글에서 새로 작성한 파일은 원칙적으로
+`LGPL-2.1-or-later`와 `Copyright 2026 Yun Chan`을 명시한다. 각 서브모듈과 제3자
+구성요소에는 해당 구성요소의 원 라이선스가 적용된다.
 
-# For macOS
-brew install extra-cmake-modules gettext
+APK 안의 `정보` 화면에서 다음 배포물을 직접 볼 수 있다.
 
-# For Windows, install MSYS2 and execute in its shell (UCRT64)
-pacman -S mingw-w64-ucrt-x86_64-extra-cmake-modules mingw-w64-ucrt-x86_64-gettext
-# then add C:\msys64\ucrt64\bin to PATH
-```
+- 오픈소스 라이선스와 제3자 저작권 고지
+- 독립 포크 고지와 원 프로젝트 귀속
+- 바이너리와 정확히 대응하는 소스 태그·아카이브 링크
+- 데이터·개인정보 처리 고지
 
-Install Android SDK Platform, Android SDK Build-Tools, Android NDK and cmake via SDK Manager in Android Studio:
+배포 번들은 LGPL 2.1, GPL 2.0, Apache License 2.0 및 실제 의존성에 필요한
+라이선스 전문을 포함한다. 릴리스 태그의 전체 소스, 빌드 스크립트, 재귀 서브모듈
+소스는 바이너리와 같은 GitHub Release에 게시한다.
 
-<details>
-<summary>Detailed steps (screenshots)</summary>
+## 계보와 기여
 
-**Note:** These screenshots are for references and the versions in them may be out of date.
-The current recommended versions are recorded in [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt) file.
+새글은 [Fcitx5 for Android](https://github.com/fcitx5-android/fcitx5-android)와
+[Fcitx5](https://github.com/fcitx/fcitx5), [libhangul](https://github.com/libhangul/libhangul)의
+작업을 기반으로 한다. 이 링크는 원 프로젝트의 출처와 저작권을 밝히기 위한 것이며,
+새글의 공식 배포·지원·보증 채널을 뜻하지 않는다.
 
-![Open SDK Manager](https://user-images.githubusercontent.com/13914967/202184493-3ee1546b-0a83-4cc9-9e41-d20b0904a0cf.png)
-
-![Install SDK Platform](https://user-images.githubusercontent.com/13914967/202184534-340a9e7c-7c42-49bd-9cf5-1ec9dcafcf32.png)
-
-![Install SDK Build-Tools](https://user-images.githubusercontent.com/13914967/202185945-0c7a9f39-1fcc-4018-9c81-b3d2bf1c2d3f.png)
-
-![Install NDK](https://user-images.githubusercontent.com/13914967/202185601-0cf877ea-e148-4b88-bd2f-70533189b3d4.png)
-
-![Install CMake](https://user-images.githubusercontent.com/13914967/202184655-3c1ab47c-432f-4bd7-a508-92096482de50.png)
-
-</details>
-
-### Hangul compatibility development
-
-See [Hangul legends and buffered compatibility mode](docs/hangul-buffered-input.md) for the module boundaries, Windows build commands, delivery transports, manual test matrix, and known risks of the experimental buffered input path.
-
-Continuation material for this branch is kept in two separate documents:
-
-- [Detailed implementation handoff](docs/hangul-buffered-input-handoff.md): exact branch state, architecture, design decisions, verification evidence, debugging recipes, and a resume checklist.
-- [Prioritized implementation backlog](docs/hangul-buffered-input-backlog.md): remaining work grouped by priority with acceptance criteria and validation requirements.
-
-### Trouble-shooting
-
-- Android Studio indexing takes forever to complete and cosumes a lot of memory.
-
-    Switch to "Project" view in the "Project" tool window (namely the file tree side bar), right click `lib/fcitx5/src/main/cpp/prebuilt` directory, then select "Mark Directory as > Excluded". You may also need to restart the IDE to interrupt ongoing indexing process.
-
-- Gradle error: "No variants found for ':app'. Check build files to ensure at least one variant exists." or "[CXX1210] <whatever>/CMakeLists.txt debug|arm64-v8a : No compatible library found"
-
-    Examine if there are environment variables set such as `_JAVA_OPTIONS` or `JAVA_TOOL_OPTIONS`. You might want to clear them (maybe in the startup script `studio.sh` of Android Studio), as some gradle plugin treats anything in stderr as errors and aborts.
-
-## Nix
-
-Appropriate Android SDK with NDK is available in the development shell.  The `gradlew` should work out-of-the-box, so you can install the app to your phone with `./gradlew installDebug` after applying the patch mentioned above. For development, you may want to install the unstable version of Android Studio, and point the project SDK path to `$ANDROID_SDK_ROOT` defined in the shell. Notice that Android Studio may generate wrong `local.properties` which sets the SDK location to `~/Android/SDK` (installed by SDK Manager). In such case, you need specify `sdk.dir` as the project SDK in that file manually, in case Android Studio sticks to the wrong global SDK.
+버그와 기여 제안은 [새글 저장소의 Issues](https://github.com/yunchan8804-blip/saegeul/issues)에
+남기면 된다. 보안 문제나 개인정보 문의는 개인정보처리방침의 연락처를 사용한다.

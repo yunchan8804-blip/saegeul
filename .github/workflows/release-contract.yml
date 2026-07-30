@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
+name: Saegeul release contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "README.md"
+      - "site/**"
+      - "settings.gradle.kts"
+      - "build-logic/convention/src/main/kotlin/ProductIdentity.kt"
+      - "scripts/verify-public-source-identity.ps1"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - "README.md"
+      - "site/**"
+      - "settings.gradle.kts"
+      - "build-logic/convention/src/main/kotlin/ProductIdentity.kt"
+      - "scripts/verify-public-source-identity.ps1"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-source-identity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify independent public product surface
+        shell: pwsh
+        run: |
+          ./scripts/verify-public-source-identity.ps1 `
+            -SourceRoot . `
+            -ExpectedProductName "Saegeul" `
+            -ExpectedKoreanProductName "새글" `
+            -ExpectedApplicationId "kr.twentyoz.saegeul" `
+            -ExpectedRepositoryUrl "https://github.com/yunchan8804-blip/saegeul" `
+            -ExpectedPrivacyPolicyUrl "https://saegeul.twentyoz.kr/privacy/"

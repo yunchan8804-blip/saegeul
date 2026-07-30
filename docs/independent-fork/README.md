@@ -175,7 +175,10 @@ APK split과 AAB는 같은 ABI 계약을 사용한다. `-PbuildABI=<abi>`를 주
 같은 태그의 재귀 소스 아카이브와 SHA-256 sidecar를 먼저 배치한다. 다음 검사는
 소스 태그·바이너리 커밋 일치, 라이선스, 비밀값, 공개 식별자, 서명 인증서,
 소스 URL, 앱 내부 개인정보 고지, 마이크·네트워크 권한, 클립보드 백업 제외를
-검사하고 CycloneDX 1.6 SBOM을 생성한다.
+검사하고 CycloneDX 1.6 SBOM을 생성한다. 소스 아카이브의 `README.md`, `site`,
+GitHub Actions에는 새글의 확정 이름·applicationId·저장소·정책 URL·독립 고지가
+있어야 하며, 기존 프로젝트의 배포·스토어·Jenkins 링크와 공개 앱 ID가 남으면
+실패한다.
 
 ```powershell
 .\scripts\verify-release-bundle.ps1 `
@@ -199,6 +202,11 @@ APK split과 AAB는 같은 ABI 계약을 사용한다. `-PbuildABI=<abi>`를 주
 provider authority, 플러그인 action/metadata, 공식 앱의 배포·스토어 링크가 남아 있으면
 실패한다. 내부 Kotlin namespace와 원 구성요소의 저작권·소스 링크는 귀속과 호환성을
 위해 허용한다.
+
+`verify-public-source-identity.ps1`은 공개 저장소 첫 화면, 정적 사이트, 배포
+워크플로를 별도로 검사한다. 원 프로젝트 소스 링크는 귀속을 위해 허용하지만, 원
+프로젝트 APK를 새글 다운로드처럼 제시하거나 옛 패키지·배포 계정을 사용하는 자동화는
+허용하지 않는다. 첫 버전의 제품 빌드 그래프도 `plugin:hangul` 하나만 허용한다.
 
 실기기 게이트는 공식 `bundletool` JAR과 같은 빌드의 APK/AAB/한글 플러그인 APK/
 instrumentation APK를 사용한다. AAB 설치와 APK 재설치 후 Android 패키지 관리자의

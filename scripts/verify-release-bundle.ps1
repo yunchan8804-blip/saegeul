@@ -74,6 +74,14 @@ if ((Split-Path -Parent $resolvedSbomOutput) -ne $resolvedReleaseDirectory) {
     -ArchivePath $resolvedInputs.SourceArchive `
     -Ref $SourceTag
 
+& (Join-Path $PSScriptRoot "verify-public-source-identity.ps1") `
+    -SourceArchivePath $resolvedInputs.SourceArchive `
+    -ExpectedProductName $ProductName `
+    -ExpectedKoreanProductName "새글" `
+    -ExpectedApplicationId $ApplicationId `
+    -ExpectedRepositoryUrl $SourceRepositoryUrl `
+    -ExpectedPrivacyPolicyUrl $PrivacyPolicyUrl
+
 & (Join-Path $PSScriptRoot "verify-release-licenses.ps1") `
     -ApkPath $resolvedInputs.MainApk
 
