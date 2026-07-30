@@ -20,6 +20,23 @@
     boolean equals(java.lang.Object);
 }
 
+# Android Test runner is packaged separately but shares the target app classpath. The release
+# shrinker must not remove shared runtime entry points while the test APK still references them.
+-keep class androidx.tracing.Trace { *; }
+-keep class androidx.lifecycle.Lifecycle$State { *; }
+-keep class androidx.lifecycle.LifecycleRegistry** { *; }
+-keep class kotlin.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+
+# Preserve only the app ABI exercised by the release device gate. Production-only code remains
+# shrinkable, while AndroidTest can call these members through the target app classpath.
+-keep class org.fcitx.fcitx5.android.core.Fcitx { *; }
+-keep class org.fcitx.fcitx5.android.core.FcitxAPI** { *; }
+-keep class org.fcitx.fcitx5.android.core.FcitxEvent** { *; }
+-keep class org.fcitx.fcitx5.android.core.InputMethodEntry { *; }
+-keep class org.fcitx.fcitx5.android.core.RawConfig { *; }
+-keep class org.fcitx.fcitx5.android.data.UserDataManager** { *; }
+
 # remove kotlin null checks
 -processkotlinnullchecks remove
 

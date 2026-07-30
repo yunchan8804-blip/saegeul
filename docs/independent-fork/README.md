@@ -248,6 +248,19 @@ instrumentation targetPackage, 메인 APK와의 서명 인증서 일치를 모�
   -KeyPasswordFile <outside-repository-password-file>
 ```
 
+Windows에서는 평문 파일 대신 DPAPI로 보호한 `SecureString` CliXml을 권장한다. 같은
+비밀번호를 사용하는 키스토어라면 두 인수에 같은 파일을 지정해도 된다. 스크립트는
+bundletool 실행 중에만 사용자 임시 디렉터리에 평문을 만들고 `finally`에서 삭제한다.
+
+```powershell
+.\scripts\verify-release-device.ps1 `
+  <위와 동일한 APK/AAB/기기 인수> `
+  -KeystorePasswordCliXml <secure-string.clixml> `
+  -KeyPasswordCliXml <secure-string.clixml>
+```
+
+`-PreflightOnly`는 키스토어 파일의 존재만 검사하며 어떤 비밀번호 인수도 요구하지 않는다.
+
 ## 8. 스토어 정책 게이트
 
 라이선스 준수와 Play 사용자 데이터 정책은 별도 게이트다. IME가 접근하거나 전송할

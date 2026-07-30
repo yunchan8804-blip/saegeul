@@ -1,5 +1,6 @@
 import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import com.android.build.gradle.internal.tasks.L8DexDesugarLibTask
 import javax.xml.parsers.DocumentBuilderFactory
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
@@ -196,6 +197,7 @@ android {
             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round")
             resValue("string", "app_name", "@string/app_name_release")
             proguardFile("proguard-rules.pro")
+            testProguardFile("proguard-test-rules.pro")
         }
         debug {
             manifestPlaceholders["appAuthRedirectScheme"] =
@@ -250,6 +252,15 @@ extensions.configure<ApplicationAndroidComponentsExtension> {
         }.configureEach {
             dependsOn(verifyTask)
         }
+    }
+}
+
+// The instrumented-test APK is loaded before the target APK. Its separately generated j$ runtime
+// therefore shadows the target runtime, so L8 must retain the members referenced only by target
+// code as well as those it can observe directly from AndroidTest.
+tasks.withType<L8DexDesugarLibTask>().configureEach {
+    if (name == "l8DexDesugarLibReleaseAndroidTest") {
+        keepRulesConfigurations.add("-keep class j$.** { *; }")
     }
 }
 

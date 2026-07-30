@@ -27,11 +27,13 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$KeyAlias,
 
-    [Parameter(Mandatory = $true)]
     [string]$KeystorePasswordFile,
 
-    [Parameter(Mandatory = $true)]
     [string]$KeyPasswordFile,
+
+    [string]$KeystorePasswordCliXml,
+
+    [string]$KeyPasswordCliXml,
 
     [switch]$PreflightOnly
 )
@@ -45,8 +47,6 @@ $resolvedHangulApk = (Resolve-Path -LiteralPath $HangulApkPath).Path
 $resolvedTestApk = (Resolve-Path -LiteralPath $AndroidTestApkPath).Path
 $resolvedBundletool = (Resolve-Path -LiteralPath $BundletoolJarPath).Path
 $resolvedKeystore = (Resolve-Path -LiteralPath $KeystorePath).Path
-$resolvedKeystorePasswordFile = (Resolve-Path -LiteralPath $KeystorePasswordFile).Path
-$resolvedKeyPasswordFile = (Resolve-Path -LiteralPath $KeyPasswordFile).Path
 
 $sdkRoot = if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_SDK_ROOT)) {
     $env:ANDROID_SDK_ROOT
@@ -137,6 +137,36 @@ function Get-SigningCertificateSha256 {
     return ($Matches[1] -replace ":", "").Trim().ToLowerInvariant()
 }
 
+function Get-ApkClassInventory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ApkPath
+    )
+
+    $output = Invoke-Checked -Command $apkAnalyzer -Arguments @(
+        "dex",
+        "packages",
+        $ApkPath
+    )
+    $definitions = [Collections.Generic.HashSet[string]]::new()
+    $references = [Collections.Generic.HashSet[string]]::new()
+    foreach ($line in $output) {
+        if ($line -notmatch "^C\s+(?<kind>[dr])\s+\d+\s+\d+\s+\d+\s+(?<name>.+)$") {
+            continue
+        }
+        $className = ($Matches.name.Trim() -replace "(\[\])+$", "")
+        if ($Matches.kind -eq "d") {
+            [void]$definitions.Add($className)
+        } else {
+            [void]$references.Add($className)
+        }
+    }
+    return [pscustomobject]@{
+        Definitions = $definitions
+        References = $references
+    }
+}
+
 $mainApplicationId = Get-ApplicationId -ApkPath $resolvedMainApk
 $hangulApplicationId = Get-ApplicationId -ApkPath $resolvedHangulApk
 $testApplicationId = Get-ApplicationId -ApkPath $resolvedTestApk
@@ -172,6 +202,27 @@ if ($testSigningCertificate -ne $mainSigningCertificate) {
         "release certificate '$mainSigningCertificate'."
     )
 }
+$mainClassInventory = Get-ApkClassInventory -ApkPath $resolvedMainApk
+$testClassInventory = Get-ApkClassInventory -ApkPath $resolvedTestApk
+$platformClassPattern = (
+    "^(android|java|javax|dalvik|sun|org\.w3c|org\.xml)\." +
+    "|^(boolean|byte|char|double|float|int|long|short|void)$"
+)
+$unresolvedRuntimeClasses = @(
+    $testClassInventory.References |
+        Where-Object {
+            -not $testClassInventory.Definitions.Contains($_) -and
+            -not $mainClassInventory.Definitions.Contains($_) -and
+            $_ -notmatch $platformClassPattern
+        } |
+        Sort-Object
+)
+if ($unresolvedRuntimeClasses.Count -gt 0) {
+    throw (
+        "Instrumentation runtime references classes that are not defined by either the main " +
+        "APK or AndroidTest APK:`n$($unresolvedRuntimeClasses -join "`n")"
+    )
+}
 
 if ($PreflightOnly) {
     Write-Output "Release device verification preflight: PASS"
@@ -180,7 +231,34 @@ if ($PreflightOnly) {
     Write-Output "Instrumentation application ID: $testApplicationId"
     Write-Output "Instrumentation target: $testTargetApplicationId"
     Write-Output "Instrumentation signing certificate: $testSigningCertificate"
+    Write-Output "Instrumentation runtime closure: PASS"
     return
+}
+
+$hasPasswordFiles = -not [string]::IsNullOrWhiteSpace($KeystorePasswordFile) -and
+    -not [string]::IsNullOrWhiteSpace($KeyPasswordFile)
+$hasEncryptedPasswords = -not [string]::IsNullOrWhiteSpace($KeystorePasswordCliXml) -and
+    -not [string]::IsNullOrWhiteSpace($KeyPasswordCliXml)
+if ($hasPasswordFiles -eq $hasEncryptedPasswords) {
+    throw (
+        "Provide exactly one complete password source: " +
+        "-KeystorePasswordFile/-KeyPasswordFile or " +
+        "-KeystorePasswordCliXml/-KeyPasswordCliXml."
+    )
+}
+
+$resolvedKeystorePasswordFile = $null
+$resolvedKeyPasswordFile = $null
+$resolvedKeystorePasswordCliXml = $null
+$resolvedKeyPasswordCliXml = $null
+if ($hasPasswordFiles) {
+    $resolvedKeystorePasswordFile = (Resolve-Path -LiteralPath $KeystorePasswordFile).Path
+    $resolvedKeyPasswordFile = (Resolve-Path -LiteralPath $KeyPasswordFile).Path
+} else {
+    $resolvedKeystorePasswordCliXml = (
+        Resolve-Path -LiteralPath $KeystorePasswordCliXml
+    ).Path
+    $resolvedKeyPasswordCliXml = (Resolve-Path -LiteralPath $KeyPasswordCliXml).Path
 }
 
 $connectedDevices = @(& adb devices) |
@@ -196,6 +274,38 @@ $temporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) (
 [void](New-Item -ItemType Directory -Path $temporaryDirectory)
 try {
     $apksPath = Join-Path $temporaryDirectory "main.apks"
+    if ($hasEncryptedPasswords) {
+        $resolvedKeystorePasswordFile = Join-Path $temporaryDirectory "keystore-password.txt"
+        $resolvedKeyPasswordFile = Join-Path $temporaryDirectory "key-password.txt"
+        $passwordInputs = @(
+            @($resolvedKeystorePasswordCliXml, $resolvedKeystorePasswordFile),
+            @($resolvedKeyPasswordCliXml, $resolvedKeyPasswordFile)
+        )
+        foreach ($passwordInput in $passwordInputs) {
+            $securePassword = Import-Clixml -LiteralPath $passwordInput[0]
+            if ($securePassword -isnot [Security.SecureString]) {
+                throw "Encrypted password input '$($passwordInput[0])' is not a SecureString."
+            }
+            $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR(
+                $securePassword
+            )
+            try {
+                $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
+                    $passwordPointer
+                )
+                [IO.File]::WriteAllText(
+                    $passwordInput[1],
+                    $plainPassword,
+                    [Text.UTF8Encoding]::new($false)
+                )
+            } finally {
+                $plainPassword = $null
+                if ($passwordPointer -ne [IntPtr]::Zero) {
+                    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+                }
+            }
+        }
+    }
     Invoke-Checked -Command "java" -Arguments @(
         "-jar",
         $resolvedBundletool,

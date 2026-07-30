@@ -1,6 +1,7 @@
 /*
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2021-2023 Fcitx5 for Android Contributors
+ * SPDX-FileCopyrightText: Copyright 2026 Yun Chan
  */
 package org.fcitx.fcitx5.android
 
@@ -9,6 +10,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
@@ -101,17 +103,25 @@ class FcitxTest {
 
     @Test
     fun testInstalledHangulPluginComposesTwoSetText(): Unit = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         val available = fcitx.availableIme().map { it.uniqueName }.toSet()
         Assert.assertTrue(
             "The separately installed Hangul plugin was not discovered.",
             available.contains("hangul")
         )
 
-        fcitx.setEnabledIme(arrayOf("hangul", "keyboard-us"))
-        fcitx.activateIme("hangul")
+        // sendKey() is routed through AndroidFrontend's active input context. Create and focus
+        // one explicitly because this test runs the engine directly, without an IME service.
+        fcitx.activate(context.applicationInfo.uid, context.packageName)
         fcitx.focus(true)
-        fcitx.reset()
+        fcitx.setEnabledIme(arrayOf("keyboard-us", "hangul"))
+        fcitx.activateIme("hangul")
         try {
+            Assert.assertEquals(
+                "Hangul was discovered but could not be activated.",
+                "hangul",
+                fcitx.currentIme().uniqueName
+            )
             val committedText = async(start = CoroutineStart.UNDISPATCHED) {
                 withTimeout(5_000) {
                     fcitx.eventFlow
@@ -120,9 +130,13 @@ class FcitxTest {
                         .data.text
                 }
             }
-            fcitx.sendKey('r')
-            fcitx.sendKey('k')
-            fcitx.sendKey(' ')
+            // Pass every argument explicitly: the release target and AndroidTest APK are shrunk
+            // separately, so a test-only Kotlin default-argument bridge is not target-app ABI.
+            fcitx.sendKey('r', 0u, 0, false, -1)
+            delay(50)
+            fcitx.sendKey('k', 0u, 0, false, -1)
+            delay(50)
+            fcitx.sendKey(' ', 0u, 0, false, -1)
             val actual = committedText.await()
             Assert.assertTrue(
                 "Two-set Hangul input did not commit '가': '$actual'.",
@@ -131,6 +145,7 @@ class FcitxTest {
         } finally {
             fcitx.reset()
             fcitx.focus(false)
+            fcitx.deactivate(context.applicationInfo.uid)
         }
     }
 
