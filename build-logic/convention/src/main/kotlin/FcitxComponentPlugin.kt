@@ -50,8 +50,14 @@ class FcitxComponentPlugin : Plugin<Project> {
                 deleteTask.get().apply {
                     dependsOn(installTask)
                     doLast {
-                        ext.excludeFiles.forEach {
-                            project.assetsDir.resolve(it).delete()
+                        ext.excludeFiles.forEach { pattern ->
+                            if (pattern.contains('*') || pattern.contains('?')) {
+                                project.fileTree(project.assetsDir) {
+                                    include(pattern)
+                                }.files.forEach(File::deleteRecursively)
+                            } else {
+                                project.assetsDir.resolve(pattern).deleteRecursively()
+                            }
                         }
                     }
                 }

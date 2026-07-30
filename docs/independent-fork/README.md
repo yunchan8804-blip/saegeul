@@ -137,6 +137,12 @@ Fcitx5 핵심과 libhangul 기반 한글 플러그인은 유지한다. 한글 �
 별도 APK 패키지로 유지하고, 독립 applicationId/action 계약만 맞춘다. 메인 APK 번들링은
 별도 설치·검색·데이터 이전 회귀 검증 뒤 다음 단계에서 수행한다.
 
+현재 빌드 그래프는 `app`과 `plugin:hangul`만 제품 APK로 만든다.
+`fcitx5-chinese-addons`와 Hangul 외 언어 플러그인은 Gradle 프로젝트에서 제외했으며,
+upstream 추적과 소스 의무 이행을 위해 해당 소스와 서브모듈 기록은 저장소에 보존한다.
+APK 검사는 Chinese Addons 라이선스 레코드, `pinyin.lua`, 관련 설정·번역·데이터의
+잔존이 하나라도 있으면 실패한다.
+
 ## 7. 릴리스 필수 게이트
 
 모든 공개 Release는 다음을 전부 통과해야 한다.

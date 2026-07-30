@@ -22,7 +22,6 @@ find_package(LibIMEPinyin MODULE)
 find_package(LibIMETable MODULE)
 
 find_package(fcitx5-lua REQUIRED CONFIG)
-find_package(fcitx5-chinese-addons REQUIRED CONFIG)
 
 include("${FCITX_INSTALL_CMAKECONFIG_DIR}/Fcitx5Utils/Fcitx5CompilerSettings.cmake")
 
@@ -39,11 +38,6 @@ find_package(libuv)
 list(APPEND CMAKE_FIND_ROOT_PATH "${PREBUILT_DIR}/boost/${ANDROID_ABI}/lib/cmake")
 find_package(Boost 1.86.0 REQUIRED COMPONENTS headers iostreams CONFIG)
 
-set(CHINESE_ADDONS_PINYIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons/im/pinyin")
-add_library(pinyin-customphrase STATIC "${CHINESE_ADDONS_PINYIN_DIR}/customphrase.cpp")
-target_include_directories(pinyin-customphrase INTERFACE "${CHINESE_ADDONS_PINYIN_DIR}")
-target_link_libraries(pinyin-customphrase PRIVATE Fcitx5::Utils LibIME::Core)
-
 add_library(native-lib SHARED native-lib.cpp androidaddonloader/androidaddonloader.cpp)
 target_link_libraries(native-lib
         log
@@ -58,7 +52,6 @@ target_link_libraries(native-lib
         Boost::iostreams
         LibIME::Pinyin
         LibIME::Table
-        pinyin-customphrase
         )
 
 # copy module libraries from dependency lib
@@ -70,21 +63,11 @@ add_custom_target(copy-fcitx5-modules
         $<TARGET_PROPERTY:fcitx5::spell,IMPORTED_LOCATION>
         $<TARGET_PROPERTY:fcitx5::unicode,IMPORTED_LOCATION>
         $<TARGET_PROPERTY:fcitx5-lua::luaaddonloader,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5-chinese-addons::pinyin,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5-chinese-addons::table,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5-chinese-addons::scel2org5,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5-chinese-addons::chttrans,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5-chinese-addons::fullwidth,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5-chinese-addons::pinyinhelper,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5-chinese-addons::punctuation,IMPORTED_LOCATION>
         ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
         COMMENT "Copying fcitx5 module libraries to :app"
         )
 
 # install prebuilt assets
 install(FILES "${PREBUILT_DIR}/spell-dict/en_dict.fscd" DESTINATION "${FCITX_INSTALL_PKGDATADIR}/spell" COMPONENT prebuilt-assets)
-install(FILES "${PREBUILT_DIR}/chinese-addons-data/pinyin/chaizi.dict" DESTINATION "${FCITX_INSTALL_PKGDATADIR}/pinyin" COMPONENT prebuilt-assets)
-install(DIRECTORY "${PREBUILT_DIR}/chinese-addons-data/pinyinhelper" DESTINATION "${FCITX_INSTALL_PKGDATADIR}" COMPONENT prebuilt-assets)
 install(DIRECTORY "${PREBUILT_DIR}/libime/table" DESTINATION "${FCITX_INSTALL_PKGDATADIR}" COMPONENT prebuilt-assets)
 install(DIRECTORY "${PREBUILT_DIR}/libime/data/" DESTINATION "${FCITX_INSTALL_DATADIR}/libime" COMPONENT prebuilt-assets)
-install(DIRECTORY "${PREBUILT_DIR}/opencc/data/" DESTINATION "${FCITX_INSTALL_DATADIR}/opencc" COMPONENT prebuilt-assets)

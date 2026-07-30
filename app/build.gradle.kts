@@ -217,13 +217,27 @@ fcitxComponent {
     includeLibs = listOf(
         "fcitx5",
         "fcitx5-lua",
-        "libime",
-        "fcitx5-chinese-addons"
+        "libime"
     )
-    // exclude (delete immediately after install) tables that nobody would use
-    excludeFiles = listOf("cangjie", "erbi", "qxm", "wanfeng").map {
-        "usr/share/fcitx5/inputmethod/$it.conf"
-    }
+    // Keep the first independent release focused on Korean input. These exclusions also remove
+    // stale generated assets after switching from an older build that included Chinese Addons.
+    excludeFiles = listOf(
+        "usr/share/fcitx5/addon/chttrans.conf",
+        "usr/share/fcitx5/addon/fullwidth.conf",
+        "usr/share/fcitx5/addon/pinyin.conf",
+        "usr/share/fcitx5/addon/pinyinhelper.conf",
+        "usr/share/fcitx5/addon/punctuation.conf",
+        "usr/share/fcitx5/addon/table.conf",
+        "usr/share/fcitx5/chttrans",
+        "usr/share/fcitx5/inputmethod",
+        "usr/share/fcitx5/lua/imeapi/extensions/pinyin.lua",
+        "usr/share/fcitx5/pinyin",
+        "usr/share/fcitx5/pinyinhelper",
+        "usr/share/fcitx5/punctuation",
+        "usr/share/fcitx5/table",
+        "usr/share/locale/*/LC_MESSAGES/fcitx5-chinese-addons.mo",
+        "usr/share/opencc"
+    )
     installPrebuiltAssets = true
 }
 
@@ -236,7 +250,6 @@ dependencies {
     implementation(project(":lib:fcitx5"))
     implementation(project(":lib:fcitx5-lua"))
     implementation(project(":lib:libime"))
-    implementation(project(":lib:fcitx5-chinese-addons"))
     implementation(project(":lib:common"))
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)

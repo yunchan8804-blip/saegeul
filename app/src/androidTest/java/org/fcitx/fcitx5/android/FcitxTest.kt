@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapNotNull
@@ -23,7 +22,6 @@ import org.junit.Assert
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
-import timber.log.Timber
 
 class FcitxTest {
 
@@ -48,7 +46,7 @@ class FcitxTest {
             // wait fcitx started
             runBlocking {
                 receiveFirst<FcitxEvent.ReadyEvent>()
-                fcitx.setEnabledIme(arrayOf("pinyin"))
+                fcitx.setEnabledIme(arrayOf("keyboard-us"))
                 fcitx.setGlobalConfig(
                     RawConfig(
                         arrayOf(
@@ -69,26 +67,8 @@ class FcitxTest {
             fcitx.stop()
         }
 
-        private suspend fun sendString(str: String) {
-            str.forEach { c ->
-                fcitx.sendKey(c)
-                delay(50)
-            }
-        }
-
         private suspend inline fun <reified T : FcitxEvent<*>> receiveFirst(): T? =
             fcitxEventChannel.receiveAsFlow().mapNotNull { it as? T }.firstOrNull()
-
-        private suspend fun receiveFirstCandidateList() =
-            receiveFirst<FcitxEvent.CandidateListEvent>()
-
-        private suspend fun receiveFirstCommitString() =
-            receiveFirst<FcitxEvent.CommitStringEvent>()
-
-        private suspend fun receiveFirstPreedit() = receiveFirst<FcitxEvent.ClientPreeditEvent>()
-
-        private suspend fun receiveFirstInputPanelAux() =
-            receiveFirst<FcitxEvent.InputPanelEvent>()
 
     }
 
@@ -105,46 +85,13 @@ class FcitxTest {
     }
 
     @Test
-    fun testWbx(): Unit = runBlocking {
-        fcitx.setEnabledIme(arrayOf("wbx"))
-        sendString("wqvb")
-        val expected = "你好"
-        fcitx.select(0)
-        val commitString = receiveFirstCommitString()?.data
-        Timber.i("commitString is $commitString")
-        Assert.assertEquals(expected, commitString)
-        fcitx.reset()
-    }
-
-    @Test
-    fun testPinyin(): Unit = runBlocking {
-        fcitx.setEnabledIme(arrayOf("pinyin"))
-        sendString("nihaoshijie")
-        val expected = "你好世界"
-        fcitx.select(0)
-        val commitString = receiveFirstCommitString()?.data
-        Timber.i("commitString is $commitString")
-        Assert.assertEquals(expected, commitString)
-        fcitx.reset()
-    }
-
-    @Test
-    fun testInputPanelStatus(): Unit = runBlocking {
-        fcitx.reset()
-        Timber.i("after first reset: ${fcitx.isEmpty()}")
-        Assert.assertEquals(true, fcitx.isEmpty())
-        fcitx.sendKey('a')
-        do {
-            val list = receiveFirstCandidateList()
-        } while (list!!.data.candidates.isNotEmpty())
-        Timber.i("after sending 'a': ${fcitx.isEmpty()}")
-        Assert.assertEquals(false, fcitx.isEmpty())
-        fcitx.reset()
-        do {
-            val list = receiveFirstCandidateList()
-        } while (list!!.data.candidates.isNotEmpty())
-        Timber.i("after second reset: ${fcitx.isEmpty()}")
-        Assert.assertEquals(true, fcitx.isEmpty())
+    fun testKoreanReleaseExcludesChineseInputMethods(): Unit = runBlocking {
+        val available = fcitx.availableIme().map { it.uniqueName }.toSet()
+        Assert.assertTrue(available.contains("keyboard-us"))
+        Assert.assertFalse(available.contains("pinyin"))
+        Assert.assertFalse(available.contains("shuangpin"))
+        Assert.assertFalse(available.contains("wbx"))
+        Assert.assertFalse(available.contains("wbpy"))
     }
 
 }

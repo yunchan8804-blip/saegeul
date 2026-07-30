@@ -43,6 +43,23 @@ try {
         }
     }
 
+    $forbiddenEntryPattern = [regex]::new(
+        "(?i)" +
+        "fcitx5-chinese-addons|" +
+        "pinyin\.lua|" +
+        "assets/usr/share/opencc/|" +
+        "assets/usr/share/fcitx5/(?:chttrans|pinyin|pinyinhelper|punctuation|table|inputmethod)/|" +
+        "assets/usr/share/fcitx5/addon/(?:chttrans|fullwidth|pinyin|pinyinhelper|punctuation|table)\.conf"
+    )
+    $forbiddenEntries = @(
+        $archive.Entries |
+            Where-Object { $forbiddenEntryPattern.IsMatch($_.FullName) }
+    )
+    if ($forbiddenEntries.Count -ne 0) {
+        $names = $forbiddenEntries | ForEach-Object { $_.FullName }
+        throw "Excluded Chinese Addons content is still packaged: $($names -join ', ')."
+    }
+
     $metadataEntry = $archive.GetEntry("res/raw/aboutlibraries.json")
     $reader = [IO.StreamReader]::new($metadataEntry.Open())
     try {
@@ -94,6 +111,17 @@ try {
         throw "Libraries without a declared license: $($names -join ', ')."
     }
 
+    $forbiddenLibraries = @(
+        $libraries |
+            Where-Object {
+                $_.uniqueId -match "(?i)fcitx5-chinese-addons|opencc"
+            }
+    )
+    if ($forbiddenLibraries.Count -ne 0) {
+        $names = $forbiddenLibraries | ForEach-Object { $_.uniqueId }
+        throw "Excluded libraries are still declared in the APK: $($names -join ', ')."
+    }
+
     $knownLicenseIds = @(
         $licenses |
             ForEach-Object {
@@ -113,12 +141,7 @@ try {
         throw "Libraries reference missing license records: $($unresolvedLicenseIds -join ', ')."
     }
 
-    $requiredSpdxIds = @(
-        "Apache-2.0",
-        "GPL-2.0-only",
-        "GPL-2.0-or-later",
-        "LGPL-2.1-or-later"
-    )
+    $requiredSpdxIds = @("Apache-2.0", "LGPL-2.1-or-later")
     foreach ($spdxId in $requiredSpdxIds) {
         $matches = @(
             $licenses |
@@ -132,6 +155,21 @@ try {
         }
     }
 
+    $gpl2Licenses = @(
+        $licenses |
+            Where-Object {
+                (Get-OptionalPropertyValue -InputObject $_ -Name "spdxId") -in @(
+                    "GPL-2.0-only",
+                    "GPL-2.0-or-later"
+                )
+            }
+    )
+    if ($gpl2Licenses.Count -eq 0 -or @($gpl2Licenses | Where-Object {
+                $_.content.Length -lt 1000
+            }).Count -ne 0) {
+        throw "A full GPL 2.0 license text is not embedded in the APK."
+    }
+
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resolvedApkPath).Hash.ToLowerInvariant()
     Write-Output "APK license audit: PASS"
     Write-Output "APK: $resolvedApkPath"
@@ -140,6 +178,7 @@ try {
     Write-Output "License records: $($licenses.Count)"
     Write-Output "Unknown licenses: 0"
     Write-Output "Missing full texts: 0"
+    Write-Output "Excluded Chinese Addons entries: 0"
 } finally {
     $archive.Dispose()
 }
