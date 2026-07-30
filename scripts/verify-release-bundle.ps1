@@ -97,6 +97,8 @@ if ((Split-Path -Parent $resolvedSbomOutput) -ne $resolvedReleaseDirectory) {
 & (Join-Path $PSScriptRoot "verify-release-secrets.ps1") `
     -ApkPath $resolvedInputs.HangulApk
 
+& (Join-Path $PSScriptRoot "verify-play-data-safety-contract.ps1")
+
 & (Join-Path $PSScriptRoot "verify-release-privacy.ps1") `
     -ApkPath $resolvedInputs.MainApk
 
