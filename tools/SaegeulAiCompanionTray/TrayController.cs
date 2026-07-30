@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 
-namespace FcitxAiCompanionTray;
+namespace SaegeulAiCompanionTray;
 
 internal sealed class TrayController : IDisposable
 {
@@ -61,7 +61,7 @@ internal sealed class TrayController : IDisposable
         exitItem.Click += (_, _) => _dispatcher.Invoke(_shutdown);
 
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add(new Forms.ToolStripMenuItem("Fcitx Android AI") { Enabled = false });
+        menu.Items.Add(new Forms.ToolStripMenuItem("Saegeul AI") { Enabled = false });
         menu.Items.Add(_statusItem);
         menu.Items.Add(_backendsItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -75,7 +75,7 @@ internal sealed class TrayController : IDisposable
         _notifyIcon = new Forms.NotifyIcon
         {
             ContextMenuStrip = menu,
-            Text = "Fcitx Android AI · 시작 중",
+            Text = "Saegeul AI · 시작 중",
             Visible = true,
             Icon = CreateStatusIcon(Color.Goldenrod)
         };
@@ -257,7 +257,7 @@ internal sealed class TrayController : IDisposable
         _startItem.Enabled = state is GatewayState.Stopped or GatewayState.Error;
         _stopItem.Enabled = state is not GatewayState.Stopped;
         _restartItem.Enabled = state is not GatewayState.Starting;
-        _notifyIcon.Text = ShortTooltip($"Fcitx Android AI · {stateText}");
+        _notifyIcon.Text = ShortTooltip($"Saegeul AI · {stateText}");
         ReplaceIcon(state switch
         {
             GatewayState.Running => Color.MediumSeaGreen,

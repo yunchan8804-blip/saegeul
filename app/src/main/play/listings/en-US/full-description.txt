@@ -1,27 +1,23 @@
-<b>Supported languages</b>
+<b>Saegeul is an independent open-source Korean keyboard for Android.</b>
+
+It provides Korean composition through Fcitx5 and libhangul, a configurable
+on-screen keyboard, candidates, themes, symbols, emoji, and optional clipboard,
+voice, OCR, GIF, and AI writing tools.
+
+<b>First independent release</b>
 <ul>
-<li>English (with spellcheck)</li>
-<li>Chinese
-  <ul>
-  <li>Pinyin, Shuangpin, Wubi, Cangjie and custom tables (built-in)</li>
-  <li>Zhuyin/Bopomofo (via Chewing Plugin)</li>
-  <li>Jyutping (via Jyutping Plugin)</li>
-  </ul>
-</li>
-<li>Vietnamese (via on UniKey Plugin, supports Telex, VNI and VIQR)</li>
-<li>Japanese (via Anthy Plugin)</li>
-<li>Korean (via Hangul Plugin)</li>
-<li>Sinhala (via Sayura Plugin)</li>
-<li>Thai (via Thai Plugin)
-<li>Generic (via RIME Plugin, supports importing custom schemas)</li>
+<li>The separate Saegeul Hangul Plugin is required for Korean input.</li>
+<li>Unused Chinese and other language engines are not included.</li>
+<li>Clipboard history is off by default and excluded from backup and migration.</li>
+<li>Voice, OCR, GIF, and AI features use the network only when the user explicitly enables or invokes them.</li>
 </ul>
-<b>Features</b>
-<ul>
-<li>Virtual Keyboard (layout not customizable yet)</li>
-<li>Expandable candidate view</li>
-<li>Clipboard management (plain text only)</li>
-<li>Theming (custom color scheme and background image)</li>
-<li>Popup preview on key press</li>
-<li>Long press popup keyboard for convenient symbol input</li>
-<li>Symbol and Emoji picker</li>
-</ul>
+
+<b>Open source and attribution</b>
+
+The app includes license texts, notices, and exact source-release links. Saegeul
+is an unofficial independent fork based on Fcitx5. It is not affiliated with,
+endorsed by, sponsored by, or warranted by the Fcitx project or the original
+Fcitx5 for Android project.
+
+Privacy policy: https://saegeul.twentyoz.kr/privacy/
+Source: https://github.com/yunchan8804-blip/saegeul

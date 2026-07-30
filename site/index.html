@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="새글(Saegeul)은 Fcitx5와 libhangul을 기반으로 한 독립 오픈소스 Android 한국어 키보드다.">
+  <meta name="theme-color" content="#101827">
+  <title>새글 — 독립 오픈소스 한국어 키보드</title>
+  <link rel="icon" href="/assets/saegeul-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav shell" aria-label="주요 메뉴">
+      <a class="brand" href="/" aria-label="새글 홈">
+        <img src="/assets/saegeul-icon.svg" alt="">
+        <span>새글 <small>SAEGEUL</small></span>
+      </a>
+      <div class="nav-links">
+        <a href="/privacy/">개인정보</a>
+        <a href="/source/">소스·라이선스</a>
+        <a href="/faq/">도움말</a>
+        <a href="https://github.com/yunchan8804-blip/saegeul">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-grid shell">
+        <div>
+          <p class="eyebrow">Korean input, independently written</p>
+          <h1>입력은 가까이.<br>선택은 분명히.</h1>
+          <p class="hero-copy">새글은 한글 조합을 기기 안에서 처리하고, 클립보드·음성·AI 같은 선택 기능은 사용자가 직접 켜고 실행할 때만 작동하는 Android 키보드다.</p>
+          <div class="actions">
+            <a class="button primary" href="https://github.com/yunchan8804-blip/saegeul/releases">릴리스 보기</a>
+            <a class="button" href="/privacy/">데이터 처리 확인</a>
+          </div>
+        </div>
+        <aside class="identity-card" aria-label="제품 공개 식별자">
+          <dl>
+            <div><dt>Product</dt><dd>새글 / Saegeul</dd></div>
+            <div><dt>Package</dt><dd class="code">kr.twentyoz.saegeul</dd></div>
+            <div><dt>License</dt><dd>LGPL-2.1-or-later</dd></div>
+            <div><dt>Publisher</dt><dd>Yun Chan</dd></div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-grid shell">
+        <div class="section-label">Product boundary</div>
+        <div class="section-body">
+          <h2>한국어에 필요한 것만 첫 화면에 둔다.</h2>
+          <p class="lede">첫 독립 버전은 Fcitx5 핵심과 libhangul 한글 엔진에 집중한다. 중국어 애드온과 사용하지 않는 언어 플러그인은 제품 APK에서 제외한다.</p>
+          <ul class="feature-list">
+            <li><strong>한글 입력</strong><span>조합 중인 글과 일반 키 입력은 개발자 서버가 아니라 기기 안의 Fcitx5·libhangul에서 처리한다.</span></li>
+            <li><strong>선택형 도구</strong><span>클립보드는 새 설치에서 꺼져 있다. 음성·OCR·GIF·AI는 기능별 고지와 사용자 동작 뒤에만 실행된다.</span></li>
+            <li><strong>독립 식별자</strong><span>새 패키지, OAuth callback, Provider authority, IPC 권한, 플러그인 action과 서명을 사용한다.</span></li>
+            <li><strong>검증 가능한 배포</strong><span>바이너리와 같은 태그의 전체 소스, 서브모듈 해시, 빌드 스크립트, SBOM과 라이선스 전문을 함께 제공한다.</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="notice">
+      <div class="section-grid shell">
+        <div class="section-label">Independent fork notice</div>
+        <div class="section-body">
+          <h2>기반은 밝히고, 관계는 분리한다.</h2>
+          <p class="lede"><strong>새글은 Fcitx5를 기반으로 한 비공식 독립 포크다.</strong> Fcitx 프로젝트 또는 원 Fcitx5 for Android 프로젝트와 제휴 관계가 없으며, 그 프로젝트의 보증·승인·후원을 받지 않는다.</p>
+          <p>원 저작권과 오픈소스 라이선스 표시는 유지한다. 독립 포크에서 추가·수정한 부분과 릴리스에 대한 책임은 Yun Chan에게 있다.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-grid shell">
+      <span>© 2026 Yun Chan · Saegeul is open source.</span>
+      <span><a href="/privacy/">개인정보처리방침</a> · <a href="/source/">소스와 라이선스</a> · <a href="mailto:yunchan@twentyoz.kr">문의</a></span>
+    </div>
+  </footer>
+</body>
+</html>

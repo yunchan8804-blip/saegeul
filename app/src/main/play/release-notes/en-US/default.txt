@@ -1,1 +1,3 @@
-104.txt
+Saegeul independent release: new name, icon, package, signing identity, repository,
+privacy disclosures, in-app license notices, Korean-focused engine set, and exact
+same-tag source/SBOM release checks.

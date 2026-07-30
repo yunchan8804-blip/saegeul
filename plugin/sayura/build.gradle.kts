@@ -11,7 +11,7 @@ android {
     namespace = "org.fcitx.fcitx5.android.plugin.sayura"
 
     defaultConfig {
-        applicationId = "org.fcitx.fcitx5.android.plugin.sayura"
+        applicationId = "${ProductIdentity.applicationId}.plugin.sayura"
 
         @Suppress("UnstableApiUsage")
         externalNativeBuild {

@@ -146,7 +146,7 @@ class AiProviderDiscoveryManager(
     }
 
     companion object {
-        const val SERVICE_TYPE = "_fcitx-ai._tcp."
+        const val SERVICE_TYPE = "_saegeul-ai._tcp."
         const val TXT_MANIFEST_URL = "manifest"
         const val ERROR_START_EXCEPTION = -1
         private const val MAX_COMPUTER_NAME_LENGTH = 80

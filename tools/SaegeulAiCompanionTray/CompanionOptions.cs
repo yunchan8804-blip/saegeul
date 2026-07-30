@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace FcitxAiCompanionTray;
+namespace SaegeulAiCompanionTray;
 
 internal sealed record CompanionOptions(
     string CompanionPath,

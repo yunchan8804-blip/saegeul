@@ -200,7 +200,7 @@ class UrlConnectionVoiceTransport : VoiceHttpTransport {
     private companion object {
         const val MAX_RESPONSE_BYTES = 256 * 1024
         const val USER_AGENT =
-            "Fcitx5Android-PrecisionDictation/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
+            "Saegeul-PrecisionDictation/0.1 (https://github.com/yunchan8804-blip/saegeul)"
     }
 }
 

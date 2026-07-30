@@ -132,7 +132,7 @@ class AiProviderProfileTest {
         oauthAuthorizationEndpoint = authorizationEndpoint,
         oauthTokenEndpoint = tokenEndpoint,
         oauthRevocationEndpoint = revocationEndpoint,
-        oauthClientId = "fcitx-android-public",
+        oauthClientId = "saegeul-android-public",
         oauthScopes = "openid offline_access ai.invoke"
     )
 }

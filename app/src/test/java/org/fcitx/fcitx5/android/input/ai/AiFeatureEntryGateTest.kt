@@ -50,7 +50,7 @@ class AiFeatureEntryGateTest {
             authMode = AiAuthMode.OAuthPkce,
             oauthAuthorizationEndpoint = "https://home.example.test/oauth/authorize",
             oauthTokenEndpoint = "https://home.example.test/oauth/token",
-            oauthClientId = "fcitx-android-public"
+            oauthClientId = "saegeul-android-public"
         )
 
         assertFalse(AiProviderReadinessPolicy.isReady(oauth, hasOAuthSession = false))

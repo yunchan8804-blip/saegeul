@@ -89,17 +89,31 @@ val debugAiProviderName = providers.gradleProperty("AI_PROVIDER_NAME").orElse("O
 val debugAiProviderBaseUrl = providers.gradleProperty("AI_PROVIDER_BASE_URL")
     .orElse("https://api.openai.com/v1")
 val debugAiProviderApiKey = providers.gradleProperty("AI_PROVIDER_API_KEY").orElse("")
-val sourceRepositoryUrl = providers.gradleProperty("SOURCE_REPOSITORY_URL").orElse("")
-val sourceArchiveUrl = providers.gradleProperty("SOURCE_ARCHIVE_URL").orElse("")
 val sourceTag = providers.gradleProperty("SOURCE_TAG").orElse("")
+val sourceRepositoryUrl = providers.gradleProperty("SOURCE_REPOSITORY_URL")
+    .orElse(ProductIdentity.repositoryUrl)
+val sourceArchiveUrl = providers.gradleProperty("SOURCE_ARCHIVE_URL").orElse(
+    sourceTag.map { tag ->
+        if (tag.isBlank()) {
+            "${ProductIdentity.repositoryUrl}/releases"
+        } else {
+            "${ProductIdentity.repositoryUrl}/releases/download/$tag/$tag-source.tar.gz"
+        }
+    }
+)
+val productWebsiteUrl = providers.gradleProperty("PRODUCT_WEBSITE_URL")
+    .orElse(ProductIdentity.websiteUrl)
+val privacyPolicyUrl = providers.gradleProperty("PRIVACY_POLICY_URL")
+    .orElse(ProductIdentity.privacyPolicyUrl)
+val faqUrl = providers.gradleProperty("FAQ_URL").orElse(ProductIdentity.faqUrl)
 
 android {
     namespace = "org.fcitx.fcitx5.android"
 
     defaultConfig {
-        applicationId = "org.fcitx.fcitx5.android"
+        applicationId = ProductIdentity.applicationId
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders["appAuthRedirectScheme"] = "org.fcitx.fcitx5.android.oauth"
+        manifestPlaceholders["appAuthRedirectScheme"] = "${ProductIdentity.applicationId}.oauth"
         buildConfigField("String", "AI_PROVIDER_NAME", "OpenAI".asBuildConfigString())
         buildConfigField(
             "String",
@@ -110,7 +124,7 @@ android {
         buildConfigField(
             "String",
             "AI_OAUTH_REDIRECT_URI",
-            "org.fcitx.fcitx5.android.oauth:/callback".asBuildConfigString()
+            "${ProductIdentity.applicationId}.oauth:/callback".asBuildConfigString()
         )
         buildConfigField("String", "AI_FAST_MODEL", "gpt-5.6-luna".asBuildConfigString())
         buildConfigField("String", "AI_BALANCED_MODEL", "gpt-5.6-terra".asBuildConfigString())
@@ -126,6 +140,17 @@ android {
             sourceArchiveUrl.get().asBuildConfigString()
         )
         buildConfigField("String", "SOURCE_TAG", sourceTag.get().asBuildConfigString())
+        buildConfigField(
+            "String",
+            "PRODUCT_WEBSITE_URL",
+            productWebsiteUrl.get().asBuildConfigString()
+        )
+        buildConfigField(
+            "String",
+            "PRIVACY_POLICY_URL",
+            privacyPolicyUrl.get().asBuildConfigString()
+        )
+        buildConfigField("String", "FAQ_URL", faqUrl.get().asBuildConfigString())
 
         @Suppress("UnstableApiUsage")
         externalNativeBuild {
@@ -159,7 +184,7 @@ android {
         }
         debug {
             manifestPlaceholders["appAuthRedirectScheme"] =
-                "org.fcitx.fcitx5.android.debug.oauth"
+                "${ProductIdentity.applicationId}.debug.oauth"
             resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
             resValue("string", "app_name", "@string/app_name_debug")
@@ -181,7 +206,7 @@ android {
             buildConfigField(
                 "String",
                 "AI_OAUTH_REDIRECT_URI",
-                "org.fcitx.fcitx5.android.debug.oauth:/callback".asBuildConfigString()
+                "${ProductIdentity.applicationId}.debug.oauth:/callback".asBuildConfigString()
             )
         }
     }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name_release">Fcitx5</string>
-    <string name="app_name_debug">Fcitx5 (디버그)</string>
+    <string name="app_name_release">새글</string>
+    <string name="app_name_debug">새글 (디버그)</string>
     <string name="save">저장</string>
     <string name="input_methods">입력기</string>
     <string name="add_input_method">입력기 추가</string>
@@ -281,7 +281,7 @@
     <string name="reset_keyboard_on_focus_change">포커스가 변경되면 키보드로 돌아가기</string>
     <string name="export_user_data">사용자 데이터 내보내기</string>
     <string name="import_user_data">사용자 데이터 가져오기</string>
-    <string name="exception_user_data_filename">%1$s의 파일 확장자는 fcitx5-android 사용자 데이터를 나타내지 않습니다</string>
+    <string name="exception_user_data_filename">%1$s의 파일 확장자는 새글 사용자 데이터를 나타내지 않습니다</string>
     <string name="exception_user_data_metadata">사용자 데이터의 메타데이터를 찾을 수 없습니다</string>
     <string name="exception_user_data_package_name_mismatch">사용자 데이터가 현재 앱과 일치하지 않습니다</string>
     <string name="user_data_imported">%1$s의 사용자 데이터를 가져왔습니다. 다시 시작하는 중…</string>

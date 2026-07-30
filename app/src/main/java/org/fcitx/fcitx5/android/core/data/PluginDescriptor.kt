@@ -37,7 +37,7 @@ data class PluginDescriptor(
     val name = packageName.removePrefix(pluginPackagePrefix).removeSuffix(pluginPackageSuffix)
 
     companion object {
-        const val pluginPackagePrefix = "org.fcitx.fcitx5.android.plugin."
+        val pluginPackagePrefix = BuildConfig.APPLICATION_ID.removeSuffix(".debug") + ".plugin."
         const val pluginPackageSuffix = ".${BuildConfig.BUILD_TYPE}"
         const val pluginAPI = "0.1"
     }

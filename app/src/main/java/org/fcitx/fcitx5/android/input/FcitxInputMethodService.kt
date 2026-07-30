@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.BuildConfig
 import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.ClipData
@@ -3301,7 +3302,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @Suppress("ConstPropertyName")
     companion object {
         private const val KOREAN_PARTICLE_CONTEXT_CHARACTERS = 64
-        const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
+        val DeleteSurroundingFlag = "${BuildConfig.APPLICATION_ID}.DELETE_SURROUNDING"
         private const val SNIPPET_CONTEXT_CHARS = 128
     }
 }

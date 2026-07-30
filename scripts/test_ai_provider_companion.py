@@ -135,7 +135,7 @@ class CliBoundaryTest(unittest.TestCase):
             return result
 
         manifest = companion.verify_public_manifest_with_retry(
-            "https://computer.example/.well-known/fcitx-ai-provider",
+            "https://computer.example/.well-known/saegeul-ai-provider",
             attempts=3,
             initial_delay_seconds=0.25,
             verify=verify,
@@ -149,7 +149,7 @@ class CliBoundaryTest(unittest.TestCase):
         delays = []
         with self.assertRaisesRegex(ValueError, "unsupported discovery protocol"):
             companion.verify_public_manifest_with_retry(
-                "https://computer.example/.well-known/fcitx-ai-provider",
+                "https://computer.example/.well-known/saegeul-ai-provider",
                 verify=lambda _url: (_ for _ in ()).throw(
                     ValueError("the provider uses an unsupported discovery protocol")
                 ),

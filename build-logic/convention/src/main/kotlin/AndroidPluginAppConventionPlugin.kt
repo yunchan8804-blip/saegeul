@@ -21,18 +21,22 @@ class AndroidPluginAppConventionPlugin : Plugin<Project> {
             }
             buildTypes {
                 release {
-                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android\"")
+                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"${ProductIdentity.applicationId}\"")
                     addManifestPlaceholders(
                         mapOf(
-                            "mainApplicationId" to "org.fcitx.fcitx5.android",
+                            "mainApplicationId" to ProductIdentity.applicationId,
                         )
                     )
                 }
                 debug {
-                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.debug\"")
+                    buildConfigField(
+                        "String",
+                        "MAIN_APPLICATION_ID",
+                        "\"${ProductIdentity.applicationId}.debug\""
+                    )
                     addManifestPlaceholders(
                         mapOf(
-                            "mainApplicationId" to "org.fcitx.fcitx5.android.debug",
+                            "mainApplicationId" to "${ProductIdentity.applicationId}.debug",
                         )
                     )
                 }

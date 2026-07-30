@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name_release">Fcitx5</string>
-    <string name="app_name_debug">Fcitx5 (Отладка)</string>
+    <string name="app_name_release">Saegeul</string>
+    <string name="app_name_debug">Saegeul (Отладка)</string>
     <string name="save">Сохранить</string>
     <string name="input_methods">Методы ввода</string>
     <string name="add_input_method">Добавить метод ввода</string>
@@ -241,7 +241,7 @@
     <string name="reset_keyboard_on_focus_change">Переключиться обратно на клавиатуру при изменении фокуса</string>
     <string name="export_user_data">Экспорт пользовательских данных</string>
     <string name="import_user_data">Импорт пользовательских данных</string>
-    <string name="exception_user_data_filename">Расширение имени файла %1$s не указывает на пользовательские данные fcitx5-android</string>
+    <string name="exception_user_data_filename">Расширение имени файла %1$s не указывает на пользовательские данные Saegeul</string>
     <string name="exception_user_data_metadata">Невозможно найти метаданные пользовательских данных</string>
     <string name="exception_user_data_package_name_mismatch">Пользовательские данные не соответствуют текущему приложению</string>
     <string name="user_data_imported">Пользовательские данные %1$s  были импортированы, перезапуск…</string>

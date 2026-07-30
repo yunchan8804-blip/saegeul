@@ -29,8 +29,8 @@ class AiProviderDiscoveryManifestTest {
     @Test
     fun `manifest rejects embedded secrets and tokens`() {
         val withSecret = validManifest().replace(
-            "\"client_id\": \"fcitx-android-public\"",
-            "\"client_id\": \"fcitx-android-public\", \"client_secret\": \"secret\""
+            "\"client_id\": \"saegeul-android-public\"",
+            "\"client_id\": \"saegeul-android-public\", \"client_secret\": \"secret\""
         )
         val withToken = validManifest().replace(
             "\"capabilities\"",
@@ -111,7 +111,7 @@ class AiProviderDiscoveryManifestTest {
             "authorization_endpoint": "https://computer.example/oauth/authorize",
             "token_endpoint": "https://computer.example/oauth/token",
             "revocation_endpoint": "https://computer.example/oauth/revoke",
-            "client_id": "fcitx-android-public",
+            "client_id": "saegeul-android-public",
             "scopes": ["openid", "offline_access", "ai.invoke"],
             "redirect_uri": "${AiProviderProfile.oauthRedirectUri}"
           },

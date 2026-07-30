@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Windows;
 
-namespace FcitxAiCompanionTray;
+namespace SaegeulAiCompanionTray;
 
 public partial class App : System.Windows.Application
 {
@@ -13,7 +13,7 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         _singleInstance = new Mutex(
             initiallyOwned: true,
-            name: @"Local\FcitxAndroidAiCompanionTray",
+            name: @"Local\SaegeulAiCompanionTray",
             createdNew: out var createdNew
         );
         if (!createdNew)
@@ -32,7 +32,7 @@ public partial class App : System.Windows.Application
         {
             System.Windows.MessageBox.Show(
                 exception.Message,
-                "Fcitx Android AI",
+                "Saegeul AI",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error
             );

@@ -344,6 +344,6 @@ class GifResultAdapter(
         private const val MAX_THUMBNAIL_CACHE_BYTES = 12 * 1024 * 1024
         private const val THUMBNAIL_TARGET_PX = 360
         private const val USER_AGENT =
-            "Fcitx5Android-GifSearch/0.2 (https://github.com/fcitx5-android/fcitx5-android)"
+            "Saegeul-GifSearch/0.2 (https://github.com/yunchan8804-blip/saegeul)"
     }
 }

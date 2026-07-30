@@ -7,13 +7,13 @@
     "authorization_endpoint": "https://computer.example/oauth/authorize",
     "token_endpoint": "https://computer.example/oauth/token",
     "revocation_endpoint": "https://computer.example/oauth/revoke",
-    "client_id": "fcitx-android-public",
+    "client_id": "saegeul-android-public",
     "scopes": [
       "openid",
       "offline_access",
       "ai.invoke"
     ],
-    "redirect_uri": "org.fcitx.fcitx5.android.debug.oauth:/callback"
+    "redirect_uri": "kr.twentyoz.saegeul.debug.oauth:/callback"
   },
   "models": {
     "fast": "fast-model",

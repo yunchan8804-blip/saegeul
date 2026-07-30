@@ -27,7 +27,7 @@ data class VerifiedAiProviderManifest(
  */
 object AiProviderDiscoveryManifestCodec {
     const val PROTOCOL_VERSION = 1
-    const val WELL_KNOWN_PATH = "/.well-known/fcitx-ai-provider"
+    const val WELL_KNOWN_PATH = "/.well-known/saegeul-ai-provider"
     const val MAX_MANIFEST_BYTES = 128 * 1024
 
     private val json = Json {

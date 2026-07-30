@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name_release">小企鵝輸入法</string>
-    <string name="app_name_debug">小企鵝輸入法 (除錯)</string>
+    <string name="app_name_release">Saegeul</string>
+    <string name="app_name_debug">Saegeul (除錯)</string>
     <string name="save">儲存</string>
     <string name="input_methods">輸入法</string>
     <string name="add_input_method">新增輸入法</string>
@@ -241,7 +241,7 @@
     <string name="reset_keyboard_on_focus_change">焦點改變時切換回鍵盤</string>
     <string name="export_user_data">匯出使用者資料</string>
     <string name="import_user_data">匯入使用者資料</string>
-    <string name="exception_user_data_filename">%1$s 副檔名並不是 fcitx5-android 使用者資料</string>
+    <string name="exception_user_data_filename">%1$s 副檔名並不是 Saegeul 使用者資料</string>
     <string name="exception_user_data_metadata">無法找到使用者資料的中繼資料</string>
     <string name="exception_user_data_package_name_mismatch">使用者資料與目前應用程式不符合</string>
     <string name="user_data_imported">已匯入來自 %1$s 的使用者資料，正在重新啟動</string>

@@ -191,7 +191,7 @@ class NotoAnimatedEmojiProvider(
         private const val LANDING_PAGE = "https://googlefonts.github.io/noto-emoji-animation/"
         private const val ASSET_ROOT = "https://fonts.gstatic.com/s/e/notoemoji/latest"
         private const val USER_AGENT =
-            "Fcitx5Android-GifSearch/0.2 (https://github.com/fcitx5-android/fcitx5-android)"
+            "Saegeul-GifSearch/0.2 (https://github.com/yunchan8804-blip/saegeul)"
         private val CODEPOINT_PATTERN = Regex("[0-9a-f]+(?:_[0-9a-f]+)*")
         private val SKIN_TONE_CODEPOINTS = setOf(
             "1f3fb", "1f3fc", "1f3fd", "1f3fe", "1f3ff"

@@ -1,7 +1,7 @@
 # 독립 포크 전환 SSOT
 
-이 문서는 독립 한국어 IME 포크 전환의 단일 기준이다. 제품명이나 공개 식별자를
-코드에서 먼저 바꾸지 않고, 소유권·배포·라이선스·검증 계약을 여기서 먼저 확정한다.
+이 문서는 독립 한국어 IME 포크 전환의 단일 기준이다. 제품명과 공개 식별자,
+소유권·배포·라이선스·검증 계약을 여기서 확정하고 코드와 배포물을 이 값에 맞춘다.
 
 ## 1. 기준 상태
 
@@ -30,14 +30,13 @@
 ## 2. Git 소유권 계약
 
 - `upstream`: 기존 `https://github.com/fcitx5-android/fcitx5-android.git`
-- `origin`: Yun Chan이 소유하는 새 독립 저장소
+- `origin`: Yun Chan이 소유하는 `https://github.com/yunchan8804-blip/saegeul.git`
 - 제품 브랜치와 태그는 `origin`에만 게시한다.
 - `upstream`에서는 기존 프로젝트의 변경을 가져오기만 한다.
 - `fork-baseline-2026-07-30` 태그는 서명된 제품 릴리스가 아니라 현재 자산의
   보존 기준이다.
 
-새 저장소 URL은 제품명과 저장소 slug를 확정한 뒤 채운다. 소유 원격이 없는 상태를
-임시 URL로 위장하지 않는다.
+Git의 `origin`은 위 소유 저장소만 가리키고, `upstream`의 push URL은 비활성화한다.
 
 ## 3. 소스 아카이브 계약
 
@@ -67,19 +66,22 @@
 
 ## 4. 공개 제품 정체성
 
-다음 값은 한 번 확정하면 Play 패키지·OAuth·외부 플러그인 호환성에 영향을 주므로
-소유자 승인 전까지 코드에 임의의 값을 넣지 않는다.
+다음 값은 Play 패키지·OAuth·외부 플러그인 호환성의 공개 계약이다.
 
 | 결정 | 상태 | 확정 규칙 |
 | --- | --- | --- |
-| 제품명 | `GATE` | 기존 Fcitx5 명칭과 혼동되지 않는 독립 이름 |
-| 제품 slug | `GATE` | 소문자 ASCII, 저장소·패키지에 공통 사용 |
-| 소유 도메인 | `GATE` | 실제 제어 가능한 도메인 |
-| applicationId | `GATE` | `kr.<소유도메인>.<제품slug>` |
-| 저장소 URL | `GATE` | 소유 계정의 새 공개 원격 |
-| 소스 다운로드 URL | `GATE` | 바이너리와 동일 태그의 소스·SBOM 제공 |
-| 개인정보처리방침 URL | `GATE` | 실제 데이터 처리와 일치하는 공개 HTTPS 문서 |
+| 제품명 | `DECIDED` | `새글 (Saegeul)` |
+| 제품 slug | `DECIDED` | `saegeul` |
+| 소유 도메인 | `DECIDED` | `twentyoz.kr`, 제품 호스트 `saegeul.twentyoz.kr` |
+| applicationId | `DECIDED` | `kr.twentyoz.saegeul` |
+| 저장소 URL | `LIVE` | `https://github.com/yunchan8804-blip/saegeul` |
+| 소스 다운로드 URL | `DECIDED` | `https://github.com/yunchan8804-blip/saegeul/releases` |
+| 개인정보처리방침 URL | `DECIDED` | `https://saegeul.twentyoz.kr/privacy/` |
 | 저작권자 | `DECIDED` | 새 파일은 우선 `Yun Chan`, 별도 법인 양도 시 일괄 갱신 |
+
+이름·저장소·일반 웹 검색에서 같은 분야의 명백한 충돌은 발견하지 못했지만 이는
+법률상 상표권 검색이나 등록 가능성 판단을 대신하지 않는다. 도메인 DNS, 공개 정책
+페이지, Play 패키지 등록은 실제 배포 증거가 생길 때 각각 `LIVE`로 승격한다.
 
 첫 공개 분리 단계에서는 내부 Kotlin namespace
 `org.fcitx.fcitx5.android`를 유지한다. 공개 경계만 먼저 바꾼다.
@@ -235,5 +237,6 @@ instrumentation APK를 사용한다. AAB 설치와 APK 재설치 후 Android 패
 코드 기준 데이터 흐름, 구현된 고지, Data Safety 답변 초안과 공개 릴리스 차단 조건은
 [`privacy-data-safety.md`](privacy-data-safety.md)를 단일 기준으로 사용한다. 현재
 AI·음성·GIF 고지, 클립보드 기본 off·백업 제외, 앱 내부 개인정보·데이터 화면은
-구현됐고, 법적 게시자·소유 개인정보처리방침 URL·공급자 계약·Play Console 제출은
-제품 결정 `GATE`로 남아 있다.
+구현됐다. 게시자는 `Yun Chan`, 공개 URL은
+`https://saegeul.twentyoz.kr/privacy/`로 결정했으며, DNS·정책 페이지 공개,
+공급자 계약 확인과 Play Console 제출은 배포 `GATE`로 남아 있다.

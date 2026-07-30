@@ -379,6 +379,6 @@ internal class OkHttpVoiceRealtimeConnector(
                 .build()
         }
         const val USER_AGENT =
-            "Fcitx5Android-RealtimeDictation/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
+            "Saegeul-RealtimeDictation/0.1 (https://github.com/yunchan8804-blip/saegeul)"
     }
 }

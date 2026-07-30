@@ -259,7 +259,7 @@ class UrlConnectionDiarizationTransport : DiarizationHttpTransport {
         const val STREAM_BUFFER_BYTES = 16 * 1024
         const val MAX_RESPONSE_BYTES = 4 * 1024 * 1024
         const val USER_AGENT =
-            "Fcitx5Android-MeetingDiarization/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
+            "Saegeul-MeetingDiarization/0.1 (https://github.com/yunchan8804-blip/saegeul)"
         val CRLF = byteArrayOf('\r'.code.toByte(), '\n'.code.toByte())
     }
 }

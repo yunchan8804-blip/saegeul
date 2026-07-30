@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: Copyright 2026 Yun Chan
 
-"""Connect Fcitx Android to this computer's logged-in Codex or Claude Code CLI.
+"""Connect Saegeul to this computer's logged-in Codex or Claude Code CLI.
 
 By default the helper exposes a small PKCE gateway through Tailscale HTTPS and advertises it on
 the local network. A separately managed HTTPS reverse proxy can be supplied with --public-origin.
@@ -40,8 +40,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-SERVICE_TYPE = "_fcitx-ai._tcp.local."
-WELL_KNOWN_PATH = "/.well-known/fcitx-ai-provider"
+SERVICE_TYPE = "_saegeul-ai._tcp.local."
+WELL_KNOWN_PATH = "/.well-known/saegeul-ai-provider"
 MULTICAST_GROUP = "224.0.0.251"
 MULTICAST_PORT = 5353
 MAX_MANIFEST_BYTES = 128 * 1024
@@ -52,8 +52,8 @@ PUBLIC_ORIGIN_VERIFY_MAX_DELAY_SECONDS = 3.0
 # Avoid Windows' Hyper-V/WSL excluded ranges, which commonly cover 8790-9200.
 DEFAULT_GATEWAY_PORT = 9211
 DEFAULT_TAILSCALE_HTTPS_PORT = 9210
-DEFAULT_REDIRECT_URI = "org.fcitx.fcitx5.android.debug.oauth:/callback"
-OAUTH_CLIENT_ID = "fcitx-android-public"
+DEFAULT_REDIRECT_URI = "kr.twentyoz.saegeul.debug.oauth:/callback"
+OAUTH_CLIENT_ID = "saegeul-android-public"
 OAUTH_SCOPES = "openid offline_access ai.invoke"
 ACCESS_TOKEN_TTL_SECONDS = 60 * 60
 REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60
@@ -117,7 +117,7 @@ def reject_credentials(value) -> None:
 def verify_manifest(url: str) -> dict:
     request = urllib.request.Request(
         url,
-        headers={"Accept": "application/json", "User-Agent": "Fcitx5-AI-Companion/1"},
+        headers={"Accept": "application/json", "User-Agent": "Saegeul-AI-Companion/1"},
     )
     opener = urllib.request.build_opener(
         NoRedirect(),
@@ -520,7 +520,7 @@ def crypt_local_data(payload: bytes, protect: bool) -> bytes:
     if protect:
         succeeded = crypt32.CryptProtectData(
             ctypes.byref(input_blob),
-            "Fcitx Android AI companion",
+            "Saegeul AI companion",
             None,
             None,
             None,
@@ -813,7 +813,7 @@ class CliGateway:
 
 
 class CliGatewayRequestHandler(http.server.BaseHTTPRequestHandler):
-    server_version = "FcitxCliCompanion/1"
+    server_version = "SaegeulCliCompanion/1"
 
     @property
     def gateway(self) -> CliGateway:
@@ -1052,7 +1052,7 @@ def run_cli_gateway(args: argparse.Namespace) -> None:
         ("127.0.0.1", args.gateway_port), CliGatewayRequestHandler
     )
     server.gateway = gateway  # type: ignore[attr-defined]
-    thread = threading.Thread(target=server.serve_forever, name="fcitx-cli-gateway", daemon=True)
+    thread = threading.Thread(target=server.serve_forever, name="saegeul-cli-gateway", daemon=True)
     thread.start()
     try:
         if not args.public_origin:
@@ -1126,7 +1126,7 @@ def advertise(name: str, address: str, port: int, url: str) -> None:
         character.lower() if character.isascii() and character.isalnum() else "-"
         for character in socket.gethostname()
     )
-    safe_host = safe_host.strip("-")[:50] or "fcitx-ai"
+    safe_host = safe_host.strip("-")[:50] or "saegeul-ai"
     hostname = f"{safe_host}.local."
     instance = f"{name}.{SERVICE_TYPE}"
     packet = response_packet(instance, hostname, address, port, url, 120)
@@ -1176,7 +1176,7 @@ def advertise(name: str, address: str, port: int, url: str) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Connect Fcitx Android to logged-in Codex or Claude Code on this computer"
+        description="Connect Saegeul to logged-in Codex or Claude Code on this computer"
     )
     parser.add_argument(
         "--manifest-url",
@@ -1203,12 +1203,12 @@ def parse_args() -> argparse.Namespace:
     local_app_data = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
     parser.add_argument(
         "--oauth-state-path",
-        default=str(Path(local_app_data) / "Fcitx5Android" / "ai-companion-oauth.bin"),
+        default=str(Path(local_app_data) / "Saegeul" / "ai-companion-oauth.bin"),
         help="DPAPI-protected companion grants used across PC restarts",
     )
     parser.add_argument(
         "--sandbox-dir",
-        default=str(Path(tempfile.gettempdir()) / "fcitx-ai-cli-sandbox"),
+        default=str(Path(tempfile.gettempdir()) / "saegeul-ai-cli-sandbox"),
     )
     return parser.parse_args()
 

@@ -11,7 +11,7 @@ android {
     namespace = "org.fcitx.fcitx5.android.plugin.chewing"
 
     defaultConfig {
-        applicationId = "org.fcitx.fcitx5.android.plugin.chewing"
+        applicationId = "${ProductIdentity.applicationId}.plugin.chewing"
 
         @Suppress("UnstableApiUsage")
         externalNativeBuild {

@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright 2026 Yun Chan
 
 param(
-    [string]$TaskName = "Fcitx5 Android AI Companion"
+    [string]$TaskName = "Saegeul AI Companion"
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,7 +18,7 @@ $trigger = New-ScheduledTaskTrigger -AtLogOn -User $currentUser
 $principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable
 
-Register-ScheduledTask -TaskName $TaskName -Description "Connect logged-in Codex and Claude Code to Fcitx Android" -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+Register-ScheduledTask -TaskName $TaskName -Description "Connect logged-in Codex and Claude Code to Saegeul" -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 
 Start-ScheduledTask -TaskName $TaskName
 Get-ScheduledTask -TaskName $TaskName | Select-Object TaskName, State

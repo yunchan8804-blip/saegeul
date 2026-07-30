@@ -11,7 +11,7 @@ android {
     namespace = "org.fcitx.fcitx5.android.plugin.hangul"
 
     defaultConfig {
-        applicationId = "org.fcitx.fcitx5.android.plugin.hangul"
+        applicationId = "${ProductIdentity.applicationId}.plugin.hangul"
 
         @Suppress("UnstableApiUsage")
         externalNativeBuild {

@@ -5,9 +5,10 @@
 package org.fcitx.fcitx5.android.data.clipboard
 
 import android.content.ClipData
+import org.fcitx.fcitx5.android.BuildConfig
 
-const val TRANSIENT_BUFFERED_PASTE_LABEL =
-    "org.fcitx.fcitx5.android.TRANSIENT_BUFFERED_PASTE"
+val TRANSIENT_BUFFERED_PASTE_LABEL =
+    "${BuildConfig.APPLICATION_ID}.TRANSIENT_BUFFERED_PASTE"
 
 fun ClipData.isTransientBufferedPaste(): Boolean =
     description.label?.toString() == TRANSIENT_BUFFERED_PASTE_LABEL

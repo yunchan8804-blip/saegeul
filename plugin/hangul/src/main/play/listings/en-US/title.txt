@@ -1,1 +1,1 @@
-Fcitx5 (Hangul Plugin)
+Saegeul Hangul Plugin

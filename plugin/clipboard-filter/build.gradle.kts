@@ -13,7 +13,7 @@ android {
     namespace = "org.fcitx.fcitx5.android.plugin.clipboard_filter"
 
     defaultConfig {
-        applicationId = "org.fcitx.fcitx5.android.plugin.clipboard_filter"
+        applicationId = "${ProductIdentity.applicationId}.plugin.clipboard_filter"
     }
 
     buildFeatures {

@@ -1258,8 +1258,8 @@ backend가 발급한 짧은 수명의 token과 WebRTC transport를 사용해야 
 - authorization request는 무작위 `state`와 PKCE verifier를 만들고 `S256` 외 method면 시작 전에
   fail-closed한다. callback은 요청 state와 정확히 일치해야 token exchange를 수행한다.
 - redirect URI는 `${applicationId}.oauth:/callback` 단일 규칙이며 release는
-  `org.fcitx.fcitx5.android.oauth:/callback`, debug는
-  `org.fcitx.fcitx5.android.debug.oauth:/callback`이다. endpoint 등록값과 정확히 일치해야 하며 open
+  `kr.twentyoz.saegeul.oauth:/callback`, debug는
+  `kr.twentyoz.saegeul.debug.oauth:/callback`이다. endpoint 등록값과 정확히 일치해야 하며 open
   redirect나 동적 redirect 입력은 지원하지 않는다.
 - browser 왕복과 token 교환 callback 시마다 현재 profile의 client ID, authorization endpoint,
   token endpoint, redirect URI를 원래 request와 정확히 비교한다. 설정이 중간에 바뀌면 이전 응답을
@@ -1300,9 +1300,9 @@ backend가 발급한 짧은 수명의 token과 WebRTC transport를 사용해야 
 일반 사용자의 기본 진입은 OAuth endpoint 직접 입력이 아니다. `AI 공급자 > 내 컴퓨터 자동으로 찾기
 (추천)`에서 다음 순서를 한 화면으로 수행한다.
 
-1. 같은 local network에서 DNS-SD/mDNS service type `_fcitx-ai._tcp.`를 검색한다.
+1. 같은 local network에서 DNS-SD/mDNS service type `_saegeul-ai._tcp.`를 검색한다.
 2. service TXT의 `manifest` 값만 읽는다. 이 값은 반드시
-   `https://<trusted-host>/.well-known/fcitx-ai-provider`여야 한다.
+   `https://<trusted-host>/.well-known/saegeul-ai-provider`여야 한다.
 3. mDNS 이름·IP·TXT 자체는 신뢰하지 않는다. Android system trust store로 HTTPS certificate를 검증하고,
    redirect를 따르지 않으며, 최대 128 KiB JSON만 읽는다.
 4. manifest version, provider ID, Responses capability, model mapping, OAuth endpoint, public client ID,
@@ -1314,8 +1314,8 @@ backend가 발급한 짧은 수명의 token과 WebRTC transport를 사용해야 
    컴퓨터를 다시 선택해 재시도한다.
 
 manifest v1 contract는 다음과 같다. `redirect_uri`는 설치 variant에 따라 release
-`org.fcitx.fcitx5.android.oauth:/callback` 또는 debug
-`org.fcitx.fcitx5.android.debug.oauth:/callback`을 endpoint가 사전에 public-client redirect로 등록한
+`kr.twentyoz.saegeul.oauth:/callback` 또는 debug
+`kr.twentyoz.saegeul.debug.oauth:/callback`을 endpoint가 사전에 public-client redirect로 등록한
 값과 정확히 맞춰 제공해야 한다.
 
 ```json
@@ -1328,9 +1328,9 @@ manifest v1 contract는 다음과 같다. `redirect_uri`는 설치 variant에 �
     "authorization_endpoint": "https://computer.example/oauth/authorize",
     "token_endpoint": "https://computer.example/oauth/token",
     "revocation_endpoint": "https://computer.example/oauth/revoke",
-    "client_id": "fcitx-android-public",
+    "client_id": "saegeul-android-public",
     "scopes": ["openid", "offline_access", "ai.invoke"],
-    "redirect_uri": "org.fcitx.fcitx5.android.oauth:/callback"
+    "redirect_uri": "kr.twentyoz.saegeul.oauth:/callback"
   },
   "models": {
     "fast": "fast-model",
@@ -1348,7 +1348,7 @@ manifest v1 contract는 다음과 같다. `redirect_uri`는 설치 variant에 �
 이미 로그인한 Codex(ChatGPT 구독 OAuth)와 Claude Code(Claude 구독 OAuth)를 그대로 사용하며, Android에
 OpenAI·Anthropic API key나 CLI의 `auth.json`, OAuth access token을 복사하지 않는다. 휴대폰에는 companion
 전용 Authorization Code + PKCE 권한만 발급한다. 이 companion grant는
-`%LOCALAPPDATA%/Fcitx5Android/ai-companion-oauth.bin`에 Windows DPAPI current-user 범위로 암호화해
+`%LOCALAPPDATA%/Saegeul/ai-companion-oauth.bin`에 Windows DPAPI current-user 범위로 암호화해
 보존하므로 PC 재시작 뒤에도 다시 로그인하지 않고 refresh할 수 있다.
 
 요청 실행 경계는 다음으로 고정한다.
@@ -1362,10 +1362,10 @@ OpenAI·Anthropic API key나 CLI의 `auth.json`, OAuth access token을 복사하
   출력은 거부한다. Fast·Quality는 Codex, Balanced는 Claude로 route한다.
 
 gateway는 loopback `127.0.0.1:9211`, tailnet 공개면은 Tailscale Serve HTTPS `:9210`, 발견은
-`_fcitx-ai._tcp.local.`을 사용한다. WPF tray `tools/FcitxAiCompanionTray`가 상태·backend·시작·중지·재시작·
+`_saegeul-ai._tcp.local.`을 사용한다. WPF tray `tools/SaegeulAiCompanionTray`가 상태·backend·시작·중지·재시작·
 local health 열기를 제공하고 helper process를 감시해 장애 시 복구한다.
-`scripts/install-ai-provider-companion-tray.ps1`은 single-file tray를 `%LOCALAPPDATA%/Fcitx5Android/tray`에
-배포하고 현재 사용자 logon 예약 작업 `Fcitx5 Android AI Companion`을 설치한다. 기존 독립 OAuth
+`scripts/install-ai-provider-companion-tray.ps1`은 single-file tray를 `%LOCALAPPDATA%/Saegeul/tray`에
+배포하고 현재 사용자 logon 예약 작업 `Saegeul AI Companion`을 설치한다. 기존 독립 OAuth
 provider를 광고할 때만 `--manifest-url`의 advertise-only 호환 모드를 사용한다.
 
 Android emulator처럼 Tailscale private address나 MagicDNS에 직접 들어갈 수 없는 검증 환경은 별도로
@@ -1470,7 +1470,7 @@ exactly-once로 입력한다. 자동 요약은 이 경로에 포함하지 않는
 | Release assemble workstation | `GATE (environment)` | release Kotlin·manifest와 OAuth browser visibility guard는 arm64에서 통과했다. 다만 이 워크스테이션의 native CMake release 단계는 Gettext `msgmerge`/`msgfmt` 부재로 멈춘다. source regression으로 분류하지 않으며, 도구 설치 또는 CI 환경에서 별도 release artifact gate가 필요하다. |
 | OAuth live provider | `PASS/ZFOLD` | 최신 arm64 debug APK의 Z Fold6 전용 고정 문장 편집기에서 실제 사용자 OAuth session으로 선택 텍스트 `맞춤법` 요청을 보냈고, 결과 card 수신 → `교체` 1회 → selection 확정 → `실행 취소` 표시·소멸을 확인했다. 해당 맞춤법 결과는 원문과 동일한 no-op이었으므로, 실제 내용이 달라지는 postcondition은 emulator non-noop test와 함께 판정한다. token·원문 외 사용자 데이터는 다루지 않았다. |
 | public-origin startup | `PASS` | 새 Quick Tunnel의 route 전파 중 404·502 뒤 정상 manifest를 제한 재시도로 수용하고, 잘못된 manifest 계약은 sleep 없이 즉시 거부하는 Python test를 고정했다. companion Python 11 tests와 실제 Cloudflare tunnel OAuth 왕복을 통과했다. |
-| 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 502와 불일치 manifest는 credential 없이 fail-closed |
+| 컴퓨터 자동 연결 마법사 | `PASS` | A35·Z Fold6 cover에서 구 `_fcitx-ai._tcp.local.`의 `alpaca-home`을 발견하고 Tailscale HTTPS `:9210` manifest 검증·확인창·OAuth 연결 통과; 독립 브랜드 전환 뒤 `_saegeul-ai._tcp.local.`로 바뀌었으므로 새 식별자의 실기기 재검증이 필요하다. 502와 불일치 manifest는 credential 없이 fail-closed |
 | PC 유료 CLI 실행 | `PASS` | Codex CLI `exec`는 ChatGPT 로그인, Claude Code `-p`는 Max 로그인으로 실행; API/token 환경 변수 제거, tool·web·write·session persistence 차단, A35에서 Codex 맞춤법과 Claude 존댓말 실제 생성 성공, Fold에서 Codex 생성 성공 |
 | PC WPF tray·자동 실행 | `PASS` | single-file WPF tray의 current-user logon 예약 작업 설치 후 helper를 종료하자 tray-owned 새 PID가 `127.0.0.1:9211` health와 Tailscale HTTPS manifest를 자동 복구; 2026-07-27 Release build warning/error 0, 예약 작업 `Running`, health `ok`, Codex·Claude backend 모두 healthy |
 | Responses client | `PASS` | `/responses`, `store=false`, JSON suggestion parse, redirect 금지, prompt/result 비로그와 sanitized error 구현 |

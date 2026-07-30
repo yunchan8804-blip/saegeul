@@ -225,7 +225,7 @@ class UrlConnectionAiTransport : AiHttpTransport {
 
     companion object {
         private const val USER_AGENT =
-            "Fcitx5Android-AiInput/0.1 (https://github.com/fcitx5-android/fcitx5-android)"
+            "Saegeul-AiInput/0.1 (https://github.com/yunchan8804-blip/saegeul)"
         internal const val MAX_RESPONSE_BODY_BYTES = 256 * 1024
 
         internal fun readResponseBody(input: InputStream, contentLength: Long = -1L): ByteArray {

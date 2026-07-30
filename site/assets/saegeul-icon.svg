@@ -1,0 +1,15 @@
+<!--
+  SPDX-License-Identifier: CC-BY-4.0
+  SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Saegeul app icon</title>
+  <desc id="desc">An ivory Hangul-inspired writing mark beside a jade text cursor on an ink navy field.</desc>
+  <rect width="1024" height="1024" fill="#101827"/>
+  <g fill="#fff9ed">
+    <rect x="302" y="255" width="304" height="65" rx="12"/>
+    <rect x="415" y="361" width="63" height="244" rx="12"/>
+    <path d="M302 649c0-8 6-14 14-14h276c8 0 14 6 14 14v38c0 8-6 14-14 14H386c-17 0-30 13-30 30v53c0 8-6 14-14 14h-40c-8 0-14-6-14-14V649h14z"/>
+  </g>
+  <rect x="672" y="255" width="63" height="543" rx="12" fill="#55d6a6"/>
+</svg>
