@@ -85,7 +85,7 @@ try {
     $expectedCommit = (Invoke-Git -Repository $repositoryRoot -Arguments @(
         "rev-parse",
         "$tagRef^{commit}"
-    ))[0].Trim()
+    ) | Select-Object -First 1).Trim()
     if ($manifest.commit -ne $expectedCommit) {
         throw "Manifest commit '$($manifest.commit)' does not match tag commit '$expectedCommit'."
     }

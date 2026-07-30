@@ -48,7 +48,11 @@ if ($LASTEXITCODE -ne 0) {
     throw "'$Ref' is not a local tag. Fetch or create the exact annotated tag first."
 }
 
-$tagType = (Invoke-Git -Repository $repositoryRoot -Arguments @("cat-file", "-t", $tagRef))[0].Trim()
+$tagType = (Invoke-Git -Repository $repositoryRoot -Arguments @(
+    "cat-file",
+    "-t",
+    $tagRef
+) | Select-Object -First 1).Trim()
 if ($tagType -ne "tag") {
     throw "'$Ref' must be an annotated tag, not a lightweight tag."
 }
@@ -56,8 +60,11 @@ if ($tagType -ne "tag") {
 $commit = (Invoke-Git -Repository $repositoryRoot -Arguments @(
     "rev-parse",
     "$tagRef^{commit}"
-))[0].Trim()
-$head = (Invoke-Git -Repository $repositoryRoot -Arguments @("rev-parse", "HEAD"))[0].Trim()
+) | Select-Object -First 1).Trim()
+$head = (Invoke-Git -Repository $repositoryRoot -Arguments @(
+    "rev-parse",
+    "HEAD"
+) | Select-Object -First 1).Trim()
 if ($head -ne $commit) {
     throw "HEAD $head does not match tagged commit $commit. Check out the release tag first."
 }
@@ -146,7 +153,7 @@ function Export-Submodules {
             $Treeish,
             "--",
             $submodulePath
-        ))[0]
+        ) | Select-Object -First 1)
         if ($treeEntry -notmatch "^160000 commit ([0-9a-f]{40})\t") {
             throw "'$submodulePath' is not a gitlink in tree '$Treeish'."
         }
@@ -160,7 +167,7 @@ function Export-Submodules {
         $checkedOutCommit = (Invoke-Git -Repository $submoduleRepository -Arguments @(
             "rev-parse",
             "HEAD"
-        ))[0].Trim()
+        ) | Select-Object -First 1).Trim()
         if ($checkedOutCommit -ne $submoduleCommit) {
             throw "Submodule '$submodulePath' is at $checkedOutCommit, expected $submoduleCommit."
         }
@@ -228,13 +235,13 @@ try {
     $rootTree = (Invoke-Git -Repository $repositoryRoot -Arguments @(
         "rev-parse",
         "$commit^{tree}"
-    ))[0].Trim()
+    ) | Select-Object -First 1).Trim()
     $commitTimestamp = (Invoke-Git -Repository $repositoryRoot -Arguments @(
         "show",
         "-s",
         "--format=%cI",
         $commit
-    ))[0].Trim()
+    ) | Select-Object -First 1).Trim()
 
     $manifest = [ordered]@{
         schemaVersion = 1
