@@ -36,6 +36,29 @@ function Invoke-ApkAnalyzer {
     return ($output -join "`n").Trim()
 }
 
+function Resolve-XmlResourcePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $path = Invoke-ApkAnalyzer -Arguments @(
+        "resources",
+        "value",
+        "--config",
+        "default",
+        "--type",
+        "xml",
+        "--name",
+        $Name,
+        $resolvedApk
+    )
+    if ($path -notmatch "^res/[^/]+\.xml$") {
+        throw "Unexpected path '$path' for XML resource '$Name'."
+    }
+    return $path
+}
+
 $permissions = Invoke-ApkAnalyzer -Arguments @("manifest", "permissions", $resolvedApk)
 foreach ($requiredPermission in @(
     "android.permission.INTERNET",
@@ -92,10 +115,8 @@ foreach ($requiredText in @(
     }
 }
 
-foreach ($backupRule in @(
-    "res/xml/full_backup_content.xml",
-    "res/xml/data_extraction_rules.xml"
-)) {
+foreach ($backupRuleName in @("full_backup_content", "data_extraction_rules")) {
+    $backupRule = Resolve-XmlResourcePath -Name $backupRuleName
     $xml = Invoke-ApkAnalyzer -Arguments @(
         "resources",
         "xml",

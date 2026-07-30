@@ -33,14 +33,47 @@ $archive = [System.IO.Compression.ZipFile]::OpenRead($resolvedApkPath)
 try {
     $requiredEntries = @(
         "assets/legal/NOTICE.txt",
-        "assets/legal/FORK-NOTICE.txt",
-        "res/raw/aboutlibraries.json"
+        "assets/legal/FORK-NOTICE.txt"
     )
     foreach ($entryName in $requiredEntries) {
         $entry = $archive.GetEntry($entryName)
         if ($null -eq $entry -or $entry.Length -eq 0) {
             throw "Required legal entry '$entryName' is missing or empty."
         }
+    }
+
+    $metadataEntryName = "res/raw/aboutlibraries.json"
+    $metadataEntry = $archive.GetEntry($metadataEntryName)
+    if ($null -eq $metadataEntry) {
+        $sdkRoot = if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_SDK_ROOT)) {
+            $env:ANDROID_SDK_ROOT
+        } elseif (-not [string]::IsNullOrWhiteSpace($env:ANDROID_HOME)) {
+            $env:ANDROID_HOME
+        } else {
+            throw "ANDROID_SDK_ROOT or ANDROID_HOME is required to resolve optimized resources."
+        }
+        $apkAnalyzer = Join-Path $sdkRoot "cmdline-tools/latest/bin/apkanalyzer.bat"
+        if (-not (Test-Path -LiteralPath $apkAnalyzer -PathType Leaf)) {
+            throw "apkanalyzer was not found at '$apkAnalyzer'."
+        }
+        $resourcePath = @(
+            & $apkAnalyzer resources value `
+                --config default `
+                --type raw `
+                --name aboutlibraries `
+                $resolvedApkPath 2>&1
+        )
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to resolve the optimized AboutLibraries resource:`n$($resourcePath -join "`n")"
+        }
+        $metadataEntryName = ($resourcePath -join "`n").Trim()
+        if ($metadataEntryName -notmatch "^res/[^/]+\.json$") {
+            throw "Unexpected AboutLibraries resource path '$metadataEntryName'."
+        }
+        $metadataEntry = $archive.GetEntry($metadataEntryName)
+    }
+    if ($null -eq $metadataEntry -or $metadataEntry.Length -eq 0) {
+        throw "Required AboutLibraries metadata is missing or empty."
     }
 
     $forbiddenEntryPattern = [regex]::new(
@@ -60,7 +93,6 @@ try {
         throw "Excluded Chinese Addons content is still packaged: $($names -join ', ')."
     }
 
-    $metadataEntry = $archive.GetEntry("res/raw/aboutlibraries.json")
     $reader = [IO.StreamReader]::new($metadataEntry.Open())
     try {
         $metadata = $reader.ReadToEnd() | ConvertFrom-Json
