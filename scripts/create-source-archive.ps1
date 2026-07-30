@@ -124,6 +124,7 @@ function Export-Submodules {
         [string]$Treeish,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string]$ArchiveRelativeBase
     )
 
