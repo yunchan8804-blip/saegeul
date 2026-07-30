@@ -89,7 +89,17 @@ val debugAiProviderName = providers.gradleProperty("AI_PROVIDER_NAME").orElse("O
 val debugAiProviderBaseUrl = providers.gradleProperty("AI_PROVIDER_BASE_URL")
     .orElse("https://api.openai.com/v1")
 val debugAiProviderApiKey = providers.gradleProperty("AI_PROVIDER_API_KEY").orElse("")
-val sourceTag = providers.gradleProperty("SOURCE_TAG").orElse("")
+val inferredSourceTag = providers.provider {
+    val versionName = buildVersionName
+    if (versionName.matches(Regex("""\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?"""))) {
+        "${ProductIdentity.slug}-v$versionName"
+    } else {
+        ""
+    }
+}
+val sourceTag = providers.gradleProperty("SOURCE_TAG")
+    .orElse(providers.environmentVariable("SOURCE_TAG"))
+    .orElse(inferredSourceTag)
 val sourceRepositoryUrl = providers.gradleProperty("SOURCE_REPOSITORY_URL")
     .orElse(ProductIdentity.repositoryUrl)
 val sourceArchiveUrl = providers.gradleProperty("SOURCE_ARCHIVE_URL").orElse(

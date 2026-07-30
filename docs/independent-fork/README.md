@@ -180,6 +180,11 @@ GitHub Actions에는 새글의 확정 이름·applicationId·저장소·정책 U
 있어야 하며, 기존 프로젝트의 배포·스토어·Jenkins 링크와 공개 앱 ID가 남으면
 실패한다.
 
+정식 `BUILD_VERSION_NAME`이 `0.1.0-rc.2`처럼 주어지면 앱 빌드는 같은 이름의
+`saegeul-v0.1.0-rc.2` 소스 태그와 아카이브 URL을 자동 생성한다. `SOURCE_TAG`로
+명시적 재정의도 가능하지만, 어떤 경로든 번들 게이트가 태그 커밋과 APK 내 URL을
+대조하므로 다른 태그의 소스를 가리키는 산출물은 배포할 수 없다.
+
 ```powershell
 .\scripts\verify-release-bundle.ps1 `
   -ReleaseDirectory <release-directory> `
