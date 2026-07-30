@@ -70,6 +70,15 @@
     <string name="license">라이선스</string>
     <string name="open_source_licenses">오픈 소스 라이선스</string>
     <string name="licenses_of_third_party_libraries">타사 라이브러리 라이선스</string>
+    <string name="bundled_license_texts">APK에 포함된 라이선스 전문</string>
+    <string name="legal_information">법적 정보</string>
+    <string name="fork_notice">독립 포크 고지</string>
+    <string name="fork_notice_summary">비공식 독립 포크이며 원 프로젝트와 제휴·보증 관계가 없음</string>
+    <string name="notice">NOTICE</string>
+    <string name="notice_summary">저작권 및 제3자 고지</string>
+    <string name="source_code_summary">이 빌드의 정확한 소스 태그·저장소·전체 소스 아카이브</string>
+    <string name="source_not_configured">이 빌드에 설정되지 않음 — 공개 릴리스 차단 상태</string>
+    <string name="source_document">이 빌드의 소스 코드\n\n저장소:\n%1$s\n\n정확한 소스 태그 또는 ref:\n%2$s\n\n재귀 서브모듈과 빌드 스크립트를 포함한 전체 소스 아카이브:\n%3$s\n\n빌드 Git 해시:\n%4$s\n\n공개 바이너리 릴리스는 정확히 같은 태그의 전체 소스 아카이브, SHA-256 체크섬, SBOM을 같은 다운로드 위치에 제공해야 한다.</string>
     <string name="github_repo">GitHub 저장소</string>
     <string name="no_config_options">현재 사용 가능한 구성 옵션이 없습니다</string>
     <string name="unimplemented_type">⛔ 구현되지 않은 유형</string>

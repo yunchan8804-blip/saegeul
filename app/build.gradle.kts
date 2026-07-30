@@ -89,6 +89,9 @@ val debugAiProviderName = providers.gradleProperty("AI_PROVIDER_NAME").orElse("O
 val debugAiProviderBaseUrl = providers.gradleProperty("AI_PROVIDER_BASE_URL")
     .orElse("https://api.openai.com/v1")
 val debugAiProviderApiKey = providers.gradleProperty("AI_PROVIDER_API_KEY").orElse("")
+val sourceRepositoryUrl = providers.gradleProperty("SOURCE_REPOSITORY_URL").orElse("")
+val sourceArchiveUrl = providers.gradleProperty("SOURCE_ARCHIVE_URL").orElse("")
+val sourceTag = providers.gradleProperty("SOURCE_TAG").orElse("")
 
 android {
     namespace = "org.fcitx.fcitx5.android"
@@ -112,6 +115,17 @@ android {
         buildConfigField("String", "AI_FAST_MODEL", "gpt-5.6-luna".asBuildConfigString())
         buildConfigField("String", "AI_BALANCED_MODEL", "gpt-5.6-terra".asBuildConfigString())
         buildConfigField("String", "AI_QUALITY_MODEL", "gpt-5.6-sol".asBuildConfigString())
+        buildConfigField(
+            "String",
+            "SOURCE_REPOSITORY_URL",
+            sourceRepositoryUrl.get().asBuildConfigString()
+        )
+        buildConfigField(
+            "String",
+            "SOURCE_ARCHIVE_URL",
+            sourceArchiveUrl.get().asBuildConfigString()
+        )
+        buildConfigField("String", "SOURCE_TAG", sourceTag.get().asBuildConfigString())
 
         @Suppress("UnstableApiUsage")
         externalNativeBuild {

@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhrase
 import org.fcitx.fcitx5.android.ui.main.AboutFragment
 import org.fcitx.fcitx5.android.ui.main.DeveloperFragment
+import org.fcitx.fcitx5.android.ui.main.LegalDocumentFragment
 import org.fcitx.fcitx5.android.ui.main.LicensesFragment
 import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.PluginFragment
@@ -40,6 +41,14 @@ import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
 import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor
 import org.fcitx.fcitx5.android.utils.parcelable
 import kotlin.reflect.typeOf
+
+@Parcelize
+@Serializable
+enum class LegalDocumentKind : Parcelable {
+    Notice,
+    ForkNotice,
+    Source
+}
 
 @Parcelize
 sealed class SettingsRoute : Parcelable {
@@ -103,6 +112,9 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object License : SettingsRoute()
+
+    @Serializable
+    data class LegalDocument(val kind: LegalDocumentKind) : SettingsRoute()
 
     @Serializable
     data object About : SettingsRoute()
@@ -251,6 +263,9 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<LicensesFragment, License> {
                 label = ctx.getString(R.string.license)
+            }
+            fragment<LegalDocumentFragment, LegalDocument> {
+                label = ctx.getString(R.string.legal_information)
             }
             fragment<AboutFragment, About> {
                 label = ctx.getString(R.string.about)

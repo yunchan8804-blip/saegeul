@@ -78,6 +78,15 @@
     <string name="license">License</string>
     <string name="open_source_licenses">Open source licenses</string>
     <string name="licenses_of_third_party_libraries">Licenses of third-party libraries</string>
+    <string name="bundled_license_texts" tools:ignore="MissingTranslation">Bundled full license texts</string>
+    <string name="legal_information" tools:ignore="MissingTranslation">Legal information</string>
+    <string name="fork_notice" tools:ignore="MissingTranslation">Independent fork notice</string>
+    <string name="fork_notice_summary" tools:ignore="MissingTranslation">Unofficial independent fork; no affiliation or warranty from the original project</string>
+    <string name="notice" tools:ignore="MissingTranslation">NOTICE</string>
+    <string name="notice_summary" tools:ignore="MissingTranslation">Copyright and third-party attribution notice</string>
+    <string name="source_code_summary" tools:ignore="MissingTranslation">Exact source tag, repository, and source archive for this build</string>
+    <string name="source_not_configured" tools:ignore="MissingTranslation">Not configured for this build; public release is blocked</string>
+    <string name="source_document" tools:ignore="MissingTranslation">SOURCE CODE FOR THIS BUILD\n\nRepository:\n%1$s\n\nExact source tag or ref:\n%2$s\n\nComplete source archive (including recursive submodules and build scripts):\n%3$s\n\nBuild Git hash:\n%4$s\n\nA public binary release must publish the complete source archive, its SHA-256 checksum, and its SBOM at the same download location under the exact same tag.</string>
     <string name="github_repo">GitHub repository</string>
     <string name="expanded_candidate_grid_span_count">Number of expanded candidate spans in grid style</string>
     <string name="no_config_options">Currently no configuration options are available</string>

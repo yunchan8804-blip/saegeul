@@ -14,6 +14,7 @@ import com.mikepenz.aboutlibraries.entity.License
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
+import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
 
 class LicensesFragment : PaddingPreferenceFragment() {
@@ -24,21 +25,39 @@ class LicensesFragment : PaddingPreferenceFragment() {
                 val jsonString = resources.openRawResource(R.raw.aboutlibraries)
                     .bufferedReader()
                     .use { it.readText() }
-                Libs.Builder()
+                val libs = Libs.Builder()
                     .withJson(jsonString)
                     .build()
-                    .libraries
-                    .sortedBy {
-                        if (it.tag == "native") it.uniqueId.uppercase() else it.uniqueId.lowercase()
-                    }
-                    .forEach {
-                        addPreference(
-                            title = "${it.uniqueId}:${it.artifactVersion}",
-                            summary = it.licenses.joinToString { l -> l.spdxId ?: l.name }
-                        ) {
-                            showLicenseDialog(it.uniqueId, it.licenses)
+                addCategory(R.string.bundled_license_texts) {
+                    libs.licenses
+                        .sortedBy { it.spdxId ?: it.name }
+                        .forEach { license ->
+                            addPreference(
+                                title = license.spdxId ?: license.name,
+                                summary = license.name
+                            ) {
+                                showLicenseContent(license)
+                            }
                         }
-                    }
+                }
+                addCategory(R.string.licenses_of_third_party_libraries) {
+                    libs.libraries
+                        .sortedBy {
+                            if (it.tag == "native") {
+                                it.uniqueId.uppercase()
+                            } else {
+                                it.uniqueId.lowercase()
+                            }
+                        }
+                        .forEach {
+                            addPreference(
+                                title = "${it.uniqueId}:${it.artifactVersion}",
+                                summary = it.licenses.joinToString { l -> l.spdxId ?: l.name }
+                            ) {
+                                showLicenseDialog(it.uniqueId, it.licenses)
+                            }
+                        }
+                }
             }
         }
     }
@@ -63,7 +82,14 @@ class LicensesFragment : PaddingPreferenceFragment() {
     }
 
     private fun showLicenseContent(license: License) {
-        if (license.url?.isNotBlank() == true) {
+        val bundledContent = license.licenseContent?.trim().orEmpty()
+        if (bundledContent.isNotEmpty()) {
+            AlertDialog.Builder(context)
+                .setTitle(license.spdxId ?: license.name)
+                .setMessage(bundledContent)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        } else if (license.url?.isNotBlank() == true) {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(license.url)))
         }
     }

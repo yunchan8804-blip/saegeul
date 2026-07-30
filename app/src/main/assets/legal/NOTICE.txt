@@ -1,0 +1,18 @@
+INDEPENDENT KOREAN IME FORK - NOTICE
+
+Copyright 2021-2026 Fcitx5 for Android Contributors
+Copyright 2026 Yun Chan
+
+This distribution contains software developed by the Fcitx project and
+Fcitx5 for Android contributors, together with independent modifications.
+Original copyright and license notices remain in their respective source
+files and in the bundled Open Source Licenses screen.
+
+This product also includes third-party Android, native, language-data, OCR,
+networking, and utility components. Their names, versions, copyright notices,
+and full license texts are bundled in the installed application under:
+
+About > Open Source Licenses
+
+This NOTICE supplements, and does not replace, the individual license and
+copyright notices shipped with each component.

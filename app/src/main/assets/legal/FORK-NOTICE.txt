@@ -1,0 +1,20 @@
+독립 포크 고지
+
+이 제품은 Fcitx5를 기반으로 한 비공식 독립 포크다.
+Fcitx 프로젝트 또는 Fcitx5 for Android 원 프로젝트와 제휴 관계가 없으며,
+그 프로젝트의 보증·승인·후원을 받지 않는다.
+
+Fcitx5와 관련 구성요소의 원 저작권과 오픈소스 라이선스 표시는 유지된다.
+독립 포크에서 추가하거나 수정한 부분의 책임은 독립 포크 배포자에게 있다.
+
+---
+
+INDEPENDENT FORK NOTICE
+
+This product is an unofficial, independent fork based on Fcitx5.
+It is not affiliated with, endorsed by, sponsored by, or warranted by the
+Fcitx project or the original Fcitx5 for Android project.
+
+Original copyright and open-source license notices for Fcitx5 and related
+components are retained. The independent fork distributor is solely
+responsible for its additions, modifications, and releases.

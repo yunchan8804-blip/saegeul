@@ -148,13 +148,15 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
         target.configure<AboutLibrariesExtension> {
             collect {
                 configPath.set(target.file("licenses").takeIf { it.exists() })
-                fetchRemoteLicense.set(false)
+                // License texts must be embedded into the generated AboutLibraries JSON so the
+                // installed APK remains compliant and useful without network access.
+                fetchRemoteLicense.set(true)
                 fetchRemoteFunding.set(false)
                 includePlatform.set(false)
             }
             export {
                 excludeFields.set(
-                    setOf("generated", "developers", "organization", "scm", "funding", "content")
+                    setOf("generated", "developers", "organization", "scm", "funding")
                 )
             }
         }

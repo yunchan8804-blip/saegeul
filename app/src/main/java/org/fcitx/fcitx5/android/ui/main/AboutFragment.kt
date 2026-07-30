@@ -10,6 +10,7 @@ import android.os.Bundle
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
+import org.fcitx.fcitx5.android.ui.main.settings.LegalDocumentKind
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.addCategory
@@ -30,11 +31,17 @@ class AboutFragment : PaddingPreferenceFragment() {
             ) {
                 navigateWithAnim(SettingsRoute.License)
             }
-            addPreference(R.string.source_code, R.string.github_repo) {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Const.githubRepo)))
+            addPreference(R.string.fork_notice, R.string.fork_notice_summary) {
+                navigateWithAnim(SettingsRoute.LegalDocument(LegalDocumentKind.ForkNotice))
+            }
+            addPreference(R.string.notice, R.string.notice_summary) {
+                navigateWithAnim(SettingsRoute.LegalDocument(LegalDocumentKind.Notice))
+            }
+            addPreference(R.string.source_code, R.string.source_code_summary) {
+                navigateWithAnim(SettingsRoute.LegalDocument(LegalDocumentKind.Source))
             }
             addPreference(R.string.license, Const.licenseSpdxId) {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Const.licenseUrl)))
+                navigateWithAnim(SettingsRoute.License)
             }
             addCategory(R.string.version) {
                 isIconSpaceReserved = false

@@ -118,6 +118,13 @@
 
 Release 의존성 라이선스의 `Unknown`과 누락은 모두 0이어야 한다.
 
+APK 산출물 검증:
+
+```powershell
+.\scripts\verify-release-licenses.ps1 `
+  -ApkPath .\app\build\outputs\apk\release\<release-apk>.apk
+```
+
 ## 6. 첫 독립 버전의 구성 경계
 
 첫 독립 버전은 한국어 제품에 필요하지 않은 다음 표면을 기본적으로 제외한다.
