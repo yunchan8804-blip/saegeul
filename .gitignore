@@ -102,3 +102,12 @@ lint/tmp/
 
 ### Kotlin ###
 .kotlin/
+
+# Local verification evidence and generated release output
+/.tmp-*
+/.codex-remote-attachments/
+/artifacts/
+*.idsig
+*.obj
+**/obj/
+/scripts/__pycache__/

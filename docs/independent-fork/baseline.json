@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "baselineTag": "fork-baseline-2026-07-30",
+  "upstream": {
+    "fetchUrl": "https://github.com/fcitx5-android/fcitx5-android.git",
+    "workBaseCommit": "0eb0e0699b0309b5f197dfb2db5fb92eabbb7dfa",
+    "headObservedAtBaseline": "bcb694384de8462302448cab6a3dfb1853ba5d5e",
+    "commitsAfterWorkBase": 15
+  },
+  "preservedWork": {
+    "originalHead": "be796c3905e8148e37402846a8c274cab232eccb",
+    "commitsAfterWorkBase": 84,
+    "commitsBehindStoredRemoteAtOriginalHead": 0,
+    "author": "Yun Chan <yunchan@twentyoz.kr>",
+    "workingTreeSnapshotCommit": "a3753391c65238dab920044cc7a4d358591d7ec3"
+  },
+  "releaseSourcePolicy": {
+    "includeTrackedRoot": true,
+    "includeRecursiveSubmoduleTrees": true,
+    "excludeLocalEvidence": true,
+    "requireSha256": true
+  }
+}

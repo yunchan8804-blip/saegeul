@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
 """Connect Fcitx Android to this computer's logged-in Codex or Claude Code CLI.
 
 By default the helper exposes a small PKCE gateway through Tailscale HTTPS and advertises it on

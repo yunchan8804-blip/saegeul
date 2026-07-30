@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
 param(
     [string]$TaskName = "Fcitx5 Android AI Companion"
 )

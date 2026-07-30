@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
 param(
     [string]$Revision = "a34aef73378c0992316861bbf13fc914ee7577d9",
     [string]$Output = "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/HangulKeyboardTables.generated.kt"

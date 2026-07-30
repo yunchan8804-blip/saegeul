@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
 param(
     [int]$GatewayPort = 9211,
     [int]$TailscaleHttpsPort = 9210

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
 param(
     [string]$SourcePath = (Join-Path $env:TEMP "nikl-korean-learning-vocab.txt"),
     [string]$OutputPath = (Join-Path $PSScriptRoot "..\plugin\hangul\src\main\cpp\fcitx5-hangul\data\completion.txt")

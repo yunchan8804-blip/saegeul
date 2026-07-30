@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
 """Generate the bundled Korean dictionary from a pinned Wiktextract snapshot.
 
 The output is a deterministic, sorted binary index. It contains only Korean-language
