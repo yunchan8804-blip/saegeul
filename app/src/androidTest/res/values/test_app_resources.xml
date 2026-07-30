@@ -6,9 +6,12 @@ SPDX-FileCopyrightText: Copyright 2026 Yun Chan
 <resources>
     <!--
     Build-type resValue aliases are also generated for the standalone instrumentation APK.
-    Give that APK local targets without copying the product launcher artwork into test outputs.
+    Give debug and release test APKs local targets without copying the product launcher artwork.
     -->
     <item name="ic_launcher_debug" type="mipmap">@android:drawable/sym_def_app_icon</item>
     <item name="ic_launcher_round_debug" type="mipmap">@android:drawable/sym_def_app_icon</item>
+    <item name="ic_launcher" type="mipmap">@android:drawable/sym_def_app_icon</item>
+    <item name="ic_launcher_round" type="mipmap">@android:drawable/sym_def_app_icon</item>
     <string name="app_name_debug" translatable="false">Release device verification</string>
+    <string name="app_name_release" translatable="false">Release device verification</string>
 </resources>
