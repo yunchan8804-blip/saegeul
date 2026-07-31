@@ -17,8 +17,8 @@
 | 제품명 | 새글 (Saegeul) |
 | Android applicationId | `net.chanpaca.saegeul` |
 | 한글 플러그인 applicationId | `net.chanpaca.saegeul.plugin.hangul` |
-| 소스 저장소 | <https://github.com/yunchan8804/saegeul> |
-| 릴리스와 대응 소스 | <https://github.com/yunchan8804/saegeul/releases> |
+| 소스 저장소 | <https://github.com/yunchan8804-blip/saegeul> |
+| 릴리스와 대응 소스 | <https://github.com/yunchan8804-blip/saegeul/releases> |
 | 개인정보처리방침 | <https://saegul.chanpaca.net/privacy/> |
 
 첫 독립 버전은 공개 앱 ID와 브랜드를 먼저 분리하고 내부 Kotlin namespace는
@@ -41,7 +41,7 @@
 
 ## 다운로드와 설치
 
-[GitHub Releases](https://github.com/yunchan8804/saegeul/releases)에서 같은
+[GitHub Releases](https://github.com/yunchan8804-blip/saegeul/releases)에서 같은
 릴리스 태그의 다음 파일을 함께 받을 수 있다.
 
 - 새글 메인 APK
@@ -68,7 +68,7 @@ API 키와 OAuth 토큰은 Android Keystore로 보호되는 백업 제외 저장
 ## 소스와 빌드
 
 ```shell
-git clone --recurse-submodules https://github.com/yunchan8804/saegeul.git
+git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git
 cd saegeul
 ./gradlew :app:assembleRelease :plugin:hangul:assembleRelease
 ```
@@ -104,5 +104,5 @@ APK 안의 `정보` 화면에서 다음 배포물을 직접 볼 수 있다.
 작업을 기반으로 한다. 이 링크는 원 프로젝트의 출처와 저작권을 밝히기 위한 것이며,
 새글의 공식 배포·지원·보증 채널을 뜻하지 않는다.
 
-버그와 기여 제안은 [새글 저장소의 Issues](https://github.com/yunchan8804/saegeul/issues)에
+버그와 기여 제안은 [새글 저장소의 Issues](https://github.com/yunchan8804-blip/saegeul/issues)에
 남기면 된다. 보안 문제나 개인정보 문의는 개인정보처리방침의 연락처를 사용한다.

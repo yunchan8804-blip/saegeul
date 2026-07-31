@@ -379,6 +379,6 @@ internal class OkHttpVoiceRealtimeConnector(
                 .build()
         }
         const val USER_AGENT =
-            "Saegeul-RealtimeDictation/0.1 (https://github.com/yunchan8804/saegeul)"
+            "Saegeul-RealtimeDictation/0.1 (https://github.com/yunchan8804-blip/saegeul)"
     }
 }

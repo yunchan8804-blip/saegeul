@@ -62,7 +62,7 @@ jobs:
             -ExpectedProductName "Saegeul" `
             -ExpectedKoreanProductName "새글" `
             -ExpectedApplicationId "net.chanpaca.saegeul" `
-            -ExpectedRepositoryUrl "https://github.com/yunchan8804/saegeul" `
+            -ExpectedRepositoryUrl "https://github.com/yunchan8804-blip/saegeul" `
             -ExpectedPrivacyPolicyUrl "https://saegul.chanpaca.net/privacy/"
       - name: Verify Play Data Safety contract
         shell: pwsh

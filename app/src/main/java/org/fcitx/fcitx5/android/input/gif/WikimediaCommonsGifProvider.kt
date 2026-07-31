@@ -149,7 +149,7 @@ class WikimediaCommonsGifProvider(
         private const val PROVIDER_ID = "wikimedia_commons"
         private const val API_ENDPOINT = "https://commons.wikimedia.org/w/api.php"
         private const val USER_AGENT =
-            "Saegeul-GifSearch/0.1 (https://github.com/yunchan8804/saegeul)"
+            "Saegeul-GifSearch/0.1 (https://github.com/yunchan8804-blip/saegeul)"
         private const val METADATA_FILTER =
             "LicenseShortName|LicenseUrl|Artist|Credit|AttributionRequired|Copyrighted|" +
                 "Restrictions|UsageTerms|ImageDescription"

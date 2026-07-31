@@ -229,7 +229,7 @@ class GiphyGifProvider(
         private const val READ_TIMEOUT_MILLIS = 20_000
         private val SAFE_RESPONSE_RATINGS = setOf("g")
         private const val USER_AGENT =
-            "Saegeul-GiphySearch/0.1 (https://github.com/yunchan8804/saegeul)"
+            "Saegeul-GiphySearch/0.1 (https://github.com/yunchan8804-blip/saegeul)"
 
         internal fun isOfficialAnalyticsUrl(value: String): Boolean = runCatching {
             val uri = URI(value)

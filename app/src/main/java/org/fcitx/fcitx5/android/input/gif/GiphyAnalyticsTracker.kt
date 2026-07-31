@@ -62,7 +62,7 @@ class GiphyAnalyticsTracker internal constructor(
         }
 
         const val USER_AGENT =
-            "Saegeul-GiphyAnalytics/0.1 (https://github.com/yunchan8804/saegeul)"
+            "Saegeul-GiphyAnalytics/0.1 (https://github.com/yunchan8804-blip/saegeul)"
     }
 }
 

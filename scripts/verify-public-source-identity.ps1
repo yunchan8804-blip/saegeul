@@ -127,7 +127,7 @@ function Test-PublicSourceIdentity {
         "official publisher bot" = "fcitx5-android-bot"
         "old public application ID" = "org.fcitx.fcitx5.android"
         "old independent application ID" = "kr.twentyoz.saegeul"
-        "old independent repository" = "github.com/yunchan8804-blip/saegeul"
+        "old independent repository" = "github.com/yunchan8804/saegeul"
         "old independent website" = "saegeul.twentyoz.kr"
     }
     $violations = [Collections.Generic.List[string]]::new()

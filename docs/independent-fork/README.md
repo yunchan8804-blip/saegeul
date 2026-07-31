@@ -30,7 +30,7 @@
 ## 2. Git 소유권 계약
 
 - `upstream`: 기존 `https://github.com/fcitx5-android/fcitx5-android.git`
-- `origin`: Yun Chan이 소유하는 `https://github.com/yunchan8804/saegeul.git`
+- `origin`: Yun Chan이 소유하는 `https://github.com/yunchan8804-blip/saegeul.git`
 - 제품 브랜치와 태그는 `origin`에만 게시한다.
 - `upstream`에서는 기존 프로젝트의 변경을 가져오기만 한다.
 - `fork-baseline-2026-07-30` 태그는 서명된 제품 릴리스가 아니라 현재 자산의
@@ -74,8 +74,8 @@ Git의 `origin`은 위 소유 저장소만 가리키고, `upstream`의 push URL�
 | 제품 slug | `DECIDED` | `saegeul` |
 | 소유 도메인 | `DECIDED` | `chanpaca.net`, 제품 호스트 `saegul.chanpaca.net` |
 | applicationId | `DECIDED` | `net.chanpaca.saegeul` |
-| 저장소 URL | `PENDING_TRANSFER` | `https://github.com/yunchan8804/saegeul` |
-| 소스 다운로드 URL | `DECIDED` | `https://github.com/yunchan8804/saegeul/releases` |
+| 저장소 URL | `DECIDED` | `https://github.com/yunchan8804-blip/saegeul` |
+| 소스 다운로드 URL | `DECIDED` | `https://github.com/yunchan8804-blip/saegeul/releases` |
 | 개인정보처리방침 URL | `DECIDED` | `https://saegul.chanpaca.net/privacy/` |
 | 저작권자 | `DECIDED` | 새 파일은 우선 `Yun Chan`, 별도 법인 양도 시 일괄 갱신 |
 

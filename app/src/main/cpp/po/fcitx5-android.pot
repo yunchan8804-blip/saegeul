@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: fcitx5-android\n"
-"Report-Msgid-Bugs-To: https://github.com/yunchan8804/saegeul/issues\n"
+"Report-Msgid-Bugs-To: https://github.com/yunchan8804-blip/saegeul/issues\n"
 "POT-Creation-Date: 2022-02-14 18:51+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"

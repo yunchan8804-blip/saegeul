@@ -110,7 +110,7 @@ jobs:
             -OutputDirectory $release
 
           $source = Get-Item (Join-Path $release "$($env:RELEASE_TAG)-source.tar.gz")
-          $sourceUrl = "https://github.com/yunchan8804/saegeul/releases/download/" +
+          $sourceUrl = "https://github.com/yunchan8804-blip/saegeul/releases/download/" +
             "$($env:RELEASE_TAG)/$($source.Name)"
           ./scripts/verify-release-bundle.ps1 `
             -ReleaseDirectory $release `
@@ -123,7 +123,7 @@ jobs:
             -SbomOutputPath (Join-Path $release "$($env:RELEASE_TAG)-sbom.cdx.json") `
             -ProductName "Saegeul" `
             -ApplicationId "net.chanpaca.saegeul" `
-            -SourceRepositoryUrl "https://github.com/yunchan8804/saegeul" `
+            -SourceRepositoryUrl "https://github.com/yunchan8804-blip/saegeul" `
             -PrivacyPolicyUrl "https://saegul.chanpaca.net/privacy/" `
             -SourceArchiveUrl $sourceUrl `
             -SigningCertificateSha256 "3B:08:8B:5C:6A:69:E3:6C:62:80:2E:F5:D4:33:BD:9D:84:5B:8E:98:09:27:8E:13:13:36:A5:03:DA:90:1A:66"

@@ -10,7 +10,7 @@ object ProductIdentity {
     const val slug = "saegeul"
     const val applicationId = "net.chanpaca.saegeul"
     const val websiteUrl = "https://saegul.chanpaca.net"
-    const val repositoryUrl = "https://github.com/yunchan8804/saegeul"
+    const val repositoryUrl = "https://github.com/yunchan8804-blip/saegeul"
     const val privacyPolicyUrl = "$websiteUrl/privacy/"
     const val faqUrl = "$websiteUrl/faq/"
 }

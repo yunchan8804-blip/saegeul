@@ -154,7 +154,7 @@ function Test-ApkRuntimeLinks {
         "https://fcitx5-android.github.io" = $false
         "https://jenkins.fcitx-im.org/job/android/job/fcitx5-android" = $false
         "https://play.google.com/store/apps/details?id=org.fcitx.fcitx5.android" = $false
-        "https://github.com/yunchan8804-blip/saegeul" = $false
+        "https://github.com/yunchan8804/saegeul" = $false
         "https://saegeul.twentyoz.kr" = $false
     }
 
