@@ -129,14 +129,19 @@ function Get-SigningCertificateSha256 {
     if ($LASTEXITCODE -ne 0) {
         throw "apksigner verification failed for '$ApkPath':`n$($output -join "`n")"
     }
-    $digestLine = $output |
-        Where-Object { $_ -match "^Signer #1 certificate SHA-256 digest:\s*(.+)$" } |
-        Select-Object -First 1
-    if ($null -eq $digestLine) {
+    $digestMatch = [regex]::Match(
+        ($output -join "`n"),
+        "certificate\s+SHA-256\s+digest:\s*([0-9a-fA-F:]{64,95})",
+        [Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    if (-not $digestMatch.Success) {
         throw "Unable to read the signing certificate digest from '$ApkPath'."
     }
-    [void]($digestLine -match "^Signer #1 certificate SHA-256 digest:\s*(.+)$")
-    return ($Matches[1] -replace ":", "").Trim().ToLowerInvariant()
+    $digest = ($digestMatch.Groups[1].Value -replace ":", "").ToLowerInvariant()
+    if ($digest -notmatch "^[0-9a-f]{64}$") {
+        throw "The signing certificate digest from '$ApkPath' is not SHA-256."
+    }
+    return $digest
 }
 
 function Get-ApkClassInventory {
