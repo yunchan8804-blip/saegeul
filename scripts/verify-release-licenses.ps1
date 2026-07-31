@@ -52,7 +52,8 @@ try {
         } else {
             throw "ANDROID_SDK_ROOT or ANDROID_HOME is required to resolve optimized resources."
         }
-        $apkAnalyzer = Join-Path $sdkRoot "cmdline-tools/latest/bin/apkanalyzer.bat"
+        $apkAnalyzerName = if ($IsWindows) { "apkanalyzer.bat" } else { "apkanalyzer" }
+        $apkAnalyzer = Join-Path $sdkRoot "cmdline-tools/latest/bin/$apkAnalyzerName"
         if (-not (Test-Path -LiteralPath $apkAnalyzer -PathType Leaf)) {
             throw "apkanalyzer was not found at '$apkAnalyzer'."
         }
