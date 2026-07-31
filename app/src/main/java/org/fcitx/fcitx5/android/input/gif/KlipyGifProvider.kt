@@ -247,7 +247,7 @@ class KlipyGifProvider(
         const val CANONICAL_ROOT = "https://klipy.com/gifs"
         const val KLIPY_TERMS = "https://klipy.com/support/api-terms"
         const val USER_AGENT =
-            "Saegeul-GifSearch/0.3 (https://github.com/yunchan8804-blip/saegeul)"
+            "Saegeul-GifSearch/0.3 (https://github.com/yunchan8804/saegeul)"
     }
 }
 

@@ -10,7 +10,7 @@ param(
     [string]$HangulApkPath,
 
     [Parameter(Mandatory = $true)]
-    [ValidatePattern("^kr\.[a-z0-9]+(?:\.[a-z0-9]+)+$")]
+    [ValidatePattern("^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*){2,}$")]
     [string]$ExpectedApplicationId,
 
     [Parameter(Mandatory = $true)]
@@ -154,6 +154,8 @@ function Test-ApkRuntimeLinks {
         "https://fcitx5-android.github.io" = $false
         "https://jenkins.fcitx-im.org/job/android/job/fcitx5-android" = $false
         "https://play.google.com/store/apps/details?id=org.fcitx.fcitx5.android" = $false
+        "https://github.com/yunchan8804-blip/saegeul" = $false
+        "https://saegeul.twentyoz.kr" = $false
     }
 
     $archive = [IO.Compression.ZipFile]::OpenRead($ApkPath)
@@ -288,7 +290,10 @@ if ($foreignAuthorities.Count -ne 0) {
     throw "Provider authorities outside the independent application ID found: $($foreignAuthorities -join ', ')."
 }
 
-$oldPublicPrefix = "org.fcitx.fcitx5.android"
+$oldPublicPrefixes = @(
+    "org.fcitx.fcitx5.android",
+    "kr.twentyoz.saegeul"
+)
 $publicValues = @(
     $mainManifest.Permissions
     $mainManifest.Actions
@@ -305,8 +310,15 @@ $publicValues = @(
 $oldPublicValues = @(
     $publicValues |
         Where-Object {
-            -not [string]::IsNullOrWhiteSpace($_) -and
-            $_.StartsWith($oldPublicPrefix, [StringComparison]::Ordinal)
+            if ([string]::IsNullOrWhiteSpace($_)) {
+                return $false
+            }
+            $value = $_
+            return $null -ne (
+                $oldPublicPrefixes |
+                    Where-Object { $value.StartsWith($_, [StringComparison]::Ordinal) } |
+                    Select-Object -First 1
+            )
         }
 )
 if ($oldPublicValues.Count -ne 0) {

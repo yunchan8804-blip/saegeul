@@ -40,7 +40,7 @@
 	url = https://github.com/rime/rime-stroke.git
 [submodule "plugin/hangul/src/main/cpp/fcitx5-hangul"]
 	path = plugin/hangul/src/main/cpp/fcitx5-hangul
-	url = https://github.com/yunchan8804-blip/fcitx5-hangul.git
+	url = https://github.com/yunchan8804/fcitx5-hangul.git
 [submodule "plugin/chewing/src/main/cpp/fcitx5-chewing"]
 	path = plugin/chewing/src/main/cpp/fcitx5-chewing
 	url = https://github.com/fcitx/fcitx5-chewing.git

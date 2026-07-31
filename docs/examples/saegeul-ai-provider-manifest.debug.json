@@ -13,7 +13,7 @@
       "offline_access",
       "ai.invoke"
     ],
-    "redirect_uri": "kr.twentyoz.saegeul.debug.oauth:/callback"
+    "redirect_uri": "net.chanpaca.saegeul.debug.oauth:/callback"
   },
   "models": {
     "fast": "fast-model",

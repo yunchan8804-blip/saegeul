@@ -1,0 +1,143 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
+name: Saegeul user release candidate
+
+on:
+  push:
+    tags:
+      - "saegeul-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated Saegeul tag to build
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: user-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build-user-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      SIGN_KEY_BASE64: ${{ secrets.SAEGEUL_UPLOAD_KEYSTORE_BASE64 }}
+      SIGN_KEY_PWD: ${{ secrets.SAEGEUL_UPLOAD_KEY_PASSWORD }}
+      SIGN_KEY_ALIAS: ${{ secrets.SAEGEUL_UPLOAD_KEY_ALIAS }}
+    steps:
+      - name: Fetch exact release source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Verify annotated tag
+        shell: bash
+        run: |
+          test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+
+      - name: Require signing secrets
+        shell: bash
+        run: |
+          test -n "$SIGN_KEY_BASE64"
+          test -n "$SIGN_KEY_PWD"
+          test -n "$SIGN_KEY_ALIAS"
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android
+        uses: android-actions/setup-android@v3
+
+      - name: Install native build dependencies
+        shell: bash
+        run: |
+          sdkmanager --install "cmake;3.31.6"
+          sudo apt-get update
+          sudo apt-get install -y extra-cmake-modules gettext
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Test developer contract
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --console=plain
+
+      - name: Build signed user APK AAB and Hangul plugin
+        shell: bash
+        run: |
+          version="${RELEASE_TAG#saegeul-v}"
+          ./gradlew \
+            :app:assembleRelease \
+            :app:bundleRelease \
+            :plugin:hangul:assembleRelease \
+            "-PbuildVersionName=$version" \
+            "-PSOURCE_TAG=$RELEASE_TAG" \
+            --no-daemon \
+            --console=plain
+
+      - name: Stage and verify release bundle
+        shell: pwsh
+        run: |
+          $release = Join-Path $PWD "release"
+          New-Item -ItemType Directory -Path $release -Force | Out-Null
+
+          $mainApk = Get-ChildItem app/build/outputs/apk/release/*.apk
+          $mainAab = Get-ChildItem app/build/outputs/bundle/release/*.aab
+          $hangulApk = Get-ChildItem plugin/hangul/build/outputs/apk/release/*.apk
+          $metadata = Get-Item app/build/outputs/apk/release/build-metadata.json
+          if (
+            @($mainApk).Count -ne 1 -or
+            @($mainAab).Count -ne 1 -or
+            @($hangulApk).Count -ne 1
+          ) {
+            throw "Expected exactly one app APK, app AAB, and Hangul APK."
+          }
+          Copy-Item $mainApk.FullName,$mainAab.FullName,$hangulApk.FullName,$metadata.FullName $release
+
+          ./scripts/create-source-archive.ps1 `
+            -Ref $env:RELEASE_TAG `
+            -OutputDirectory $release
+
+          $source = Get-Item (Join-Path $release "$($env:RELEASE_TAG)-source.tar.gz")
+          $sourceUrl = "https://github.com/yunchan8804/saegeul/releases/download/" +
+            "$($env:RELEASE_TAG)/$($source.Name)"
+          ./scripts/verify-release-bundle.ps1 `
+            -ReleaseDirectory $release `
+            -MainApkPath (Join-Path $release $mainApk.Name) `
+            -MainAabPath (Join-Path $release $mainAab.Name) `
+            -HangulApkPath (Join-Path $release $hangulApk.Name) `
+            -BuildMetadataPath (Join-Path $release $metadata.Name) `
+            -SourceArchivePath $source.FullName `
+            -SourceTag $env:RELEASE_TAG `
+            -SbomOutputPath (Join-Path $release "$($env:RELEASE_TAG)-sbom.cdx.json") `
+            -ProductName "Saegeul" `
+            -ApplicationId "net.chanpaca.saegeul" `
+            -SourceRepositoryUrl "https://github.com/yunchan8804/saegeul" `
+            -PrivacyPolicyUrl "https://saegul.chanpaca.net/privacy/" `
+            -SourceArchiveUrl $sourceUrl `
+            -SigningCertificateSha256 "3B:08:8B:5C:6A:69:E3:6C:62:80:2E:F5:D4:33:BD:9D:84:5B:8E:98:09:27:8E:13:13:36:A5:03:DA:90:1A:66"
+
+          Get-ChildItem $release -File |
+            Where-Object Name -ne "SHA256SUMS" |
+            ForEach-Object {
+              "$((Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant())  $($_.Name)"
+            } | Set-Content (Join-Path $release "SHA256SUMS") -Encoding utf8NoBOM
+
+      - name: Upload verified user release candidate
+        uses: actions/upload-artifact@v6
+        with:
+          name: user-release-${{ env.RELEASE_TAG }}
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

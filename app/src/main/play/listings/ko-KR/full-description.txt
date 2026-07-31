@@ -17,5 +17,5 @@ Fcitx5와 libhangul을 기반으로 한글을 조합하며, 화면 키보드, �
 Fcitx5 기반의 비공식 독립 포크이며 Fcitx 프로젝트 또는 원 Fcitx5 for Android
 프로젝트와 제휴 관계가 없고 보증·승인·후원을 받지 않는다.
 
-개인정보처리방침: https://saegeul.twentyoz.kr/privacy/
-소스 코드: https://github.com/yunchan8804-blip/saegeul
+개인정보처리방침: https://saegul.chanpaca.net/privacy/
+소스 코드: https://github.com/yunchan8804/saegeul

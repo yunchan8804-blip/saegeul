@@ -16,7 +16,7 @@ param(
     [string]$ExpectedKoreanProductName,
 
     [Parameter(Mandatory = $true)]
-    [ValidatePattern("^kr\.[a-z0-9]+(?:\.[a-z0-9]+)+$")]
+    [ValidatePattern("^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*){2,}$")]
     [string]$ExpectedApplicationId,
 
     [Parameter(Mandatory = $true)]
@@ -126,6 +126,9 @@ function Test-PublicSourceIdentity {
         "official Jenkins distribution" = "https://jenkins.fcitx-im.org/job/android/job/fcitx5-android"
         "official publisher bot" = "fcitx5-android-bot"
         "old public application ID" = "org.fcitx.fcitx5.android"
+        "old independent application ID" = "kr.twentyoz.saegeul"
+        "old independent repository" = "github.com/yunchan8804-blip/saegeul"
+        "old independent website" = "saegeul.twentyoz.kr"
     }
     $violations = [Collections.Generic.List[string]]::new()
     foreach ($path in $publicSurfacePaths | Sort-Object -Unique) {

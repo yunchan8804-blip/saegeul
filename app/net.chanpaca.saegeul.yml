@@ -2,14 +2,14 @@ Categories:
   - System
 License: LGPL-2.1-or-later
 AuthorName: Yun Chan
-WebSite: https://saegeul.twentyoz.kr
-SourceCode: https://github.com/yunchan8804-blip/saegeul
-IssueTracker: https://github.com/yunchan8804-blip/saegeul/issues
+WebSite: https://saegul.chanpaca.net
+SourceCode: https://github.com/yunchan8804/saegeul
+IssueTracker: https://github.com/yunchan8804/saegeul/issues
 
 AutoName: Saegeul
 
 RepoType: git
-Repo: https://github.com/yunchan8804-blip/saegeul
+Repo: https://github.com/yunchan8804/saegeul
 
 Builds:
   - versionName: placeholder
@@ -25,7 +25,7 @@ Builds:
         python-is-python3
     gradle:
       - yes
-    binary: https://github.com/yunchan8804-blip/saegeul/releases/download/%v/kr.twentyoz.saegeul-%v-%abi-release.apk
+    binary: https://github.com/yunchan8804/saegeul/releases/download/%v/net.chanpaca.saegeul-%v-%abi-release.apk
     srclibs:
       - fcitx5-android-prebuilder@master
     rm:

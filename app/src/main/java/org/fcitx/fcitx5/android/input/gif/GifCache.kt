@@ -126,7 +126,7 @@ class GifCache(private val context: Context) {
             size == UNKNOWN_SIZE || size in 1..MAX_BYTES
 
         private const val USER_AGENT =
-            "Saegeul-GifSearch/0.2 (https://github.com/yunchan8804-blip/saegeul)"
+            "Saegeul-GifSearch/0.2 (https://github.com/yunchan8804/saegeul)"
     }
 }
 

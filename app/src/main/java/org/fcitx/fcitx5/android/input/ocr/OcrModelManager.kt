@@ -100,7 +100,7 @@ class HttpsOcrModelTransport : OcrModelTransport {
 
     private companion object {
         const val USER_AGENT =
-            "Saegeul-KoreanOCR/0.1 (https://github.com/yunchan8804-blip/saegeul)"
+            "Saegeul-KoreanOCR/0.1 (https://github.com/yunchan8804/saegeul)"
     }
 }
 

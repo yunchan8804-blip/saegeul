@@ -30,7 +30,7 @@
 ## 2. Git 소유권 계약
 
 - `upstream`: 기존 `https://github.com/fcitx5-android/fcitx5-android.git`
-- `origin`: Yun Chan이 소유하는 `https://github.com/yunchan8804-blip/saegeul.git`
+- `origin`: Yun Chan이 소유하는 `https://github.com/yunchan8804/saegeul.git`
 - 제품 브랜치와 태그는 `origin`에만 게시한다.
 - `upstream`에서는 기존 프로젝트의 변경을 가져오기만 한다.
 - `fork-baseline-2026-07-30` 태그는 서명된 제품 릴리스가 아니라 현재 자산의
@@ -72,11 +72,11 @@ Git의 `origin`은 위 소유 저장소만 가리키고, `upstream`의 push URL�
 | --- | --- | --- |
 | 제품명 | `DECIDED` | `새글 (Saegeul)` |
 | 제품 slug | `DECIDED` | `saegeul` |
-| 소유 도메인 | `DECIDED` | `twentyoz.kr`, 제품 호스트 `saegeul.twentyoz.kr` |
-| applicationId | `DECIDED` | `kr.twentyoz.saegeul` |
-| 저장소 URL | `LIVE` | `https://github.com/yunchan8804-blip/saegeul` |
-| 소스 다운로드 URL | `DECIDED` | `https://github.com/yunchan8804-blip/saegeul/releases` |
-| 개인정보처리방침 URL | `DECIDED` | `https://saegeul.twentyoz.kr/privacy/` |
+| 소유 도메인 | `DECIDED` | `chanpaca.net`, 제품 호스트 `saegul.chanpaca.net` |
+| applicationId | `DECIDED` | `net.chanpaca.saegeul` |
+| 저장소 URL | `PENDING_TRANSFER` | `https://github.com/yunchan8804/saegeul` |
+| 소스 다운로드 URL | `DECIDED` | `https://github.com/yunchan8804/saegeul/releases` |
+| 개인정보처리방침 URL | `DECIDED` | `https://saegul.chanpaca.net/privacy/` |
 | 저작권자 | `DECIDED` | 새 파일은 우선 `Yun Chan`, 별도 법인 양도 시 일괄 갱신 |
 
 이름·저장소·일반 웹 검색에서 같은 분야의 명백한 충돌은 발견하지 못했지만 이는
@@ -93,6 +93,18 @@ Git의 `origin`은 위 소유 저장소만 가리키고, `upstream`의 push URL�
 - IPC signature permission
 - 플러그인 manifest action, metadata key, 대상 package ID
 - 앱 이름, 아이콘, 저장소·도메인·스토어 링크
+
+Release는 `user` 배포 채널이며 저수준 엔진 설정, 애드온 목록, 외부 플러그인
+관리, 개발자 메뉴를 사용자 화면에서 숨긴다. Debug는 `developer` 채널이며
+`net.chanpaca.saegeul.debug` 패키지와 별도 아이콘으로 이 진단 표면을 모두
+제공한다. 두 채널의 노출 정책은 `BuildConfig.SHOW_DEVELOPER_SURFACES`와
+`ProductSurfacePolicy`의 단일 계약을 사용하고 Debug/Release 단위 테스트를 모두
+통과해야 한다.
+
+새 데이터 영역의 첫 실행에만 `hangul`과 `keyboard-us`를 함께 활성화한다.
+사용자가 이후 입력기 목록을 바꾼 경우에는 다시 강제하지 않는다. 공개 사용자판은
+이 기본값과 별개로 한글 플러그인 APK가 설치·검색됐는지 릴리스 기기 게이트에서
+확인한다.
 
 데이터 이전은 기존 공식 앱의 저장소를 몰래 읽지 않는다. 사용자가 명시적으로
 내보내고 새 앱에서 가져오는 버전 있는 이전 파일을 기본 경로로 삼는다. 민감한
@@ -215,7 +227,7 @@ provider authority, 플러그인 action/metadata, 공식 앱의 배포·스토�
 
 실기기 게이트는 공식 `bundletool` JAR과 같은 빌드의 APK/AAB/한글 플러그인 APK/
 release 대상 instrumentation APK를 사용한다. instrumentation APK는 메인 APK와 같은
-인증서로 서명되고 `kr.twentyoz.saegeul`을 대상으로 해야 한다. AAB 설치와 APK 재설치 후
+인증서로 서명되고 `net.chanpaca.saegeul`을 대상으로 해야 한다. AAB 설치와 APK 재설치 후
 Android 패키지 관리자의 플러그인 action 검색, Fcitx 엔진의 `hangul` 검색, 두벌식 `가`
 조합·확정, 구 `org.fcitx.fcitx5.android` 내보내기 데이터의 설정 이전과 클립보드 제외를
 검사한다.
@@ -280,5 +292,5 @@ bundletool 실행 중에만 사용자 임시 디렉터리에 평문을 만들고
 [`privacy-data-safety.md`](privacy-data-safety.md)를 단일 기준으로 사용한다. 현재
 AI·음성·GIF 고지, 클립보드 기본 off·백업 제외, 앱 내부 개인정보·데이터 화면은
 구현됐다. 게시자는 `Yun Chan`, 공개 URL은
-`https://saegeul.twentyoz.kr/privacy/`로 결정했으며, DNS·정책 페이지 공개,
+`https://saegul.chanpaca.net/privacy/`로 결정했으며, DNS·정책 페이지 공개,
 공급자 계약 확인과 Play Console 제출은 배포 `GATE`로 남아 있다.
