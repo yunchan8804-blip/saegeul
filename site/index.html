@@ -3,84 +3,184 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="새글(Saegeul)은 Fcitx5와 libhangul을 기반으로 한 독립 오픈소스 Android 한국어 키보드다.">
-  <meta name="theme-color" content="#101827">
-  <title>새글 — 독립 오픈소스 한국어 키보드</title>
+  <meta name="description" content="한글부터 AI 글쓰기, 음성, GIF까지. 새글은 쓰는 곳 어디서나 바로 만나는 Android 키보드다.">
+  <meta name="theme-color" content="#07111e">
+  <meta property="og:title" content="새글 | AI를 품은 안드로이드 키보드">
+  <meta property="og:description" content="쓰는 곳 어디서나, 더 빠르게 생각하고 더 자연스럽게 말한다.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://saegul.chanpaca.net/assets/keyboard-glass.webp?v=20260731-water1">
+  <title>새글 | AI를 품은 안드로이드 키보드</title>
   <link rel="icon" href="/assets/saegeul-icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="preload" href="/assets/keyboard-glass.webp?v=20260731-water1" as="image" type="image/webp" fetchpriority="high">
+  <link rel="stylesheet" href="/promo.css">
+  <script src="/promo.js" defer></script>
 </head>
-<body>
+<body class="promo-page">
+  <svg class="filter-bank" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs id="liquid-filter-defs"></defs>
+  </svg>
+
   <header class="site-header">
-    <nav class="nav shell" aria-label="주요 메뉴">
-      <a class="brand" href="/" aria-label="새글 홈">
-        <img src="/assets/saegeul-icon.svg" alt="">
+    <nav class="glass-nav shell liquid-glass liquid-glass-refract" aria-label="주요 메뉴">
+      <a class="brand" href="/" aria-label="새글 홈" aria-current="page">
+        <img src="/assets/saegeul-icon.svg" width="40" height="40" alt="">
         <span>새글 <small>SAEGEUL</small></span>
       </a>
       <div class="nav-links">
         <a href="/privacy/">개인정보</a>
         <a href="/source/">소스·라이선스</a>
         <a href="/faq/">도움말</a>
-        <a href="https://github.com/yunchan8804-blip/saegeul">GitHub</a>
+        <a href="https://github.com/yunchan8804-blip/saegeul" rel="noreferrer">GitHub</a>
       </div>
     </nav>
   </header>
 
   <main>
-    <section class="hero">
-      <div class="hero-grid shell">
-        <div>
-          <p class="eyebrow">Korean input, independently written</p>
-          <h1>입력은 가까이.<br>선택은 분명히.</h1>
-          <p class="hero-copy">새글은 한글 조합을 기기 안에서 처리하고, 클립보드·음성·AI 같은 선택 기능은 사용자가 직접 켜고 실행할 때만 작동하는 Android 키보드다.</p>
-          <div class="actions">
-            <a class="button primary" href="https://github.com/yunchan8804-blip/saegeul/releases">릴리스 보기</a>
-            <a class="button" href="/privacy/">데이터 처리 확인</a>
+    <section class="hero story-scene" aria-labelledby="hero-title">
+      <div class="story-frame">
+        <div class="scene-media" aria-hidden="true">
+          <img src="/assets/keyboard-glass.webp?v=20260731-water1" width="1672" height="941" alt="" fetchpriority="high">
+        </div>
+        <div class="scene-shade"></div>
+        <div class="hero-layout shell">
+          <div class="hero-copy">
+            <p class="eyebrow">새글 안드로이드 키보드</p>
+            <h1 id="hero-title">AI를 품은<br>키보드.</h1>
+            <p class="hero-lede">한글부터 답장, 번역, 음성까지. 쓰는 곳 어디서나 바로.</p>
+            <div class="actions">
+              <a class="button button-primary" href="https://github.com/yunchan8804-blip/saegeul/releases">새글 내려받기</a>
+              <a class="button button-ghost liquid-glass liquid-glass-refract" href="#ai">무엇이 다른지 보기</a>
+            </div>
           </div>
         </div>
-        <aside class="identity-card" aria-label="제품 공개 식별자">
-          <dl>
-            <div><dt>Product</dt><dd>새글 / Saegeul</dd></div>
-            <div><dt>Package</dt><dd class="code">kr.twentyoz.saegeul</dd></div>
-            <div><dt>License</dt><dd>LGPL-2.1-or-later</dd></div>
-            <div><dt>Publisher</dt><dd>Yun Chan</dd></div>
-          </dl>
-        </aside>
       </div>
     </section>
 
-    <section>
-      <div class="section-grid shell">
-        <div class="section-label">Product boundary</div>
-        <div class="section-body">
-          <h2>한국어에 필요한 것만 첫 화면에 둔다.</h2>
-          <p class="lede">첫 독립 버전은 Fcitx5 핵심과 libhangul 한글 엔진에 집중한다. 중국어 애드온과 사용하지 않는 언어 플러그인은 제품 APK에서 제외한다.</p>
-          <ul class="feature-list">
-            <li><strong>한글 입력</strong><span>조합 중인 글과 일반 키 입력은 개발자 서버가 아니라 기기 안의 Fcitx5·libhangul에서 처리한다.</span></li>
-            <li><strong>선택형 도구</strong><span>클립보드는 새 설치에서 꺼져 있다. 음성·OCR·GIF·AI는 기능별 고지와 사용자 동작 뒤에만 실행된다.</span></li>
-            <li><strong>독립 식별자</strong><span>새 패키지, OAuth callback, Provider authority, IPC 권한, 플러그인 action과 서명을 사용한다.</span></li>
-            <li><strong>검증 가능한 배포</strong><span>바이너리와 같은 태그의 전체 소스, 서브모듈 해시, 빌드 스크립트, SBOM과 라이선스 전문을 함께 제공한다.</span></li>
-          </ul>
+    <section class="everywhere full-panel" aria-labelledby="everywhere-title">
+      <div class="shell type-stage">
+        <h2 id="everywhere-title">무슨 앱이든,<br><span>바로 쓴다.</span></h2>
+        <p>메시지와 메모, 검색과 댓글까지. 키보드가 열리는 모든 곳이 새글의 자리다.</p>
+      </div>
+    </section>
+
+    <section class="ai-scene story-scene" id="ai" aria-labelledby="ai-title">
+      <div class="story-frame">
+        <div class="scene-media" aria-hidden="true">
+          <img src="/assets/ai-flow.webp?v=20260731-water1" width="1672" height="941" alt="">
+        </div>
+        <div class="scene-shade scene-shade-wide"></div>
+        <div class="scene-copy shell">
+          <span class="refraction-trace ai-refraction-trace" aria-hidden="true"></span>
+          <div class="scene-copy-panel liquid-glass liquid-glass-refract">
+            <p class="scene-kicker">키보드 안의 AI</p>
+            <h2 id="ai-title">부탁하면,<br>문장이 된다.</h2>
+            <p>답장을 쓰고, 문장을 다듬고, 번역하고, 요약한다.</p>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="notice">
-      <div class="section-grid shell">
-        <div class="section-label">Independent fork notice</div>
-        <div class="section-body">
-          <h2>기반은 밝히고, 관계는 분리한다.</h2>
-          <p class="lede"><strong>새글은 Fcitx5를 기반으로 한 비공식 독립 포크다.</strong> Fcitx 프로젝트 또는 원 Fcitx5 for Android 프로젝트와 제휴 관계가 없으며, 그 프로젝트의 보증·승인·후원을 받지 않는다.</p>
-          <p>원 저작권과 오픈소스 라이선스 표시는 유지한다. 독립 포크에서 추가·수정한 부분과 릴리스에 대한 책임은 Yun Chan에게 있다.</p>
+    <section class="connect-scene split-story" id="connect" aria-labelledby="connect-title">
+      <div class="connect-media" aria-hidden="true">
+        <img src="/assets/computer-link.webp?v=20260731-water1" width="1672" height="941" alt="">
+      </div>
+      <div class="connect-content">
+        <div class="connect-copy-wrap">
+          <span class="refraction-trace connect-refraction-trace" aria-hidden="true"></span>
+          <div class="connect-copy liquid-glass liquid-glass-refract">
+            <p class="scene-kicker">내 컴퓨터와 연결</p>
+            <h2 id="connect-title">추가 API 요금,<br><strong>0원.</strong></h2>
+            <p>로그인된 Codex 또는 Claude를 새글에 연결해 쓴다.</p>
+            <a class="text-link" href="/faq/">연결 방법 보기</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="control-section full-panel" aria-labelledby="control-title">
+      <div class="control-glow" aria-hidden="true"></div>
+      <div class="shell control-layout">
+        <div class="control-heading">
+          <p class="scene-kicker">내가 정하는 연결</p>
+          <h2 id="control-title">평소 입력은<br>내 폰에서.</h2>
+        </div>
+        <div class="control-stack">
+          <div class="control-refraction-field" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <article class="control-line liquid-glass liquid-glass-refract">
+            <strong>한글 입력</strong>
+            <span>기기 안에서 바로</span>
+          </article>
+          <article class="control-line liquid-glass liquid-glass-refract">
+            <strong>AI와 음성</strong>
+            <span>내가 실행할 때만</span>
+          </article>
+          <article class="control-line liquid-glass liquid-glass-refract">
+            <strong>연결과 기록</strong>
+            <span>내가 보고 지우게</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="more-section" aria-labelledby="more-title">
+      <div class="more-backdrop" aria-hidden="true"></div>
+      <div class="shell more-layout">
+        <h2 id="more-title" class="sr-only">키보드 안에서 더 많은 일을 한다</h2>
+        <div class="verb verb-one">
+          <span>음성 입력</span>
+          <strong>말하고.</strong>
+        </div>
+        <div class="verb verb-two">
+          <span>GIF 검색</span>
+          <strong>찾고.</strong>
+        </div>
+        <div class="verb verb-three">
+          <span>클립보드</span>
+          <strong>보낸다.</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta full-panel" aria-labelledby="cta-title">
+      <div class="final-media" aria-hidden="true"></div>
+      <div class="shell final-layout">
+        <span class="refraction-trace final-refraction-trace" aria-hidden="true"></span>
+        <div class="final-copy liquid-glass liquid-glass-refract">
+          <h2 id="cta-title">이제,<br>새글로 쓴다.</h2>
+          <p>Android에서 새글을 만나보자.</p>
+          <div class="actions">
+            <a class="button button-primary" href="https://github.com/yunchan8804-blip/saegeul/releases">새글 내려받기</a>
+            <a class="button button-ghost" href="/faq/">설치 도움말</a>
+          </div>
         </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="footer-grid shell">
-      <span>© 2026 Yun Chan · Saegeul is open source.</span>
-      <span><a href="/privacy/">개인정보처리방침</a> · <a href="/source/">소스와 라이선스</a> · <a href="mailto:yunchan@twentyoz.kr">문의</a></span>
+    <div class="shell footer-grid">
+      <div class="footer-brand">
+        <img src="/assets/saegeul-icon.svg" width="46" height="46" alt="">
+        <div><strong>새글</strong><span>AI를 품은 안드로이드 키보드</span></div>
+      </div>
+      <div class="footer-links">
+        <a href="/privacy/">개인정보처리방침</a>
+        <a href="/source/">소스와 라이선스</a>
+        <a href="mailto:yunchan@chanpaca.net">문의</a>
+      </div>
     </div>
+    <details class="legal-note shell">
+      <summary>독립 프로젝트 안내</summary>
+      <div>
+        <p><strong>새글은 Fcitx5를 기반으로 한 비공식 독립 포크다.</strong> Fcitx 프로젝트 또는 원 Fcitx5 for Android 프로젝트와 제휴 관계가 없으며, 그 프로젝트의 보증·승인·후원을 받지 않는다.</p>
+        <p>원 저작권과 오픈소스 라이선스 표시는 유지한다. 독립 포크에서 추가·수정한 부분과 릴리스에 대한 책임은 Yun Chan에게 있다.</p>
+      </div>
+    </details>
+    <div class="shell copyright">© 2026 Yun Chan. Saegeul is open source.</div>
   </footer>
 </body>
 </html>

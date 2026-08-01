@@ -19,5 +19,5 @@ is an unofficial independent fork based on Fcitx5. It is not affiliated with,
 endorsed by, sponsored by, or warranted by the Fcitx project or the original
 Fcitx5 for Android project.
 
-Privacy policy: https://saegeul.twentyoz.kr/privacy/
+Privacy policy: https://saegul.chanpaca.net/privacy/
 Source: https://github.com/yunchan8804-blip/saegeul

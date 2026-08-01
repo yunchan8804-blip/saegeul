@@ -10,7 +10,7 @@ param(
     [string]$HangulApkPath,
 
     [Parameter(Mandatory = $true)]
-    [ValidatePattern("^kr\.[a-z0-9]+(?:\.[a-z0-9]+)+$")]
+    [ValidatePattern("^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*){2,}$")]
     [string]$ExpectedApplicationId,
 
     [Parameter(Mandatory = $true)]
@@ -52,7 +52,8 @@ $sdkRoot = if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_SDK_ROOT)) {
 } else {
     throw "ANDROID_SDK_ROOT or ANDROID_HOME is required."
 }
-$apkAnalyzer = Join-Path $sdkRoot "cmdline-tools/latest/bin/apkanalyzer.bat"
+$apkAnalyzerName = if ($IsWindows) { "apkanalyzer.bat" } else { "apkanalyzer" }
+$apkAnalyzer = Join-Path $sdkRoot "cmdline-tools/latest/bin/$apkAnalyzerName"
 if (-not (Test-Path -LiteralPath $apkAnalyzer -PathType Leaf)) {
     throw "apkanalyzer was not found at '$apkAnalyzer'."
 }
@@ -62,7 +63,8 @@ $buildTools = Get-ChildItem (Join-Path $sdkRoot "build-tools") -Directory |
 if ($null -eq $buildTools) {
     throw "Android SDK build-tools are not installed."
 }
-$apkSigner = Join-Path $buildTools.FullName "apksigner.bat"
+$apkSignerName = if ($IsWindows) { "apksigner.bat" } else { "apksigner" }
+$apkSigner = Join-Path $buildTools.FullName $apkSignerName
 if (-not (Test-Path -LiteralPath $apkSigner -PathType Leaf)) {
     throw "apksigner was not found at '$apkSigner'."
 }
@@ -129,14 +131,19 @@ function Get-SigningCertificateSha256 {
     if ($LASTEXITCODE -ne 0) {
         throw "apksigner verification failed for '$ApkPath':`n$($output -join "`n")"
     }
-    $digestLine = $output |
-        Where-Object { $_ -match "^Signer #1 certificate SHA-256 digest:\s*(.+)$" } |
-        Select-Object -First 1
-    if ($null -eq $digestLine) {
+    $digestMatch = [regex]::Match(
+        ($output -join "`n"),
+        "certificate\s+SHA-256\s+digest:\s*([0-9a-fA-F:]{64,95})",
+        [Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    if (-not $digestMatch.Success) {
         throw "Unable to read the signing certificate digest from '$ApkPath'."
     }
-    [void]($digestLine -match "^Signer #1 certificate SHA-256 digest:\s*(.+)$")
-    return ($Matches[1] -replace ":", "").Trim().ToLowerInvariant()
+    $digest = ($digestMatch.Groups[1].Value -replace ":", "").ToLowerInvariant()
+    if ($digest -notmatch "^[0-9a-f]{64}$") {
+        throw "The signing certificate digest from '$ApkPath' is not SHA-256."
+    }
+    return $digest
 }
 
 function Test-ApkRuntimeLinks {
@@ -154,6 +161,8 @@ function Test-ApkRuntimeLinks {
         "https://fcitx5-android.github.io" = $false
         "https://jenkins.fcitx-im.org/job/android/job/fcitx5-android" = $false
         "https://play.google.com/store/apps/details?id=org.fcitx.fcitx5.android" = $false
+        "https://github.com/yunchan8804/saegeul" = $false
+        "https://saegeul.twentyoz.kr" = $false
     }
 
     $archive = [IO.Compression.ZipFile]::OpenRead($ApkPath)
@@ -288,7 +297,10 @@ if ($foreignAuthorities.Count -ne 0) {
     throw "Provider authorities outside the independent application ID found: $($foreignAuthorities -join ', ')."
 }
 
-$oldPublicPrefix = "org.fcitx.fcitx5.android"
+$oldPublicPrefixes = @(
+    "org.fcitx.fcitx5.android",
+    "kr.twentyoz.saegeul"
+)
 $publicValues = @(
     $mainManifest.Permissions
     $mainManifest.Actions
@@ -305,8 +317,15 @@ $publicValues = @(
 $oldPublicValues = @(
     $publicValues |
         Where-Object {
-            -not [string]::IsNullOrWhiteSpace($_) -and
-            $_.StartsWith($oldPublicPrefix, [StringComparison]::Ordinal)
+            if ([string]::IsNullOrWhiteSpace($_)) {
+                return $false
+            }
+            $value = $_
+            return $null -ne (
+                $oldPublicPrefixes |
+                    Where-Object { $value.StartsWith($_, [StringComparison]::Ordinal) } |
+                    Select-Object -First 1
+            )
         }
 )
 if ($oldPublicValues.Count -ne 0) {

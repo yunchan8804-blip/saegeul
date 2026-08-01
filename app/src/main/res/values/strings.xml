@@ -2,6 +2,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name_release">Saegeul</string>
     <string name="app_name_debug">Saegeul (Debug)</string>
+    <string name="languages_and_input" tools:ignore="MissingTranslation">Languages and input</string>
+    <string name="product_settings" tools:ignore="MissingTranslation">Saegeul settings</string>
+    <string name="engine_developer_tools" tools:ignore="MissingTranslation">Engine developer tools</string>
+    <string name="distribution_channel" tools:ignore="MissingTranslation">Distribution channel</string>
     <string name="save">Save</string>
     <string name="input_methods">Input Methods</string>
     <string name="add_input_method">Add Input Method</string>

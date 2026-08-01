@@ -71,11 +71,11 @@ function Assert-ContainsAll {
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 Assert-Equal -Actual $contract.schemaVersion -Expected 1 -Label "Contract schema version"
 Assert-Equal -Actual $contract.status -Expected "READY_FOR_PLAY_CONSOLE_DRAFT" -Label "Contract status"
-Assert-Equal -Actual $contract.applicationId -Expected "kr.twentyoz.saegeul" -Label "Application ID"
+Assert-Equal -Actual $contract.applicationId -Expected "net.chanpaca.saegeul" -Label "Application ID"
 Assert-Equal -Actual $contract.publisher -Expected "Yun Chan" -Label "Publisher"
-Assert-Equal -Actual $contract.contactEmail -Expected "yunchan@twentyoz.kr" -Label "Contact email"
+Assert-Equal -Actual $contract.contactEmail -Expected "yunchan@chanpaca.net" -Label "Contact email"
 Assert-Equal -Actual $contract.privacyPolicyUrl `
-    -Expected "https://saegeul.twentyoz.kr/privacy/" `
+    -Expected "https://saegul.chanpaca.net/privacy/" `
     -Label "Privacy policy URL"
 
 foreach ($answer in @(
@@ -178,8 +178,8 @@ Assert-ContainsAll -Text $notice -Label "Embedded privacy notice" -Needles @(
 )
 Assert-ContainsAll -Text $publicPolicy -Label "Public privacy policy" -Needles @(
     "Yun Chan",
-    "yunchan@twentyoz.kr",
-    "kr.twentyoz.saegeul",
+    "yunchan@chanpaca.net",
+    "net.chanpaca.saegeul",
     "IP 주소",
     "대략적 위치",
     "앱 내 검색 기록",

@@ -102,10 +102,10 @@ plugin/hangul/src/main/res/xml/plugin.xml
 Debug와 release는 패키지와 intent action이 다르다.
 
 ```text
-Debug main app:      kr.twentyoz.saegeul.debug
-Debug Hangul plugin: kr.twentyoz.saegeul.plugin.hangul.debug
-Release main app:    kr.twentyoz.saegeul
-Release Hangul:      kr.twentyoz.saegeul.plugin.hangul
+Debug main app:      net.chanpaca.saegeul.debug
+Debug Hangul plugin: net.chanpaca.saegeul.plugin.hangul.debug
+Release main app:    net.chanpaca.saegeul
+Release Hangul:      net.chanpaca.saegeul.plugin.hangul
 ```
 
 따라서 main app과 Hangul plugin은 반드시 같은 build variant로 설치해야 한다. 다른 서명으로 이미 설치된 동일 패키지를 업데이트하면 Android가 설치를 거부할 수 있고, 서비스형 플러그인은 signature permission도 고려해야 한다. 현재 Hangul plugin은 `hasService=false`인 네이티브 addon이라 main/plugin 간 동일 signer를 로딩 조건으로 요구하지 않는다. Variant 혼합은 지원하지 않으며, 서로 다른 배포 소스를 섞을 때는 로딩 자체와 동일 package 업데이트 호환성을 구분해서 검증해라.
@@ -796,10 +796,10 @@ UCRT64 `bin`을 PATH 앞쪽에 둔 새 PowerShell에서 다시 실행해라. 무
 2. package 목록에서 `.debug` suffix를 확인한다.
 3. Fcitx 앱의 plugin 화면을 다시 연다.
 4. main app을 재실행해 data sync를 유도한다.
-5. merged manifest에서 debug plugin action이 `kr.twentyoz.saegeul.debug.plugin.MANIFEST`인지 확인한다.
+5. merged manifest에서 debug plugin action이 `net.chanpaca.saegeul.debug.plugin.MANIFEST`인지 확인한다.
 
 ```powershell
-adb shell pm list packages | Select-String 'kr.twentyoz.saegeul'
+adb shell pm list packages | Select-String 'net.chanpaca.saegeul'
 Get-Content `
   plugin\hangul\build\intermediates\merged_manifests\debug\processDebugManifest\arm64-v8a\AndroidManifest.xml |
   Select-String 'package=|plugin.MANIFEST'

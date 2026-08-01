@@ -18,7 +18,8 @@ $sdkRoot = if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_SDK_ROOT)) {
 } else {
     throw "ANDROID_SDK_ROOT or ANDROID_HOME is required."
 }
-$apkAnalyzer = Join-Path $sdkRoot "cmdline-tools/latest/bin/apkanalyzer.bat"
+$apkAnalyzerName = if ($IsWindows) { "apkanalyzer.bat" } else { "apkanalyzer" }
+$apkAnalyzer = Join-Path $sdkRoot "cmdline-tools/latest/bin/$apkAnalyzerName"
 if (-not (Test-Path -LiteralPath $apkAnalyzer -PathType Leaf)) {
     throw "apkanalyzer was not found at '$apkAnalyzer'."
 }

@@ -137,6 +137,8 @@ android {
             "https://api.openai.com/v1".asBuildConfigString()
         )
         buildConfigField("String", "AI_PROVIDER_API_KEY", "".asBuildConfigString())
+        buildConfigField("String", "DISTRIBUTION_CHANNEL", "user".asBuildConfigString())
+        buildConfigField("boolean", "SHOW_DEVELOPER_SURFACES", "false")
         buildConfigField(
             "String",
             "AI_OAUTH_REDIRECT_URI",
@@ -202,6 +204,12 @@ android {
         debug {
             manifestPlaceholders["appAuthRedirectScheme"] =
                 "${ProductIdentity.applicationId}.debug.oauth"
+            buildConfigField(
+                "String",
+                "DISTRIBUTION_CHANNEL",
+                "developer".asBuildConfigString()
+            )
+            buildConfigField("boolean", "SHOW_DEVELOPER_SURFACES", "true")
             resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
             resValue("string", "app_name", "@string/app_name_debug")
