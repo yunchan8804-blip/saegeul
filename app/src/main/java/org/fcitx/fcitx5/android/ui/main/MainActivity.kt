@@ -135,17 +135,21 @@ class MainActivity : AppCompatActivity() {
             viewModel.toolbarSaveButtonOnClickListener
                 .observe(this@MainActivity) { listener -> isVisible = listener != null }
         }
-        val aboutMenuItems = listOf(
-            menu.item(R.string.faq) {
+        val aboutMenuItems = buildList {
+            add(menu.item(R.string.faq) {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Const.faqUrl)))
-            },
-            menu.item(R.string.developer) {
-                navController.navigateWithAnim(SettingsRoute.Developer)
-            },
-            menu.item(R.string.about) {
-                navController.navigateWithAnim(SettingsRoute.About)
+            })
+            if (ProductSurfacePolicy.forBuild(BuildConfig.SHOW_DEVELOPER_SURFACES)
+                    .showDeveloperTools
+            ) {
+                add(menu.item(R.string.developer) {
+                    navController.navigateWithAnim(SettingsRoute.Developer)
+                })
             }
-        )
+            add(menu.item(R.string.about) {
+                navController.navigateWithAnim(SettingsRoute.About)
+            })
+        }
         viewModel.aboutButton.observe(this@MainActivity) { enabled ->
             aboutMenuItems.forEach { menu -> menu.isVisible = enabled }
         }

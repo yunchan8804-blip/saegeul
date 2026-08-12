@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+#
 name: Pull Request
 
 on:
@@ -60,25 +64,30 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Build Release APK
-        run: |
-          ./gradlew :app:assembleRelease
-          ./gradlew :assembleReleasePlugins
+      - name: Verify developer tests and user compilation
+        run: ./gradlew :app:testDebugUnitTest :app:assembleRelease
 
-      - name: Upload app
+      - name: Build developer APK
+        run: |
+          ./gradlew :app:assembleDebug
+          ./gradlew :assembleDebugPlugins
+
+      - name: Upload developer app
         uses: actions/upload-artifact@v6
         with:
-          name: app-${{ matrix.os }}
-          path: app/build/outputs/apk/release/
+          name: developer-app-${{ matrix.os }}
+          path: app/build/outputs/apk/debug/
+          retention-days: 7
 
-      - name: Pack product plugins
+      - name: Pack developer plugins
         shell: bash
         run: |
           mkdir plugins-to-upload
-          mv plugin/hangul/build/outputs/apk/release plugins-to-upload/hangul
+          mv plugin/hangul/build/outputs/apk/debug plugins-to-upload/hangul
 
-      - name: Upload plugins
+      - name: Upload developer plugins
         uses: actions/upload-artifact@v6
         with:
-          name: plugins-${{ matrix.os }}
+          name: developer-plugins-${{ matrix.os }}
           path: plugins-to-upload
+          retention-days: 7

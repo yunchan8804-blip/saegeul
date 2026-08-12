@@ -107,6 +107,7 @@ lint/tmp/
 /.tmp-*
 /.codex-remote-attachments/
 /artifacts/
+/.wrangler/
 *.idsig
 *.obj
 **/obj/

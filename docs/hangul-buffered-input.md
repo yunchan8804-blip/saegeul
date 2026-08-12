@@ -51,7 +51,8 @@ While active:
 2. `CommitString` events are captured in an in-memory prefix instead of being sent to the editor.
 3. The keyboard UI displays `captured prefix + current engine preedit` as one internal composition.
 4. Backspace deletes one Unicode code point from the captured prefix when the engine has no remaining preedit.
-5. A forwarded Unicode delimiter (for example space, a number, or punctuation) is appended and submits the segment. Return and left/right arrows submit first, then perform their editor action.
+5. A forwarded Unicode delimiter (for example space, a number, or punctuation) is appended and submits the segment. Left/right arrows submit first, then perform their editor action.
+   Return is two-stage: while a segment is pending it only submits, so the segment can be ended without inserting a delimiter character; the next Return performs the editor's own action. A failed dispatch keeps the buffer, so the next Return retries the submission instead of sending Return after text the editor never received.
 6. Input-method changes and input-view shutdown submit the current segment, reset the Hangul engine, and clear the session so text cannot leak into a later editor.
 7. If the target reports an unexpected selection change while text is still buffered, the unsent segment is discarded. Once the editor has moved its cursor there is no reliable way to recover the original insertion anchor without reintroducing composing spans.
 

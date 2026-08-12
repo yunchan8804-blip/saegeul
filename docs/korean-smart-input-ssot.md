@@ -1258,8 +1258,8 @@ backend가 발급한 짧은 수명의 token과 WebRTC transport를 사용해야 
 - authorization request는 무작위 `state`와 PKCE verifier를 만들고 `S256` 외 method면 시작 전에
   fail-closed한다. callback은 요청 state와 정확히 일치해야 token exchange를 수행한다.
 - redirect URI는 `${applicationId}.oauth:/callback` 단일 규칙이며 release는
-  `kr.twentyoz.saegeul.oauth:/callback`, debug는
-  `kr.twentyoz.saegeul.debug.oauth:/callback`이다. endpoint 등록값과 정확히 일치해야 하며 open
+  `net.chanpaca.saegeul.oauth:/callback`, debug는
+  `net.chanpaca.saegeul.debug.oauth:/callback`이다. endpoint 등록값과 정확히 일치해야 하며 open
   redirect나 동적 redirect 입력은 지원하지 않는다.
 - browser 왕복과 token 교환 callback 시마다 현재 profile의 client ID, authorization endpoint,
   token endpoint, redirect URI를 원래 request와 정확히 비교한다. 설정이 중간에 바뀌면 이전 응답을
@@ -1314,8 +1314,8 @@ backend가 발급한 짧은 수명의 token과 WebRTC transport를 사용해야 
    컴퓨터를 다시 선택해 재시도한다.
 
 manifest v1 contract는 다음과 같다. `redirect_uri`는 설치 variant에 따라 release
-`kr.twentyoz.saegeul.oauth:/callback` 또는 debug
-`kr.twentyoz.saegeul.debug.oauth:/callback`을 endpoint가 사전에 public-client redirect로 등록한
+`net.chanpaca.saegeul.oauth:/callback` 또는 debug
+`net.chanpaca.saegeul.debug.oauth:/callback`을 endpoint가 사전에 public-client redirect로 등록한
 값과 정확히 맞춰 제공해야 한다.
 
 ```json
@@ -1330,7 +1330,7 @@ manifest v1 contract는 다음과 같다. `redirect_uri`는 설치 variant에 �
     "revocation_endpoint": "https://computer.example/oauth/revoke",
     "client_id": "saegeul-android-public",
     "scopes": ["openid", "offline_access", "ai.invoke"],
-    "redirect_uri": "kr.twentyoz.saegeul.oauth:/callback"
+    "redirect_uri": "net.chanpaca.saegeul.oauth:/callback"
   },
   "models": {
     "fast": "fast-model",

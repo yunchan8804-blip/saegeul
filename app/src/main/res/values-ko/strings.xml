@@ -2,6 +2,10 @@
 <resources>
     <string name="app_name_release">새글</string>
     <string name="app_name_debug">새글 (디버그)</string>
+    <string name="languages_and_input">언어 및 입력</string>
+    <string name="product_settings">새글 설정</string>
+    <string name="engine_developer_tools">엔진 개발 도구</string>
+    <string name="distribution_channel">배포 채널</string>
     <string name="save">저장</string>
     <string name="input_methods">입력기</string>
     <string name="add_input_method">입력기 추가</string>

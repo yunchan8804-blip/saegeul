@@ -15,15 +15,29 @@
 | 항목 | 값 |
 | --- | --- |
 | 제품명 | 새글 (Saegeul) |
-| Android applicationId | `kr.twentyoz.saegeul` |
-| 한글 플러그인 applicationId | `kr.twentyoz.saegeul.plugin.hangul` |
+| Android applicationId | `net.chanpaca.saegeul` |
+| 한글 플러그인 applicationId | `net.chanpaca.saegeul.plugin.hangul` |
 | 소스 저장소 | <https://github.com/yunchan8804-blip/saegeul> |
 | 릴리스와 대응 소스 | <https://github.com/yunchan8804-blip/saegeul/releases> |
-| 개인정보처리방침 | <https://saegeul.twentyoz.kr/privacy/> |
+| 개인정보처리방침 | <https://saegul.chanpaca.net/privacy/> |
 
 첫 독립 버전은 공개 앱 ID와 브랜드를 먼저 분리하고 내부 Kotlin namespace는
 호환성을 위해 유지한다. 제품 빌드에는 메인 앱과 libhangul 기반 한글 플러그인만
 포함하며, 중국어 애드온과 사용하지 않는 언어 플러그인은 APK/AAB에서 제외한다.
+
+## 사용자판과 개발판
+
+새 설치에서는 한글 `hangul`과 영어 `keyboard-us` 입력기를 이 순서로 함께
+활성화한다. 사용자가 언어를 직접 제거하거나 순서를 바꾼 뒤에는 그 설정을
+덮어쓰지 않는다.
+
+| 채널 | 패키지 | 화면과 배포 규칙 |
+| --- | --- | --- |
+| 사용자판 (Release) | `net.chanpaca.saegeul` | 저수준 엔진·애드온·플러그인·개발자 메뉴를 숨기고, 서명된 APK/AAB만 장기 배포 |
+| 개발판 (Debug) | `net.chanpaca.saegeul.debug` | 진단 로그, 엔진·애드온·플러그인 관리 메뉴를 표시하고 CI 산출물은 7일만 보관 |
+
+두 채널은 앱 이름·아이콘·패키지·OAuth callback·플러그인 패키지도 분리되므로 한
+기기에 함께 설치해 검증할 수 있다. `정보 > 배포 채널`에서 현재 빌드를 확인한다.
 
 ## 다운로드와 설치
 
@@ -49,7 +63,7 @@ Android의 `설정 > 일반 관리 > 키보드 목록 및 기본값`에서 새�
 API 키와 OAuth 토큰은 Android Keystore로 보호되는 백업 제외 저장소에 둔다.
 
 실제 데이터 처리 범위와 삭제·문의 방법은
-[개인정보처리방침](https://saegeul.twentyoz.kr/privacy/)에서 확인할 수 있다.
+[개인정보처리방침](https://saegul.chanpaca.net/privacy/)에서 확인할 수 있다.
 
 ## 소스와 빌드
 

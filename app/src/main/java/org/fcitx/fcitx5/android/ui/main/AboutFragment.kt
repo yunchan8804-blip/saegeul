@@ -52,6 +52,10 @@ class AboutFragment : PaddingPreferenceFragment() {
             addCategory(R.string.version) {
                 isIconSpaceReserved = false
                 addPreference(R.string.current_version, Const.versionName)
+                addPreference(
+                    R.string.distribution_channel,
+                    BuildConfig.DISTRIBUTION_CHANNEL
+                )
                 addPreference(R.string.build_git_hash, BuildConfig.BUILD_GIT_HASH) {
                     val commit = BuildConfig.BUILD_GIT_HASH.substringBefore('-')
                     val uri = Uri.parse("${Const.githubRepo}/commit/${commit}")

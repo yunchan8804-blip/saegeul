@@ -61,9 +61,9 @@ jobs:
             -SourceRoot . `
             -ExpectedProductName "Saegeul" `
             -ExpectedKoreanProductName "새글" `
-            -ExpectedApplicationId "kr.twentyoz.saegeul" `
+            -ExpectedApplicationId "net.chanpaca.saegeul" `
             -ExpectedRepositoryUrl "https://github.com/yunchan8804-blip/saegeul" `
-            -ExpectedPrivacyPolicyUrl "https://saegeul.twentyoz.kr/privacy/"
+            -ExpectedPrivacyPolicyUrl "https://saegul.chanpaca.net/privacy/"
       - name: Verify Play Data Safety contract
         shell: pwsh
         run: ./scripts/verify-play-data-safety-contract.ps1

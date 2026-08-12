@@ -25,5 +25,5 @@ Google Play App Signing을 사용하면 위 인증서는 업로드 인증서다.
 서명 인증서는 패키지 등록 뒤 이 문서에 별도로 기록하고, OAuth·API 공급자에 필요한
 SHA-256도 두 인증서의 역할을 구분해 등록한다.
 
-Play Console의 `kr.twentyoz.saegeul` 패키지 생성, App Signing 등록, 업로드 인증서
+Play Console의 `net.chanpaca.saegeul` 패키지 생성, App Signing 등록, 업로드 인증서
 확인은 외부 콘솔 증거가 있어야 `DONE`으로 표시한다.

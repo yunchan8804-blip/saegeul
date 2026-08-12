@@ -95,7 +95,7 @@ Wikimedia Commons, GIPHY, GitHub raw content, OAuth 공급자 8개다. GIPHY와 
 
 ## 5. 공개 릴리스 차단 조건
 
-- `DONE-PRIVACY-01` 법적 게시자 `Yun Chan`, 연락 이메일 `yunchan@twentyoz.kr`, 소유 도메인 `twentyoz.kr`
+- `DONE-PRIVACY-01` 법적 게시자 `Yun Chan`, 연락 이메일 `yunchan@chanpaca.net`, 소유 도메인 `chanpaca.net`
 - `GATE-PRIVACY-02` 소유 도메인의 공개 개인정보처리방침 URL. 활성 URL이어야 하고, 지역 제한·편집 권한 요구·PDF만 제공하는 형태는 허용하지 않는다.
 - `DONE-PRIVACY-03` 기술 공급자 집합과 6개 Data Safety 데이터 유형을 JSON 계약으로 잠금. 서비스 제공자 예외 없이 모두 `공유: 예`
 - `GATE-PRIVACY-04` GIPHY 프로덕션 승인과 미디어 복사 승인이 없으면 GIPHY를 릴리스에서 비활성화하거나 제거

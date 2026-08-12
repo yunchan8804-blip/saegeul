@@ -52,7 +52,7 @@ PUBLIC_ORIGIN_VERIFY_MAX_DELAY_SECONDS = 3.0
 # Avoid Windows' Hyper-V/WSL excluded ranges, which commonly cover 8790-9200.
 DEFAULT_GATEWAY_PORT = 9211
 DEFAULT_TAILSCALE_HTTPS_PORT = 9210
-DEFAULT_REDIRECT_URI = "kr.twentyoz.saegeul.debug.oauth:/callback"
+DEFAULT_REDIRECT_URI = "net.chanpaca.saegeul.debug.oauth:/callback"
 OAUTH_CLIENT_ID = "saegeul-android-public"
 OAUTH_SCOPES = "openid offline_access ai.invoke"
 ACCESS_TOKEN_TTL_SECONDS = 60 * 60

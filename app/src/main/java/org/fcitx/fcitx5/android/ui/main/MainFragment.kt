@@ -9,6 +9,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.fragment.app.activityViewModels
 import androidx.preference.PreferenceCategory
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -41,25 +42,30 @@ class MainFragment : PaddingPreferenceFragment() {
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        val productSurfaces = ProductSurfacePolicy.forBuild(BuildConfig.SHOW_DEVELOPER_SURFACES)
         preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
-            addCategory("Fcitx") {
-                addDestinationPreference(
-                    R.string.global_options,
-                    R.drawable.ic_baseline_tune_24,
-                    SettingsRoute.GlobalConfig
-                )
+            addCategory(R.string.languages_and_input) {
                 addDestinationPreference(
                     R.string.input_methods,
                     R.drawable.ic_baseline_language_24,
                     SettingsRoute.InputMethodList
                 )
-                addDestinationPreference(
-                    R.string.addons,
-                    R.drawable.ic_baseline_extension_24,
-                    SettingsRoute.AddonList
-                )
             }
-            addCategory("Android") {
+            if (productSurfaces.showRawEngineSettings) {
+                addCategory(R.string.engine_developer_tools) {
+                    addDestinationPreference(
+                        R.string.global_options,
+                        R.drawable.ic_baseline_tune_24,
+                        SettingsRoute.GlobalConfig
+                    )
+                    addDestinationPreference(
+                        R.string.addons,
+                        R.drawable.ic_baseline_extension_24,
+                        SettingsRoute.AddonList
+                    )
+                }
+            }
+            addCategory(R.string.product_settings) {
                 addDestinationPreference(
                     R.string.theme,
                     R.drawable.ic_baseline_palette_24,
@@ -85,11 +91,13 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.drawable.ic_baseline_emoji_symbols_24,
                     SettingsRoute.Symbol
                 )
-                addDestinationPreference(
-                    R.string.plugins,
-                    R.drawable.ic_baseline_android_24,
-                    SettingsRoute.Plugin
-                )
+                if (productSurfaces.showPluginManager) {
+                    addDestinationPreference(
+                        R.string.plugins,
+                        R.drawable.ic_baseline_android_24,
+                        SettingsRoute.Plugin
+                    )
+                }
                 addDestinationPreference(
                     R.string.advanced,
                     R.drawable.ic_baseline_more_horiz_24,

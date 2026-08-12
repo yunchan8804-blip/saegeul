@@ -3,10 +3,10 @@
   "spdxLicense": "LGPL-2.1-or-later",
   "copyright": "Copyright 2026 Yun Chan",
   "status": "READY_FOR_PLAY_CONSOLE_DRAFT",
-  "applicationId": "kr.twentyoz.saegeul",
+  "applicationId": "net.chanpaca.saegeul",
   "publisher": "Yun Chan",
-  "contactEmail": "yunchan@twentyoz.kr",
-  "privacyPolicyUrl": "https://saegeul.twentyoz.kr/privacy/",
+  "contactEmail": "yunchan@chanpaca.net",
+  "privacyPolicyUrl": "https://saegul.chanpaca.net/privacy/",
   "globalAnswers": {
     "collectsOrSharesData": true,
     "allCollectedDataEncryptedInTransit": true,
