@@ -2261,7 +2261,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
             }
             FcitxKeyMapping.FcitxKey_Return -> {
-                if (submitBufferedHangul()) handleReturnKey()
+                // Two-stage Return. The first press only finalizes the pending segment, so a
+                // segment can be ended without a delimiter such as Space inserting an unwanted
+                // character. The next press runs the editor's own Return action. A failed
+                // dispatch keeps the buffer, and the next press retries it instead of sending
+                // Return after text the editor never received.
+                if (hasPendingBufferedHangul()) submitBufferedHangul() else handleReturnKey()
                 true
             }
             FcitxKeyMapping.FcitxKey_Left -> {
@@ -2308,6 +2313,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun clearBufferedHangul() {
         bufferedHangul.clear()
         inputView?.refreshBufferedHangulPreedit()
+    }
+
+    /** Whether an unsent segment exists in the captured prefix or in the engine's live preedit. */
+    private fun hasPendingBufferedHangul(): Boolean {
+        if (!bufferedHangul.isEmpty) return true
+        return !bufferedHangulEngineResetPending &&
+            fcitx.runImmediately { inputPanelCached.preedit.isNotEmpty() }
     }
 
     /**
