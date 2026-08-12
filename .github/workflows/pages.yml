@@ -13,8 +13,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -23,16 +21,18 @@ concurrency:
 jobs:
   deploy:
     timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      # saegul.chanpaca.net is served by the Cloudflare Pages project `saegul`, which uses
+      # direct upload rather than a Git integration. A push therefore cannot deploy it on its
+      # own; Wrangler uploads site/ against the project's production branch.
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
         with:
-          path: site
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy site --project-name saegul --branch main
+      - name: Report deployment
+        run: echo "Deployed to ${{ steps.deploy.outputs.deployment-url }}"

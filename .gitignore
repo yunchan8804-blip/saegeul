@@ -103,6 +103,11 @@ lint/tmp/
 ### Kotlin ###
 .kotlin/
 
+# Local secrets. Deploy credentials must never reach the repository.
+.env
+.env.*
+!.env.example
+
 # Local verification evidence and generated release output
 /.tmp-*
 /.codex-remote-attachments/
