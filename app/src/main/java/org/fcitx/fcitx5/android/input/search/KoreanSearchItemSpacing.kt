@@ -8,9 +8,11 @@ import android.content.Context
 import android.graphics.Rect
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import splitties.dimensions.dp
 
 class KoreanSearchItemSpacing(context: Context) : RecyclerView.ItemDecoration() {
-    private val spacing = (6 * context.resources.displayMetrics.density).toInt()
+    private val spacing = context.dp(PanelStyle.GAP_M_DP)
 
     override fun getItemOffsets(
         outRect: Rect,
@@ -18,6 +20,12 @@ class KoreanSearchItemSpacing(context: Context) : RecyclerView.ItemDecoration() 
         parent: RecyclerView,
         state: RecyclerView.State
     ) {
-        outRect.bottom = spacing
+        // Skip the last item so the list padding stays symmetric top and bottom.
+        val position = parent.getChildAdapterPosition(view)
+        outRect.bottom = if (position == RecyclerView.NO_POSITION || position == state.itemCount - 1) {
+            0
+        } else {
+            spacing
+        }
     }
 }

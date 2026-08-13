@@ -5,17 +5,22 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.content.Context
-import android.content.res.ColorStateList
-import android.graphics.drawable.GradientDrawable
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.core.os.ConfigurationCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
+import org.fcitx.fcitx5.android.input.panel.PanelRecovery
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelSurface
+import splitties.dimensions.dp
 
 /** Visibility contract for the separate, network-backed meeting transcription entry. */
 internal object VoiceTranscriptionUiPolicy {
@@ -43,22 +48,26 @@ class VoiceTranscriptionUi(
     private val title = TextView(context).apply {
         setText(R.string.voice_precision_title)
         setTextColor(theme.keyTextColor)
-        textSize = 18f
+        textSize = PanelStyle.TEXT_TITLE
     }
     private val provider = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
-        textSize = 11f
+        textSize = PanelStyle.TEXT_CAPTION
     }
     private val status = TextView(context).apply {
         setTextColor(theme.keyTextColor)
-        textSize = 14f
+        textSize = PanelStyle.TEXT_BODY
         gravity = Gravity.CENTER
+        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
     }
     private val transcript = TextView(context).apply {
         setTextColor(theme.keyTextColor)
-        textSize = 16f
-        setPadding(dp(12), dp(10), dp(12), dp(10))
-        background = rounded(theme.keyBackgroundColor, dp(10))
+        textSize = PanelStyle.TEXT_EMPHASIS
+        setPadding(
+            dp(PanelStyle.CARD_PADDING_H_DP), dp(PanelStyle.CARD_PADDING_V_DP),
+            dp(PanelStyle.CARD_PADDING_H_DP), dp(PanelStyle.CARD_PADDING_V_DP)
+        )
+        background = context.panelSurface(theme.keyBackgroundColor)
         setTextIsSelectable(false)
     }
     private val transcriptScroller = ScrollView(context).apply {
@@ -68,15 +77,18 @@ class VoiceTranscriptionUi(
             LinearLayout.LayoutParams.WRAP_CONTENT
         ))
     }
-    private val primary = actionButton(active = true)
-    private val secondary = actionButton(active = false)
-    private val meeting = actionButton(active = false).apply {
+    private val primary = context.panelButton(theme, PanelButtonKind.Primary)
+    private val secondary = context.panelButton(theme, PanelButtonKind.Secondary)
+    private val meeting = context.panelButton(theme, PanelButtonKind.Secondary).apply {
         visibility = View.GONE
     }
 
     val root: View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(10), dp(14), dp(10))
+        setPadding(
+            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP),
+            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP)
+        )
         setBackgroundColor(theme.keyboardColor)
         addView(title, matchWrap())
         addView(provider, matchWrap())
@@ -91,16 +103,16 @@ class VoiceTranscriptionUi(
             2f
         ))
         addView(meeting, matchWrap().apply {
-            height = dp(40)
-            bottomMargin = dp(6)
+            height = dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP)
+            bottomMargin = dp(PanelStyle.GAP_M_DP)
         })
         addView(LinearLayout(context).apply {
             gravity = Gravity.CENTER
-            addView(primary, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-                marginEnd = dp(5)
+            addView(primary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
+                marginEnd = dp(PanelStyle.GAP_S_DP)
             })
-            addView(secondary, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-                marginStart = dp(5)
+            addView(secondary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
+                marginStart = dp(PanelStyle.GAP_S_DP)
             })
         }, matchWrap())
     }
@@ -146,7 +158,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showRecording(elapsedSeconds: Int) {
-        status.text = context.getString(R.string.voice_recording, elapsedSeconds)
+        status.text = recordingStatus(context.getString(R.string.voice_recording, elapsedSeconds))
         transcriptScroller.visibility = View.GONE
         hideMeeting()
         primary.apply {
@@ -180,7 +192,9 @@ class VoiceTranscriptionUi(
 
     fun showRealtimeRecording(elapsedSeconds: Int, partial: String) {
         title.setText(R.string.voice_realtime_title)
-        status.text = context.getString(R.string.voice_realtime_recording, elapsedSeconds)
+        status.text = recordingStatus(
+            context.getString(R.string.voice_realtime_recording, elapsedSeconds)
+        )
         showTranscript(partial)
         hideMeeting()
         primary.apply {
@@ -245,14 +259,32 @@ class VoiceTranscriptionUi(
         }
     }
 
-    fun showError(message: String, canRetry: Boolean) {
+    /**
+     * [recovery] takes over the primary slot when there is nothing to retry, so a blocked
+     * panel still offers the setting that unblocks it rather than a dead button.
+     */
+    fun showError(message: String, canRetry: Boolean, recovery: PanelRecovery? = null) {
         status.text = message
         transcriptScroller.visibility = View.GONE
         hideMeeting()
         primary.apply {
-            isEnabled = canRetry
-            setText(R.string.voice_retry_record)
-            setOnClickListener(if (canRetry) View.OnClickListener { onStart?.invoke() } else null)
+            when {
+                canRetry -> {
+                    isEnabled = true
+                    setText(R.string.voice_retry_record)
+                    setOnClickListener { onStart?.invoke() }
+                }
+                recovery != null -> {
+                    isEnabled = true
+                    setText(recovery.labelRes)
+                    setOnClickListener { recovery.run() }
+                }
+                else -> {
+                    isEnabled = false
+                    setText(R.string.voice_retry_record)
+                    setOnClickListener(null)
+                }
+            }
         }
         secondary.apply {
             isEnabled = true
@@ -319,21 +351,15 @@ class VoiceTranscriptionUi(
         }
     }
 
-    private fun actionButton(active: Boolean) = Button(context).apply {
-        isAllCaps = false
-        textSize = 13f
-        minHeight = 0
-        minimumHeight = 0
-        setTextColor(if (active) theme.accentKeyTextColor else theme.keyTextColor)
-        backgroundTintList = ColorStateList.valueOf(
-            if (active) theme.accentKeyBackgroundColor else theme.keyBackgroundColor
-        )
-    }
-
-    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius.toFloat()
-    }
+    /** Recording states carry a leading dot in the recording-red convention. */
+    private fun recordingStatus(text: String): CharSequence =
+        SpannableString("● $text").apply {
+            setSpan(
+                ForegroundColorSpan(PanelStyle.errorTextColor(theme)),
+                0, 1,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
 
     private fun hideMeeting() {
         meeting.visibility = View.GONE
@@ -348,7 +374,7 @@ class VoiceTranscriptionUi(
         meeting.apply {
             visibility = View.VISIBLE
             isEnabled = true
-            text = local("회의·메모 음성 파일", "Meeting audio file")
+            setText(R.string.meeting_entry_button)
             setOnClickListener { onMeeting?.invoke() }
         }
     }
@@ -358,18 +384,8 @@ class VoiceTranscriptionUi(
         transcriptScroller.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
     }
 
-    private fun local(korean: String, english: String): String =
-        if (ConfigurationCompat.getLocales(context.resources.configuration)[0]?.language == "ko") {
-            korean
-        } else {
-            english
-        }
-
     private fun matchWrap() = LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT,
         LinearLayout.LayoutParams.WRAP_CONTENT
     )
-
-    private fun dp(value: Int): Int =
-        (value * context.resources.displayMetrics.density).toInt()
 }

@@ -16,15 +16,18 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.InputFeatureBlock
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
+import splitties.dimensions.dp
 import timber.log.Timber
 
 /** Preview-first AI writing assistant. Network requests only begin after an action tap. */
@@ -85,7 +88,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             visibility = View.GONE
             setOnClickListener { showClipboardSourcePicker() }
         }
-        val size = KawaiiBarComponent.HEIGHT.dp()
+        val size = context.dp(KawaiiBarComponent.HEIGHT)
         addView(clipboardBarButton, LinearLayout.LayoutParams(size, size))
         renderClipboardBarButton()
     }
@@ -127,7 +130,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             }
             AiFeatureEntryGate.NetworkPolicyBlocked -> {
                 pendingCustomRequest = null
-                ui.showError(context.getString(R.string.ai_network_policy_disabled), canRetry = false)
+                showAiBlocked()
                 return
             }
             AiFeatureEntryGate.SetupRequired -> {
@@ -236,7 +239,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
 
     private fun openPromptKeyboard(initialText: String) {
         if (!service.allowsAiInputFeatures()) {
-            ui.showError(context.getString(R.string.ai_network_policy_disabled), canRetry = false)
+            showAiBlocked()
             return
         }
         val source = snapshot ?: run {
@@ -456,7 +459,7 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
             return
         }
         if (!service.allowsAiInputFeatures()) {
-            ui.showError(context.getString(R.string.ai_network_policy_disabled), canRetry = false)
+            showAiBlocked()
             return
         }
         val target = captureReplyTarget()
@@ -589,14 +592,47 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         service.applyAiReplyAtCursor(source, text)
 
     private fun validateCurrentSource(source: AiInputSnapshot): Boolean {
-        val error = when {
-            !service.allowsTextInspectionFeatures() -> R.string.ai_private_disabled
-            !service.allowsAiInputFeatures() -> R.string.ai_network_policy_disabled
-            !service.isAiSnapshotCurrent(source) -> R.string.ai_editor_changed
-            else -> return true
+        if (!service.allowsTextInspectionFeatures()) {
+            ui.showError(
+                context.getString(R.string.ai_private_disabled),
+                profile?.displayName,
+                canRetry = false
+            )
+            return false
         }
-        ui.showError(context.getString(error), profile?.displayName, canRetry = false)
-        return false
+        if (!service.allowsAiInputFeatures()) {
+            showAiBlocked()
+            return false
+        }
+        if (!service.isAiSnapshotCurrent(source)) {
+            ui.showError(
+                context.getString(R.string.ai_editor_changed),
+                profile?.displayName,
+                canRetry = false
+            )
+            return false
+        }
+        return true
+    }
+
+    /**
+     * Names which gate closed - offline mode, this app's network policy, or its AI policy -
+     * and offers the setting that reopens it. A private editor stays a plain block.
+     */
+    private fun showAiBlocked() {
+        val block = service.aiInputBlock() ?: InputFeatureBlock.AppPolicy
+        val message = when {
+            block == InputFeatureBlock.PrivateEditor -> R.string.ai_private_disabled
+            block == InputFeatureBlock.OfflineMode -> R.string.blocked_offline_mode
+            // Only the AI policy is closed when the shared network gate is still open.
+            service.networkInputBlock() == null -> R.string.blocked_app_ai_policy
+            else -> R.string.blocked_app_network_policy
+        }
+        ui.showError(
+            context.getString(message),
+            canRetry = false,
+            recovery = PanelRecoveries.forBlock(service, block)
+        )
     }
 
     private fun captureReplyTarget(): AiEditorTarget? {
@@ -653,7 +689,6 @@ class AiAssistantWindow : InputWindow.ExtendedInputWindow<AiAssistantWindow>() {
         clipboardBarButton.alpha = if (clipboardBarButton.isEnabled) 1f else 0.45f
     }
 
-    private fun Int.dp(): Int = (this * context.resources.displayMetrics.density).toInt()
 
     private companion object {
         const val PROMPT_DRAIN_POLL_MILLIS = 16L

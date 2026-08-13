@@ -17,11 +17,13 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.InputFeatureBlock
 import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
 import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
@@ -100,7 +102,7 @@ class VoiceTranscriptionWindow(
                 return
             }
             AiFeatureEntryGate.NetworkPolicyBlocked -> {
-                ui.showError(context.getString(R.string.voice_policy_disabled), canRetry = false)
+                showPolicyBlock()
                 return
             }
             AiFeatureEntryGate.SetupRequired -> {
@@ -420,7 +422,7 @@ class VoiceTranscriptionWindow(
                 false
             }
             AiFeatureEntryGate.NetworkPolicyBlocked -> {
-                ui.showError(context.getString(R.string.voice_policy_disabled), canRetry = false)
+                showPolicyBlock()
                 false
             }
             AiFeatureEntryGate.SetupRequired -> {
@@ -428,6 +430,21 @@ class VoiceTranscriptionWindow(
                 false
             }
         }
+    }
+
+    /**
+     * Says which gate closed — offline mode or this app's profile — and hands over the
+     * setting that reopens it, instead of the older combined "offline or policy" wording.
+     */
+    private fun showPolicyBlock() {
+        val block = service.networkInputBlock() ?: InputFeatureBlock.AppPolicy
+        ui.showError(
+            context.getString(
+                PanelRecoveries.messageFor(block, R.string.voice_private_disabled)
+            ),
+            canRetry = false,
+            recovery = PanelRecoveries.forBlock(service, block)
+        )
     }
 
     private fun validateTarget(boundTarget: VoiceEditorTarget, showError: Boolean): Boolean {

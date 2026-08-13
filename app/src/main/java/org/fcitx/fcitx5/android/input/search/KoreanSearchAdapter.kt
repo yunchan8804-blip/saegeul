@@ -6,16 +6,17 @@ package org.fcitx.fcitx5.android.input.search
 
 import android.content.Context
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.pressablePanelSurface
+import splitties.dimensions.dp
 
 class KoreanSearchAdapter(
     private val context: Context,
@@ -42,7 +43,7 @@ class KoreanSearchAdapter(
         val result = results[position]
         holder.ui.bind(result)
         holder.itemView.isEnabled = !actionLocked
-        holder.itemView.alpha = if (actionLocked) 0.55f else 1f
+        holder.itemView.alpha = if (actionLocked) PanelStyle.DISABLED_ALPHA else 1f
         holder.itemView.setOnClickListener {
             if (!actionLocked) onInsert(result)
         }
@@ -56,32 +57,32 @@ class KoreanSearchAdapter(
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(context.dp(12))
-            background = GradientDrawable().apply {
-                setColor(theme.altKeyBackgroundColor)
-                cornerRadius = context.dp(12).toFloat()
-            }
+            setPadding(
+                context.dp(PanelStyle.CARD_PADDING_H_DP), context.dp(PanelStyle.CARD_PADDING_V_DP),
+                context.dp(PanelStyle.CARD_PADDING_H_DP), context.dp(PanelStyle.CARD_PADDING_V_DP)
+            )
+            background = context.pressablePanelSurface(theme, theme.altKeyBackgroundColor)
             isClickable = true
             isFocusable = true
         }
         private val source = TextView(context).apply {
             setTextColor(theme.altKeyTextColor)
-            textSize = 10f
+            textSize = PanelStyle.TEXT_CAPTION
             typeface = Typeface.DEFAULT_BOLD
         }
         private val primary = TextView(context).apply {
             setTextColor(theme.keyTextColor)
-            textSize = 16f
+            textSize = PanelStyle.TEXT_EMPHASIS
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
-            setPadding(0, context.dp(3), 0, 0)
+            setPadding(0, context.dp(PanelStyle.GAP_S_DP), 0, 0)
         }
         private val secondary = TextView(context).apply {
             setTextColor(theme.altKeyTextColor)
-            textSize = 11f
+            textSize = PanelStyle.TEXT_CAPTION
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setPadding(0, context.dp(3), 0, 0)
+            setPadding(0, context.dp(PanelStyle.GAP_S_DP), 0, 0)
         }
 
         init {
@@ -102,7 +103,7 @@ class KoreanSearchAdapter(
             primary.textSize = if (
                 entry.source == KoreanSearchSource.Emoji ||
                 entry.source == KoreanSearchSource.Emotion
-            ) 27f else 16f
+            ) PanelStyle.TEXT_GLYPH else PanelStyle.TEXT_EMPHASIS
             secondary.text = entry.secondaryText.orEmpty()
             secondary.visibility = if (entry.secondaryText.isNullOrBlank()) TextView.GONE else TextView.VISIBLE
             root.contentDescription = listOfNotNull(
@@ -111,8 +112,5 @@ class KoreanSearchAdapter(
                 entry.secondaryText
             ).joinToString(", ")
         }
-
-        private fun Context.dp(value: Int): Int =
-            (value * resources.displayMetrics.density).toInt()
     }
 }

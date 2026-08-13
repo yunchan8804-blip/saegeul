@@ -108,6 +108,11 @@ lint/tmp/
 .env.*
 !.env.example
 
+# Unrelated local documents that happen to sit in this working directory
+/signiel_baby_guide_build/
+/*.pptx
+/*.pptx.inspect.ndjson
+
 # Local verification evidence and generated release output
 /.tmp-*
 /.codex-remote-attachments/

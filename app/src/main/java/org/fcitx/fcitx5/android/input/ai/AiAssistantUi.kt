@@ -5,10 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import android.content.Context
-import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextUtils
@@ -28,6 +25,14 @@ import androidx.annotation.StringRes
 import androidx.core.view.setPadding
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
+import org.fcitx.fcitx5.android.input.panel.PanelRecovery
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelSurface
+import org.fcitx.fcitx5.android.input.panel.pressableChipSurface
+import org.fcitx.fcitx5.android.input.panel.pressablePanelSurface
+import splitties.dimensions.dp
 
 /**
  * Compact, programmatic UI for AI writing actions inside the input method.
@@ -42,7 +47,12 @@ class AiAssistantUi(
     val root = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         setBackgroundColor(theme.barColor)
-        setPadding(dp(10), dp(4), dp(10), dp(4))
+        setPadding(
+            dp(PanelStyle.PANEL_PADDING_H_DP),
+            dp(PanelStyle.PANEL_PADDING_V_DP),
+            dp(PanelStyle.PANEL_PADDING_H_DP),
+            dp(PanelStyle.PANEL_PADDING_V_DP)
+        )
     }
 
     var onActionSelected: ((AiAction) -> Unit)? = null
@@ -70,31 +80,36 @@ class AiAssistantUi(
 
     private val sourceText = TextView(context).apply {
         setTextColor(theme.keyTextColor)
-        textSize = 13f
+        textSize = PanelStyle.TEXT_BODY
         maxLines = SOURCE_PREVIEW_COLLAPSED_LINES
         ellipsize = TextUtils.TruncateAt.END
-        setPadding(dp(10), dp(3), dp(10), dp(3))
-        background = rounded(theme.altKeyBackgroundColor, dp(10))
+        setPadding(
+            dp(PanelStyle.CARD_PADDING_H_DP),
+            dp(PanelStyle.GAP_S_DP),
+            dp(PanelStyle.CARD_PADDING_H_DP),
+            dp(PanelStyle.GAP_S_DP)
+        )
+        background = context.pressablePanelSurface(theme, theme.altKeyBackgroundColor)
         setOnClickListener { toggleSourcePreview() }
     }
     private val sourceMeta = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
-        textSize = 11f
-        setPadding(dp(2), 0, 0, dp(3))
+        textSize = PanelStyle.TEXT_CAPTION
+        setPadding(dp(PanelStyle.GAP_XS_DP), 0, 0, dp(PanelStyle.GAP_XS_DP))
     }
     private val transmissionDisclosure = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
-        textSize = 10f
-        setPadding(dp(2), dp(3), dp(2), 0)
+        textSize = PanelStyle.TEXT_CAPTION
+        setPadding(dp(PanelStyle.GAP_XS_DP), dp(PanelStyle.GAP_XS_DP), dp(PanelStyle.GAP_XS_DP), 0)
         visibility = View.GONE
     }
     private val sourcePreviewToggle = TextView(context).apply {
         setTextColor(theme.genericActiveForegroundColor)
-        textSize = 11f
+        textSize = PanelStyle.TEXT_CAPTION
         gravity = Gravity.CENTER
-        minHeight = dp(SOURCE_PREVIEW_TOGGLE_HEIGHT_DP)
-        setPadding(dp(7), 0, dp(7), 0)
-        background = rounded(theme.genericActiveBackgroundColor, dp(9))
+        minHeight = dp(PanelStyle.CHIP_HEIGHT_DP)
+        setPadding(dp(PanelStyle.GAP_M_DP), 0, dp(PanelStyle.GAP_M_DP), 0)
+        background = context.pressableChipSurface(theme, theme.genericActiveBackgroundColor)
         visibility = View.GONE
         setOnClickListener { toggleSourcePreview() }
     }
@@ -103,7 +118,7 @@ class AiAssistantUi(
         addView(sourceMeta, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         addView(sourcePreviewToggle, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
-            dp(SOURCE_PREVIEW_TOGGLE_HEIGHT_DP)
+            dp(PanelStyle.CHIP_HEIGHT_DP)
         ))
     }
     private val sourceSection = LinearLayout(context).apply {
@@ -114,14 +129,19 @@ class AiAssistantUi(
     }
     private val sourceReviewTitle = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
-        textSize = 11f
-        setPadding(dp(2), 0, 0, dp(4))
+        textSize = PanelStyle.TEXT_CAPTION
+        setPadding(dp(PanelStyle.GAP_XS_DP), 0, 0, dp(PanelStyle.GAP_S_DP))
     }
     private val sourceReviewText = TextView(context).apply {
         setTextColor(theme.keyTextColor)
-        textSize = 14f
-        setPadding(dp(10), dp(8), dp(10), dp(8))
-        background = rounded(theme.altKeyBackgroundColor, dp(10))
+        textSize = PanelStyle.TEXT_BODY
+        setPadding(
+            dp(PanelStyle.CARD_PADDING_H_DP),
+            dp(PanelStyle.CARD_PADDING_V_DP),
+            dp(PanelStyle.CARD_PADDING_H_DP),
+            dp(PanelStyle.CARD_PADDING_V_DP)
+        )
+        background = context.panelSurface(theme.altKeyBackgroundColor)
     }
     private val sourceReviewScroll = ScrollView(context).apply {
         isFillViewport = true
@@ -132,12 +152,13 @@ class AiAssistantUi(
             orientation = LinearLayout.VERTICAL
             addView(sourceReviewTitle, matchWrap())
             addView(sourceReviewText, matchWrap())
-            addView(compactButton(R.string.ai_source_preview_back, active = false).apply {
+            addView(context.panelButton(theme, PanelButtonKind.Secondary).apply {
+                setText(R.string.ai_source_preview_back)
                 setOnClickListener { hideSourceReview() }
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(40)
-            ).apply { topMargin = dp(8) })
+                dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP)
+            ).apply { topMargin = dp(PanelStyle.GAP_M_DP) })
         }, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
@@ -172,9 +193,9 @@ class AiAssistantUi(
     }
     private val status = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
-        textSize = 13f
+        textSize = PanelStyle.TEXT_BODY
         gravity = Gravity.CENTER
-        setPadding(dp(8))
+        setPadding(dp(PanelStyle.GAP_M_DP))
         setText(R.string.ai_select_action)
         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
     }
@@ -192,36 +213,47 @@ class AiAssistantUi(
     }
     private val resultsScroll = ScrollView(context).apply {
         isFillViewport = true
+        isVerticalScrollBarEnabled = true
+        isScrollbarFadingEnabled = false
         addView(results, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ))
     }
 
-    private val retryButton = compactButton(R.string.ai_retry, active = true).apply {
+    private val retryButton = context.panelButton(theme, PanelButtonKind.Primary).apply {
+        setText(R.string.ai_retry)
         visibility = View.GONE
         setOnClickListener { onRetry?.invoke() }
     }
-    private val setupButton = compactButton(R.string.ai_setup_action, active = true).apply {
+    // The setup slot doubles as the fix-it action for blocked states: same position,
+    // label swapped to whatever destination actually resolves the block.
+    private var pendingRecovery: PanelRecovery? = null
+
+    private val setupButton = context.panelButton(theme, PanelButtonKind.Primary).apply {
+        setText(R.string.ai_setup_action)
         visibility = View.GONE
-        setOnClickListener { onSetupRequested?.invoke() }
+        setOnClickListener {
+            pendingRecovery?.let { it.run() } ?: onSetupRequested?.invoke()
+        }
     }
-    private val undoButton = compactButton(R.string.ai_undo, active = false).apply {
+    private val undoButton = context.panelButton(theme, PanelButtonKind.Secondary).apply {
+        setText(R.string.ai_undo)
         visibility = View.GONE
         setOnClickListener { onUndo?.invoke() }
     }
     private val footer = LinearLayout(context).apply {
         gravity = Gravity.END
-        addView(setupButton, LinearLayout.LayoutParams(0, dp(42), 1f))
-        addView(retryButton, LinearLayout.LayoutParams(0, dp(42), 1f))
-        addView(undoButton, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-            marginStart = dp(6)
+        addView(setupButton, LinearLayout.LayoutParams(0, dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP), 1f))
+        addView(retryButton, LinearLayout.LayoutParams(0, dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP), 1f))
+        addView(undoButton, LinearLayout.LayoutParams(0, dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP), 1f).apply {
+            marginStart = dp(PanelStyle.GAP_S_DP)
         })
         visibility = View.GONE
     }
 
     init {
-        root.addView(sourceSection, matchWrap().apply { topMargin = dp(4) })
+        root.addView(sourceSection, matchWrap().apply { topMargin = context.dp(PanelStyle.GAP_S_DP) })
         // The source stays pinned, while the action catalog can scroll on compact keyboards.
         // All groups are still rendered from the first frame; scrolling is only a fallback for
         // very short IME windows instead of silently clipping the lower actions.
@@ -229,12 +261,12 @@ class AiAssistantUi(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
             1f
-        ).apply { topMargin = dp(4) })
+        ).apply { topMargin = context.dp(PanelStyle.GAP_S_DP) })
         root.addView(sourceReviewScroll, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
             1f
-        ).apply { topMargin = dp(4) })
+        ).apply { topMargin = context.dp(PanelStyle.GAP_S_DP) })
         root.addView(statusArea, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
@@ -244,8 +276,8 @@ class AiAssistantUi(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
             1f
-        ).apply { topMargin = dp(4) })
-        root.addView(footer, matchWrap().apply { topMargin = dp(4) })
+        ).apply { topMargin = context.dp(PanelStyle.GAP_S_DP) })
+        root.addView(footer, matchWrap().apply { topMargin = context.dp(PanelStyle.GAP_S_DP) })
     }
 
     /** Shows the exact editor text that will be sent, before any network request begins. */
@@ -383,7 +415,7 @@ class AiAssistantUi(
         results.removeAllViews()
         if (presentation == AiResultPresentation.NoChanges) {
             results.addView(noChangesResultCard(), matchWrap().apply {
-                bottomMargin = dp(6)
+                bottomMargin = context.dp(PanelStyle.GAP_M_DP)
             })
         } else {
             visibleSuggestions
@@ -396,7 +428,7 @@ class AiAssistantUi(
                 }
                 .forEachIndexed { index, suggestion ->
                     results.addView(resultCard(action, index, source, suggestion), matchWrap().apply {
-                        bottomMargin = dp(6)
+                        bottomMargin = context.dp(PanelStyle.GAP_M_DP)
                     })
                 }
         }
@@ -412,7 +444,16 @@ class AiAssistantUi(
         resultsScroll.announceForAccessibility(context.getString(R.string.ai_results_ready))
     }
 
-    fun showError(message: String, providerLabel: String? = null, canRetry: Boolean = true) {
+    /**
+     * [recovery] fills the setup slot when the failure is a policy or connection block, so
+     * the user gets the exact setting that reopens it next to the message.
+     */
+    fun showError(
+        message: String,
+        providerLabel: String? = null,
+        canRetry: Boolean = true,
+        recovery: PanelRecovery? = null
+    ) {
         setProvider(providerLabel)
         resultPresentation = null
         // Error copy is one small status item, not a second half-height pane.  Keeping it compact
@@ -433,14 +474,20 @@ class AiAssistantUi(
         status.apply {
             text = context.getString(R.string.ai_error, message)
             contentDescription = text
-            setTextColor(Color.rgb(220, 85, 85))
+            setTextColor(PanelStyle.errorTextColor(theme))
             visibility = View.VISIBLE
         }
         retryButton.visibility = if (canRetry) View.VISIBLE else View.GONE
-        setupButton.visibility = View.GONE
+        setRecovery(recovery)
         setIntakeInteractionEnabled(true)
         updateFooterVisibility()
-        status.sendAccessibilityEvent(AccessibilityEvent.TYPE_ANNOUNCEMENT)
+    }
+
+    /** Points the setup slot at [recovery], or hides it when there is nothing to fix. */
+    private fun setRecovery(recovery: PanelRecovery?) {
+        pendingRecovery = recovery
+        setupButton.setText(recovery?.labelRes ?: R.string.ai_setup_action)
+        setupButton.visibility = if (recovery == null) View.GONE else View.VISIBLE
     }
 
     fun showSetupRequired(message: String) {
@@ -467,10 +514,10 @@ class AiAssistantUi(
             visibility = View.VISIBLE
         }
         retryButton.visibility = View.GONE
+        setRecovery(null)
         setupButton.visibility = View.VISIBLE
         setIntakeAvailable(false)
         updateFooterVisibility()
-        status.sendAccessibilityEvent(AccessibilityEvent.TYPE_ANNOUNCEMENT)
     }
 
     /**
@@ -493,23 +540,25 @@ class AiAssistantUi(
         clearResultActionState()
         results.removeAllViews()
         results.addView(sectionLabel(R.string.ai_clipboard_source_title), matchWrap().apply {
-            bottomMargin = dp(4)
+            bottomMargin = context.dp(PanelStyle.GAP_S_DP)
         })
         items.forEach { item ->
-            results.addView(compactButtonText(item.label, active = false).apply {
+            results.addView(context.panelButton(theme, PanelButtonKind.Secondary).apply {
+                text = item.label
                 contentDescription = item.label
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
                 setOnClickListener { onClipboardSourceSelected?.invoke(item.id) }
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(42)
-            ).apply { bottomMargin = dp(4) })
+                context.dp(PanelStyle.BUTTON_HEIGHT_DP)
+            ).apply { bottomMargin = context.dp(PanelStyle.GAP_S_DP) })
         }
-        results.addView(compactButton(android.R.string.cancel, active = false).apply {
+        results.addView(context.panelButton(theme, PanelButtonKind.Secondary).apply {
+            setText(android.R.string.cancel)
             setOnClickListener { onClipboardSourceSelectionCancelled?.invoke() }
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(38)
+            context.dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP)
         ))
         resultsScroll.visibility = View.VISIBLE
         resultsScroll.post { resultsScroll.scrollTo(0, 0) }
@@ -538,7 +587,8 @@ class AiAssistantUi(
         if (!enabled) {
             resultInteractionViews.forEach { control ->
                 control.isEnabled = false
-                control.alpha = RESULT_CONTROL_DISABLED_ALPHA
+                // Buttons fade via state color lists; only alpha-fade the other controls.
+                if (control !is Button) control.alpha = RESULT_CONTROL_DISABLED_ALPHA
             }
         }
         resultAppliedLabels.forEach { label ->
@@ -554,10 +604,8 @@ class AiAssistantUi(
 
     private fun registerResultActionControl(button: Button): Button = button.apply {
         resultInteractionViews += this
-        if (!resultActionControlsEnabled) {
-            isEnabled = false
-            alpha = RESULT_CONTROL_DISABLED_ALPHA
-        }
+        // Buttons fade through their state color lists; no manual alpha on top.
+        if (!resultActionControlsEnabled) isEnabled = false
     }
 
     private fun <T : View> registerResultInteraction(view: T): T = view.apply {
@@ -571,7 +619,7 @@ class AiAssistantUi(
     private fun appliedResultLabel(): TextView = TextView(context).apply {
         setText(R.string.ai_result_applied)
         setTextColor(theme.altKeyTextColor)
-        textSize = 12f
+        textSize = PanelStyle.TEXT_BODY
         gravity = Gravity.END
         visibility = if (resultActionControlsEnabled) View.GONE else View.VISIBLE
         resultAppliedLabels += this
@@ -585,27 +633,34 @@ class AiAssistantUi(
     ): View =
         LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(9), dp(7), dp(9), dp(7))
-            background = rounded(theme.altKeyBackgroundColor, dp(10))
+            setPadding(
+                dp(PanelStyle.CARD_PADDING_H_DP),
+                dp(PanelStyle.CARD_PADDING_V_DP),
+                dp(PanelStyle.CARD_PADDING_H_DP),
+                dp(PanelStyle.CARD_PADDING_V_DP)
+            )
+            background = context.panelSurface(theme.altKeyBackgroundColor)
 
             val patch = AiTextDiff.compute(source, suggestion)
 
             addView(TextView(context).apply {
                 text = context.getString(R.string.ai_result_number, index + 1)
                 setTextColor(theme.altKeyTextColor)
-                textSize = 11f
+                textSize = PanelStyle.TEXT_CAPTION
                 typeface = Typeface.DEFAULT_BOLD
             }, matchWrap())
 
             addView(TextView(context).apply {
                 text = if (action == AiAction.Proofread) highlightedSuggestion(patch) else suggestion
                 setTextColor(theme.keyTextColor)
-                textSize = 15f
-                setPadding(0, dp(4), 0, dp(5))
+                textSize = PanelStyle.TEXT_EMPHASIS
+                setPadding(0, dp(PanelStyle.GAP_S_DP), 0, dp(PanelStyle.GAP_S_DP))
             }, matchWrap())
 
             if (action == AiAction.Proofread) {
-                addView(partialChanges(patch), matchWrap().apply { bottomMargin = dp(5) })
+                addView(partialChanges(patch), matchWrap().apply {
+                    bottomMargin = dp(PanelStyle.GAP_S_DP)
+                })
             }
 
             val canApplySuggestion = AiResultApplyPolicy.canApply(
@@ -618,7 +673,7 @@ class AiAssistantUi(
                     addView(TextView(context).apply {
                         setText(R.string.ai_result_no_changes)
                         setTextColor(theme.altKeyTextColor)
-                        textSize = 12f
+                        textSize = PanelStyle.TEXT_BODY
                     }, matchWrap())
                 }
                 return@apply
@@ -628,46 +683,55 @@ class AiAssistantUi(
                 gravity = Gravity.END
                 if (source.isEmpty()) {
                     addView(registerResultActionControl(
-                        compactButton(R.string.ai_insert, active = true).apply {
+                        context.panelButton(theme, PanelButtonKind.Primary).apply {
+                            setText(R.string.ai_insert)
                             setOnClickListener { onSuggestionReplace?.invoke(suggestion) }
                         }
                     ), LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
-                        dp(RESULT_ACTION_BUTTON_HEIGHT_DP)
+                        dp(PanelStyle.BUTTON_HEIGHT_DP)
                     ))
                 } else if (replySourceOrigin != null) {
                     addView(registerResultActionControl(
-                        compactButton(R.string.ai_insert_reply, active = true).apply {
+                        context.panelButton(theme, PanelButtonKind.Primary).apply {
+                            setText(R.string.ai_insert_reply)
                             setOnClickListener { onSuggestionReplace?.invoke(suggestion) }
                         }
                     ), LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
-                        dp(RESULT_ACTION_BUTTON_HEIGHT_DP)
+                        dp(PanelStyle.BUTTON_HEIGHT_DP)
                     ))
                 } else {
                     addView(registerResultActionControl(
-                        compactButton(R.string.ai_replace, active = true).apply {
+                        context.panelButton(theme, PanelButtonKind.Primary).apply {
+                            setText(R.string.ai_replace)
                             setOnClickListener { onSuggestionReplace?.invoke(suggestion) }
                         }
-                    ), LinearLayout.LayoutParams(0, dp(RESULT_ACTION_BUTTON_HEIGHT_DP), 1f))
+                    ), LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f))
                     addView(registerResultActionControl(
-                        compactButton(R.string.ai_append, active = false).apply {
+                        context.panelButton(theme, PanelButtonKind.Secondary).apply {
+                            setText(R.string.ai_append)
                             setOnClickListener { onSuggestionAppend?.invoke(suggestion) }
                         }
-                    ), LinearLayout.LayoutParams(0, dp(RESULT_ACTION_BUTTON_HEIGHT_DP), 1f).apply {
-                        marginStart = dp(6)
+                    ), LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
+                        marginStart = dp(PanelStyle.GAP_S_DP)
                     })
                 }
             }, matchWrap())
-            addView(appliedResultLabel(), matchWrap().apply { topMargin = dp(4) })
+            addView(appliedResultLabel(), matchWrap().apply { topMargin = dp(PanelStyle.GAP_S_DP) })
         }
 
     private fun noChangesResultCard(): View = TextView(context).apply {
         setText(R.string.ai_result_no_changes)
         setTextColor(theme.altKeyTextColor)
-        textSize = 13f
-        setPadding(dp(10), dp(8), dp(10), dp(8))
-        background = rounded(theme.altKeyBackgroundColor, dp(10))
+        textSize = PanelStyle.TEXT_BODY
+        setPadding(
+            dp(PanelStyle.CARD_PADDING_H_DP),
+            dp(PanelStyle.CARD_PADDING_V_DP),
+            dp(PanelStyle.CARD_PADDING_H_DP),
+            dp(PanelStyle.CARD_PADDING_V_DP)
+        )
+        background = context.panelSurface(theme.altKeyBackgroundColor)
     }
 
     private fun partialChanges(patch: AiTextPatch): View = LinearLayout(context).apply {
@@ -676,7 +740,7 @@ class AiAssistantUi(
             addView(TextView(context).apply {
                 setText(R.string.ai_diff_no_changes)
                 setTextColor(theme.altKeyTextColor)
-                textSize = 12f
+                textSize = PanelStyle.TEXT_BODY
             }, matchWrap())
             return@apply
         }
@@ -684,16 +748,16 @@ class AiAssistantUi(
         addView(sectionLabel(R.string.ai_diff_changes), matchWrap())
         val selected = linkedSetOf<Int>()
         val applyButton = registerResultActionControl(
-            compactButton(R.string.ai_diff_apply_selected, active = true).apply {
-            isEnabled = false
-            alpha = 0.45f
-            setOnClickListener {
-                if (selected.isEmpty()) return@setOnClickListener
+            context.panelButton(theme, PanelButtonKind.Primary).apply {
+                setText(R.string.ai_diff_apply_selected)
                 isEnabled = false
-                alpha = 0.45f
-                onSelectedChangesApply?.invoke(patch, selected.toSet())
+                setOnClickListener {
+                    if (selected.isEmpty()) return@setOnClickListener
+                    isEnabled = false
+                    onSelectedChangesApply?.invoke(patch, selected.toSet())
+                }
             }
-        })
+        )
         patch.changes.forEachIndexed { index, change ->
             addView(registerResultInteraction(CheckBox(context).apply {
                 text = context.getString(
@@ -703,20 +767,19 @@ class AiAssistantUi(
                     change.replacement.visibleDiffText()
                 )
                 setTextColor(theme.keyTextColor)
-                textSize = 12f
-                minHeight = dp(38)
-                setPadding(dp(2), 0, dp(2), 0)
+                textSize = PanelStyle.TEXT_BODY
+                minHeight = dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP)
+                setPadding(dp(PanelStyle.GAP_XS_DP), 0, dp(PanelStyle.GAP_XS_DP), 0)
                 setOnCheckedChangeListener { _, checked ->
                     if (checked) selected += change.id else selected -= change.id
                     applyButton.isEnabled = resultActionControlsEnabled && selected.isNotEmpty()
-                    applyButton.alpha = if (applyButton.isEnabled) 1f else 0.45f
                 }
             }), matchWrap())
         }
         addView(applyButton, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(38)
-        ).apply { topMargin = dp(3) })
+            dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP)
+        ).apply { topMargin = dp(PanelStyle.GAP_S_DP) })
     }
 
     private fun highlightedSuggestion(patch: AiTextPatch): CharSequence =
@@ -748,35 +811,34 @@ class AiAssistantUi(
         actions: List<AiAction>,
         columns: Int
     ) {
-        addView(sectionLabel(labelRes), matchWrap().apply { topMargin = dp(1) })
+        addView(sectionLabel(labelRes), matchWrap().apply { topMargin = dp(PanelStyle.GAP_XS_DP) })
         actions.chunked(columns).forEach { rowActions ->
             addView(LinearLayout(context).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 rowActions.forEachIndexed { index, action ->
-                    addView(actionButton(action, columns), LinearLayout.LayoutParams(
+                    // The source surface deliberately keeps every action group visible before
+                    // scrolling. This compact IME row is still comfortably larger than a character
+                    // key on the same keyboard and avoids hiding translation actions below the
+                    // fold on a phone.
+                    addView(actionButton(action), LinearLayout.LayoutParams(
                         0,
-                        dp(ACTION_BUTTON_HEIGHT_DP),
+                        dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP),
                         1f
                     ).apply {
-                        if (index > 0) marginStart = dp(4)
+                        if (index > 0) marginStart = dp(PanelStyle.GAP_S_DP)
                     })
                 }
-            }, matchWrap().apply { topMargin = dp(1) })
+            }, matchWrap().apply { topMargin = dp(PanelStyle.GAP_XS_DP) })
         }
     }
 
-    private fun actionButton(action: AiAction, columns: Int): Button {
-        val (textSize, horizontalPadding) = when (columns) {
-            4 -> 10.5f to 2
-            3 -> 11f to 3
-            else -> 12f to 8
-        }
-        return compactButton(
-            textRes = action.labelRes(),
-            active = false,
-            textSize = textSize,
-            horizontalPadding = horizontalPadding
+    private fun actionButton(action: AiAction): Button =
+        context.panelButton(
+            theme,
+            PanelButtonKind.Secondary,
+            horizontalPaddingDp = PanelStyle.GAP_S_DP
         ).apply {
+            setText(action.labelRes())
             isSingleLine = true
             ellipsize = TextUtils.TruncateAt.END
             gravity = Gravity.CENTER
@@ -792,18 +854,16 @@ class AiAssistantUi(
                 }
             }
         }
-    }
 
     private fun updateActionButtons(enabledActions: Set<AiAction>) {
         actionButtons.forEach { (action, button) ->
             val selected = action == selectedAction
             val actionEnabled = action in enabledActions
             button.isEnabled = actionEnabled
-            button.alpha = if (actionEnabled) 1f else 0.45f
-            button.setTextColor(
+            button.setTextColor(PanelStyle.stateColors(
                 if (selected) theme.genericActiveForegroundColor else theme.keyTextColor
-            )
-            button.backgroundTintList = ColorStateList.valueOf(
+            ))
+            button.backgroundTintList = PanelStyle.stateColors(
                 if (selected) theme.genericActiveBackgroundColor else theme.keyBackgroundColor
             )
             button.isSelected = selected
@@ -934,7 +994,7 @@ class AiAssistantUi(
     private fun useResultPriorityLayout() {
         setPaneWeight(
             actionsScroll,
-            height = dp(RESULT_ACTION_CATALOG_MAX_HEIGHT_DP),
+            height = context.dp(RESULT_ACTION_CATALOG_MAX_HEIGHT_DP),
             weight = 0f
         )
         setPaneWeight(resultsScroll, height = 0, weight = 1f)
@@ -971,43 +1031,8 @@ class AiAssistantUi(
     private fun sectionLabel(@StringRes textRes: Int) = TextView(context).apply {
         setText(textRes)
         setTextColor(theme.altKeyTextColor)
-        textSize = 11f
+        textSize = PanelStyle.TEXT_CAPTION
         gravity = Gravity.CENTER_VERTICAL
-    }
-
-    private fun compactButton(
-        @StringRes textRes: Int,
-        active: Boolean,
-        textSize: Float = 12f,
-        horizontalPadding: Int = 10
-    ) = Button(context).apply {
-        isAllCaps = false
-        setText(textRes)
-        this.textSize = textSize
-        minHeight = 0
-        minimumHeight = 0
-        minWidth = 0
-        minimumWidth = 0
-        setPadding(dp(horizontalPadding), 0, dp(horizontalPadding), 0)
-        setTextColor(if (active) theme.genericActiveForegroundColor else theme.keyTextColor)
-        backgroundTintList = ColorStateList.valueOf(
-            if (active) theme.genericActiveBackgroundColor else theme.keyBackgroundColor
-        )
-    }
-
-    private fun compactButtonText(text: CharSequence, active: Boolean) = Button(context).apply {
-        isAllCaps = false
-        this.text = text
-        textSize = 12f
-        minHeight = 0
-        minimumHeight = 0
-        minWidth = 0
-        minimumWidth = 0
-        setPadding(dp(10), 0, dp(10), 0)
-        setTextColor(if (active) theme.genericActiveForegroundColor else theme.keyTextColor)
-        backgroundTintList = ColorStateList.valueOf(
-            if (active) theme.genericActiveBackgroundColor else theme.keyBackgroundColor
-        )
     }
 
     private fun AiAction.labelRes(): Int = when (this) {
@@ -1027,28 +1052,16 @@ class AiAssistantUi(
         AiAction.TranslateChinese -> R.string.ai_action_translate_chinese
     }
 
-    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius.toFloat()
-    }
-
     private fun matchWrap() = LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT,
         LinearLayout.LayoutParams.WRAP_CONTENT
     )
 
-    private fun dp(value: Int): Int =
-        (value * context.resources.displayMetrics.density).toInt()
-
     private companion object {
-        // The source surface deliberately keeps every action group visible before scrolling.
-        // This compact IME row is still comfortably larger than a character key on the same
-        // keyboard and avoids hiding translation actions below the fold on a phone.
-        const val ACTION_BUTTON_HEIGHT_DP = 36
-        const val RESULT_ACTION_BUTTON_HEIGHT_DP = 44
-        const val RESULT_ACTION_CATALOG_MAX_HEIGHT_DP = 84
-        const val SOURCE_PREVIEW_TOGGLE_HEIGHT_DP = 32
-        const val RESULT_CONTROL_DISABLED_ALPHA = 0.45f
+        // Cap = 2 × COMPACT_BUTTON_HEIGHT_DP: exactly two compact catalog rows stay visible
+        // above the result pane.
+        const val RESULT_ACTION_CATALOG_MAX_HEIGHT_DP = 2 * PanelStyle.COMPACT_BUTTON_HEIGHT_DP
+        const val RESULT_CONTROL_DISABLED_ALPHA = PanelStyle.DISABLED_ALPHA
         const val SOURCE_PREVIEW_COLLAPSED_LINES = 2
         const val SOURCE_PREVIEW_EXPAND_CHARACTERS = 140
         const val SOURCE_PREVIEW_EXPAND_NEWLINES = 2

@@ -23,26 +23,30 @@ import splitties.views.imageResource
 class TextKeyboard(
     context: Context,
     theme: Theme
-) : BaseKeyboard(context, theme, Layout) {
+) : BaseKeyboard(context, theme, layout()) {
 
     enum class CapsState { None, Once, Lock }
 
     companion object {
         const val Name = "Text"
 
-        val Layout: List<List<KeyDef>> = listOf(
-            listOf(
-                AlphabetKey("Q", "1"),
-                AlphabetKey("W", "2"),
-                AlphabetKey("E", "3"),
-                AlphabetKey("R", "4"),
-                AlphabetKey("T", "5"),
-                AlphabetKey("Y", "6"),
-                AlphabetKey("U", "7"),
-                AlphabetKey("I", "8"),
-                AlphabetKey("O", "9"),
-                AlphabetKey("P", "0")
-            ),
+        /** Swipe/long-press symbols of the top letter row when no number row is pinned. */
+        private const val TopRowDigits = "1234567890"
+
+        /**
+         * With a pinned number row the digits here would be a duplicate of the row right above,
+         * so the swipe layer earns its keep with symbols no other row offers.
+         */
+        private const val TopRowSymbols = "%^&_[]{}<>"
+
+        private fun topRow(numberRowPinned: Boolean): List<KeyDef> {
+            val alt = if (numberRowPinned) TopRowSymbols else TopRowDigits
+            return "QWERTYUIOP".mapIndexed { i, c ->
+                AlphabetKey(c.toString(), alt[i].toString())
+            }
+        }
+
+        private val LowerRows: List<List<KeyDef>> = listOf(
             listOf(
                 AlphabetKey("A", "@"),
                 AlphabetKey("S", "*"),
@@ -74,6 +78,11 @@ class TextKeyboard(
                 ReturnKey()
             )
         )
+
+        private fun layout(): List<List<KeyDef>> {
+            val pinned = PinnedNumberRow.isEnabled()
+            return PinnedNumberRow.prependTo(listOf(topRow(pinned)) + LowerRows, pinned)
+        }
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
@@ -96,8 +105,10 @@ class TextKeyboard(
     private var hangulInputMethodActive = false
     private var hangulKeyboardLayout: String? = null
 
+    private val numberRowOffset = if (PinnedNumberRow.isEnabled()) 1 else 0
+
     override fun thumbSplitBoundaryIndex(rowIndex: Int, keyCount: Int): Int? =
-        TextKeyboardSplitPolicy.boundaryIndex(rowIndex, keyCount)
+        TextKeyboardSplitPolicy.boundaryIndex(rowIndex, keyCount, numberRowOffset)
 
     init {
         updateLangSwitchKey(showLangSwitchKey.getValue())
@@ -277,7 +288,9 @@ class TextKeyboard(
 
     private fun updateAlphabetKeys() {
         textKeys.forEach {
-            if (it.def !is KeyDef.Appearance.AltText) return
+            // Skip this key, not the whole pass: non-AltText keys (the pinned number row, the
+            // layout switch key) sit among the alphabet keys and must not cut the loop short.
+            if (it.def !is KeyDef.Appearance.AltText) return@forEach
             it.mainText.text = it.def.displayText.let { str ->
                 if (str.length != 1 || !str[0].isLetter()) return@forEach
                 if (hangulInputMethodActive) transformAlphabetLegend(str)

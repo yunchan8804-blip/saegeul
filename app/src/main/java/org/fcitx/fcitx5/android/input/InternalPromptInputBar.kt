@@ -5,19 +5,21 @@
 package org.fcitx.fcitx5.android.input
 
 import android.content.Context
-import android.content.res.ColorStateList
-import android.graphics.drawable.GradientDrawable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextUtils
 import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelSurface
+import splitties.dimensions.dp
 
 /** Prompt strip shown above the existing Fcitx keyboard while text is captured internally. */
 class InternalPromptInputBar(
@@ -38,8 +40,8 @@ class InternalPromptInputBar(
     private val aiContextLabel = TextView(context).apply {
         setText(R.string.ai_direct_prompt_context)
         setTextColor(theme.keyTextColor)
-        alpha = AI_CONTEXT_ALPHA
-        textSize = 10f
+        alpha = PanelStyle.HINT_ALPHA
+        textSize = PanelStyle.TEXT_CAPTION
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
@@ -49,52 +51,66 @@ class InternalPromptInputBar(
         addView(TextView(context).apply {
             setText(R.string.ai_direct_prompt_title)
             setTextColor(theme.keyTextColor)
-            textSize = 11f
+            textSize = PanelStyle.TEXT_CAPTION
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
         }, LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(AI_CONTEXT_HEIGHT_DP)))
         addView(aiContextLabel, LayoutParams(0, dp(AI_CONTEXT_HEIGHT_DP), 1f).apply {
-            marginStart = dp(6)
+            marginStart = dp(PanelStyle.GAP_S_DP)
         })
     }
 
     private val prompt = TextView(context).apply {
         gravity = Gravity.CENTER_VERTICAL
         setTextColor(theme.keyTextColor)
-        textSize = 14f
+        textSize = PanelStyle.TEXT_BODY
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.START
-        setPadding(dp(12), 0, dp(10), 0)
-        background = rounded(theme.altKeyBackgroundColor, dp(10))
+        setPadding(dp(PanelStyle.CARD_PADDING_H_DP), 0, dp(PanelStyle.CARD_PADDING_H_DP), 0)
+        background = context.panelSurface(theme.altKeyBackgroundColor)
     }
 
-    private val cancel = compactButton(android.R.string.cancel, active = false).apply {
+    private val cancel = context.panelButton(theme, PanelButtonKind.Secondary).apply {
+        setText(android.R.string.cancel)
+        minWidth = dp(MIN_CONTROL_WIDTH_DP)
         setOnClickListener { onCancel?.invoke() }
     }
 
-    private val submit = compactButton(spec.submitRes, active = true).apply {
+    private val submit = context.panelButton(theme, PanelButtonKind.Primary).apply {
+        setText(spec.submitRes)
+        minWidth = dp(MIN_CONTROL_WIDTH_DP)
         setOnClickListener { onSubmit?.invoke() }
     }
 
     private val promptRow = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
         orientation = HORIZONTAL
-        addView(prompt, LayoutParams(0, dp(GIF_CONTROL_HEIGHT_DP), 1f))
-        addView(cancel, LayoutParams(dp(58), dp(GIF_CONTROL_HEIGHT_DP)).apply {
-            marginStart = dp(6)
-        })
-        addView(submit, LayoutParams(dp(66), dp(GIF_CONTROL_HEIGHT_DP)).apply {
-            marginStart = dp(4)
-        })
+        addView(prompt, LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f))
+        addView(cancel, LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            dp(PanelStyle.BUTTON_HEIGHT_DP)
+        ).apply { marginStart = dp(PanelStyle.GAP_S_DP) })
+        addView(submit, LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            dp(PanelStyle.BUTTON_HEIGHT_DP)
+        ).apply { marginStart = dp(PanelStyle.GAP_S_DP) })
     }
 
     init {
         orientation = VERTICAL
-        setPadding(dp(8), dp(6), dp(8), dp(6))
+        setPadding(
+            dp(PanelStyle.GAP_M_DP),
+            dp(PanelStyle.PANEL_PADDING_V_DP),
+            dp(PanelStyle.GAP_M_DP),
+            dp(PanelStyle.PANEL_PADDING_V_DP)
+        )
         setBackgroundColor(theme.barColor)
         visibility = View.GONE
         addView(aiContext, LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(AI_CONTEXT_HEIGHT_DP)))
-        addView(promptRow, LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(GIF_CONTROL_HEIGHT_DP)))
+        addView(promptRow, LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(PanelStyle.BUTTON_HEIGHT_DP)
+        ))
     }
 
     fun configure(spec: InternalPromptSpec, contextLabel: CharSequence? = null) {
@@ -102,7 +118,6 @@ class InternalPromptInputBar(
         val isAi = spec.feature == InternalPromptFeature.Ai
         aiContext.visibility = if (isAi) View.VISIBLE else View.GONE
         aiContextLabel.text = contextLabel ?: context.getString(R.string.ai_direct_prompt_context)
-        updateControlHeight(if (isAi) AI_CONTROL_HEIGHT_DP else GIF_CONTROL_HEIGHT_DP)
         submit.setText(spec.submitRes)
         render(committed = "", preedit = "")
     }
@@ -119,7 +134,7 @@ class InternalPromptInputBar(
         prompt.text = if (combined.isBlank()) {
             SpannableString(context.getString(spec.hintRes) + CARET).apply {
                 setSpan(
-                    ForegroundColorSpan(theme.genericActiveBackgroundColor),
+                    ForegroundColorSpan(theme.accentKeyBackgroundColor),
                     length - CARET.length,
                     length,
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -129,7 +144,7 @@ class InternalPromptInputBar(
             SpannableString(combined + CARET).apply {
                 if (preedit.isNotEmpty()) {
                     setSpan(
-                        ForegroundColorSpan(theme.genericActiveBackgroundColor),
+                        ForegroundColorSpan(theme.accentKeyBackgroundColor),
                         committed.length,
                         combined.length,
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -138,16 +153,15 @@ class InternalPromptInputBar(
                 // Internal prompt capture intentionally supports only the end cursor. Keep the
                 // caret visible so this does not look like a read-only status label.
                 setSpan(
-                    ForegroundColorSpan(theme.genericActiveBackgroundColor),
+                    ForegroundColorSpan(theme.accentKeyBackgroundColor),
                     combined.length,
                     length,
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
             }
         }
-        prompt.alpha = if (combined.isBlank()) EMPTY_PROMPT_ALPHA else 1f
+        prompt.alpha = if (combined.isBlank()) PanelStyle.HINT_ALPHA else 1f
         submit.isEnabled = !submitPending && (spec.allowBlankSubmission || hasInput)
-        submit.alpha = if (submit.isEnabled) 1f else 0.45f
         contentDescription = context.getString(spec.hintRes) + ": " + combined
     }
 
@@ -155,51 +169,18 @@ class InternalPromptInputBar(
     fun setSubmitPending(pending: Boolean) {
         submitPending = pending
         cancel.isEnabled = !pending
-        cancel.alpha = if (cancel.isEnabled) 1f else 0.45f
         submit.isEnabled = !pending && (spec.allowBlankSubmission || hasInput)
-        submit.alpha = if (submit.isEnabled) 1f else 0.45f
     }
-
-    private fun compactButton(textRes: Int, active: Boolean) = Button(context).apply {
-        isAllCaps = false
-        setText(textRes)
-        textSize = 12f
-        minHeight = 0
-        minimumHeight = 0
-        minWidth = 0
-        minimumWidth = 0
-        setPadding(dp(8), 0, dp(8), 0)
-        setTextColor(if (active) theme.genericActiveForegroundColor else theme.keyTextColor)
-        backgroundTintList = ColorStateList.valueOf(
-            if (active) theme.genericActiveBackgroundColor else theme.keyBackgroundColor
-        )
-    }
-
-    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius.toFloat()
-    }
-
-    private fun updateControlHeight(heightDp: Int) {
-        val height = dp(heightDp)
-        promptRow.layoutParams.height = height
-        prompt.layoutParams.height = height
-        cancel.layoutParams.height = height
-        submit.layoutParams.height = height
-        promptRow.requestLayout()
-    }
-
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
 
     private companion object {
         const val AI_CONTEXT_HEIGHT_DP = 16
-        const val AI_CONTROL_HEIGHT_DP = 40
-        const val GIF_CONTROL_HEIGHT_DP = 44
-        const val AI_PROMPT_HEIGHT_DP = 68
-        const val GIF_PROMPT_HEIGHT_DP = 56
-        const val AI_CONTEXT_ALPHA = 0.72f
-        const val EMPTY_PROMPT_ALPHA = 0.65f
+        const val MIN_CONTROL_WIDTH_DP = 64
+        // Strip heights are the sum of their parts:
+        // GIF = controls (48) + vertical padding (8 + 8) = 64
+        // AI  = context row (16) + GIF strip (64) = 80
+        const val GIF_PROMPT_HEIGHT_DP =
+            PanelStyle.BUTTON_HEIGHT_DP + 2 * PanelStyle.PANEL_PADDING_V_DP
+        const val AI_PROMPT_HEIGHT_DP = AI_CONTEXT_HEIGHT_DP + GIF_PROMPT_HEIGHT_DP
         const val CARET = "\u200A│"
     }
 }

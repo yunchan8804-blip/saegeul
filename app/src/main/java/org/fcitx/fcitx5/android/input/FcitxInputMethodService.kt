@@ -374,6 +374,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
         prefs.keyboard.expandKeypressArea,
+        // Key layouts are built once per keyboard instance, so the pinned number row can only be
+        // added or removed by rebuilding the whole input view.
+        prefs.keyboard.showNumberRow,
         prefs.advanced.disableAnimation,
         prefs.advanced.ignoreSystemWindowInsets,
     )
@@ -1547,6 +1550,24 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun allowsAiInputFeatures(): Boolean =
         allowsNetworkInputFeatures() &&
             effectiveAppProfile?.source?.aiPolicy != AppFeaturePolicy.Block
+
+    /**
+     * Which of the three gates in [allowsNetworkInputFeatures] is closed, so a panel can
+     * name the real cause and point at the setting that reopens it. Null when allowed.
+     */
+    fun networkInputBlock(): InputFeatureBlock? = when {
+        !allowsTextInspectionFeatures() -> InputFeatureBlock.PrivateEditor
+        offlineMode -> InputFeatureBlock.OfflineMode
+        effectiveAppProfile?.source?.networkPolicy == AppFeaturePolicy.Block ->
+            InputFeatureBlock.AppPolicy
+        else -> null
+    }
+
+    /** [networkInputBlock] plus the AI-only app policy. Null when allowed. */
+    fun aiInputBlock(): InputFeatureBlock? = networkInputBlock()
+        ?: InputFeatureBlock.AppPolicy.takeIf {
+            effectiveAppProfile?.source?.aiPolicy == AppFeaturePolicy.Block
+        }
 
     fun effectiveMobileHangulLayout(global: MobileHangulLayout): MobileHangulLayout =
         effectiveAppProfile?.source?.mobileHangulLayout ?: global

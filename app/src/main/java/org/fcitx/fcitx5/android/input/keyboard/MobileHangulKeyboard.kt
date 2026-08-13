@@ -50,7 +50,7 @@ class MobileHangulKeyboard(
     context: Context,
     theme: Theme,
     val mobileLayout: MobileHangulLayout
-) : BaseKeyboard(context, theme, layoutFor(mobileLayout)) {
+) : BaseKeyboard(context, theme, PinnedNumberRow.prependTo(layoutFor(mobileLayout))) {
 
     companion object {
         fun name(layout: MobileHangulLayout) = "MobileHangul:${layout.name}"

@@ -86,10 +86,10 @@ Enable Windows Developer Mode and Git symlink support before cloning:
 
 ```powershell
 git config --global core.symlinks true
-git clone --recurse-submodules https://github.com/fcitx5-android/fcitx5-android.git D:\workspace\fcitx5-android
+git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git D:\workspace\fcitx5-android
 ```
 
-That command recovers the upstream baseline only. The `feat/hangul-buffered-input` branch is local and has not been pushed to the official remote, so preserve the existing `D:\workspace\fcitx5-android` checkout. Reproducing this branch elsewhere requires an approved fork/remote push, a verified Git bundle, or an exported patch containing the local commits.
+That command recovers the current independent-fork baseline (`origin` = `yunchan8804-blip/saegeul`; the original `fcitx5-android/fcitx5-android` project is tracked separately as `upstream` — see [`docs/independent-fork/README.md`](independent-fork/README.md) §2). The `feat/hangul-buffered-input` branch is local and has not been pushed to `origin`, so preserve the existing `D:\workspace\fcitx5-android` checkout. Reproducing this branch elsewhere requires an approved fork/remote push, a verified Git bundle, or an exported patch containing the local commits.
 
 Install MSYS2 plus the native configuration tools:
 

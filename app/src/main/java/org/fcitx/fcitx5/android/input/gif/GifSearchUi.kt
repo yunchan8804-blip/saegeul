@@ -6,9 +6,7 @@ package org.fcitx.fcitx5.android.input.gif
 
 import android.content.Context
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -22,6 +20,14 @@ import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
+import org.fcitx.fcitx5.android.input.panel.PanelRecovery
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.pressableChipSurface
+import org.fcitx.fcitx5.android.input.panel.pressablePanelSurface
+import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
+import splitties.dimensions.dp
 
 class GifSearchUi(private val context: Context, private val theme: Theme) {
 
@@ -36,30 +42,39 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
     private val queryText = TextView(context).apply {
         gravity = Gravity.CENTER_VERTICAL
         setTextColor(theme.keyTextColor)
-        textSize = 15f
-        setPadding(context.dp(12), 0, context.dp(8), 0)
-        background = rounded(theme.altKeyBackgroundColor, context.dp(12).toFloat())
+        textSize = PanelStyle.TEXT_EMPHASIS
+        setPadding(dp(PanelStyle.CARD_PADDING_H_DP), 0, dp(PanelStyle.GAP_M_DP), 0)
+        background = context.pressablePanelSurface(theme, theme.altKeyBackgroundColor)
         setOnClickListener { onQueryClick?.invoke() }
     }
 
     private val searchButton = ImageButton(context).apply {
         setImageResource(R.drawable.ic_baseline_search_24)
         imageTintList = ColorStateList.valueOf(theme.altKeyTextColor)
-        background = null
+        // Half of the 48dp touch target, like the toolbar tool buttons.
+        background = borderlessRippleDrawable(theme.keyPressHighlightColor, dp(24))
         contentDescription = context.getString(R.string.gif_search_action)
         setOnClickListener { onQueryClick?.invoke() }
     }
 
     private val queryRow = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(context.dp(8), context.dp(6), context.dp(4), context.dp(2))
-        addView(queryText, LinearLayout.LayoutParams(0, context.dp(42), 1f))
-        addView(searchButton, LinearLayout.LayoutParams(context.dp(44), context.dp(44)))
+        setPadding(
+            dp(PanelStyle.GAP_M_DP),
+            dp(PanelStyle.GAP_S_DP),
+            dp(PanelStyle.GAP_S_DP),
+            dp(PanelStyle.GAP_S_DP)
+        )
+        addView(queryText, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f))
+        addView(searchButton, LinearLayout.LayoutParams(
+            dp(PanelStyle.BUTTON_HEIGHT_DP),
+            dp(PanelStyle.BUTTON_HEIGHT_DP)
+        ))
     }
 
     private val keywordRow = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
-        setPadding(context.dp(6), 0, context.dp(6), context.dp(2))
+        setPadding(dp(PanelStyle.GAP_M_DP), 0, dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_S_DP))
     }
 
     private val keywordScroller = HorizontalScrollView(context).apply {
@@ -69,27 +84,28 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
 
     private val providerLabel = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
-        alpha = 0.72f
-        textSize = 10f
+        textSize = PanelStyle.TEXT_CAPTION
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(0, context.dp(1), 0, context.dp(3))
+        setPadding(0, 0, 0, dp(PanelStyle.GAP_S_DP))
     }
     private val providerDisclosure = TextView(context).apply {
         setTextColor(theme.altKeyTextColor)
-        alpha = 0.82f
-        textSize = 10f
-        setPadding(context.dp(8), 0, context.dp(8), context.dp(3))
+        textSize = PanelStyle.TEXT_CAPTION
+        setPadding(dp(PanelStyle.GAP_M_DP), 0, dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_S_DP))
     }
 
     private val moreGifSettingsButton = Button(context).apply {
         isAllCaps = false
         text = context.getString(R.string.gif_more_settings)
-        textSize = 11f
+        textSize = PanelStyle.TEXT_CAPTION
         minHeight = 0
         minimumHeight = 0
-        setPadding(context.dp(9), 0, context.dp(9), 0)
+        minWidth = 0
+        minimumWidth = 0
+        setPadding(dp(PanelStyle.CARD_PADDING_H_DP), 0, dp(PanelStyle.CARD_PADDING_H_DP), 0)
+        // Settings entry keeps the genericActive emphasis tokens; not a committing action.
         setTextColor(theme.genericActiveForegroundColor)
-        background = rounded(theme.genericActiveBackgroundColor, context.dp(12).toFloat())
+        background = context.pressableChipSurface(theme, theme.genericActiveBackgroundColor)
         contentDescription = text
         visibility = View.GONE
         setOnClickListener { onMoreGifSettings?.invoke() }
@@ -97,29 +113,30 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
 
     private val providerRow = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(context.dp(8), 0, context.dp(8), context.dp(2))
+        setPadding(dp(PanelStyle.GAP_M_DP), 0, dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_XS_DP))
         addView(providerLabel, LinearLayout.LayoutParams(
             0,
-            context.dp(30),
+            LinearLayout.LayoutParams.WRAP_CONTENT,
             1f
         ))
         addView(moreGifSettingsButton, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
-            context.dp(30)
-        ).apply { marginStart = context.dp(6) })
+            dp(PanelStyle.CHIP_HEIGHT_DP)
+        ).apply { marginStart = dp(PanelStyle.GAP_M_DP) })
     }
 
     val recyclerView = RecyclerView(context).apply {
         overScrollMode = View.OVER_SCROLL_NEVER
-        setPadding(context.dp(4))
+        setPadding(dp(PanelStyle.GAP_S_DP))
         clipToPadding = false
     }
 
     private val centerMessage = TextView(context).apply {
         gravity = Gravity.CENTER
         setTextColor(theme.keyTextColor)
-        textSize = 15f
-        setPadding(context.dp(24))
+        textSize = PanelStyle.TEXT_EMPHASIS
+        setPadding(dp(PanelStyle.PANEL_PADDING_H_DP))
+        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         visibility = View.GONE
     }
 
@@ -128,11 +145,30 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         visibility = View.GONE
     }
 
-    private val retryButton = Button(context).apply {
-        isAllCaps = false
+    private val retryButton = context.panelButton(theme, PanelButtonKind.Primary).apply {
         text = context.getString(R.string.gif_retry)
         visibility = View.GONE
         setOnClickListener { onRetry?.invoke() }
+    }
+
+    // Fix-it action that leaves the panel for the setting behind the block.
+    private var recovery: PanelRecovery? = null
+
+    private val recoveryButton = context.panelButton(theme, PanelButtonKind.Secondary).apply {
+        visibility = View.GONE
+        setOnClickListener { recovery?.run?.invoke() }
+    }
+
+    private val statusActions = LinearLayout(context).apply {
+        gravity = Gravity.CENTER
+        addView(retryButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            dp(PanelStyle.BUTTON_HEIGHT_DP)
+        ))
+        addView(recoveryButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            dp(PanelStyle.BUTTON_HEIGHT_DP)
+        ).apply { marginStart = dp(PanelStyle.GAP_M_DP) })
     }
 
     private val statusOverlay = FrameLayout(context).apply {
@@ -140,20 +176,26 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
-        addView(progress, FrameLayout.LayoutParams(context.dp(42), context.dp(42), Gravity.CENTER))
-        addView(retryButton, FrameLayout.LayoutParams(
+        addView(progress, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER))
+        addView(statusActions, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
-            context.dp(44),
+            FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
-        ).apply { bottomMargin = context.dp(22) })
+        ).apply { bottomMargin = dp(20) })
     }
 
     private val actionStatus = TextView(context).apply {
         gravity = Gravity.CENTER
-        setTextColor(Color.WHITE)
-        setBackgroundColor(0xcc202124.toInt())
-        textSize = 13f
-        setPadding(context.dp(8), context.dp(6), context.dp(8), context.dp(6))
+        setTextColor(PanelStyle.STATUS_SCRIM_TEXT)
+        setBackgroundColor(PanelStyle.STATUS_SCRIM_NEUTRAL)
+        textSize = PanelStyle.TEXT_BODY
+        setPadding(
+            dp(PanelStyle.CARD_PADDING_H_DP),
+            dp(PanelStyle.CARD_PADDING_V_DP),
+            dp(PanelStyle.CARD_PADDING_H_DP),
+            dp(PanelStyle.CARD_PADDING_V_DP)
+        )
+        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         visibility = View.GONE
     }
 
@@ -182,11 +224,11 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         column.addView(queryRow)
         column.addView(keywordScroller, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            context.dp(32)
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ))
         column.addView(providerRow, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            context.dp(32)
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ))
         column.addView(providerDisclosure, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -212,15 +254,15 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
                 text = context.getString(labelRes)
                 gravity = Gravity.CENTER
                 setTextColor(theme.altKeyTextColor)
-                textSize = 12f
+                textSize = PanelStyle.TEXT_BODY
                 typeface = Typeface.DEFAULT_BOLD
-                setPadding(context.dp(12), 0, context.dp(12), 0)
-                background = rounded(theme.altKeyBackgroundColor, context.dp(14).toFloat())
+                setPadding(dp(PanelStyle.CARD_PADDING_H_DP), 0, dp(PanelStyle.CARD_PADDING_H_DP), 0)
+                background = context.pressableChipSurface(theme, theme.altKeyBackgroundColor)
                 setOnClickListener { onKeyword?.invoke(query) }
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                context.dp(30)
-            ).apply { marginEnd = context.dp(5) })
+                context.dp(PanelStyle.CHIP_HEIGHT_DP)
+            ).apply { marginEnd = context.dp(PanelStyle.GAP_S_DP) })
         }
     }
 
@@ -248,6 +290,7 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         centerMessage.visibility = View.VISIBLE
         progress.visibility = View.VISIBLE
         retryButton.visibility = View.GONE
+        setRecovery(null)
         actionStatus.visibility = View.GONE
     }
 
@@ -255,6 +298,7 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         recyclerView.visibility = View.VISIBLE
         progress.visibility = View.GONE
         retryButton.visibility = View.GONE
+        setRecovery(null)
         if (hasResults) {
             statusOverlay.visibility = View.GONE
         } else {
@@ -265,33 +309,43 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         actionStatus.visibility = View.GONE
     }
 
-    fun showBlockingMessage(message: String, retry: Boolean = false) {
+    fun showBlockingMessage(
+        message: String,
+        retry: Boolean = false,
+        recovery: PanelRecovery? = null
+    ) {
         recyclerView.visibility = View.INVISIBLE
         statusOverlay.visibility = View.VISIBLE
         centerMessage.text = message
         centerMessage.visibility = View.VISIBLE
         progress.visibility = View.GONE
         retryButton.visibility = if (retry) View.VISIBLE else View.GONE
+        setRecovery(recovery)
         actionStatus.visibility = View.GONE
+    }
+
+    private fun setRecovery(recovery: PanelRecovery?) {
+        this.recovery = recovery
+        if (recovery == null) {
+            recoveryButton.visibility = View.GONE
+            return
+        }
+        recoveryButton.setText(recovery.labelRes)
+        recoveryButton.contentDescription = recoveryButton.text
+        recoveryButton.visibility = View.VISIBLE
     }
 
     fun showActionStatus(message: String, isError: Boolean = false) {
         actionStatus.text = message
-        actionStatus.setBackgroundColor(if (isError) 0xdd8b1e1e.toInt() else 0xcc202124.toInt())
+        actionStatus.setBackgroundColor(
+            if (isError) PanelStyle.STATUS_SCRIM_ERROR else PanelStyle.STATUS_SCRIM_NEUTRAL
+        )
         actionStatus.visibility = View.VISIBLE
     }
 
     fun clearActionStatus() {
         actionStatus.visibility = View.GONE
     }
-
-    private fun rounded(color: Int, radius: Float) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius
-    }
-
-    private fun Context.dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
 
     private fun GifQuickSuggestion.labelAndQuery(): Pair<Int, String> = when (this) {
         GifQuickSuggestion.Trending -> R.string.gif_keyword_trending to ""

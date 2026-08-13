@@ -113,6 +113,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandedCandidateStyle by prefs.keyboard.expandedCandidateStyle
     private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
+    private val showNumberRow by prefs.keyboard.showNumberRow
     private val showVoiceInputButton by prefs.keyboard.showVoiceInputButton
     private val preferredVoiceInput by prefs.keyboard.preferredVoiceInput
 
@@ -552,7 +553,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }
-        isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
+        // The pinned number row already covers password fields, so don't stack a second one here.
+        isCapabilityFlagsPassword =
+            toolbarNumRowOnPassword && !showNumberRow && capFlags.has(CapabilityFlag.Password)
         val allowsTextInspection = service.allowsTextInspectionFeatures()
         val allowsNetwork = service.allowsNetworkInputFeatures()
         val allowsAi = service.allowsAiInputFeatures()

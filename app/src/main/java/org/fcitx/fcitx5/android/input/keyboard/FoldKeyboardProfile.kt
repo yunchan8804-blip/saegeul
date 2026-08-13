@@ -164,6 +164,14 @@ object ThumbSplitLayoutCalculator {
 internal object TextKeyboardSplitPolicy {
     private val boundaryByRow = intArrayOf(5, 5, 5, 3)
 
-    fun boundaryIndex(rowIndex: Int, keyCount: Int): Int? =
-        boundaryByRow.getOrNull(rowIndex)?.takeIf { it in 1 until keyCount }
+    /**
+     * A pinned digit row shifts every letter row down by one, so [numberRowOffset] maps the view
+     * row back onto the letter row this policy is written against.
+     */
+    fun boundaryIndex(rowIndex: Int, keyCount: Int, numberRowOffset: Int = 0): Int? {
+        val letterRow = rowIndex - numberRowOffset
+        val boundary =
+            if (letterRow < 0) PinnedNumberRow.SPLIT_BOUNDARY else boundaryByRow.getOrNull(letterRow)
+        return boundary?.takeIf { it in 1 until keyCount }
+    }
 }

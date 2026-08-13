@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseAuthCoordinat
 import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.PinnedNumberRow
 import org.fcitx.fcitx5.android.input.ocr.OcrDocumentCoordinator
 import org.fcitx.fcitx5.android.input.ocr.OcrWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
@@ -72,6 +73,9 @@ import splitties.views.dsl.core.view
 import splitties.views.dsl.core.wrapContent
 import splitties.views.imageDrawable
 import kotlin.math.max
+
+/** Upper bound of the keyboard height preference; scaling must not exceed what users can set. */
+private const val MAX_HEIGHT_PERCENT = 90
 
 @SuppressLint("ViewConstructor")
 class InputView(
@@ -176,7 +180,10 @@ class InputView(
                 Configuration.ORIENTATION_LANDSCAPE -> keyboardHeightPercentLandscape
                 else -> keyboardHeightPercent
             }.getValue()
-            return resources.displayMetrics.heightPixels * percent / 100
+            // A pinned number row adds a fifth row to the letter surfaces. Grow the keyboard with
+            // it so the existing keys keep their size instead of being squeezed.
+            val effectivePercent = PinnedNumberRow.scaleHeightPercent(percent, MAX_HEIGHT_PERCENT)
+            return resources.displayMetrics.heightPixels * effectivePercent / 100
         }
 
     private val keyboardSidePaddingPx: Int
