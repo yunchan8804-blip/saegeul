@@ -46,9 +46,7 @@ class AboutFragment : PaddingPreferenceFragment() {
             addPreference(R.string.source_code, R.string.source_code_summary) {
                 navigateWithAnim(SettingsRoute.LegalDocument(LegalDocumentKind.Source))
             }
-            addPreference(R.string.license, Const.licenseSpdxId) {
-                navigateWithAnim(SettingsRoute.License)
-            }
+            addPreference(R.string.license, Const.licenseSpdxId)
             addCategory(R.string.version) {
                 isIconSpaceReserved = false
                 addPreference(R.string.current_version, Const.versionName)

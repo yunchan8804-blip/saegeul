@@ -17,10 +17,12 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.InputFeatureBlock
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
@@ -133,18 +135,16 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         val query = pendingPromptQuery ?: currentQuery
         pendingPromptQuery = null
         cache.cleanupExpired()
-        val networkInputAllowed = service.allowsNetworkInputFeatures()
+        val networkBlock = service.networkInputBlock()
         ui.setMoreGifSettingsVisible(
-            providerPresentation.showsMoreGifSettings && networkInputAllowed
+            providerPresentation.showsMoreGifSettings && networkBlock == null
         )
-        if (!networkInputAllowed) {
-            retryAction = null
-            ui.showBlockingMessage(context.getString(R.string.gif_private_disabled))
+        if (networkBlock != null) {
+            showNetworkBlock(networkBlock)
             return
         }
         if (!effectiveProvider.networkReady) {
-            retryAction = null
-            ui.showBlockingMessage(giphyUnavailableMessage())
+            showProviderUnavailable()
             return
         }
         adapter.setAttachSupported(committer.supportsGif(info))
@@ -158,10 +158,34 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         adapter.onDetached()
     }
 
+    /**
+     * Names the gate that actually closed instead of blaming the editor, and offers the
+     * setting that reopens it. A private editor is a privacy guarantee, so it gets none.
+     */
+    private fun showNetworkBlock(block: InputFeatureBlock) {
+        retryAction = null
+        hasNextPage = false
+        ui.showBlockingMessage(
+            context.getString(
+                PanelRecoveries.messageFor(block, R.string.gif_private_disabled)
+            ),
+            recovery = PanelRecoveries.forBlock(service, block)
+        )
+    }
+
+    /** The provider itself is unusable (missing key or approval): send the user to its settings. */
+    private fun showProviderUnavailable() {
+        retryAction = null
+        hasNextPage = false
+        ui.showBlockingMessage(
+            giphyUnavailableMessage(),
+            recovery = PanelRecoveries.gifSettings(service)
+        )
+    }
+
     private fun search(query: String) {
         if (!effectiveProvider.networkReady) {
-            retryAction = null
-            ui.showBlockingMessage(giphyUnavailableMessage())
+            showProviderUnavailable()
             return
         }
         searchJob?.cancel()
@@ -195,9 +219,9 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
                 when (val outcome = searchGate.search(allowed, currentQuery, page = page)) {
                     GifSearchOutcome.Blocked -> {
                         if (generation != searchGeneration) return@launch
-                        retryAction = null
-                        hasNextPage = false
-                        ui.showBlockingMessage(context.getString(R.string.gif_private_disabled))
+                        showNetworkBlock(
+                            service.networkInputBlock() ?: InputFeatureBlock.PrivateEditor
+                        )
                     }
                     GifSearchOutcome.SafeSearchBlocked -> {
                         if (generation != searchGeneration) return@launch
@@ -236,12 +260,12 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
     }
 
     private fun beginQueryEditing() {
-        if (!service.allowsNetworkInputFeatures()) {
-            ui.showBlockingMessage(context.getString(R.string.gif_private_disabled))
+        service.networkInputBlock()?.let {
+            showNetworkBlock(it)
             return
         }
         if (!effectiveProvider.networkReady) {
-            ui.showBlockingMessage(giphyUnavailableMessage())
+            showProviderUnavailable()
             return
         }
         searchJob?.cancel()

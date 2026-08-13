@@ -110,7 +110,7 @@ class MainFragment : PaddingPreferenceFragment() {
                 )
                 addDestinationPreference(
                     R.string.app_profiles,
-                    R.drawable.ic_baseline_android_24,
+                    R.drawable.ic_baseline_settings_24,
                     SettingsRoute.AppProfiles
                 )
                 addDestinationPreference(

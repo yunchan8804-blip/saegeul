@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
@@ -95,16 +96,13 @@ class OcrWindow(
                 } else if (modelInstalled) {
                     ui.showReady()
                 } else {
-                    ui.showModelMissing(canDownload = service.allowsNetworkInputFeatures())
+                    showModelMissing()
                 }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
                 modelInstalled = false
-                if (attached) ui.showModelMissing(
-                    canDownload = service.allowsNetworkInputFeatures(),
-                    failed = true
-                )
+                if (attached) showModelMissing(failed = true)
             }
         }
     }
@@ -115,7 +113,7 @@ class OcrWindow(
             return
         }
         if (!service.allowsNetworkInputFeatures()) {
-            ui.showModelMissing(canDownload = false)
+            showModelMissing()
             return
         }
         cancelWork()
@@ -131,10 +129,7 @@ class OcrWindow(
                 throw exception
             } catch (exception: Exception) {
                 modelInstalled = false
-                if (attached) ui.showModelMissing(
-                    canDownload = service.allowsNetworkInputFeatures(),
-                    failed = true
-                )
+                if (attached) showModelMissing(failed = true)
             } finally {
                 modelManager.cancel()
             }
@@ -306,7 +301,7 @@ class OcrWindow(
             } else if (modelInstalled) {
                 ui.showReady()
             } else {
-                ui.showModelMissing(canDownload = service.allowsNetworkInputFeatures())
+                showModelMissing()
             }
         }
     }
@@ -324,6 +319,18 @@ class OcrWindow(
         selectedIds = emptySet()
         if (!keepTarget) target = null
         commitGate.resetForReview()
+    }
+
+    /**
+     * The model download is the only network step here, so a blocked one names the gate
+     * that closed and offers the setting that reopens it.
+     */
+    private fun showModelMissing(failed: Boolean = false) {
+        ui.showModelMissing(
+            canDownload = service.allowsNetworkInputFeatures(),
+            failed = failed,
+            recovery = service.networkInputBlock()?.let { PanelRecoveries.forBlock(service, it) }
+        )
     }
 
     private fun showPrivateBlocked() {

@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
@@ -142,7 +143,9 @@ class SensitivePhraseWindow(
                 privateEditor = !service.allowsTextInspectionFeatures()
             )
         }
-        ui.showItems(allowed)
+        // An empty list here means nothing in the vault is allowed for this app, which is
+        // fixed by adding a phrase or its package in settings rather than by retrying.
+        ui.showItems(allowed, PanelRecoveries.phraseSettings(service))
     }
 
     private fun preview(item: SensitivePhrase) {

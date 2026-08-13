@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
@@ -64,7 +65,12 @@ class DynamicPhraseWindow(
                 privateEditor = privateEditor
             )
         ).also { result ->
-            ui.show(template, result, result.issues.map(::issueMessage))
+            ui.show(
+                template,
+                result,
+                result.issues.map(::issueMessage),
+                PanelRecoveries.phraseSettings(service)
+            )
         }
     }
 

@@ -215,9 +215,23 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
             }
             existing?.let { profile ->
                 dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
-                    store.remove(profile.packageName)
-                    dialog.dismiss()
-                    rebuild()
+                    // Deleting a profile is destructive; confirm once, like the credential
+                    // and personal word removal flows.
+                    AlertDialog.Builder(ctx)
+                        .setTitle(R.string.delete)
+                        .setMessage(
+                            getString(
+                                R.string.personal_dictionary_delete_confirm,
+                                appLabel(profile.packageName)
+                            )
+                        )
+                        .setPositiveButton(R.string.delete) { _, _ ->
+                            store.remove(profile.packageName)
+                            dialog.dismiss()
+                            rebuild()
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
                 }
             }
         }

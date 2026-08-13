@@ -241,6 +241,8 @@
     <string name="notification_permission_message">Without the permission to post notifications, we are not able to notify you when some time-consuming operations are done.</string>
     <string name="notification_permission_title">No Notification Permission</string>
     <string name="toolbar_num_row_on_password">Show number row on toolbar when inputting password</string>
+    <string name="show_number_row">Always show number row</string>
+    <string name="show_number_row_summary">Pin a 1234567890 row above the letter keys. The keyboard grows taller to fit it.</string>
     <string name="space_long_press_behavior">Space key long press behavior</string>
     <string name="space_behavior_none">None</string>
     <string name="space_behavior_enumerate">Enumerate input methods</string>
@@ -569,7 +571,6 @@
     <string name="ai_reply_source_clipboard" tools:ignore="MissingTranslation">Clipboard reply context</string>
     <string name="ai_reply_cursor_required" tools:ignore="MissingTranslation">Place a single cursor in the reply field before choosing external context</string>
     <string name="ai_insert_reply" tools:ignore="MissingTranslation">Insert reply</string>
-    <string name="ai_network_policy_disabled" tools:ignore="MissingTranslation">AI is blocked by offline mode or this app’s AI policy</string>
     <string name="ai_action_proofread" tools:ignore="MissingTranslation">Proofread</string>
     <string name="ai_action_polite" tools:ignore="MissingTranslation">Polite</string>
     <string name="ai_action_casual" tools:ignore="MissingTranslation">Chat</string>
@@ -837,12 +838,29 @@
     <string name="voice_meeting_disclosure_message" tools:ignore="MissingTranslation">The audio file you choose (up to 24 MB and 60 minutes) and connection information such as your IP address are sent over encrypted HTTPS to OpenAI or the compatible online speech provider you configured to create a speaker-separated transcript. This app does not retain a copy of the file. Provider processing and retention follow that provider’s terms. Continue only if you have permission to upload every speaker’s voice.</string>
     <string name="voice_meeting_disclosure_continue" tools:ignore="MissingTranslation">Choose audio file</string>
     <string name="voice_private_disabled">Dictation is disabled in password, sensitive, and no-personalized-learning fields</string>
-    <string name="voice_policy_disabled">Dictation is blocked by offline mode or this app’s network policy</string>
     <string name="voice_cursor_required">Place a single cursor in the target input field before recording</string>
     <string name="voice_editor_changed">The target app, field, or cursor changed. The transcript was not inserted.</string>
     <string name="voice_record_failed">Could not record usable audio. No audio was retained.</string>
     <string name="voice_transcription_failed">Could not transcribe this recording. No text was inserted.</string>
     <string name="voice_commit_failed">Could not insert the transcript. No second attempt was made.</string>
+    <string name="meeting_title" tools:ignore="MissingTranslation">Meeting speaker transcription</string>
+    <string name="meeting_entry_button" tools:ignore="MissingTranslation">Meeting audio file</string>
+    <string name="meeting_ready" tools:ignore="MissingTranslation">Only your selected audio up to 60 minutes and 24 MB is sent. Review and choose speaker segments before inserting.</string>
+    <string name="meeting_checking_file" tools:ignore="MissingTranslation">Checking the selected audio…</string>
+    <string name="meeting_transcribing" tools:ignore="MissingTranslation">Separating speakers in %1$s of audio…</string>
+    <string name="meeting_duration_format" tools:ignore="MissingTranslation">%1$dm %2$ds</string>
+    <string name="meeting_processing_button" tools:ignore="MissingTranslation">Processing…</string>
+    <string name="meeting_preview" tools:ignore="MissingTranslation">Select the speaker segments to insert</string>
+    <string name="meeting_speaker_prefix" tools:ignore="MissingTranslation">Speaker</string>
+    <string name="meeting_choose_again" tools:ignore="MissingTranslation">Choose again</string>
+    <string name="meeting_blocked_private_editor" tools:ignore="MissingTranslation">Audio files are disabled in sensitive or private editors.</string>
+    <string name="meeting_diarization_unsupported" tools:ignore="MissingTranslation">Speaker transcription isn\'t available with the current voice connection. Check voice settings.</string>
+    <string name="meeting_editor_required" tools:ignore="MissingTranslation">Open this again in a text field with a cursor.</string>
+    <string name="meeting_picker_failed" tools:ignore="MissingTranslation">Could not open the audio picker.</string>
+    <string name="meeting_unsupported_audio" tools:ignore="MissingTranslation">Choose a supported audio file up to 60 minutes and 24 MB.</string>
+    <string name="meeting_transcribe_failed" tools:ignore="MissingTranslation">Speaker transcription failed. Check the file and connection, then retry.</string>
+    <string name="meeting_insert_failed" tools:ignore="MissingTranslation">Could not insert the selected transcript.</string>
+    <string name="meeting_editor_changed" tools:ignore="MissingTranslation">The editor or cursor changed. Start again in the new text field.</string>
     <string name="secret_vault_title" tools:ignore="MissingTranslation">Sensitive phrase vault</string>
     <string name="secret_vault_unlock" tools:ignore="MissingTranslation">Unlock vault</string>
     <string name="secret_vault_unlock_summary" tools:ignore="MissingTranslation">Authenticate to show phrases allowed in this app for 60 seconds</string>
@@ -897,4 +915,13 @@
     <string name="ocr_no_text" tools:ignore="MissingTranslation">No safe, bounded text could be extracted from this image.</string>
     <string name="ocr_failed" tools:ignore="MissingTranslation">On-device OCR failed. The image and result were not saved.</string>
     <string name="ocr_commit_failed" tools:ignore="MissingTranslation">Insertion failed. No second insertion or clipboard fallback was attempted.</string>
+    <string name="blocked_offline_mode" tools:ignore="MissingTranslation">Full offline mode is on, so this feature is unavailable.</string>
+    <string name="blocked_app_network_policy" tools:ignore="MissingTranslation">This app\'s keyboard profile blocks network features.</string>
+    <string name="blocked_app_ai_policy" tools:ignore="MissingTranslation">This app\'s keyboard profile blocks AI writing.</string>
+    <string name="cta_open_offline_mode" tools:ignore="MissingTranslation">Open offline mode setting</string>
+    <string name="cta_open_app_profile" tools:ignore="MissingTranslation">Open app profile settings</string>
+    <string name="cta_open_writing_setup" tools:ignore="MissingTranslation">Open AI connection settings</string>
+    <string name="cta_open_voice_setup" tools:ignore="MissingTranslation">Open voice connection settings</string>
+    <string name="cta_open_gif_settings" tools:ignore="MissingTranslation">Open GIF settings</string>
+    <string name="cta_open_phrase_settings" tools:ignore="MissingTranslation">Open phrase settings</string>
 </resources>

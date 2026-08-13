@@ -6,16 +6,18 @@ package org.fcitx.fcitx5.android.input.search
 
 import android.content.Context
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.panelSurface
+import org.fcitx.fcitx5.android.utils.rippleDrawable
+import splitties.dimensions.dp
 
 class KoreanDictionaryAdapter(
     private val context: Context,
@@ -45,33 +47,34 @@ class KoreanDictionaryAdapter(
     class ItemUi(context: Context, theme: Theme) {
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(context.dp(12))
-            background = GradientDrawable().apply {
-                setColor(theme.altKeyBackgroundColor)
-                cornerRadius = context.dp(12).toFloat()
-            }
+            setPadding(
+                context.dp(PanelStyle.CARD_PADDING_H_DP), context.dp(PanelStyle.CARD_PADDING_V_DP),
+                context.dp(PanelStyle.CARD_PADDING_H_DP), context.dp(PanelStyle.CARD_PADDING_V_DP)
+            )
+            background = context.panelSurface(theme.altKeyBackgroundColor)
         }
         private val title = TextView(context).apply {
             setTextColor(theme.keyTextColor)
-            textSize = 16f
+            textSize = PanelStyle.TEXT_EMPHASIS
             typeface = Typeface.DEFAULT_BOLD
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
         }
         private val definitions = TextView(context).apply {
             setTextColor(theme.altKeyTextColor)
-            textSize = 13f
-            setLineSpacing(context.dp(3).toFloat(), 1f)
-            setPadding(0, context.dp(6), 0, context.dp(4))
+            textSize = PanelStyle.TEXT_BODY
+            setLineSpacing(context.dp(PanelStyle.GAP_XS_DP).toFloat(), 1f)
+            setPadding(0, context.dp(PanelStyle.GAP_S_DP), 0, context.dp(PanelStyle.GAP_S_DP))
         }
         val sourceAction = TextView(context).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setTextColor(theme.genericActiveBackgroundColor)
-            textSize = 12f
+            setTextColor(theme.accentKeyBackgroundColor)
+            textSize = PanelStyle.TEXT_BODY
             setText(R.string.korean_dictionary_source_action)
             isClickable = true
             isFocusable = true
-            minHeight = context.dp(44)
+            background = rippleDrawable(theme.keyPressHighlightColor)
+            minHeight = context.dp(PanelStyle.BUTTON_HEIGHT_DP)
         }
 
         init {
@@ -103,8 +106,5 @@ class KoreanDictionaryAdapter(
             root.contentDescription = listOf(title.text, definitions.text, sourceAction.text)
                 .joinToString(", ")
         }
-
-        private fun Context.dp(value: Int): Int =
-            (value * resources.displayMetrics.density).toInt()
     }
 }

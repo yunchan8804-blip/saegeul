@@ -12,6 +12,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
@@ -44,7 +45,17 @@ class PersonalDictionaryFragment : PaddingPreferenceFragment() {
                     summary = getString(R.string.personal_dictionary_enabled_summary)
                     isChecked = dictionary.enabled
                     setOnPreferenceChangeListener { _, newValue ->
-                        runCatching { store.setEnabled(newValue as Boolean) }.isSuccess
+                        runCatching { store.setEnabled(newValue as Boolean) }
+                            .onFailure {
+                                // The switch snaps back on failure; say why instead of
+                                // reverting silently.
+                                Toast.makeText(
+                                    ctx,
+                                    R.string.voice_provider_save_failed,
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            .isSuccess
                     }
                 })
                 addPreference(
@@ -83,6 +94,7 @@ class PersonalDictionaryFragment : PaddingPreferenceFragment() {
         }
         content.addView(TextView(ctx).apply {
             setText(R.string.personal_dictionary_category)
+            setPadding(0, ctx.dp(12), 0, 0)
         }, matchWrapParams())
         val categories = PersonalWordCategory.entries
         val categorySpinner = Spinner(ctx).apply {

@@ -12,23 +12,28 @@
 
 ## 1. 한눈에 보는 현재 상태
 
+> 이 표는 2026-07-25 작성 시점의 Git 원격 모델(단일 `origin` = `fcitx5-android/fcitx5-android`)을
+> 기준으로 한 기록이다. 이후 독립 포크 전환으로 `origin` = `yunchan8804-blip/saegeul`,
+> `upstream` = `fcitx5-android/fcitx5-android`로 재편됐다. 현재 Git 소유권 계약은
+> [`docs/independent-fork/README.md`](independent-fork/README.md) §2를 따른다.
+
 | 항목 | 현재 값 |
 | --- | --- |
-| 공식 원격 저장소 | `https://github.com/fcitx5-android/fcitx5-android.git` |
+| 원격 저장소 (작성 당시) | `https://github.com/fcitx5-android/fcitx5-android.git` |
 | 기본 브랜치 | `master` |
 | 작업 브랜치 | `feat/hangul-buffered-input` |
 | 기준 커밋 | `0eb0e0699b0309b5f197dfb2db5fb92eabbb7dfa` |
 | 구현 커밋 | `5338d80ac247a21b6831626d4b3ae09710f1c65b` |
 | 구현 커밋 제목 | `Add buffered Hangul compatibility mode` |
 | 기준 대비 변경량 | 21개 파일, 1,014줄 추가, 40줄 삭제 |
-| 공개 상태 | 기능 브랜치와 구현 커밋은 공식 `origin`에 push되지 않은 로컬 전용 상태 |
+| 공개 상태 (작성 당시) | 기능 브랜치와 구현 커밋은 당시 `origin`에 push되지 않은 로컬 전용 상태 |
 | 브랜치 upstream | 설정되지 않음 |
 | 구현 기본값 | 한글 버퍼 호환 모드 꺼짐 |
 | 지원 키캡 | 현대 두벌식 `Dubeolsik`만 |
 | 버퍼 전달 방식 | System paste, Ctrl+V, Direct commit |
 | 실기기 검증 | Samsung SM-F956N, Android 16 / API 36에서 핵심 System paste 흐름 통과 |
 
-구현 커밋 자체는 깨끗한 상태로 만들어졌고, 백로그·인수인계·문서 링크는 그 뒤의 문서 전용 커밋으로 분리한다. `D:\workspace\fcitx5-android`는 공식 원격에 없는 기능 커밋을 보유한 현재 작업본이므로, 승인된 원격 push나 검증된 bundle/patch 백업 전에는 삭제하거나 새 clone으로 교체하지 마라. 다음 작업 시작 시 아래 명령으로 동적 상태를 다시 확인해라.
+구현 커밋 자체는 깨끗한 상태로 만들어졌고, 백로그·인수인계·문서 링크는 그 뒤의 문서 전용 커밋으로 분리한다. `D:\workspace\fcitx5-android`는 당시 원격에 없는 기능 커밋을 보유한 현재 작업본이므로, 승인된 원격 push나 검증된 bundle/patch 백업 전에는 삭제하거나 새 clone으로 교체하지 마라. 다음 작업 시작 시 아래 명령으로 동적 상태를 다시 확인해라.
 
 ```powershell
 Set-Location D:\workspace\fcitx5-android
@@ -415,7 +420,7 @@ Android 버전의 source of truth는 `build-logic/convention/src/main/kotlin/Ver
 
 ### 9.2 로컬 기능 브랜치 보존과 upstream clone
 
-공식 저장소를 clone하면 upstream `master` 기준선만 받을 수 있다. 현재 `feat/hangul-buffered-input`은 공식 원격에 없으므로 아래 clone 명령만으로 구현 커밋이나 이 문서를 복구할 수 없다. 현재 `D:\workspace\fcitx5-android`를 보존한 채 별도 baseline이 필요할 때만 다른 빈 경로에 clone해라.
+`upstream` 저장소(`fcitx5-android/fcitx5-android`, 독립 포크 전 원 프로젝트)를 clone하면 `master` 기준선만 받을 수 있다. 현재 `feat/hangul-buffered-input`은 이 upstream에도, 현재 `origin`(`yunchan8804-blip/saegeul`)에도 없으므로 아래 clone 명령만으로 구현 커밋이나 이 문서를 복구할 수 없다. 현재 `D:\workspace\fcitx5-android`를 보존한 채 별도 baseline이 필요할 때만 다른 빈 경로에 clone해라.
 
 ```powershell
 git config --global core.symlinks true

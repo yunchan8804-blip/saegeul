@@ -6,18 +6,20 @@ package org.fcitx.fcitx5.android.input.voice
 
 import android.net.Uri
 import android.view.View
-import androidx.core.os.ConfigurationCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.InputFeatureBlock
 import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
 import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.panel.PanelRecovery
+import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
@@ -45,7 +47,7 @@ class MeetingTranscriptionWindow(
     private var documentResumeConsumed = false
     private val commitGate = MeetingCommitGate()
 
-    override val title: String by lazy { local("회의·메모 화자 분리", "Meeting transcription") }
+    override val title: String by lazy { context.getString(R.string.meeting_title) }
     override val showTitle: Boolean = false
 
     override fun onCreateView(): View {
@@ -81,25 +83,15 @@ class MeetingTranscriptionWindow(
             profile = resolved
         )) {
             AiFeatureEntryGate.PrivateEditor -> showBlocked(
-                local(
-                    "민감하거나 비공개인 입력란에서는 음성 파일을 읽지 않아.",
-                    "Audio files are disabled in sensitive or private editors."
-                )
+                context.getString(R.string.meeting_blocked_private_editor)
             )
-            AiFeatureEntryGate.NetworkPolicyBlocked -> showBlocked(
-                local(
-                    "오프라인 모드 또는 이 앱의 네트워크 차단 설정 때문에 사용할 수 없어.",
-                    "Offline mode or this app's network policy blocks transcription."
-                )
-            )
+            AiFeatureEntryGate.NetworkPolicyBlocked -> showNetworkBlocked()
             AiFeatureEntryGate.SetupRequired -> showSetupRequired()
             AiFeatureEntryGate.Ready -> {
                 if (resolved != null && !MeetingDiarizationCapability.supports(resolved)) {
                     showBlocked(
-                        local(
-                            "현재 음성 전사 연결에서는 화자 분리를 사용할 수 없어. 음성 설정에서 연결을 확인해줘.",
-                            "Speaker transcription isn’t available with the current voice connection. Check the model in voice settings."
-                        )
+                        context.getString(R.string.meeting_diarization_unsupported),
+                        PanelRecoveries.voiceSetup(service)
                     )
                 } else if (resolved != null) {
                     if (!documentResumeConsumed && documentResume != null) {
@@ -129,7 +121,7 @@ class MeetingTranscriptionWindow(
         cancelSession(clearUi = false)
         val boundTarget = captureTarget()
         if (boundTarget == null) {
-            showBlocked(local("커서가 있는 일반 입력란에서 다시 열어줘.", "Open this again in a text field with a cursor."))
+            showBlocked(context.getString(R.string.meeting_editor_required))
             return
         }
         target = boundTarget
@@ -137,10 +129,7 @@ class MeetingTranscriptionWindow(
         pickerRequestId = VoiceAudioDocumentCoordinator.request(context, boundTarget)
         if (pickerRequestId == null) {
             clearReviewState()
-            ui.showError(
-                local("음성 파일 선택 창을 열지 못했어.", "Could not open the audio picker."),
-                canRetry = true
-            )
+            ui.showError(context.getString(R.string.meeting_picker_failed), canRetry = true)
         }
     }
 
@@ -195,17 +184,13 @@ class MeetingTranscriptionWindow(
                         clearReviewState()
                         ui.showSetupRequired(context.getString(R.string.voice_provider_auth_failed))
                     } else {
-                        val message = if (exception is MeetingAudioException) {
-                            local(
-                                "지원되는 60분·24MB 이하 음성 파일을 골라줘.",
-                                "Choose a supported audio file up to 60 minutes and 24 MB."
-                            )
-                        } else {
-                            local(
-                                "화자 분리 전사에 실패했어. 파일과 연결을 확인하고 다시 시도해.",
-                                "Speaker transcription failed. Check the file and connection, then retry."
-                            )
-                        }
+                        val message = context.getString(
+                            if (exception is MeetingAudioException) {
+                                R.string.meeting_unsupported_audio
+                            } else {
+                                R.string.meeting_transcribe_failed
+                            }
+                        )
                         clearReviewState(keepTarget = true)
                         ui.showError(message, canRetry = true)
                     }
@@ -226,10 +211,7 @@ class MeetingTranscriptionWindow(
         if (!commitGate.claim()) return
         if (!validateTarget(boundTarget, showError = true)) return
         if (!service.commitToEditor(reviewed)) {
-            ui.showError(
-                local("선택한 전사를 입력하지 못했어.", "Could not insert the selected transcript."),
-                canRetry = false
-            )
+            ui.showError(context.getString(R.string.meeting_insert_failed), canRetry = false)
             return
         }
         clearReviewState()
@@ -255,23 +237,19 @@ class MeetingTranscriptionWindow(
             allowsNetworkInput = service.allowsNetworkInputFeatures(),
             profile = configured
         )) {
-            AiFeatureEntryGate.PrivateEditor -> showBlocked(local(
-                "민감하거나 비공개인 입력란에서는 사용할 수 없어.",
-                "This is disabled in sensitive or private editors."
-            ))
-            AiFeatureEntryGate.NetworkPolicyBlocked -> showBlocked(local(
-                "오프라인 모드 또는 앱 정책이 온라인 전사를 차단하고 있어.",
-                "Offline mode or app policy blocks online transcription."
-            ))
+            AiFeatureEntryGate.PrivateEditor -> showBlocked(
+                context.getString(R.string.meeting_blocked_private_editor)
+            )
+            AiFeatureEntryGate.NetworkPolicyBlocked -> showNetworkBlocked()
             AiFeatureEntryGate.SetupRequired -> showSetupRequired()
             AiFeatureEntryGate.Ready -> {
                 if (configured != null && MeetingDiarizationCapability.supports(configured)) {
                     return true
                 }
-                showBlocked(local(
-                    "현재 음성 전사 연결에서는 화자 분리를 사용할 수 없어. 음성 설정에서 연결을 확인해줘.",
-                    "Speaker transcription isn’t available with the current voice connection. Check voice settings."
-                ))
+                showBlocked(
+                    context.getString(R.string.meeting_diarization_unsupported),
+                    PanelRecoveries.voiceSetup(service)
+                )
             }
         }
         return false
@@ -287,12 +265,7 @@ class MeetingTranscriptionWindow(
             boundTarget.cursor
         )
         if (!valid && showError && attached) {
-            showBlocked(
-                local(
-                    "입력 앱이나 커서가 바뀌었어. 새 입력란에서 다시 시작해.",
-                    "The editor or cursor changed. Start again in the new text field."
-                )
-            )
+            showBlocked(context.getString(R.string.meeting_editor_changed))
         }
         return valid
     }
@@ -322,9 +295,20 @@ class MeetingTranscriptionWindow(
         commitGate.resetForSelection()
     }
 
-    private fun showBlocked(message: String) {
+    private fun showBlocked(message: String, recovery: PanelRecovery? = null) {
         clearReviewState()
-        ui.showError(message, canRetry = false)
+        ui.showError(message, canRetry = false, recovery = recovery)
+    }
+
+    /** Names the closed gate and offers the setting that reopens it. */
+    private fun showNetworkBlocked() {
+        val block = service.networkInputBlock() ?: InputFeatureBlock.AppPolicy
+        showBlocked(
+            context.getString(
+                PanelRecoveries.messageFor(block, R.string.meeting_blocked_private_editor)
+            ),
+            PanelRecoveries.forBlock(service, block)
+        )
     }
 
     private fun showSetupRequired() {
@@ -335,13 +319,6 @@ class MeetingTranscriptionWindow(
     private fun returnToKeyboard() {
         windowManager.attachWindow(KeyboardWindow)
     }
-
-    private fun local(korean: String, english: String): String =
-        if (ConfigurationCompat.getLocales(context.resources.configuration)[0]?.language == "ko") {
-            korean
-        } else {
-            english
-        }
 
     private fun voiceProviderName(): String = context.getString(R.string.voice_openai_provider_name)
 

@@ -10,6 +10,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -21,6 +22,7 @@ import org.fcitx.fcitx5.android.data.quickphrase.dynamic.SensitivePhrase
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.SensitivePhraseKind
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.SensitivePhraseVault
 import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseAuthenticator
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.appProfileDialogViewportHeight
 import splitties.dimensions.dp
 
 class SensitivePhraseVaultSettings(private val fragment: Fragment) {
@@ -84,12 +86,16 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
         }
         content.addView(kindSpinner, matchWrapParams())
 
+        // Prefilled values hide the EditText hints when editing, so repeat each hint as a
+        // fixed label above its field.
+        label(R.string.secret_vault_label_hint)
         val labelField = EditText(context).apply {
             setHint(R.string.secret_vault_label_hint)
             setText(existing?.label.orEmpty())
             maxLines = 1
         }
         content.addView(labelField, matchWrapParams())
+        label(R.string.secret_vault_value_hint)
         val valueField = EditText(context).apply {
             setHint(R.string.secret_vault_value_hint)
             setText(existing?.value.orEmpty())
@@ -101,6 +107,7 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
             maxLines = 5
         }
         content.addView(valueField, matchWrapParams())
+        label(R.string.secret_vault_packages_hint)
         val packagesField = EditText(context).apply {
             setHint(R.string.secret_vault_packages_hint)
             setText(existing?.allowedPackages?.joinToString("\n").orEmpty())
@@ -110,13 +117,14 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
         }
         content.addView(packagesField, matchWrapParams())
 
+        val scroll = ScrollView(context).apply { addView(content) }
         val dialog = AlertDialog.Builder(context)
             .setTitle(
                 if (existing == null) R.string.secret_vault_add
                 else R.string.secret_vault_edit
             )
             .setMessage(R.string.secret_vault_item_security)
-            .setView(content)
+            .setView(scroll)
             .setPositiveButton(R.string.save, null)
             .setNegativeButton(android.R.string.cancel, null)
             .apply {
@@ -124,6 +132,17 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
             }
             .create()
         dialog.setOnShowListener {
+            // The editor stacks a spinner and three multi-line fields. Let the form scroll
+            // inside a bounded viewport so the dialog buttons never fall below the visible
+            // display (same policy as the app profile form).
+            scroll.layoutParams = scroll.layoutParams.apply {
+                height = appProfileDialogViewportHeight(
+                    context.resources.displayMetrics.heightPixels,
+                    context.dp(420),
+                    context.dp(220)
+                )
+            }
+            scroll.isFillViewport = true
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val packages = packagesField.text.toString()
                     .split(Regex("[,\\s]+"))

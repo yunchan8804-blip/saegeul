@@ -112,6 +112,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(providerPreference)
                 clearAiProviderPreference = Preference(ctx).apply {
                     setTitle(R.string.ai_clear_custom_provider)
+                    isIconSpaceReserved = false
                     setOnPreferenceClickListener {
                         clearAiProvider()
                         true
@@ -131,6 +132,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(voiceModePreference)
                 voiceProviderPreference = Preference(ctx).apply {
                     setTitle(R.string.voice_openai_api_settings)
+                    isIconSpaceReserved = false
                     setOnPreferenceClickListener {
                         showVoiceProviderDialog()
                         true
@@ -139,6 +141,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(voiceProviderPreference)
                 clearVoiceProviderPreference = Preference(ctx).apply {
                     setTitle(R.string.voice_provider_key_remove)
+                    isIconSpaceReserved = false
                     setOnPreferenceClickListener {
                         showRemoveVoiceProviderDialog()
                         true
@@ -149,6 +152,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             addCategory(R.string.gif_provider_settings) {
                 gifSelectionPreference = Preference(ctx).apply {
                     setTitle(R.string.gif_provider_selection_title)
+                    isIconSpaceReserved = false
                     setOnPreferenceClickListener {
                         showGifProviderSelectionDialog()
                         true
@@ -157,6 +161,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(gifSelectionPreference)
                 gifProviderPreference = Preference(ctx).apply {
                     setTitle(R.string.gif_klipy_settings)
+                    isIconSpaceReserved = false
                     setOnPreferenceClickListener {
                         showKlipyProviderDialog()
                         true
@@ -165,6 +170,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(gifProviderPreference)
                 clearGifProviderPreference = Preference(ctx).apply {
                     setTitle(R.string.gif_provider_key_remove)
+                    isIconSpaceReserved = false
                     setOnPreferenceClickListener {
                         showRemoveGifProviderDialog()
                         true
@@ -173,6 +179,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(clearGifProviderPreference)
                 giphyProviderPreference = Preference(ctx).apply {
                     setTitle(R.string.gif_giphy_settings)
+                    isIconSpaceReserved = false
                     setOnPreferenceClickListener {
                         showGiphyProviderDialog()
                         true
@@ -181,6 +188,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(giphyProviderPreference)
                 clearGiphyProviderPreference = Preference(ctx).apply {
                     setTitle(R.string.gif_giphy_key_remove)
+                    isIconSpaceReserved = false
                     setOnPreferenceClickListener {
                         showRemoveGiphyProviderDialog()
                         true
@@ -191,6 +199,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             addCategory(R.string.privacy_local_data) {
                 usagePreference = Preference(ctx).apply {
                     setTitle(R.string.ai_usage_title)
+                    isIconSpaceReserved = false
                     isSelectable = false
                 }
                 addPreference(usagePreference)
@@ -449,7 +458,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val horizontal = ctx.dp(20)
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
             addView(apiKey)
             addView(models)
         }
@@ -461,6 +470,9 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .setNegativeButton(android.R.string.cancel, null)
             .create()
         dialog.setOnShowListener {
+            // Keep the save button reachable while the soft keyboard is up, matching the
+            // OpenAI credential dialog.
+            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val key = apiKey.text.toString().trim().ifEmpty { configured?.apiKey.orEmpty() }
                 val model = if (models.checkedRadioButtonId == efficient.id) {
@@ -542,7 +554,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val horizontal = ctx.dp(20)
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
             isFocusableInTouchMode = true
             addView(TextView(ctx).apply {
                 setText(R.string.ai_openai_api_key_endpoint_summary)
@@ -603,11 +615,23 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             val horizontal = ctx.dp(20)
-            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
             isFocusableInTouchMode = true
         }
-        fun field(hint: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT) =
-            EditText(ctx).apply {
+        fun field(hint: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT): EditText {
+            // Prefilled values hide the EditText hint, so repeat it as a fixed label above
+            // the field (same idiom as the app profile form labels).
+            container.addView(
+                TextView(ctx).apply {
+                    setText(hint)
+                    setPadding(0, ctx.dp(12), 0, 0)
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+            return EditText(ctx).apply {
                 setHint(hint)
                 setText(value)
                 inputType = type
@@ -620,6 +644,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     )
                 )
             }
+        }
 
         val name = field(R.string.ai_provider_name_hint, effective?.displayName.orEmpty())
         val baseUrl = field(
@@ -702,10 +727,22 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             val horizontal = ctx.dp(20)
-            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
         }
-        fun field(hint: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT) =
-            EditText(ctx).apply {
+        fun field(hint: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT): EditText {
+            // Prefilled values hide the EditText hint, so repeat it as a fixed label above
+            // the field (same idiom as the app profile form labels).
+            container.addView(
+                TextView(ctx).apply {
+                    setText(hint)
+                    setPadding(0, ctx.dp(12), 0, 0)
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+            return EditText(ctx).apply {
                 setHint(hint)
                 setText(value)
                 inputType = type
@@ -719,6 +756,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     )
                 )
             }
+        }
         val uriType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
         val name = field(R.string.ai_provider_name_hint, custom?.displayName.orEmpty())
         val baseUrl = field(R.string.ai_provider_url_hint, custom?.baseUrl.orEmpty(), uriType)
@@ -914,7 +952,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val horizontal = ctx.dp(20)
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
             addView(
                 apiKey,
                 LinearLayout.LayoutParams(
@@ -924,13 +962,16 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             )
         }
         val dialog = AlertDialog.Builder(ctx)
-            .setTitle(R.string.gif_provider_settings)
+            .setTitle(R.string.gif_klipy_settings)
             .setMessage(R.string.gif_provider_security_note)
             .setView(container)
             .setPositiveButton(R.string.save, null)
             .setNegativeButton(android.R.string.cancel, null)
             .create()
         dialog.setOnShowListener {
+            // Keep the save button reachable while the soft keyboard is up, matching the
+            // OpenAI credential dialog.
+            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val key = apiKey.text.toString().trim()
                 if (key.isEmpty()) {
@@ -988,7 +1029,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val horizontal = ctx.dp(20)
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, 0)
+            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
             addView(apiKey)
             addView(productionApproved)
             addView(mediaCachingApproved)
@@ -1001,6 +1042,9 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .setNegativeButton(android.R.string.cancel, null)
             .create()
         dialog.setOnShowListener {
+            // Keep the save button reachable while the soft keyboard is up, matching the
+            // OpenAI credential dialog.
+            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val key = apiKey.text.toString().trim().ifEmpty { configured?.apiKey.orEmpty() }
                 if (key.isEmpty()) {

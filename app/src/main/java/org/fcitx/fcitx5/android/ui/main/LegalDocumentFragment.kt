@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.main.settings.LegalDocumentKind
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.lazyRoute
+import splitties.dimensions.dp
 
 class LegalDocumentFragment : Fragment() {
 
@@ -27,8 +28,8 @@ class LegalDocumentFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val horizontalPadding = (24 * resources.displayMetrics.density).toInt()
-        val verticalPadding = (20 * resources.displayMetrics.density).toInt()
+        val horizontalPadding = requireContext().dp(24)
+        val verticalPadding = requireContext().dp(20)
         val content = when (args.kind) {
             LegalDocumentKind.DataPrivacy -> readAsset("legal/DATA-PRIVACY.txt")
             LegalDocumentKind.Notice -> readAsset("legal/NOTICE.txt")

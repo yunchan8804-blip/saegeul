@@ -164,8 +164,18 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val expandToolbarByDefault =
             switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", false)
         val inlineSuggestions = switch(R.string.inline_suggestions, "inline_suggestions", true)
-        val toolbarNumRowOnPassword =
-            switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", true)
+        val showNumberRow = switch(
+            R.string.show_number_row,
+            "show_number_row",
+            false,
+            R.string.show_number_row_summary
+        )
+        // Redundant while the keyboard already pins a number row of its own.
+        val toolbarNumRowOnPassword = switch(
+            R.string.toolbar_num_row_on_password,
+            "toolbar_num_row_on_password",
+            true
+        ) { !showNumberRow.getValue() }
         val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
         val keepLettersUppercase = switch(
             R.string.keep_keyboard_letters_uppercase,

@@ -6,16 +6,21 @@ package org.fcitx.fcitx5.android.input.ocr
 
 import android.content.Context
 import android.content.res.ColorStateList
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.CheckBox
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
+import org.fcitx.fcitx5.android.input.panel.PanelRecovery
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelSurface
+import splitties.dimensions.dp
 
 class OcrUi(
     private val context: Context,
@@ -31,8 +36,14 @@ class OcrUi(
     private val selectedIds = linkedSetOf<String>()
     private val status = TextView(context).apply {
         setTextColor(theme.keyTextColor)
-        textSize = 14f
+        textSize = PanelStyle.TEXT_BODY
         gravity = Gravity.CENTER
+        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+    }
+    private val progress = ProgressBar(context).apply {
+        isIndeterminate = true
+        indeterminateTintList = ColorStateList.valueOf(theme.accentKeyBackgroundColor)
+        visibility = View.GONE
     }
     private val blocks = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -41,28 +52,38 @@ class OcrUi(
         visibility = View.GONE
         addView(blocks, matchWrap())
     }
-    private val primary = actionButton(active = true)
-    private val secondary = actionButton(active = false)
+    private val primary = context.panelButton(theme, PanelButtonKind.Primary)
+    private val secondary = context.panelButton(theme, PanelButtonKind.Secondary)
 
     val root: View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(10), dp(14), dp(10))
+        setPadding(
+            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP),
+            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP)
+        )
         setBackgroundColor(theme.keyboardColor)
         addView(TextView(context).apply {
             setText(R.string.ocr_title)
             setTextColor(theme.keyTextColor)
-            textSize = 18f
+            textSize = PanelStyle.TEXT_TITLE
         }, matchWrap())
         addView(TextView(context).apply {
             setText(R.string.ocr_engine_attribution)
             setTextColor(theme.altKeyTextColor)
-            textSize = 11f
+            textSize = PanelStyle.TEXT_CAPTION
         }, matchWrap())
         addView(status, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
             1f
         ))
+        addView(progress, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(PanelStyle.GAP_S_DP)
+        })
         addView(scroller, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
@@ -70,11 +91,11 @@ class OcrUi(
         ))
         addView(LinearLayout(context).apply {
             gravity = Gravity.CENTER
-            addView(primary, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-                marginEnd = dp(5)
+            addView(primary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
+                marginEnd = dp(PanelStyle.GAP_S_DP)
             })
-            addView(secondary, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-                marginStart = dp(5)
+            addView(secondary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
+                marginStart = dp(PanelStyle.GAP_S_DP)
             })
         }, matchWrap())
     }
@@ -82,6 +103,7 @@ class OcrUi(
     fun showCheckingModel() {
         status.setText(R.string.ocr_checking_model)
         clearBlocks()
+        progress.visibility = View.VISIBLE
         primary.apply {
             isEnabled = false
             setText(R.string.ocr_checking_model)
@@ -90,7 +112,15 @@ class OcrUi(
         showBack()
     }
 
-    fun showModelMissing(canDownload: Boolean, failed: Boolean = false) {
+    /**
+     * [recovery] takes over the primary slot when the download is blocked, so the panel
+     * points at the setting behind the block instead of a disabled download button.
+     */
+    fun showModelMissing(
+        canDownload: Boolean,
+        failed: Boolean = false,
+        recovery: PanelRecovery? = null
+    ) {
         status.setText(
             when {
                 failed -> R.string.ocr_model_download_failed
@@ -100,11 +130,23 @@ class OcrUi(
         )
         clearBlocks()
         primary.apply {
-            isEnabled = canDownload
-            setText(R.string.ocr_model_download)
-            setOnClickListener(
-                if (canDownload) View.OnClickListener { onDownloadModel?.invoke() } else null
-            )
+            when {
+                canDownload -> {
+                    isEnabled = true
+                    setText(R.string.ocr_model_download)
+                    setOnClickListener { onDownloadModel?.invoke() }
+                }
+                recovery != null -> {
+                    isEnabled = true
+                    setText(recovery.labelRes)
+                    setOnClickListener { recovery.run() }
+                }
+                else -> {
+                    isEnabled = false
+                    setText(R.string.ocr_model_download)
+                    setOnClickListener(null)
+                }
+            }
         }
         showBack()
     }
@@ -112,6 +154,7 @@ class OcrUi(
     fun showDownloadingModel() {
         status.setText(R.string.ocr_model_downloading)
         clearBlocks()
+        progress.visibility = View.VISIBLE
         primary.apply {
             isEnabled = false
             setText(R.string.ocr_model_downloading)
@@ -145,6 +188,7 @@ class OcrUi(
     fun showRecognizing() {
         status.setText(R.string.ocr_recognizing)
         clearBlocks()
+        progress.visibility = View.VISIBLE
         primary.apply {
             isEnabled = false
             setText(R.string.ocr_recognizing)
@@ -162,16 +206,20 @@ class OcrUi(
                 isChecked = false
                 buttonTintList = ColorStateList.valueOf(theme.accentKeyBackgroundColor)
                 setTextColor(theme.keyTextColor)
-                textSize = 14f
+                textSize = PanelStyle.TEXT_BODY
                 text = block.text
-                setPadding(dp(8), dp(5), dp(8), dp(5))
-                background = rounded(theme.keyBackgroundColor, dp(8))
+                setPadding(
+                    dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_S_DP),
+                    dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_S_DP)
+                )
+                background = context.panelSurface(theme.keyBackgroundColor)
                 setOnCheckedChangeListener { _, checked ->
                     if (checked) selectedIds += block.id else selectedIds -= block.id
                     primary.isEnabled = onSelectionChanged?.invoke(selectedIds.toSet()) == true
                 }
-            }, matchWrap().apply { bottomMargin = dp(5) })
+            }, matchWrap().apply { bottomMargin = context.dp(PanelStyle.GAP_S_DP) })
         }
+        progress.visibility = View.GONE
         scroller.visibility = View.VISIBLE
         primary.apply {
             isEnabled = false
@@ -212,29 +260,11 @@ class OcrUi(
         selectedIds.clear()
         blocks.removeAllViews()
         scroller.visibility = View.GONE
-    }
-
-    private fun actionButton(active: Boolean) = Button(context).apply {
-        isAllCaps = false
-        textSize = 13f
-        minHeight = 0
-        minimumHeight = 0
-        setTextColor(if (active) theme.accentKeyTextColor else theme.keyTextColor)
-        backgroundTintList = ColorStateList.valueOf(
-            if (active) theme.accentKeyBackgroundColor else theme.keyBackgroundColor
-        )
-    }
-
-    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius.toFloat()
+        progress.visibility = View.GONE
     }
 
     private fun matchWrap() = LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT,
         LinearLayout.LayoutParams.WRAP_CONTENT
     )
-
-    private fun dp(value: Int): Int =
-        (value * context.resources.displayMetrics.density).toInt()
 }

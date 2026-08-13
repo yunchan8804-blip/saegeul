@@ -45,6 +45,12 @@ object AppUtil {
     fun launchMainToInputMethodConfig(context: Context, uniqueName: String, displayName: String) =
         launchMainToDest(context, SettingsRoute.InputMethodConfig(displayName, uniqueName))
 
+    fun launchMainToAppProfiles(context: Context) =
+        launchMainToDest(context, SettingsRoute.AppProfiles)
+
+    fun launchMainToQuickPhraseList(context: Context) =
+        launchMainToDest(context, SettingsRoute.QuickPhraseList)
+
     fun launchClipboardEdit(context: Context, id: Int, lastEntry: Boolean = false) {
         context.startActivity<ClipboardEditActivity> {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

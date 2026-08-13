@@ -1344,6 +1344,11 @@ manifest v1 contract는 다음과 같다. `redirect_uri`는 설치 variant에 �
 `transcription`은 provider가 실제 `/audio/transcriptions` 호환 endpoint를 구현한 경우에만 배열에
 추가한다. 현재 Codex·Claude CLI companion은 `responses`만 선언한다.
 
+debug variant(`redirect_uri`가 `net.chanpaca.saegeul.debug.oauth:/callback`)와 `transcription`
+capability를 포함한 전체 예시는
+[`docs/examples/saegeul-ai-provider-manifest.debug.json`](examples/saegeul-ai-provider-manifest.debug.json)에
+있다.
+
 컴퓨터 쪽 기본 경로는 `scripts/ai-provider-companion.py`가 제공하는 로컬 CLI gateway다. 사용자가 PC에서
 이미 로그인한 Codex(ChatGPT 구독 OAuth)와 Claude Code(Claude 구독 OAuth)를 그대로 사용하며, Android에
 OpenAI·Anthropic API key나 CLI의 `auth.json`, OAuth access token을 복사하지 않는다. 휴대폰에는 companion

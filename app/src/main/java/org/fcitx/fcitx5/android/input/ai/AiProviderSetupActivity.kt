@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.ai
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -18,12 +19,14 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -31,6 +34,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import splitties.dimensions.dp
 import timber.log.Timber
 import java.net.URI
 
@@ -39,6 +44,7 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
     private lateinit var discovery: AiProviderDiscoveryManager
     private lateinit var progress: ProgressBar
     private lateinit var status: TextView
+    private lateinit var emptyLabel: TextView
     private lateinit var list: ListView
     private lateinit var adapter: ServiceAdapter
     private lateinit var refresh: Button
@@ -46,16 +52,17 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
     private val handler = Handler(Looper.getMainLooper())
     private var waitingForOAuth = false
     private var rejectedServiceCount = 0
+    private var defaultStatusColor = 0
 
     private val scanTimeout = Runnable {
         progress.visibility = View.GONE
-        status.setText(
-            when {
-                services.isNotEmpty() -> R.string.ai_setup_choose_computer
-                rejectedServiceCount > 0 -> R.string.ai_setup_only_untrusted_computers
-                else -> R.string.ai_setup_no_computers
-            }
-        )
+        val reason = when {
+            services.isNotEmpty() -> R.string.ai_setup_choose_computer
+            rejectedServiceCount > 0 -> R.string.ai_setup_only_untrusted_computers
+            else -> R.string.ai_setup_no_computers
+        }
+        setStatus(reason)
+        if (services.isEmpty()) emptyLabel.setText(reason)
     }
 
     private val oauthLauncher = registerForActivityResult(
@@ -68,9 +75,21 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
         } else {
             progress.visibility = View.GONE
             refresh.isEnabled = true
-            status.setText(R.string.ai_setup_login_not_finished)
+            setStatus(R.string.ai_setup_login_not_finished)
         }
     }
+
+    /**
+     * This screen follows the activity (app) theme rather than a keyboard Theme,
+     * so PanelStyle.errorTextColor(theme) does not apply here; pick between its
+     * light and dark values from the system night mode instead.
+     */
+    private val statusErrorColor: Int
+        get() {
+            val night = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+            return if (night) PanelStyle.ERROR_TEXT_ON_DARK else PanelStyle.ERROR_TEXT_ON_LIGHT
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,10 +136,15 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { gravity = android.view.Gravity.CENTER_HORIZONTAL }
         )
+        // Independent status label that stays visible above the list; it must not be
+        // the ListView emptyView, because the ListView hides that view as soon as
+        // the adapter has items, swallowing scan and verification messages.
         status = TextView(this).apply {
             gravity = android.view.Gravity.CENTER
             setPadding(0, dp(8), 0, dp(12))
             setText(R.string.ai_setup_scanning)
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            defaultStatusColor = currentTextColor
         }
         root.addView(
             status,
@@ -129,17 +153,43 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
+        // Dedicated empty-list label; its text tracks why the list is empty
+        // (scanning, nothing found, discovery failed) and is auto-hidden by the
+        // ListView once computers appear.
+        emptyLabel = TextView(this).apply {
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setText(R.string.ai_setup_scanning)
+        }
         adapter = ServiceAdapter(this, services)
         list = ListView(this).apply {
             this.adapter = this@AiProviderSetupActivity.adapter
+            // Hairline divider: intentionally 1 raw px (not dp) so it stays a single
+            // physical pixel on every density.
             dividerHeight = 1
-            emptyView = status
+            emptyView = emptyLabel
             setOnItemClickListener { _, _, position, _ ->
                 verifyService(services[position])
             }
         }
+        val listContainer = FrameLayout(this).apply {
+            addView(
+                list,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
+            addView(
+                emptyLabel,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = android.view.Gravity.CENTER }
+            )
+        }
         root.addView(
-            list,
+            listContainer,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
@@ -177,6 +227,14 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
         setContentView(root)
     }
 
+    private fun setStatus(text: CharSequence, isError: Boolean = false) {
+        status.setTextColor(if (isError) statusErrorColor else defaultStatusColor)
+        status.text = text
+    }
+
+    private fun setStatus(@StringRes resId: Int, isError: Boolean = false) =
+        setStatus(getText(resId), isError)
+
     private fun startScan() {
         if (waitingForOAuth) return
         handler.removeCallbacks(scanTimeout)
@@ -186,8 +244,8 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
         rejectedServiceCount = 0
         progress.visibility = View.VISIBLE
         refresh.isEnabled = false
-        status.visibility = View.VISIBLE
-        status.setText(R.string.ai_setup_scanning)
+        setStatus(R.string.ai_setup_scanning)
+        emptyLabel.setText(R.string.ai_setup_scanning)
         discovery.start()
         handler.postDelayed(scanTimeout, SCAN_TIMEOUT_MS)
     }
@@ -203,11 +261,12 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
             adapter.notifyDataSetChanged()
         }
         progress.visibility = View.GONE
-        status.visibility = View.VISIBLE
-        status.text = resources.getQuantityString(
-            R.plurals.ai_setup_computers_found,
-            services.size,
-            services.size
+        setStatus(
+            resources.getQuantityString(
+                R.plurals.ai_setup_computers_found,
+                services.size,
+                services.size
+            )
         )
     }
 
@@ -219,7 +278,8 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
         handler.removeCallbacks(scanTimeout)
         progress.visibility = View.GONE
         refresh.isEnabled = true
-        status.setText(R.string.ai_setup_discovery_failed)
+        setStatus(R.string.ai_setup_discovery_failed, isError = true)
+        if (services.isEmpty()) emptyLabel.setText(R.string.ai_setup_discovery_failed)
     }
 
     private fun verifyService(service: DiscoveredAiProviderService) {
@@ -229,12 +289,16 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
     private fun verifyManifest(computerName: String, manifestUrl: String) {
         progress.visibility = View.VISIBLE
         refresh.isEnabled = false
-        status.setText(R.string.ai_setup_checking_connection)
+        // Lock the list while the manifest fetch runs, so repeated taps cannot start
+        // overlapping verifications and stack confirmation dialogs.
+        list.isEnabled = false
+        setStatus(R.string.ai_setup_checking_connection)
         lifecycleScope.launch {
             runCatching { AiProviderManifestClient().fetch(manifestUrl) }
                 .onSuccess { manifest ->
                     progress.visibility = View.GONE
                     refresh.isEnabled = true
+                    list.isEnabled = true
                     showConnectionConfirmation(computerName, manifest)
                 }
                 .onFailure { error ->
@@ -242,7 +306,8 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
                     Timber.w("AI provider manifest verification failed: ${failure.name}")
                     progress.visibility = View.GONE
                     refresh.isEnabled = true
-                    status.setText(
+                    list.isEnabled = true
+                    setStatus(
                         when (failure) {
                             AiProviderManifestFailure.TailnetAddressUnavailable ->
                                 R.string.ai_setup_tailnet_address_unavailable
@@ -255,7 +320,8 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
                             AiProviderManifestFailure.InvalidManifest ->
                                 R.string.ai_setup_manifest_invalid
                             AiProviderManifestFailure.Unknown -> R.string.ai_setup_connection_failed
-                        }
+                        },
+                        isError = true
                     )
                 }
         }
@@ -286,7 +352,7 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
         discovery.stop()
         progress.visibility = View.VISIBLE
         refresh.isEnabled = false
-        status.setText(R.string.ai_setup_saving)
+        setStatus(R.string.ai_setup_saving)
         lifecycleScope.launch {
             runCatching {
                 val store = AiProviderCredentialStore(this@AiProviderSetupActivity)
@@ -312,7 +378,7 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
             }.onFailure {
                 progress.visibility = View.GONE
                 refresh.isEnabled = true
-                status.setText(R.string.ai_setup_save_failed)
+                setStatus(R.string.ai_setup_save_failed, isError = true)
             }
         }
     }
@@ -323,10 +389,21 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             maxLines = 1
         }
+        // AlertDialog.setView() adds no padding of its own; keep the field off the edges.
+        val inputContainer = FrameLayout(this).apply {
+            setPadding(dp(20), 0, dp(20), 0)
+            addView(
+                input,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
         val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.ai_setup_enter_address)
             .setMessage(R.string.ai_setup_enter_address_summary)
-            .setView(input)
+            .setView(inputContainer)
             .setPositiveButton(R.string.ai_setup_check_address, null)
             .setNegativeButton(android.R.string.cancel, null)
             .create()
@@ -343,8 +420,6 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
         }
         dialog.show()
     }
-
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private class ServiceAdapter(
         context: Context,

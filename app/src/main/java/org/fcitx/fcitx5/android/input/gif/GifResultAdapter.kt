@@ -5,23 +5,22 @@
 package org.fcitx.fcitx5.android.input.gif
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.ImageDecoder
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.util.LruCache
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
@@ -37,6 +36,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
+import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelSurface
+import splitties.dimensions.dp
 
 class GifResultAdapter(
     private val context: Context,
@@ -121,6 +125,7 @@ class GifResultAdapter(
     override fun onViewRecycled(holder: Holder) {
         holder.thumbnailJob?.cancel()
         holder.thumbnailJob = null
+        holder.loading.visibility = View.GONE
         (holder.image.drawable as? Animatable)?.stop()
         holder.image.setImageDrawable(null)
         holder.boundResult = null
@@ -143,6 +148,7 @@ class GifResultAdapter(
         holder.thumbnailJob?.cancel()
         (holder.image.drawable as? Animatable)?.stop()
         holder.image.setImageDrawable(null)
+        holder.loading.visibility = View.VISIBLE
         holder.thumbnailJob = scope.launch {
             val drawable = withContext(Dispatchers.IO) {
                 val bytes = if (result.providerId == GiphyGifProvider.PROVIDER_ID) {
@@ -156,7 +162,10 @@ class GifResultAdapter(
                 }
                 bytes?.let(::decodeDrawable)
             }
-            if (holder.boundId != result.id || drawable == null) return@launch
+            // A newer bind owns the holder now; its own load manages the indicator.
+            if (holder.boundId != result.id) return@launch
+            holder.loading.visibility = View.GONE
+            if (drawable == null) return@launch
             holder.image.setImageDrawable(drawable)
             (drawable as? Animatable)?.start()
         }
@@ -215,47 +224,53 @@ class GifResultAdapter(
             scaleType = ImageView.ScaleType.CENTER_CROP
             setBackgroundColor(theme.altKeyBackgroundColor)
         }
+        val loading = ProgressBar(context).apply {
+            isIndeterminate = true
+            indeterminateTintList = ColorStateList.valueOf(theme.genericActiveBackgroundColor)
+            visibility = View.GONE
+        }
         private val attribution = TextView(context).apply {
-            setTextColor(Color.WHITE)
-            setBackgroundColor(0x99000000.toInt())
-            textSize = 10f
+            setTextColor(OVERLAY_TEXT)
+            setBackgroundColor(OVERLAY_SCRIM)
+            textSize = PanelStyle.TEXT_CAPTION
             maxLines = 2
-            setPadding(context.dp(6), context.dp(3), context.dp(6), context.dp(3))
+            setPadding(
+                dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_XS_DP),
+                dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_XS_DP)
+            )
         }
-        private val linkButton = Button(context).apply {
-            isAllCaps = false
+        private val linkButton = context.panelButton(
+            theme, PanelButtonKind.Primary, textSize = PanelStyle.TEXT_CAPTION
+        ).apply {
             text = context.getString(R.string.gif_link_insert)
-            textSize = 11f
-            minHeight = 0
-            minimumHeight = 0
         }
-        private val attachButton = Button(context).apply {
-            isAllCaps = false
+        private val attachButton = context.panelButton(
+            theme, PanelButtonKind.Secondary, textSize = PanelStyle.TEXT_CAPTION
+        ).apply {
             text = context.getString(R.string.gif_attach)
-            textSize = 11f
-            minHeight = 0
-            minimumHeight = 0
         }
         private val unsupported = TextView(context).apply {
             text = context.getString(R.string.gif_attachment_unsupported)
-            setTextColor(Color.WHITE)
+            setTextColor(OVERLAY_TEXT)
             gravity = Gravity.CENTER
-            textSize = 10f
-            setPadding(context.dp(4), context.dp(2), context.dp(4), 0)
+            textSize = PanelStyle.TEXT_CAPTION
+            setPadding(dp(PanelStyle.GAP_S_DP), dp(PanelStyle.GAP_XS_DP), dp(PanelStyle.GAP_S_DP), 0)
         }
         private val actions = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(context.dp(6))
-            setBackgroundColor(0xc9000000.toInt())
+            // Horizontal padding only: two 40dp buttons, their 4dp gap and the caption
+            // line must fit the card height inside the 4dp card padding and margins.
+            setPadding(dp(PanelStyle.GAP_S_DP), 0, dp(PanelStyle.GAP_S_DP), 0)
+            setBackgroundColor(ACTIONS_SCRIM)
             addView(linkButton, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                context.dp(34)
+                dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP)
             ))
             addView(attachButton, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                context.dp(34)
-            ).apply { topMargin = context.dp(4) })
+                dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP)
+            ).apply { topMargin = dp(PanelStyle.GAP_S_DP) })
             addView(unsupported, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -269,27 +284,37 @@ class GifResultAdapter(
         init {
             itemView.layoutParams = RecyclerView.LayoutParams(
                 RecyclerView.LayoutParams.MATCH_PARENT,
-                context.dp(122)
+                context.dp(CARD_HEIGHT_DP)
             )
             (itemView as FrameLayout).apply {
-                setPadding(context.dp(3))
-                background = GradientDrawable().apply {
-                    setColor(theme.altKeyBackgroundColor)
-                    cornerRadius = context.dp(10).toFloat()
-                }
+                setPadding(dp(PanelStyle.GAP_S_DP))
+                background = context.panelSurface(theme.altKeyBackgroundColor)
                 addView(image, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
-                ).apply { setMargins(context.dp(3), context.dp(3), context.dp(3), context.dp(3)) })
+                ).apply {
+                    setMargins(
+                        dp(PanelStyle.GAP_S_DP), dp(PanelStyle.GAP_S_DP),
+                        dp(PanelStyle.GAP_S_DP), dp(PanelStyle.GAP_S_DP)
+                    )
+                })
+                addView(loading, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
                 addView(attribution, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     Gravity.BOTTOM
-                ).apply { setMargins(context.dp(3), 0, context.dp(3), context.dp(3)) })
+                ).apply {
+                    setMargins(dp(PanelStyle.GAP_S_DP), 0, dp(PanelStyle.GAP_S_DP), dp(PanelStyle.GAP_S_DP))
+                })
                 addView(actions, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
-                ).apply { setMargins(context.dp(3), context.dp(3), context.dp(3), context.dp(3)) })
+                ).apply {
+                    setMargins(
+                        dp(PanelStyle.GAP_S_DP), dp(PanelStyle.GAP_S_DP),
+                        dp(PanelStyle.GAP_S_DP), dp(PanelStyle.GAP_S_DP)
+                    )
+                })
             }
         }
 
@@ -315,7 +340,6 @@ class GifResultAdapter(
             unsupported.visibility = if (attachmentEnabled) View.GONE else View.VISIBLE
             linkButton.isEnabled = !locked
             attachButton.isEnabled = attachmentEnabled && !locked
-            attachButton.alpha = if (attachButton.isEnabled) 1f else 0.45f
             itemView.setOnClickListener {
                 if (!locked) {
                     onCardTap(result)
@@ -336,10 +360,17 @@ class GifResultAdapter(
         }
     }
 
-    private fun Context.dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
-
     companion object {
+        // 4dp card padding + 4dp overlay margins (16) + two 40dp action buttons with a
+        // 4dp gap (84) leave 24dp headroom for the caption line under the buttons.
+        private const val CARD_HEIGHT_DP = 124
+
+        // Overlays sit on the thumbnail itself, so they keep the theme-independent
+        // toast-like scrim convention instead of theme tokens.
+        private const val OVERLAY_TEXT = 0xFFFFFFFF.toInt()
+        private const val OVERLAY_SCRIM = 0x99000000.toInt()
+        private const val ACTIONS_SCRIM = 0xC9000000.toInt()
+
         private const val MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024
         private const val MAX_THUMBNAIL_CACHE_BYTES = 12 * 1024 * 1024
         private const val THUMBNAIL_TARGET_PX = 360
