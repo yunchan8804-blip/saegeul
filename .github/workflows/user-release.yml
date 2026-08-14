@@ -15,7 +15,8 @@ on:
         type: string
 
 permissions:
-  contents: read
+  # write is required by the publish step, which creates the release for the built tag.
+  contents: write
 
 concurrency:
   group: user-release-${{ inputs.tag || github.ref_name }}
@@ -141,3 +142,51 @@ jobs:
           path: release/
           retention-days: 30
           if-no-files-found: error
+
+      # Artifacts expire after 30 days and are not reachable without a GitHub login, so the
+      # verified bundle is also published as a release. This runs only after every verification
+      # step above has passed, which is what keeps an unverified build off the release page.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version="${RELEASE_TAG#saegeul-v}"
+          # A semver pre-release identifier ("0.1.0-rc.10") marks the release as a pre-release,
+          # while a plain version ("0.1.1") publishes as the latest release.
+          prerelease=()
+          case "$version" in
+            *-*) prerelease=(--prerelease) ;;
+          esac
+
+          # The annotated tag body is the changelog; the trailer is identical every release.
+          notes="$(mktemp)"
+          {
+            body="$(git tag -l --format='%(contents:body)' "$RELEASE_TAG")"
+            if [ -n "$body" ]; then
+              printf '%s\n\n' "$body"
+            fi
+            cat <<'TRAILER'
+          설치할 때 Play Protect가 "안전하지 않은 앱"으로 경고하면 자세히 > 무시하고 설치를 누르면 돼. Google Play를 거치지 않은 앱이라 뜨는 경고이고, 자세한 절차와 서명 지문 확인 방법은 https://saegul.chanpaca.net/faq/ 에 있어.
+
+          - 사용자 앱: `net.chanpaca.saegeul`
+          - 한글 플러그인: `net.chanpaca.saegeul.plugin.hangul`
+          - 두 APK를 같은 태그에서 함께 설치해야 한글 엔진이 잡혀
+          - 동일 태그 전체 소스, SBOM, SHA256SUMS 동시 제공
+
+          새글은 Fcitx5 기반의 비공식 독립 포크이며 원 프로젝트와 제휴·보증 관계가 없어.
+          TRAILER
+          } > "$notes"
+
+          # Re-running the workflow for a tag that was already published must refresh the assets
+          # instead of failing outright.
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release/* --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              --title "Saegeul $version" \
+              --notes-file "$notes" \
+              --verify-tag \
+              "${prerelease[@]}" \
+              release/*
+          fi
