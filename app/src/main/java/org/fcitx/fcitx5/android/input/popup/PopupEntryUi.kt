@@ -26,6 +26,8 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
     var lastShowTime = -1L
 
     val textView = view(::AutoScaleTextView) {
+        // popup width follows the key cap, so narrow keys must shrink their preview text
+        scaleMode = AutoScaleTextView.Mode.Proportional
         textSize = 23f
         gravity = gravityCenter
         setTextColor(theme.popupTextColor)

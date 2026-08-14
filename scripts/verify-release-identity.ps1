@@ -121,18 +121,20 @@ function Get-ManifestValues {
     }
 }
 
-function Get-SigningCertificateSha256 {
+function Get-ApkSignature {
     param(
         [Parameter(Mandatory = $true)]
         [string]$ApkPath
     )
 
-    $output = @(& $apkSigner verify --print-certs $ApkPath 2>&1)
+    # --verbose is what makes apksigner report the per-scheme verification lines.
+    $output = @(& $apkSigner verify --verbose --print-certs $ApkPath 2>&1)
     if ($LASTEXITCODE -ne 0) {
         throw "apksigner verification failed for '$ApkPath':`n$($output -join "`n")"
     }
+    $text = $output -join "`n"
     $digestMatch = [regex]::Match(
-        ($output -join "`n"),
+        $text,
         "certificate\s+SHA-256\s+digest:\s*([0-9a-fA-F:]{64,95})",
         [Text.RegularExpressions.RegexOptions]::IgnoreCase
     )
@@ -143,7 +145,42 @@ function Get-SigningCertificateSha256 {
     if ($digest -notmatch "^[0-9a-f]{64}$") {
         throw "The signing certificate digest from '$ApkPath' is not SHA-256."
     }
-    return $digest
+
+    $schemes = [ordered]@{}
+    foreach ($scheme in @("v1", "v2", "v3")) {
+        $schemeMatch = [regex]::Match(
+            $text,
+            "Verified\s+using\s+$([regex]::Escape($scheme))\s+scheme[^:]*:\s*(true|false)",
+            [Text.RegularExpressions.RegexOptions]::IgnoreCase
+        )
+        if (-not $schemeMatch.Success) {
+            throw "Unable to read the $scheme signature scheme state from '$ApkPath'."
+        }
+        $schemes[$scheme] = [bool]::Parse($schemeMatch.Groups[1].Value)
+    }
+
+    return [pscustomobject]@{
+        CertificateSha256 = $digest
+        Schemes           = $schemes
+    }
+}
+
+function Assert-ApkSignatureSchemes {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+        [Parameter(Mandatory = $true)]
+        [object]$Signature
+    )
+
+    # Android 11 and newer reject a package that only carries the legacy JAR signature, and a
+    # missing v2/v3 block is also what Play Protect reads as a tampered download. v1 stays
+    # required because minSdk 23 still covers Android 6, which predates v2.
+    foreach ($scheme in @("v1", "v2", "v3")) {
+        if (-not $Signature.Schemes[$scheme]) {
+            throw "$Label APK is not signed with the $scheme signature scheme."
+        }
+    }
 }
 
 function Test-ApkRuntimeLinks {
@@ -240,14 +277,18 @@ if ($hangulApplicationId -ne $expectedHangulId) {
 }
 
 $expectedCertificate = ($ExpectedSigningCertificateSha256 -replace ":", "").ToLowerInvariant()
-$mainCertificate = Get-SigningCertificateSha256 -ApkPath $resolvedMainApk
-$hangulCertificate = Get-SigningCertificateSha256 -ApkPath $resolvedHangulApk
+$mainSignature = Get-ApkSignature -ApkPath $resolvedMainApk
+$hangulSignature = Get-ApkSignature -ApkPath $resolvedHangulApk
+$mainCertificate = $mainSignature.CertificateSha256
+$hangulCertificate = $hangulSignature.CertificateSha256
 if ($mainCertificate -ne $expectedCertificate) {
     throw "Main APK signing certificate mismatch: expected '$expectedCertificate', got '$mainCertificate'."
 }
 if ($hangulCertificate -ne $expectedCertificate) {
     throw "Hangul APK signing certificate mismatch: expected '$expectedCertificate', got '$hangulCertificate'."
 }
+Assert-ApkSignatureSchemes -Label "Main" -Signature $mainSignature
+Assert-ApkSignatureSchemes -Label "Hangul" -Signature $hangulSignature
 
 $releaseName = Invoke-ApkAnalyzer -Arguments @(
     "resources", "value",
@@ -341,6 +382,7 @@ Write-Output "Hangul application ID: $hangulApplicationId"
 Write-Output "OAuth scheme: $expectedOAuthScheme"
 Write-Output "Plugin action: $expectedPluginAction"
 Write-Output "Signing certificate SHA-256: $mainCertificate"
+Write-Output "Signature schemes: $(($mainSignature.Schemes.Keys | Where-Object { $mainSignature.Schemes[$_] }) -join ', ')"
 Write-Output "Repository URL: $ExpectedRepositoryUrl"
 Write-Output "Privacy policy URL: $ExpectedPrivacyPolicyUrl"
 Write-Output "Source archive URL: $ExpectedSourceArchiveUrl"

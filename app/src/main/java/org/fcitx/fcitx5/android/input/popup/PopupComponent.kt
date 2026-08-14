@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import android.content.res.Configuration
 import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
@@ -44,10 +45,33 @@ class PopupComponent :
 
     private val showingContainerUi = HashMap<Int, PopupContainerUi>()
 
-    private val keyBottomMargin by lazy {
+    private val keyHorizontalMargin by lazy {
+        context.dp(ThemeManager.prefs.keyHorizontalMargin.getValue())
+    }
+    private val keyHorizontalMarginLandscape by lazy {
+        context.dp(ThemeManager.prefs.keyHorizontalMarginLandscape.getValue())
+    }
+    private val keyVerticalMargin by lazy {
         context.dp(ThemeManager.prefs.keyVerticalMargin.getValue())
     }
-    private val popupWidth by lazy {
+    private val keyVerticalMarginLandscape by lazy {
+        context.dp(ThemeManager.prefs.keyVerticalMarginLandscape.getValue())
+    }
+
+    private val isLandscape
+        get() = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    /**
+     * A key view reports the whole cell as its bounds, while the visible key cap is inset by
+     * `KeyView.hMargin`/`KeyView.vMargin`. Popups align with the cap, not the cell.
+     */
+    private val keyBottomMargin
+        get() = if (isLandscape) keyVerticalMarginLandscape else keyVerticalMargin
+
+    private val keySideMargin
+        get() = if (isLandscape) keyHorizontalMarginLandscape else keyHorizontalMargin
+
+    private val popupKeyWidth by lazy {
         context.dp(38)
     }
     private val popupHeight by lazy {
@@ -80,6 +104,16 @@ class PopupComponent :
         }
     }
 
+    /**
+     * Popup preview takes the width of the key cap that triggered it, so it never looks wider or
+     * narrower than the key under the finger. Falls back to [popupKeyWidth] when the trigger view
+     * has not been laid out yet.
+     */
+    private fun popupEntryWidth(bounds: Rect): Int {
+        val capWidth = bounds.width() - keySideMargin * 2
+        return if (capWidth > 0) capWidth else popupKeyWidth
+    }
+
     private fun showPopup(viewId: Int, content: String, bounds: Rect) {
         showingEntryUi[viewId]?.apply {
             dismissJobs[viewId]?.also {
@@ -94,10 +128,11 @@ class PopupComponent :
             lastShowTime = System.currentTimeMillis()
             setText(content)
         }
-        popup.root.layoutParams = FrameLayout.LayoutParams(popupWidth, popupHeight).apply {
+        val entryWidth = popupEntryWidth(bounds)
+        popup.root.layoutParams = FrameLayout.LayoutParams(entryWidth, popupHeight).apply {
             // align popup bottom with key border bottom [^1]
             topMargin = bounds.bottom - popupHeight - keyBottomMargin
-            leftMargin = (bounds.left + bounds.right - popupWidth) / 2
+            leftMargin = (bounds.left + bounds.right - entryWidth) / 2
         }
         // make sure that popup.root does not have parent view before adding it under root container
         // it's wired that on some devices it would have a parent view despite it was newly created
@@ -140,7 +175,7 @@ class PopupComponent :
             bounds,
             { dismissPopup(viewId) },
             popupRadius,
-            popupWidth,
+            popupKeyWidth,
             popupKeyHeight,
             // position popup keyboard higher, because of [^1]
             popupHeight + keyBottomMargin,

@@ -108,5 +108,12 @@ fun NamedDomainObjectContainer<out ApkSigningConfig>.fromProjectEnv(project: Pro
         storePassword = project.signKeyPwd
         keyAlias = project.signKeyAlias
         keyPassword = project.signKeyPwd
+        // Pin every signature scheme instead of letting AGP infer them from minSdk. Android 11 and
+        // newer refuse to install an APK that only carries the legacy JAR signature, and a package
+        // whose v2/v3 block is missing also trips Play Protect's tamper heuristics. v1 stays on
+        // because minSdk 23 still covers Android 6, which predates v2.
+        enableV1Signing = true
+        enableV2Signing = true
+        enableV3Signing = true
     }
 }

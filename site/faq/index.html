@@ -104,6 +104,22 @@
               </div>
             </details>
             <details>
+              <summary>설치할 때 "안전하지 않은 앱" 경고가 뜬다</summary>
+              <div>
+                <p>Google Play를 거치지 않고 받은 앱이라 Play Protect가 아직 모르는 서명으로 본다. 앱에 문제가 있다는 뜻이 아니라 배포 경로 때문에 뜨는 경고다. 경고 화면에서 <strong>자세히 &gt; 무시하고 설치</strong>를 누르면 그대로 설치된다.</p>
+                <p>설치 자체가 막힌다면 <strong>Play 스토어 &gt; 프로필 &gt; Play Protect &gt; 설정</strong>에서 기기 검사를 잠시 끄고 두 APK를 설치한 뒤 다시 켜면 된다. 파일을 받은 앱에서 <strong>이 출처의 앱 설치 허용</strong>도 함께 켜야 할 수 있다.</p>
+                <p>받은 파일이 진짜 새글인지는 아래 서명 지문으로 직접 확인할 수 있다.</p>
+              </div>
+            </details>
+            <details>
+              <summary>받은 APK가 진짜인지 어떻게 확인하나?</summary>
+              <div>
+                <p>사용자판 APK와 한글 플러그인은 항상 같은 키로 서명한다. 서명 인증서 SHA-256 지문은 다음과 같다.</p>
+                <p><code>3B:08:8B:5C:6A:69:E3:6C:62:80:2E:F5:D4:33:BD:9D:84:5B:8E:98:09:27:8E:13:13:36:A5:03:DA:90:1A:66</code></p>
+                <p>Android SDK가 있다면 <code>apksigner verify --verbose --print-certs 파일이름.apk</code>로 같은 지문이 나오는지, v1·v2·v3 서명이 모두 확인되는지 맞춰 보면 된다. 릴리스마다 함께 올리는 <code>SHA256SUMS</code>로 파일 자체의 해시도 확인할 수 있다.</p>
+              </div>
+            </details>
+            <details>
               <summary>설치한 뒤 키보드는 어디서 켜나?</summary>
               <div>
                 <p>Android의 <strong>설정 &gt; 일반 관리 &gt; 키보드 목록 및 기본값</strong>에서 새글을 켜고 기본 키보드로 선택한다. 제조사와 Android 버전에 따라 메뉴 이름은 조금 다를 수 있다.</p>
