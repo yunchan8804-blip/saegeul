@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://github.com/yunchan8804-blip/saegeul/releases"><img src="https://img.shields.io/github/v/release/yunchan8804-blip/saegeul?style=flat-square&color=55D6A6&label=Release" alt="Latest Release"></a>
   <a href="https://saegul.chanpaca.net"><img src="https://img.shields.io/badge/Website-saegul.chanpaca.net-0a172a?style=flat-square&logo=cloudflare&logoColor=55D6A6" alt="Official Website"></a>
+  <a href="docs/wiki/Home.md"><img src="https://img.shields.io/badge/Wiki-Documentation-0c5b48?style=flat-square&logo=gitbook&logoColor=white" alt="Wiki Documentation"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-LGPL--2.1--or--later-blue?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-success?style=flat-square" alt="Android 8.0+">
   <img src="https://img.shields.io/badge/Offline-100%25%20On--Device%20Core-55D6A6?style=flat-square" alt="100% On-Device Core">
@@ -28,6 +29,7 @@
 - [📦 다운로드 및 설치 (Quick Start)](#-다운로드-및-설치-quick-start)
 - [🔒 개인정보 및 보안 원칙 (Data Boundary)](#-개인정보-및-보안-원칙-data-boundary)
 - [🛠️ 소스 코드 및 빌드 (Build Guide)](#️-소스-코드-및-빌드-build-guide)
+- [📚 [공식 상세 위키 문서 전체 보기 (Wiki)](docs/wiki/Home.md)](#-공식-상세-위키-문서-전체-보기-wiki)
 - [📜 오픈소스 계보 및 독립 포크 고지](#-오픈소스-계보-및-독립-포크-고지)
 - [🌐 관련 링크 & 커뮤니티](#-관련-링크--커뮤니티)
 
