@@ -11,7 +11,6 @@
   const refractiveGlasses = glasses.filter((glass) => glass.classList.contains("liquid-glass-refract"));
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-
   const convexSquircle = (x) => Math.pow(10 - Math.pow(1 - x, 8), 0.25);
 
   const calculateRefractionProfile = (glassThickness, bezelWidth, refractiveIndex, samples = 128) => {
@@ -21,9 +20,7 @@
       const dot = normalY;
       const k = 1 - eta * eta * (1 - dot * dot);
 
-      if (k < 0) {
-        return null;
-      }
+      if (k < 0) return null;
 
       const root = Math.sqrt(k);
       return [
@@ -235,10 +232,7 @@
   };
 
   const buildAllFilters = () => {
-    if (!filterDefs) {
-      return;
-    }
-
+    if (!filterDefs) return;
     refractiveGlasses.forEach(buildFilter);
   };
 
@@ -301,4 +295,223 @@
       }
     }, { passive: true });
   });
+
+  /* ==========================================================================
+     Toast Notification Utility
+     ========================================================================== */
+  const showToast = (message) => {
+    let toast = document.querySelector("#global-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "global-toast";
+      toast.className = "global-toast";
+      toast.setAttribute("role", "status");
+      toast.setAttribute("aria-live", "polite");
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add("is-visible");
+    clearTimeout(toast.__timer);
+    toast.__timer = setTimeout(() => {
+      toast.classList.remove("is-visible");
+    }, 2400);
+  };
+
+  /* ==========================================================================
+     One-Click Copy Buttons
+     ========================================================================== */
+  document.querySelectorAll("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const textToCopy = btn.getAttribute("data-copy");
+      if (!textToCopy) return;
+
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        const originalText = btn.getAttribute("data-copied-label") || "클립보드에 복사되었습니다.";
+        showToast(originalText);
+      } catch {
+        showToast("클립보드 복사에 실패했습니다.");
+      }
+    });
+  });
+
+  /* ==========================================================================
+     Interactive Hangul Demo Controller
+     ========================================================================== */
+  const hangulDemoTabs = document.querySelectorAll(".hangul-demo-tab");
+  const hangulDemoDisplay = document.querySelector(".hangul-demo-display");
+  if (hangulDemoTabs.length && hangulDemoDisplay) {
+    const demos = {
+      typo: {
+        from: "dkssudgktpdy",
+        to: "안녕하세요",
+        tag: "오타 자동복구",
+        desc: "영문 상태로 잘못 입력한 한글 단어를 기기 내에서 즉시 분석하여 올바른 한글 어절로 복구합니다.",
+      },
+      chosung: {
+        from: "ㄱㅅㅎㄴㄷ",
+        to: "감사합니다",
+        tag: "초성 검색",
+        desc: "자주 쓰는 문구, 클립보드 내역, 이모지를 초성만으로 빠르게 검색하여 즉시 입력합니다.",
+      },
+      josa: {
+        from: "새글을 쓴다 / 키보드가 열린다",
+        to: "받침별 자동 판별",
+        tag: "조사 보정",
+        desc: "앞 음절의 종성(받침)과 ㄹ 받침 예외 규칙을 정밀하게 감지하여 올바른 조사를 추천합니다.",
+      },
+      hanja: {
+        from: "가 → 可",
+        to: "옳을 가 (음훈 안내)",
+        tag: "한자 음훈",
+        desc: "음과 훈을 함께 확인하며 변환합니다. 일회성으로 치환되어 한자 모드가 고정되지 않습니다.",
+      },
+      dict: {
+        from: "31,808 표제어",
+        to: "오프라인 표준국어대사전",
+        tag: "오프라인 사전",
+        desc: "인터넷 연결 없이도 낱말의 뜻과 표준 표기를 기기 내에서 즉시 확인합니다. 데이터 유출 0바이트.",
+      },
+    };
+
+    hangulDemoTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const key = tab.getAttribute("data-demo-key");
+        const data = demos[key];
+        if (!data) return;
+
+        hangulDemoTabs.forEach((t) => {
+          t.classList.remove("is-active");
+          t.setAttribute("aria-selected", "false");
+        });
+        tab.classList.add("is-active");
+        tab.setAttribute("aria-selected", "true");
+
+        hangulDemoDisplay.innerHTML = `
+          <div class="demo-pill-badge">${data.tag}</div>
+          <div class="demo-transform-box">
+            <span class="demo-from-val">${data.from}</span>
+            <span class="demo-arrow-icon" aria-hidden="true">→</span>
+            <span class="demo-to-val">${data.to}</span>
+          </div>
+          <p class="demo-desc-text">${data.desc}</p>
+        `;
+      });
+    });
+  }
+
+  /* ==========================================================================
+     Interactive AI Writing Diff Controller
+     ========================================================================== */
+  const aiToneButtons = document.querySelectorAll(".ai-tone-btn");
+  const aiDiffContainer = document.querySelector(".ai-diff-container");
+  if (aiToneButtons.length && aiDiffContainer) {
+    const aiDemos = {
+      correct: {
+        title: "교정 & 맞춤법",
+        original: "내일 봬요! 이번 프로젝트 정말 수고하셧어요",
+        result: '내일 <span class="diff-highlight-add">봬요</span>! 이번 프로젝트 정말 수고<span class="diff-highlight-add">하셨어요</span>.',
+        actionNote: "틀린 맞춤법과 띄어쓰기만 짚어내고 기존 문맥을 온전히 보존합니다.",
+      },
+      business: {
+        title: "업무 메일체",
+        original: "보내주신 자료 잘 봤습니다 수정사항 확인 부탁해요",
+        result: '보내주신 자료 확인하였습니다. <span class="diff-highlight-add">요청드린 수정사항 검토 부탁드립니다.</span>',
+        actionNote: "비즈니스 상황에 걸맞은 격식과 명확한 어조로 가다듬습니다.",
+      },
+      polite_reject: {
+        title: "정중한 거절",
+        original: "이번 일정은 참여하기 힘들 것 같아요 죄송합니다",
+        result: '제안 주셔서 감사드립니다. <span class="diff-highlight-add">현재 일정상 부득이하게 참여가 어려울 것 같습니다. 양해를 부탁드립니다.</span>',
+        actionNote: "상대방의 기분을 상하지 않게 하면서도 단호하고 예의 바르게 거절합니다.",
+      },
+      casual: {
+        title: "카톡체 / 편한 말투",
+        original: "오늘 저녁에 시간 되시면 같이 식사하실래요?",
+        result: '오늘 저녁에 시간 돼? <span class="diff-highlight-add">같이 밥 먹자! 😊</span>',
+        actionNote: "친구 및 지인과의 자연스러운 대화 흐름에 맞게 부드럽게 전환합니다.",
+      },
+    };
+
+    aiToneButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const toneKey = btn.getAttribute("data-tone-key");
+        const data = aiDemos[toneKey];
+        if (!data) return;
+
+        aiToneButtons.forEach((b) => {
+          b.classList.remove("is-active");
+          b.setAttribute("aria-selected", "false");
+        });
+        btn.classList.add("is-active");
+        btn.setAttribute("aria-selected", "true");
+
+        aiDiffContainer.innerHTML = `
+          <div class="ai-diff-row">
+            <div class="diff-box diff-before">
+              <span class="diff-label">입력 원문</span>
+              <p>${data.original}</p>
+            </div>
+            <div class="diff-arrow" aria-hidden="true">→</div>
+            <div class="diff-box diff-after">
+              <span class="diff-label">새글 AI 제안</span>
+              <p>${data.result}</p>
+            </div>
+          </div>
+          <p class="ai-action-note">${data.actionNote}</p>
+        `;
+      });
+    });
+  }
+
+  /* ==========================================================================
+     FAQ Live Search Filter
+     ========================================================================== */
+  const faqSearchInput = document.querySelector("#faq-search-input");
+  const faqItems = document.querySelectorAll(".faq-list details");
+  if (faqSearchInput && faqItems.length) {
+    faqSearchInput.addEventListener("input", (e) => {
+      const query = e.target.value.trim().toLowerCase();
+      let matchCount = 0;
+
+      faqItems.forEach((item) => {
+        const text = item.textContent.toLowerCase();
+        const matches = text.includes(query);
+        item.style.display = matches ? "" : "none";
+        if (matches) {
+          matchCount++;
+          if (query.length > 1) {
+            item.setAttribute("open", "");
+          }
+        }
+      });
+
+      const countDisplay = document.querySelector("#faq-search-count");
+      if (countDisplay) {
+        countDisplay.textContent = query ? `${matchCount}개의 질문 일치` : "";
+      }
+    });
+  }
+
+  /* ==========================================================================
+     Scroll Reveal Animation via IntersectionObserver
+     ========================================================================== */
+  if ("IntersectionObserver" in window && !reduceMotion.matches) {
+    const revealElements = document.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-revealed");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -40px 0px" }
+    );
+
+    revealElements.forEach((el) => observer.observe(el));
+  } else {
+    document.querySelectorAll(".reveal").forEach((el) => el.classList.add("is-revealed"));
+  }
 })();

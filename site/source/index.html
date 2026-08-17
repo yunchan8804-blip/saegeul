@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="새글의 공개 소스 코드, 오픈소스 라이선스, 저작권 고지와 공식 배포 파일을 안내한다.">
-  <meta name="theme-color" content="#07111e">
+  <meta name="theme-color" content="#060e1a">
   <meta property="og:title" content="소스와 라이선스 | 새글">
   <meta property="og:description" content="새글의 소스 코드와 라이선스, 공식 배포 파일을 확인할 수 있다.">
   <meta property="og:type" content="website">
@@ -13,19 +13,19 @@
   <title>소스와 라이선스 | 새글</title>
   <link rel="icon" href="/assets/saegeul-icon.svg" type="image/svg+xml">
   <link rel="preload" href="/assets/computer-link.webp?v=20260731-water1" as="image" type="image/webp" fetchpriority="high">
-  <link rel="stylesheet" href="/styles.css?v=20260731-3">
-  <script src="/promo.js?v=20260731-1" defer></script>
+  <link rel="stylesheet" href="/styles.css?v=20260818-1">
+  <script src="/promo.js?v=20260818-1" defer></script>
 </head>
 <body class="document-page source-document-page" data-page="source">
   <svg class="filter-bank" width="0" height="0" aria-hidden="true" focusable="false">
     <defs id="liquid-filter-defs"></defs>
   </svg>
-  <a class="skip-link" href="#main-content">본문으로 이동</a>
+  <a class="skip-link" href="#main-content">본문 바로가기</a>
 
   <header class="site-header">
     <nav class="glass-nav shell liquid-glass liquid-glass-refract" aria-label="주요 메뉴">
       <a class="brand" href="/" aria-label="새글 홈">
-        <img src="/assets/saegeul-icon.svg" width="40" height="40" alt="">
+        <img src="/assets/saegeul-icon.svg" width="40" height="40" alt="새글 로고">
         <span>새글 <small>SAEGEUL</small></span>
       </a>
       <div class="nav-links">
@@ -45,29 +45,29 @@
       <div class="doc-hero-shade"></div>
       <div class="shell doc-hero-layout">
         <div class="doc-hero-copy">
-          <p class="eyebrow">소스와 라이선스</p>
+          <p class="eyebrow">오픈소스와 투명성</p>
           <h1>소스와 라이선스</h1>
-          <p>새글의 소스 코드, 라이선스, 저작권 고지와 공식 배포 파일을 확인할 수 있다.</p>
+          <p>새글의 전체 소스 코드, 오픈소스 라이선스, 저작권 고지 및 재현 가능한 빌드 절차를 투명하게 공개합니다.</p>
         </div>
       </div>
     </header>
 
-    <section class="source-links-bridge shell" aria-label="소스와 라이선스 바로가기">
+    <section class="source-links-bridge shell" aria-label="소스 및 공식 배포 바로가기">
       <div class="source-links-bar liquid-glass liquid-glass-refract">
-        <a href="https://github.com/yunchan8804-blip/saegeul">
-          <span>소스 코드</span>
-          <strong>GitHub 저장소</strong>
-          <small>코드와 변경 기록 보기</small>
+        <a href="https://github.com/yunchan8804-blip/saegeul" target="_blank" rel="noreferrer">
+          <span>소스 저장소</span>
+          <strong>GitHub Repository</strong>
+          <small>전체 코드와 커밋 히스토리 확인</small>
         </a>
-        <a href="https://github.com/yunchan8804-blip/saegeul/releases">
-          <span>공식 배포</span>
+        <a href="https://github.com/yunchan8804-blip/saegeul/releases" target="_blank" rel="noreferrer">
+          <span>공식 릴리스</span>
           <strong>GitHub Releases</strong>
-          <small>앱과 한글 플러그인 받기</small>
+          <small>서명된 APK, SBOM, 체크섬 다운로드</small>
         </a>
-        <a href="https://github.com/yunchan8804-blip/saegeul/tree/main/app/src/main/assets/legal">
+        <a href="https://github.com/yunchan8804-blip/saegeul/blob/main/LICENSE" target="_blank" rel="noreferrer">
           <span>법적 고지</span>
-          <strong>오픈소스 고지</strong>
-          <small>저작권과 라이선스 전문 보기</small>
+          <strong>LGPL-2.1-or-later</strong>
+          <small>라이선스 전문 및 제3자 라이브러리 고지</small>
         </a>
       </div>
     </section>
@@ -76,9 +76,9 @@
       <aside class="page-rail" aria-label="소스와 라이선스 목차">
         <p>목차</p>
         <nav>
-          <a href="#release">소스와 배포</a>
+          <a href="#release">소스와 공식 배포</a>
           <a href="#license">라이선스 안내</a>
-          <a href="#lineage">사용한 오픈소스</a>
+          <a href="#lineage">사용한 오픈소스 계보</a>
           <a href="#build">직접 빌드하기</a>
         </nav>
       </aside>
@@ -87,20 +87,20 @@
         <section id="release">
           <div class="section-heading">
             <h2>소스 코드와 배포 파일</h2>
-            <p>개발 중인 코드는 GitHub 저장소에서 공개한다. 설치 가능한 공식 파일은 GitHub Releases에서 제공한다.</p>
+            <p>모든 개발 과정은 GitHub 저장소에서 실시간으로 공개되며, 공식 바이너리는 Releases에서 제공됩니다.</p>
           </div>
           <dl class="source-resource-table">
             <div>
-              <dt>소스 코드</dt>
-              <dd><a href="https://github.com/yunchan8804-blip/saegeul">새글 GitHub 저장소</a>에서 코드와 변경 기록을 볼 수 있다.</dd>
+              <dt>공개 저장소</dt>
+              <dd><a href="https://github.com/yunchan8804-blip/saegeul">GitHub @yunchan8804-blip/saegeul</a>에서 전체 소스 트리와 이슈 트래커를 확인할 수 있습니다.</dd>
             </div>
             <div>
-              <dt>설치 파일</dt>
-              <dd><a href="https://github.com/yunchan8804-blip/saegeul/releases">GitHub Releases</a>에서 새글 앱과 한글 플러그인을 받을 수 있다.</dd>
+              <dt>공식 설치 파일</dt>
+              <dd><a href="https://github.com/yunchan8804-blip/saegeul/releases">GitHub Releases</a>에서 서명된 메인 앱 APK, 한글 플러그인 APK, Play Store용 AAB를 내려받을 수 있습니다.</dd>
             </div>
             <div>
-              <dt>릴리스 자료</dt>
-              <dd>각 릴리스에는 대응 소스와 체크섬, 소프트웨어 구성 명세가 함께 제공된다.</dd>
+              <dt>재현성 명세</dt>
+              <dd>각 릴리스마다 대응 소스 아카이브, CycloneDX SBOM, SHA-256 체크섬, Git 서브모듈 해시가 함께 게시됩니다.</dd>
             </div>
           </dl>
         </section>
@@ -108,57 +108,68 @@
         <section id="license">
           <div class="section-heading">
             <h2>라이선스 안내</h2>
-            <p>새글은 파일과 구성요소에 표시된 오픈소스 라이선스를 따른다.</p>
+            <p>새글은 구성 요소별 원 저작권과 오픈소스 라이선스 규정을 철저히 준수합니다.</p>
           </div>
           <dl class="license-list">
             <div>
-              <dt>새글에서 작성한 코드</dt>
-              <dd>별도 표시가 없는 경우 <code>LGPL-2.1-or-later</code>로 공개한다.</dd>
+              <dt>새글 신규 작성 코드</dt>
+              <dd>별도 표시가 없는 한 <code>LGPL-2.1-or-later</code> (GNU Lesser General Public License v2.1 이상) 및 <code>Copyright 2026 Yun Chan</code>을 명시합니다.</dd>
             </div>
             <div>
-              <dt>Fcitx5와 libhangul</dt>
-              <dd>원 프로젝트와 각 파일에 표시된 저작권, 라이선스 조건을 유지한다.</dd>
+              <dt>Fcitx5 및 libhangul</dt>
+              <dd>원 프로젝트와 원 파일에 명시된 저작권 및 라이선스 조건을 그대로 유지합니다.</dd>
             </div>
             <div>
-              <dt>외부 라이브러리와 데이터</dt>
-              <dd>각 구성요소의 원 라이선스와 저작권 고지를 적용한다.</dd>
+              <dt>제3자 라이브러리</dt>
+              <dd>APK 내부의 <strong>정보 &gt; 오픈소스 라이선스</strong> 화면 및 저장소의 legal 디렉터리에서 각 라이브러리의 라이선스 전문을 확인할 수 있습니다.</dd>
             </div>
           </dl>
           <div class="legal-links">
-            <a href="https://github.com/yunchan8804-blip/saegeul/blob/main/LICENSE">라이선스 전문</a>
-            <a href="https://github.com/yunchan8804-blip/saegeul/tree/main/app/src/main/assets/legal">저작권과 오픈소스 고지</a>
+            <a href="https://github.com/yunchan8804-blip/saegeul/blob/main/LICENSE">라이선스 전문 (LICENSE)</a>
+            <a href="https://github.com/yunchan8804-blip/saegeul/tree/main/app/src/main/assets/legal">제3자 저작권 고지 모음</a>
           </div>
         </section>
 
         <section id="lineage">
           <div class="section-heading">
-            <h2>사용한 오픈소스</h2>
-            <p>새글은 다음 프로젝트를 기반으로 하며 각 프로젝트의 라이선스와 저작권을 존중한다.</p>
+            <h2>사용한 오픈소스 계보</h2>
+            <p>새글은 다음 오픈소스 프로젝트의 위대한 기여를 기반으로 탄생했습니다.</p>
           </div>
           <div class="lineage-links">
-            <a href="https://github.com/fcitx5-android/fcitx5-android"><strong>Fcitx5 for Android</strong><span>Android 기반 프로젝트</span></a>
-            <a href="https://github.com/fcitx/fcitx5"><strong>Fcitx5</strong><span>입력기 프레임워크</span></a>
-            <a href="https://github.com/libhangul/libhangul"><strong>libhangul</strong><span>한글 입력 엔진</span></a>
+            <a href="https://github.com/fcitx5-android/fcitx5-android" target="_blank" rel="noreferrer">
+              <strong>Fcitx5 for Android</strong>
+              <span>Android 입력기 프레임워크 기반</span>
+            </a>
+            <a href="https://github.com/fcitx/fcitx5" target="_blank" rel="noreferrer">
+              <strong>Fcitx5</strong>
+              <span>차세대 다국어 입력기 코어</span>
+            </a>
+            <a href="https://github.com/libhangul/libhangul" target="_blank" rel="noreferrer">
+              <strong>libhangul</strong>
+              <span>한국어 자소 조합 엔진</span>
+            </a>
           </div>
           <aside class="fork-notice" aria-label="독립 프로젝트 안내">
-            <h3>독립 프로젝트 안내</h3>
-            <p>새글은 Fcitx5를 기반으로 한 비공식 독립 포크다. Fcitx 프로젝트 또는 원 Fcitx5 for Android 프로젝트와 제휴 관계가 없으며 보증, 승인, 후원을 받지 않는다.</p>
-            <p>원 저작권과 오픈소스 라이선스 표시는 유지한다. 새글에서 추가하거나 수정한 부분과 배포는 Yun Chan이 책임진다.</p>
+            <h3>독립 프로젝트 고지</h3>
+            <p><strong>새글은 Fcitx5를 기반으로 한 비공식 독립 포크입니다.</strong> Fcitx 프로젝트 또는 원 Fcitx5 for Android 프로젝트와 공식 제휴 관계가 없으며, 원 프로젝트의 보증·승인·후원을 받지 않습니다.</p>
+            <p>원 저작권과 오픈소스 라이선스 표시는 온전히 유지됩니다. 독립 포크에서 추가·수정한 기능과 공식 배포물에 대한 모든 책임은 Yun Chan에게 있습니다.</p>
           </aside>
         </section>
 
         <section id="build">
           <div class="section-heading">
             <h2>직접 빌드하기</h2>
-            <p>개발자는 저장소를 내려받아 새글 앱과 한글 플러그인을 직접 빌드할 수 있다.</p>
+            <p>개발자는 서브모듈을 포함한 저장소를 클론하여 로컬에서 서명 및 빌드할 수 있습니다.</p>
           </div>
-          <details class="build-disclosure">
-            <summary>기본 빌드 명령 보기</summary>
+          <div style="position: relative;">
             <pre class="code-block"><code>git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git
 cd saegeul
 ./gradlew :app:assembleRelease :plugin:hangul:assembleRelease</code></pre>
-          </details>
-          <p>자세한 준비 사항은 <a href="https://github.com/yunchan8804-blip/saegeul#readme">저장소 안내</a>에서 확인하고, 기여와 버그 보고는 <a href="https://github.com/yunchan8804-blip/saegeul/issues">새글 Issues</a>에서 진행한다.</p>
+            <div style="margin-top: 10px;">
+              <button class="button button-ghost" style="padding: 6px 14px; font-size: 12.5px;" data-copy="git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git && cd saegeul && ./gradlew :app:assembleRelease :plugin:hangul:assembleRelease" data-copied-label="빌드 명령어 복사 완료!">빌드 명령어 복사</button>
+            </div>
+          </div>
+          <p style="margin-top: 24px;">빌드 환경 요구사항 및 서명 키 설정 절차는 <a href="https://github.com/yunchan8804-blip/saegeul#readme">저장소 README</a> 및 <code>docs/independent-fork/</code> 문서를 참조하세요.</p>
         </section>
       </article>
     </div>
@@ -167,24 +178,18 @@ cd saegeul
   <footer class="site-footer">
     <div class="shell footer-grid">
       <div class="footer-brand">
-        <img src="/assets/saegeul-icon.svg" width="46" height="46" alt="">
-        <div><strong>새글</strong><span>AI를 품은 안드로이드 키보드</span></div>
+        <img src="/assets/saegeul-icon.svg" width="46" height="46" alt="새글">
+        <div><strong>새글 (Saegeul)</strong><span>AI를 품은 독립 안드로이드 한국어 키보드</span></div>
       </div>
       <div class="footer-links">
-        <a href="/">제품</a>
+        <a href="/">제품 홈</a>
         <a href="/privacy/">개인정보처리방침</a>
         <a href="/faq/">도움말</a>
+        <a href="https://github.com/yunchan8804-blip/saegeul">GitHub</a>
         <a href="mailto:yunchan@chanpaca.net">문의</a>
       </div>
     </div>
-    <details class="legal-note shell">
-      <summary>독립 프로젝트 안내</summary>
-      <div>
-        <p><strong>새글은 Fcitx5를 기반으로 한 비공식 독립 포크다.</strong> Fcitx 프로젝트 또는 원 Fcitx5 for Android 프로젝트와 제휴 관계가 없으며 보증, 승인, 후원을 받지 않는다.</p>
-        <p>원 저작권과 오픈소스 라이선스 표시는 유지한다. 독립 포크에서 추가하거나 수정한 부분과 릴리스는 Yun Chan이 책임진다.</p>
-      </div>
-    </details>
-    <div class="shell copyright">© 2026 Yun Chan. Saegeul is open source.</div>
+    <div class="shell copyright">© 2026 Yun Chan. Saegeul is open source under LGPL-2.1-or-later.</div>
   </footer>
 </body>
 </html>
