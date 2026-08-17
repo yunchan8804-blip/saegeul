@@ -18,9 +18,13 @@ def main():
 
     tmp_dir = Path(tempfile.gettempdir()) / "saegeul-wiki-deploy"
     if tmp_dir.exists():
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        try:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        except Exception:
+            pass
     
-    shutil.copytree(wiki_src, tmp_dir)
+    os.makedirs(tmp_dir, exist_ok=True)
+    shutil.copytree(wiki_src, tmp_dir, dirs_exist_ok=True)
     print(f"Copied {len(list(tmp_dir.glob('*.md')))} wiki documents to {tmp_dir}")
 
     commands = [
@@ -41,12 +45,10 @@ def main():
         if res.returncode != 0:
             print(f"Stderr: {res.stderr.strip()}")
             if "push" in cmd:
-                print("\n[안내] GitHub Wiki 저장소가 아직 초기화되지 않았습니다.")
-                print("GitHub 웹사이트 (https://github.com/yunchan8804-blip/saegeul/wiki)에서")
-                print("'Create the first page' 버튼을 눌러 첫 페이지만 저장해주시면 즉시 위키가 활성화되고 동기화됩니다.")
+                print("\n[안내] GitHub Wiki 저장소에 푸시하지 못했습니다.")
             return
 
-    print("\n✨ GitHub Wiki 배포가 성공적으로 완료되었습니다!")
+    print("\n[SUCCESS] GitHub Wiki 배포가 성공적으로 완료되었습니다!")
 
 if __name__ == "__main__":
     main()
