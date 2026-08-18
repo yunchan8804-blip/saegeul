@@ -198,6 +198,43 @@ class CustomThemeActivity : AppCompatActivity() {
         }
     }
 
+    private val rgbModeContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val particleModeContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val glowColorContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val perKeyTargetContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val perKeyColorContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private var selectedKeyTarget = "ALL"
+
     private val editorContainer by lazy {
         verticalLayout {
             setPadding(dp(12), dp(8), dp(12), dp(32))
@@ -208,19 +245,46 @@ class CustomThemeActivity : AppCompatActivity() {
                 bottomMargin = dp(8)
             })
 
-            // 2. Accent / Enter Color Swatches
+            // 2. RGB Chroma Backlight Section
+            add(createSectionHeader(getString(R.string.theme_rgb_backlight)), lParams(matchParent, wrapContent))
+            add(rgbModeContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(8)
+            })
+
+            // 3. Touch Particle & Sparkle Section
+            add(createSectionHeader(getString(R.string.theme_particle_effect)), lParams(matchParent, wrapContent))
+            add(particleModeContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(8)
+            })
+
+            // 4. Keycap Glow & Aura Section
+            add(createSectionHeader(getString(R.string.theme_key_glow_effect)), lParams(matchParent, wrapContent))
+            add(glowColorContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(8)
+            })
+
+            // 5. Per-Key Custom Studio Section
+            add(createSectionHeader(getString(R.string.theme_per_key_customization)), lParams(matchParent, wrapContent))
+            add(perKeyTargetContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(4)
+            })
+            add(perKeyColorContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(8)
+            })
+
+            // 6. Accent / Enter Color Swatches
             add(createSectionHeader(getString(R.string.theme_accent_key_color)), lParams(matchParent, wrapContent))
             add(accentColorContainer, lParams(matchParent, wrapContent) {
                 bottomMargin = dp(8)
             })
 
-            // 3. Keyboard Surface Color Swatches
+            // 7. Keyboard Surface Color Swatches
             add(createSectionHeader(getString(R.string.theme_keyboard_bg_color)), lParams(matchParent, wrapContent))
             add(surfaceColorContainer, lParams(matchParent, wrapContent) {
                 bottomMargin = dp(8)
             })
 
-            // 4. Keycap & Style Options
+            // 8. Keycap & Style Options
             add(createSectionHeader(getString(R.string.theme_color_customization)), lParams(matchParent, wrapContent))
             val variantRow = horizontalLayout {
                 gravity = Gravity.CENTER_VERTICAL
@@ -233,7 +297,7 @@ class CustomThemeActivity : AppCompatActivity() {
             }
             add(variantRow, lParams(matchParent, wrapContent))
 
-            // 5. Background Image Section
+            // 9. Background Image Section
             add(createSectionHeader(getString(R.string.theme_background_image)), lParams(matchParent, wrapContent))
             add(changeImageLabel, lParams(matchParent, dp(44)))
             add(cropLabel, lParams(matchParent, dp(44)))
@@ -523,6 +587,262 @@ class CustomThemeActivity : AppCompatActivity() {
         surfaceColorContainer.addView(row)
     }
 
+    private fun setupRgbModeRow() {
+        val modes = listOf(
+            getString(R.string.theme_rgb_mode_off) to "off",
+            getString(R.string.theme_rgb_mode_wave) to "rgb_wave",
+            getString(R.string.theme_rgb_mode_breathe) to "rgb_breathe",
+            getString(R.string.theme_rgb_mode_cyberpunk) to "cyberpunk",
+            getString(R.string.theme_rgb_mode_matrix) to "matrix_flow",
+            getString(R.string.theme_rgb_mode_pulse) to "neon_pulse"
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        modes.forEach { (label, modeKey) ->
+            val pill = TextView(this).apply {
+                text = label
+                textSize = 12f
+                paint.isFakeBoldText = true
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+
+                val isCurrent = (theme.lightingEffect?.mode ?: "off") == modeKey
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(20f)
+                    setColor(if (isCurrent) Color.parseColor("#7C3AED") else Color.parseColor("#27272A"))
+                    setStroke(dp(1), if (isCurrent) Color.parseColor("#A78BFA") else Color.parseColor("#3F3F46"))
+                }
+                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
+
+                setOnClickListener {
+                    theme = theme.copy(
+                        lightingEffect = Theme.Custom.LightingEffectDef(
+                            mode = modeKey,
+                            speed = if (modeKey == "neon_pulse") 1.5f else 1.0f,
+                            intensity = 0.85f
+                        )
+                    )
+                    updatePreview()
+                    setupRgbModeRow()
+                }
+            }
+
+            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                rightMargin = dp(8)
+            })
+        }
+
+        rgbModeContainer.removeAllViews()
+        rgbModeContainer.addView(row)
+    }
+
+    private fun setupParticleModeRow() {
+        val particles = listOf(
+            getString(R.string.theme_particle_mode_off) to "off",
+            getString(R.string.theme_particle_mode_star) to "star_sparkle",
+            getString(R.string.theme_particle_mode_dust) to "glowing_dust",
+            getString(R.string.theme_particle_mode_burst) to "neon_burst",
+            getString(R.string.theme_particle_mode_ripple) to "cosmic_ripple"
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        particles.forEach { (label, typeKey) ->
+            val pill = TextView(this).apply {
+                text = label
+                textSize = 12f
+                paint.isFakeBoldText = true
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+
+                val isCurrent = (theme.particleEffect?.type ?: "off") == typeKey
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(20f)
+                    setColor(if (isCurrent) Color.parseColor("#0EA5E9") else Color.parseColor("#27272A"))
+                    setStroke(dp(1), if (isCurrent) Color.parseColor("#38BDF8") else Color.parseColor("#3F3F46"))
+                }
+                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
+
+                setOnClickListener {
+                    theme = theme.copy(
+                        particleEffect = Theme.Custom.ParticleEffectDef(
+                            type = typeKey,
+                            particleCount = if (typeKey == "cosmic_ripple") 6 else 10,
+                            lifetimeMs = 500L
+                        )
+                    )
+                    updatePreview()
+                    setupParticleModeRow()
+                }
+            }
+
+            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                rightMargin = dp(8)
+            })
+        }
+
+        particleModeContainer.removeAllViews()
+        particleModeContainer.addView(row)
+    }
+
+    private fun setupGlowColorRow() {
+        val glowColors = listOf(
+            0 to "Off",
+            0xFF00F0FF.toInt() to "Cyan",
+            0xFFFF007F.toInt() to "Pink",
+            0xFFFFE600.toInt() to "Gold",
+            0xFF00FF66.toInt() to "Green",
+            0xFFA855F7.toInt() to "Purple",
+            0xFFFFFFFF.toInt() to "White"
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        glowColors.forEach { (colorVal, _) ->
+            val circle = View(this).apply {
+                val isOff = colorVal == 0
+                val isSelected = if (isOff) (theme.keyGlowEffect?.enabled != true) else (theme.keyGlowEffect?.enabled == true && theme.keyGlowEffect?.glowColor == colorVal)
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(if (isOff) Color.parseColor("#27272A") else colorVal)
+                    setStroke(dp(if (isSelected) 3 else 1), if (isSelected) Color.WHITE else Color.argb(80, 255, 255, 255))
+                }
+                background = shape
+                setOnClickListener {
+                    theme = if (isOff) {
+                        theme.copy(keyGlowEffect = null)
+                    } else {
+                        theme.copy(keyGlowEffect = Theme.Custom.KeyGlowDef(enabled = true, glowColor = colorVal, glowRadius = 4f))
+                    }
+                    updatePreview()
+                    setupGlowColorRow()
+                }
+            }
+
+            row.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
+                rightMargin = dp(10)
+            })
+        }
+
+        glowColorContainer.removeAllViews()
+        glowColorContainer.addView(row)
+    }
+
+    private fun setupPerKeyRow() {
+        val targets = listOf(
+            getString(R.string.theme_target_all_keys) to "ALL",
+            getString(R.string.theme_target_space) to "button_space",
+            getString(R.string.theme_target_return) to "button_return",
+            getString(R.string.theme_target_backspace) to "button_backspace",
+            getString(R.string.theme_target_shift) to "button_shift"
+        )
+
+        val targetRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        targets.forEach { (name, targetKey) ->
+            val pill = TextView(this).apply {
+                text = name
+                textSize = 12f
+                paint.isFakeBoldText = true
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(dp(12), dp(6), dp(12), dp(6))
+
+                val isSelected = selectedKeyTarget == targetKey
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(16f)
+                    setColor(if (isSelected) Color.parseColor("#E11D48") else Color.parseColor("#27272A"))
+                    setStroke(dp(1), if (isSelected) Color.parseColor("#FB7185") else Color.parseColor("#3F3F46"))
+                }
+                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
+
+                setOnClickListener {
+                    selectedKeyTarget = targetKey
+                    setupPerKeyRow()
+                }
+            }
+
+            targetRow.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                rightMargin = dp(8)
+            })
+        }
+
+        perKeyTargetContainer.removeAllViews()
+        perKeyTargetContainer.addView(targetRow)
+
+        val keyColors = listOf(
+            null, // Reset / Default
+            0xFF2D2D2D.toInt(),
+            0xFF1E293B.toInt(),
+            0xFFE11D48.toInt(),
+            0xFF0EA5E9.toInt(),
+            0xFF10B981.toInt(),
+            0xFFF59E0B.toInt(),
+            0xFF8B5CF6.toInt(),
+            0xFFF8FAFC.toInt()
+        )
+
+        val colorRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        keyColors.forEach { col ->
+            val circle = View(this).apply {
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(6f)
+                    setColor(col ?: Color.TRANSPARENT)
+                    setStroke(dp(if (col == null) 2 else 1), if (col == null) Color.RED else Color.argb(80, 255, 255, 255))
+                }
+                background = shape
+                setOnClickListener {
+                    if (selectedKeyTarget == "ALL") {
+                        val currentGlobal = theme.globalKeyStyle ?: Theme.Custom.KeyCustomStyle()
+                        theme = theme.copy(
+                            globalKeyStyle = if (col == null) null else currentGlobal.copy(keyBackgroundColor = col)
+                        )
+                    } else {
+                        val overrides = (theme.keyOverrides ?: emptyMap()).toMutableMap()
+                        if (col == null) {
+                            overrides.remove(selectedKeyTarget)
+                        } else {
+                            val current = overrides[selectedKeyTarget] ?: Theme.Custom.KeyCustomStyle()
+                            overrides[selectedKeyTarget] = current.copy(keyBackgroundColor = col)
+                        }
+                        theme = theme.copy(keyOverrides = if (overrides.isEmpty()) null else overrides)
+                    }
+                    updatePreview()
+                }
+            }
+
+            colorRow.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
+                rightMargin = dp(10)
+            })
+        }
+
+        perKeyColorContainer.removeAllViews()
+        perKeyColorContainer.addView(colorRow)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // recover from bundle
@@ -572,6 +892,10 @@ class CustomThemeActivity : AppCompatActivity() {
 
         // Setup preset rows
         setupPresetPaletteRow()
+        setupRgbModeRow()
+        setupParticleModeRow()
+        setupGlowColorRow()
+        setupPerKeyRow()
         setupAccentColorRow()
         setupSurfaceColorRow()
 

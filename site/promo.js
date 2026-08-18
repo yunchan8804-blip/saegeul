@@ -614,11 +614,178 @@
   // Initial render of palette
   renderThemePalette("hanji");
 
+  /* ==========================================================================
+     Theme Studio Effects Engine (Chroma, Particles & Glow)
+     ========================================================================== */
+  const vkChromaBg = document.querySelector("#vk-chroma-bg");
+  const vkParticleCanvas = document.querySelector("#vk-particle-canvas");
+  const fxRgbButtons = document.querySelectorAll("#fx-rgb-modes .fx-btn");
+  const fxParticleButtons = document.querySelectorAll("#fx-particle-modes .fx-btn");
+  const fxGlowToggle = document.querySelector("#fx-glow-toggle");
+
+  let activeParticleType = "star";
+  let particles = [];
+  let particleCtx = null;
+
+  if (vkParticleCanvas) {
+    particleCtx = vkParticleCanvas.getContext("2d");
+    const resizeCanvas = () => {
+      if (vkBody && vkParticleCanvas) {
+        vkParticleCanvas.width = vkBody.clientWidth;
+        vkParticleCanvas.height = vkBody.clientHeight;
+      }
+    };
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+  }
+
+  // RGB Chroma modes
+  fxRgbButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      fxRgbButtons.forEach((b) => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      const mode = btn.dataset.rgb;
+      if (vkChromaBg) {
+        vkChromaBg.className = "vk-chroma-bg";
+        if (mode !== "off") {
+          vkChromaBg.classList.add(`mode-${mode}`);
+        }
+      }
+    });
+  });
+
+  // Particle modes
+  fxParticleButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      fxParticleButtons.forEach((b) => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      activeParticleType = btn.dataset.particle;
+    });
+  });
+
+  // Glow toggle
+  if (fxGlowToggle) {
+    fxGlowToggle.addEventListener("click", () => {
+      const isPressed = fxGlowToggle.getAttribute("aria-pressed") === "true";
+      fxGlowToggle.setAttribute("aria-pressed", String(!isPressed));
+      fxGlowToggle.classList.toggle("is-active", !isPressed);
+      if (vkBody) {
+        vkBody.classList.toggle("has-glow", !isPressed);
+      }
+    });
+  }
+
+  function spawnWebParticles(x, y) {
+    if (activeParticleType === "off" || !particleCtx || !vkParticleCanvas) return;
+    const count = activeParticleType === "ripple" ? 2 : 8;
+    const colors = ["#FFE600", "#00FFFF", "#FF007F", "#00FF66", "#FFFFFF", "#A855F7"];
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 4 + 2;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: Math.random() * 6 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1,
+        life: 0,
+        maxLife: 28 + Math.random() * 14,
+        type: activeParticleType,
+        rotation: Math.random() * Math.PI,
+        rotationSpeed: (Math.random() - 0.5) * 0.2
+      });
+    }
+
+    if (!isParticleLoopRunning) {
+      isParticleLoopRunning = true;
+      requestAnimationFrame(renderParticles);
+    }
+  }
+
+  let isParticleLoopRunning = false;
+  function renderParticles() {
+    if (!particleCtx || !vkParticleCanvas) return;
+    particleCtx.clearRect(0, 0, vkParticleCanvas.width, vkParticleCanvas.height);
+
+    particles = particles.filter((p) => p.life < p.maxLife);
+
+    particles.forEach((p) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.08;
+      p.rotation += p.rotationSpeed;
+      p.life++;
+      p.alpha = 1 - p.life / p.maxLife;
+
+      particleCtx.save();
+      particleCtx.globalAlpha = Math.max(0, p.alpha);
+
+      if (p.type === "star") {
+        particleCtx.translate(p.x, p.y);
+        particleCtx.rotate(p.rotation);
+        particleCtx.fillStyle = p.color;
+        drawStarPath(particleCtx, 0, 0, p.size, 5);
+        particleCtx.fill();
+      } else if (p.type === "dust") {
+        particleCtx.fillStyle = p.color;
+        particleCtx.beginPath();
+        particleCtx.arc(p.x, p.y, p.size * p.alpha, 0, Math.PI * 2);
+        particleCtx.fill();
+      } else if (p.type === "burst") {
+        particleCtx.strokeStyle = p.color;
+        particleCtx.lineWidth = 2;
+        particleCtx.beginPath();
+        particleCtx.moveTo(p.x, p.y);
+        particleCtx.lineTo(p.x - p.vx * 3, p.y - p.vy * 3);
+        particleCtx.stroke();
+      } else if (p.type === "ripple") {
+        particleCtx.strokeStyle = p.color;
+        particleCtx.lineWidth = 2;
+        particleCtx.beginPath();
+        particleCtx.arc(p.x, p.y, p.size * (1 + (1 - p.alpha) * 3), 0, Math.PI * 2);
+        particleCtx.stroke();
+      }
+      particleCtx.restore();
+    });
+
+    if (particles.length > 0) {
+      requestAnimationFrame(renderParticles);
+    } else {
+      isParticleLoopRunning = false;
+    }
+  }
+
+  function drawStarPath(ctx, cx, cy, r, points) {
+    ctx.beginPath();
+    const innerR = r * 0.45;
+    for (let i = 0; i < points * 2; i++) {
+      const radius = i % 2 === 0 ? r : innerR;
+      const angle = (i * Math.PI) / points - Math.PI / 2;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
   // Virtual keyboard typing interactions
   vkKeys.forEach((key) => {
     key.addEventListener("click", () => {
       key.classList.add("pressed");
       setTimeout(() => key.classList.remove("pressed"), 120);
+
+      // Trigger particle burst from key center
+      if (vkParticleCanvas) {
+        const rect = key.getBoundingClientRect();
+        const canvasRect = vkParticleCanvas.getBoundingClientRect();
+        const x = rect.left + rect.width / 2 - canvasRect.left;
+        const y = rect.top + rect.height / 2 - canvasRect.top;
+        spawnWebParticles(x, y);
+      }
 
       if (!vkTypedText) return;
       const char = key.dataset.key;

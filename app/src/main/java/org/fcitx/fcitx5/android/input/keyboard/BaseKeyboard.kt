@@ -23,6 +23,8 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
+import org.fcitx.fcitx5.android.input.keyboard.effects.ParticleTouchOverlayView
+import org.fcitx.fcitx5.android.input.keyboard.effects.RgbChromaEffectView
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import splitties.dimensions.dp
@@ -30,11 +32,13 @@ import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
+import splitties.views.dsl.constraintlayout.centerInParent
 import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.leftToRightOf
+import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.rightToLeftOf
 import splitties.views.dsl.constraintlayout.topOfParent
@@ -83,6 +87,9 @@ abstract class BaseKeyboard(
     private var thumbSplitEnabled = false
     private var thumbSplitGapPx = 0
 
+    val rgbEffectView = RgbChromaEffectView(context, theme.lightingEffect)
+    val particleOverlayView = ParticleTouchOverlayView(context, theme.particleEffect)
+
     /**
      * HashMap of [PointerId (Int)][MotionEvent.getPointerId] to [KeyView]
      */
@@ -90,6 +97,12 @@ abstract class BaseKeyboard(
 
     init {
         isMotionEventSplittingEnabled = true
+
+        // RGB Chroma backlight layer beneath key rows
+        add(rgbEffectView, lParams(matchConstraints, matchConstraints) {
+            centerInParent()
+        })
+
         keyRows = keyLayout.map { row ->
             val keyViews = row.map(::createKeyView)
             constraintLayout Row@{
@@ -149,7 +162,22 @@ abstract class BaseKeyboard(
                 centerHorizontally()
             })
         }
+        // Particle touch overlay on top of all key rows
+        add(particleOverlayView, lParams(matchConstraints, matchConstraints) {
+            centerInParent()
+        })
+
         spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN || ev.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            val pointerIndex = ev.actionIndex
+            val x = ev.getX(pointerIndex)
+            val y = ev.getY(pointerIndex)
+            particleOverlayView.spawnTouchBurst(x, y)
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     private fun createKeyView(def: KeyDef): KeyView {

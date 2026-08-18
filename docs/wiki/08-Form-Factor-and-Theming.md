@@ -56,3 +56,23 @@
 - **세부 색상 커스터마이징:** 엔터/강조키, 키보드 바탕색, 키캡 색상, 글자색 세부 조율.
 - **배경 이미지 지원:** 갤러리 이미지 선택, 실시간 자르기 및 회전, 밝기 조절(0~100%), 배경 제거.
 - **테마 내보내기/가져오기:** ZIP 포맷을 통한 테마 공유 및 안전한 백업.
+
+---
+
+## 6. 테마 v3.0 & 초정밀 키 커스터마이징 (Per-Key & Visual Effects)
+
+FlorisBoard Snygg 및 HeliBoard 아키텍처 모범 사례를 기반으로 설계된 차세대 렌더링 엔진입니다.
+
+- **개별 키 맞춤 스타일링 (Per-Key Overrides):**
+  - 스페이스바, 엔터키, 백스페이스, 쉬프트키, 특정 문자키마다 개별 배경색, 텍스트색, 코너 반경, 테두리 두께 지정 가능.
+- **9-Patch 슬라이스 키캡 (Sliced 9-Patch Keycaps):**
+  - 런타임에 동적으로 임의의 비트맵 이미지를 3x3 분할 격자로 연산하여 모서리 왜곡 없이 정밀 렌더링.
+- **하드웨어 가속 RGB 크로마 백라이트 (RGB Chroma Wave):**
+  - 키캡 하단에 `LinearGradient` 및 `SweepGradient` 매트릭스 변환 셰이더를 렌더링하여 무지개 웨이브(`Rainbow Wave`), 브리딩(`Breathing`), 사이버펑크(`Cyberpunk Neon`), 매트릭스 플로우(`Matrix Flow`) 지원.
+  - 창 숨김/종료 시 애니메이션 자동 일시정지로 배터리 소모 0% 보장.
+- **Choreographer 기반 터치 별빛 스파클링 피직스 (Touch Star Sparkles):**
+  - 싱글턴 `Choreographer.postFrameCallback`과 객체 풀링 기법을 적용하여 120Hz 고주사율 타이핑 시에도 0 프레임 드랍 보장.
+  - 별빛 스파클링(`Star Sparkles`), 별가루(`Glowing Stardust`), 네온 버스트(`Neon Burst`), 코스믹 파동(`Cosmic Ripple`) 지원.
+- **키캡 네온 글로우 & 아우라 (Keycap Glow):**
+  - 은은하게 빛나는 외곽선 네온 후광 효과 지원.
+

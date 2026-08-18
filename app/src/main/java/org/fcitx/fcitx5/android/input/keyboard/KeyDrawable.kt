@@ -78,3 +78,53 @@ fun borderedKeyBackgroundDrawable(
 ).apply {
     setLayerInset(0, hMargin, vMargin, hMargin, vMargin)
 }
+
+fun glowingKeyBackgroundDrawable(
+    @ColorInt bkgColor: Int,
+    @ColorInt glowColor: Int,
+    radius: Float,
+    glowWidth: Int,
+    hMargin: Int,
+    vMargin: Int
+): Drawable {
+    val glowAlpha = Color.argb(
+        (Color.alpha(glowColor) * 0.45f).toInt(),
+        Color.red(glowColor),
+        Color.green(glowColor),
+        Color.blue(glowColor)
+    )
+    val outerGlowAlpha = Color.argb(
+        (Color.alpha(glowColor) * 0.20f).toInt(),
+        Color.red(glowColor),
+        Color.green(glowColor),
+        Color.blue(glowColor)
+    )
+    return LayerDrawable(
+        arrayOf(
+            // Outer halo
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = radius + glowWidth * 1.5f
+                setColor(outerGlowAlpha)
+            },
+            // Inner halo
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = radius + glowWidth
+                setColor(glowAlpha)
+                setStroke(glowWidth, glowColor)
+            },
+            // Core key body
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = radius
+                setColor(bkgColor)
+            }
+        )
+    ).apply {
+        setLayerInset(0, maxOf(0, hMargin - glowWidth * 2), maxOf(0, vMargin - glowWidth * 2), maxOf(0, hMargin - glowWidth * 2), maxOf(0, vMargin - glowWidth * 2))
+        setLayerInset(1, maxOf(0, hMargin - glowWidth), maxOf(0, vMargin - glowWidth), maxOf(0, hMargin - glowWidth), maxOf(0, vMargin - glowWidth))
+        setLayerInset(2, hMargin, vMargin, hMargin, vMargin)
+    }
+}
+

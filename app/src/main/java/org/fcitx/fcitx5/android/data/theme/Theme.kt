@@ -55,6 +55,12 @@ sealed class Theme : Parcelable {
     abstract val genericActiveBackgroundColor: Int
     abstract val genericActiveForegroundColor: Int
 
+    open val keyOverrides: Map<String, Custom.KeyCustomStyle>? get() = null
+    open val globalKeyStyle: Custom.KeyCustomStyle? get() = null
+    open val lightingEffect: Custom.LightingEffectDef? get() = null
+    open val particleEffect: Custom.ParticleEffectDef? get() = null
+    open val keyGlowEffect: Custom.KeyGlowDef? get() = null
+
     open fun backgroundDrawable(keyBorder: Boolean = false): Drawable {
         return ColorDrawable(if (keyBorder) backgroundColor else keyboardColor)
     }
@@ -67,7 +73,7 @@ sealed class Theme : Parcelable {
         /**
          * absolute paths of cropped and src png files
          */
-        val backgroundImage: CustomBackground?,
+        val backgroundImage: CustomBackground? = null,
         override val backgroundColor: Int,
         override val barColor: Int,
         override val keyboardColor: Int,
@@ -88,8 +94,65 @@ sealed class Theme : Parcelable {
         override val dividerColor: Int,
         override val clipboardEntryColor: Int,
         override val genericActiveBackgroundColor: Int,
-        override val genericActiveForegroundColor: Int
+        override val genericActiveForegroundColor: Int,
+        override val keyOverrides: Map<String, KeyCustomStyle>? = null,
+        override val globalKeyStyle: KeyCustomStyle? = null,
+        override val lightingEffect: LightingEffectDef? = null,
+        override val particleEffect: ParticleEffectDef? = null,
+        override val keyGlowEffect: KeyGlowDef? = null
     ) : Theme() {
+        @Parcelize
+        @Serializable
+        data class KeyCustomStyle(
+            val keyBackgroundColor: Int? = null,
+            val keyTextColor: Int? = null,
+            val keyBorderColor: Int? = null,
+            val keyGlowColor: Int? = null,
+            val keyGlowRadius: Float? = null,
+            val cornerRadius: Float? = null,
+            val slicedImage: SlicedImageDef? = null
+        ) : Parcelable
+
+        @Parcelize
+        @Serializable
+        data class SlicedImageDef(
+            val imagePath: String,
+            val leftSlice: Int = 0,
+            val topSlice: Int = 0,
+            val rightSlice: Int = 0,
+            val bottomSlice: Int = 0,
+            val repeatMode: String = "stretch"
+        ) : Parcelable
+
+        @Parcelize
+        @Serializable
+        data class LightingEffectDef(
+            val mode: String = "off",
+            val speed: Float = 1.0f,
+            val intensity: Float = 0.8f,
+            val direction: String = "left_to_right",
+            val customColors: List<Int>? = null
+        ) : Parcelable
+
+        @Parcelize
+        @Serializable
+        data class ParticleEffectDef(
+            val type: String = "off",
+            val particleCount: Int = 8,
+            val color: Int? = null,
+            val lifetimeMs: Long = 450L,
+            val speed: Float = 1.0f
+        ) : Parcelable
+
+        @Parcelize
+        @Serializable
+        data class KeyGlowDef(
+            val enabled: Boolean = false,
+            val glowColor: Int = 0,
+            val glowRadius: Float = 4f,
+            val glowSpread: Float = 1f
+        ) : Parcelable
+
         @Parcelize
         @Serializable
         data class CustomBackground(

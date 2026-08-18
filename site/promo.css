@@ -2377,6 +2377,171 @@ h1 {
   color: var(--ink-faint);
 }
 
+/* FX Bar Controls */
+.theme-fx-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+  padding: 12px 18px;
+  background: rgb(4 10 18 / 65%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 16px;
+  margin-bottom: 8px;
+}
+
+.fx-control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fx-group-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.fx-btn-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fx-btn {
+  padding: 5px 11px;
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fx-btn:hover {
+  background: rgb(255 255 255 / 14%);
+  color: #fff;
+}
+
+.fx-btn.is-active {
+  background: var(--jade);
+  border-color: var(--jade-bright);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgb(0 230 153 / 40%);
+}
+
+.fx-toggle-btn {
+  padding: 5px 14px;
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fx-toggle-btn.is-active {
+  background: #a855f7;
+  border-color: #c084fc;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 14px rgb(168 85 247 / 50%);
+}
+
+/* Chroma Backlight and Particle Canvas */
+.virtual-keyboard-body {
+  position: relative;
+  overflow: hidden;
+}
+
+.vk-chroma-bg {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: 24px;
+  transition: opacity 0.4s ease;
+  z-index: 0;
+}
+
+.vk-chroma-bg.mode-wave {
+  opacity: 0.85;
+  background: linear-gradient(90deg, #ff0055, #ff5500, #ffe600, #00ff66, #00ccff, #7700ff, #ff0055);
+  background-size: 300% 100%;
+  animation: chroma-flow 3s linear infinite;
+}
+
+.vk-chroma-bg.mode-breathe {
+  opacity: 0.8;
+  background: radial-gradient(circle at center, #00f0ff 0%, #ff0077 50%, #7700ff 100%);
+  animation: chroma-breathe 2.5s ease-in-out infinite alternate;
+}
+
+.vk-chroma-bg.mode-cyberpunk {
+  opacity: 0.9;
+  background: linear-gradient(135deg, #00f0ff, #ff0077, #7700ff, #ffe600, #00f0ff);
+  background-size: 400% 400%;
+  animation: chroma-cyber 4s ease infinite;
+}
+
+.vk-chroma-bg.mode-matrix {
+  opacity: 0.85;
+  background: linear-gradient(180deg, #003300, #00ff66, #66ffaa, #00ff66, #003300);
+  background-size: 100% 300%;
+  animation: chroma-matrix 2s linear infinite;
+}
+
+@keyframes chroma-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+@keyframes chroma-breathe {
+  0% { opacity: 0.2; transform: scale(0.96); filter: blur(4px); }
+  100% { opacity: 0.85; transform: scale(1.02); filter: blur(0px); }
+}
+
+@keyframes chroma-cyber {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes chroma-matrix {
+  0% { background-position: 50% 0%; }
+  100% { background-position: 50% 100%; }
+}
+
+.vk-particle-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.vk-toolbar, .vk-candidate-bar, .vk-keys-container {
+  position: relative;
+  z-index: 2;
+}
+
+/* Keycap Glow */
+.virtual-keyboard-body.has-glow .vk-key {
+  box-shadow: 0 0 10px rgb(0 240 255 / 40%), inset 0 0 4px rgb(0 240 255 / 20%);
+  border-color: rgb(0 240 255 / 60%) !important;
+}
+
+.virtual-keyboard-body.has-glow .vk-key-accent {
+  box-shadow: 0 0 16px rgb(255 0 127 / 70%), inset 0 0 6px rgb(255 255 255 / 40%);
+}
+
 @media (max-width: 640px) {
   .theme-tabs-wrapper {
     grid-template-columns: repeat(2, 1fr);

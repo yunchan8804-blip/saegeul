@@ -109,6 +109,22 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         isDuplicateParentStateEnabled = true
     }
 
+    fun findCustomKeyStyle(): Theme.Custom.KeyCustomStyle? {
+        val overrides = theme.keyOverrides
+        val keyName = when {
+            def.viewId > 0 -> runCatching { resources.getResourceEntryName(def.viewId) }.getOrNull()
+            def is KeyDef.Appearance.Text -> def.displayText
+            else -> null
+        }
+        if (overrides != null && keyName != null && overrides.containsKey(keyName)) {
+            return overrides[keyName]
+        }
+        if (overrides != null && def is KeyDef.Appearance.Text && overrides.containsKey(def.displayText.lowercase())) {
+            return overrides[def.displayText.lowercase()]
+        }
+        return theme.globalKeyStyle
+    }
+
     init {
         // trigger setEnabled(true)
         isEnabled = true
@@ -117,21 +133,58 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         if (def.viewId > 0) {
             id = def.viewId
         }
-        // key border
-        if ((bordered && def.border != Border.Off) || def.border == Border.On) {
-            val bkgColor = when (def.variant) {
+
+        val customStyle = findCustomKeyStyle()
+        val customRadius = customStyle?.cornerRadius?.let { dp(it) } ?: radius
+        val glowDef = theme.keyGlowEffect
+        val glowColor = customStyle?.keyGlowColor ?: (if (glowDef?.enabled == true) glowDef.glowColor else null)
+
+        val slicedImageDef = customStyle?.slicedImage
+        val slicedDrawable = if (slicedImageDef != null) {
+            val file = java.io.File(slicedImageDef.imagePath)
+            if (file.exists()) {
+                val bmp = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                if (bmp != null) {
+                    SlicedKeyDrawable(
+                        bmp,
+                        slicedImageDef.leftSlice,
+                        slicedImageDef.topSlice,
+                        slicedImageDef.rightSlice,
+                        slicedImageDef.bottomSlice,
+                        slicedImageDef.repeatMode
+                    )
+                } else null
+            } else null
+        } else null
+
+        if (slicedDrawable != null) {
+            appearanceView.background = slicedDrawable
+            setupPressHighlight()
+        } else if (glowColor != null) {
+            val bkgColor = customStyle?.keyBackgroundColor ?: when (def.variant) {
+                Variant.Normal, Variant.AltForeground -> theme.keyBackgroundColor
+                Variant.Alternative -> theme.altKeyBackgroundColor
+                Variant.Accent -> theme.accentKeyBackgroundColor
+            }
+            val glowWidth = dp(glowDef?.glowRadius ?: 4f).toInt()
+            appearanceView.background = glowingKeyBackgroundDrawable(
+                bkgColor, glowColor, customRadius, glowWidth, hMargin, vMargin
+            )
+            setupPressHighlight()
+        } else if ((bordered && def.border != Border.Off) || def.border == Border.On || customStyle?.keyBackgroundColor != null) {
+            val bkgColor = customStyle?.keyBackgroundColor ?: when (def.variant) {
                 Variant.Normal, Variant.AltForeground -> theme.keyBackgroundColor
                 Variant.Alternative -> theme.altKeyBackgroundColor
                 Variant.Accent -> theme.accentKeyBackgroundColor
             }
             val borderOrShadowWidth = dp(1)
-            // background: key border
-            appearanceView.background = if (borderStroke) borderedKeyBackgroundDrawable(
-                bkgColor, theme.keyShadowColor,
-                radius, borderOrShadowWidth, hMargin, vMargin
+            val borderColor = customStyle?.keyBorderColor ?: theme.keyShadowColor
+            appearanceView.background = if (borderStroke || customStyle?.keyBorderColor != null) borderedKeyBackgroundDrawable(
+                bkgColor, borderColor,
+                customRadius, borderOrShadowWidth, hMargin, vMargin
             ) else shadowedKeyBackgroundDrawable(
-                bkgColor, theme.keyShadowColor,
-                radius, borderOrShadowWidth, hMargin, vMargin
+                bkgColor, borderColor,
+                customRadius, borderOrShadowWidth, hMargin, vMargin
             )
             // foreground: press highlight or ripple
             setupPressHighlight()
@@ -260,8 +313,9 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
         // keep original typeface, apply textStyle only
         setTypeface(typeface, def.textStyle)
+        val customStyle = findCustomKeyStyle()
         setTextColor(
-            when (def.variant) {
+            customStyle?.keyTextColor ?: when (def.variant) {
                 Variant.Normal -> theme.keyTextColor
                 Variant.AltForeground, Variant.Alternative -> theme.altKeyTextColor
                 Variant.Accent -> theme.accentKeyTextColor

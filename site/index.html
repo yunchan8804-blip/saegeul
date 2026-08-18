@@ -515,6 +515,34 @@
             <div class="theme-info-spec" id="theme-spec">닥나무 한지의 따뜻한 미색 표면(#E9E1D2)과 선명한 붓먹 텍스트, 은은한 적갈색(#B83A32) 엔터키 액센트</div>
           </div>
 
+          <!-- Real-Time Hardware Lighting & Particle FX Controls -->
+          <div class="theme-fx-bar">
+            <div class="fx-control-group">
+              <span class="fx-group-label">🌈 RGB 백라이트:</span>
+              <div class="fx-btn-row" id="fx-rgb-modes">
+                <button type="button" class="fx-btn is-active" data-rgb="off">끄기</button>
+                <button type="button" class="fx-btn" data-rgb="wave">레인보우</button>
+                <button type="button" class="fx-btn" data-rgb="breathe">브리딩</button>
+                <button type="button" class="fx-btn" data-rgb="cyberpunk">사이버펑크</button>
+                <button type="button" class="fx-btn" data-rgb="matrix">매트릭스</button>
+              </div>
+            </div>
+            <div class="fx-control-group">
+              <span class="fx-group-label">✨ 터치 피드백:</span>
+              <div class="fx-btn-row" id="fx-particle-modes">
+                <button type="button" class="fx-btn" data-particle="off">끄기</button>
+                <button type="button" class="fx-btn is-active" data-particle="star">⭐ 별빛</button>
+                <button type="button" class="fx-btn" data-particle="dust">💫 별가루</button>
+                <button type="button" class="fx-btn" data-particle="burst">💥 버스트</button>
+                <button type="button" class="fx-btn" data-particle="ripple">🌊 파동</button>
+              </div>
+            </div>
+            <div class="fx-control-group">
+              <span class="fx-group-label">🔮 네온 글로우:</span>
+              <button type="button" class="fx-toggle-btn" id="fx-glow-toggle" aria-pressed="false">글로우 ON</button>
+            </div>
+          </div>
+
           <!-- Virtual Keyboard Renderer with live typing display -->
           <div class="virtual-keyboard-display">
             <div class="vk-input-box">
@@ -529,6 +557,12 @@
             </div>
             
             <div class="virtual-keyboard-body" id="vk-body" data-theme="hanji">
+              <!-- Animated RGB Chroma Backlight Layer -->
+              <div class="vk-chroma-bg" id="vk-chroma-bg"></div>
+
+              <!-- Interactive Touch Particle Canvas Overlay -->
+              <canvas class="vk-particle-canvas" id="vk-particle-canvas"></canvas>
+
               <!-- Toolbar -->
               <div class="vk-toolbar">
                 <button type="button" class="vk-tool-btn active">ㄱ가 자판</button>
