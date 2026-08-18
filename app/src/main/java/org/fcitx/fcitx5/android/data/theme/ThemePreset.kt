@@ -60,6 +60,114 @@ object ThemePreset {
         genericActiveForegroundColor = 0xffffffff
     )
 
+    /** Joseon white porcelain palette with cobalt blue accents. */
+    val BaegjaLight = Theme.Builtin(
+        name = "BaegjaLight",
+        isDark = false,
+        backgroundColor = 0xfff5f6f8,
+        barColor = 0xffeef0f3,
+        keyboardColor = 0xfff5f6f8,
+        keyBackgroundColor = 0xffffffff,
+        keyTextColor = 0xff1e293b,
+        candidateTextColor = 0xff0f172a,
+        candidateLabelColor = 0xff475569,
+        candidateCommentColor = 0xff64748b,
+        altKeyBackgroundColor = 0xffe2e8f0,
+        altKeyTextColor = 0xff475569,
+        accentKeyBackgroundColor = 0xff1e40af,
+        accentKeyTextColor = 0xffffffff,
+        keyPressHighlightColor = 0x1f000000,
+        keyShadowColor = 0xffcbd5e1,
+        popupBackgroundColor = 0xfff1f5f9,
+        popupTextColor = 0xff0f172a,
+        spaceBarColor = 0xffe2e8f0,
+        dividerColor = 0x1e000000,
+        clipboardEntryColor = 0xffffffff,
+        genericActiveBackgroundColor = 0xff2563eb,
+        genericActiveForegroundColor = 0xffffffff
+    )
+
+    /** Goryeo celadon palette with antique gold accents. */
+    val CheongjaDark = Theme.Builtin(
+        name = "CheongjaDark",
+        isDark = true,
+        backgroundColor = 0xff0f1e1b,
+        barColor = 0xff0a1614,
+        keyboardColor = 0xff0f1e1b,
+        keyBackgroundColor = 0xff1a2f2b,
+        keyTextColor = 0xffe6f4f1,
+        candidateTextColor = 0xffe6f4f1,
+        candidateLabelColor = 0xffb5d6ce,
+        candidateCommentColor = 0xff8faea7,
+        altKeyBackgroundColor = 0xff142421,
+        altKeyTextColor = 0xffa3c4bd,
+        accentKeyBackgroundColor = 0xffc49a45,
+        accentKeyTextColor = 0xff1a1a1a,
+        keyPressHighlightColor = 0x33ffffff,
+        keyShadowColor = 0xff08100e,
+        popupBackgroundColor = 0xff1a2f2b,
+        popupTextColor = 0xffe6f4f1,
+        spaceBarColor = 0xff243e39,
+        dividerColor = 0x24ffffff,
+        clipboardEntryColor = 0xff1a2f2b,
+        genericActiveBackgroundColor = 0xff2a7d6e,
+        genericActiveForegroundColor = 0xffffffff
+    )
+
+    /** Pure OLED pitch black with neon jade accents. */
+    val MidnightOLED = Theme.Builtin(
+        name = "MidnightOLED",
+        isDark = true,
+        backgroundColor = 0xff000000,
+        barColor = 0xff080808,
+        keyboardColor = 0xff000000,
+        keyBackgroundColor = 0xff141414,
+        keyTextColor = 0xffffffff,
+        candidateTextColor = 0xffffffff,
+        candidateLabelColor = 0xffa0a0a0,
+        candidateCommentColor = 0xff707070,
+        altKeyBackgroundColor = 0xff0c0c0c,
+        altKeyTextColor = 0xff888888,
+        accentKeyBackgroundColor = 0xff00e699,
+        accentKeyTextColor = 0xff000000,
+        keyPressHighlightColor = 0x3300e699,
+        keyShadowColor = 0xff000000,
+        popupBackgroundColor = 0xff141414,
+        popupTextColor = 0xffffffff,
+        spaceBarColor = 0xff1c1c1c,
+        dividerColor = 0x1affffff,
+        clipboardEntryColor = 0xff141414,
+        genericActiveBackgroundColor = 0xff00e699,
+        genericActiveForegroundColor = 0xff000000
+    )
+
+    /** Modern frosted slate glass aesthetic with sky cyan accents. */
+    val SeoulMistGlass = Theme.Builtin(
+        name = "SeoulMistGlass",
+        isDark = true,
+        backgroundColor = 0xff182230,
+        barColor = 0xff0f1722,
+        keyboardColor = 0xff182230,
+        keyBackgroundColor = 0xff253346,
+        keyTextColor = 0xfff8fafc,
+        candidateTextColor = 0xfff8fafc,
+        candidateLabelColor = 0xffcbd5e1,
+        candidateCommentColor = 0xff94a3b8,
+        altKeyBackgroundColor = 0xff1b2636,
+        altKeyTextColor = 0xff94a3b8,
+        accentKeyBackgroundColor = 0xff38bdf8,
+        accentKeyTextColor = 0xff0f172a,
+        keyPressHighlightColor = 0x2e38bdf8,
+        keyShadowColor = 0xff0b1017,
+        popupBackgroundColor = 0xff253346,
+        popupTextColor = 0xfff8fafc,
+        spaceBarColor = 0xff2e3f57,
+        dividerColor = 0x24ffffff,
+        clipboardEntryColor = 0xff253346,
+        genericActiveBackgroundColor = 0xff38bdf8,
+        genericActiveForegroundColor = 0xff0f172a
+    )
+
     val MaterialLight = Theme.Builtin(
         name = "MaterialLight",
         isDark = false,

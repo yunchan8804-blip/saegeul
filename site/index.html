@@ -33,6 +33,7 @@
         <a href="#ai">AI 글쓰기</a>
         <a href="#connect">내 컴퓨터 연결</a>
         <a href="#privacy">개인정보</a>
+        <a href="#themes">시그니처 테마</a>
         <a href="/faq/">도움말</a>
         <a href="https://github.com/yunchan8804-blip/saegeul/releases" class="nav-cta" rel="noreferrer">내려받기</a>
       </div>
@@ -442,9 +443,162 @@
           <p>업무용 슬랙, 메신저 카카오톡, 메모 앱마다 서로 다른 기본 자판, 테마, AI 허용 여부를 따로 지정할 수 있습니다.</p>
         </article>
         <article class="bento-card reveal">
-          <h3>단청과 한지 테마</h3>
-          <p>한국의 정취를 담은 단청(다크)과 한지(라이트) 테마를 기본 탑재했으며, 커스텀 배경 이미지도 자유롭게 설정합니다.</p>
+          <h3>단청과 한지 등 시그니처 테마</h3>
+          <p>한지, 단청, 백자, 청자, 자정 OLED, 안개 글래스 등 한국의 미학과 고대비 OLED 테마를 완벽 지원합니다.</p>
         </article>
+      </div>
+    </section>
+
+    <!-- Interactive Theme Studio Section -->
+    <section class="reader-section theme-studio-section" id="themes" aria-labelledby="themes-title">
+      <div class="shell reader-head reveal">
+        <p class="section-eyebrow">SIGNATURE THEME STUDIO</p>
+        <div class="reader-head-grid">
+          <h2 id="themes-title">한국의 선과 색을 담은<br>시그니처 테마 시스템.</h2>
+          <div class="reader-lede">
+            <p>닥나무 결이 살아있는 <strong>한지</strong>, 궁궐의 위엄을 품은 <strong>단청</strong>, 맑고 고결한 <strong>백자</strong>와 비색의 <strong>청자</strong>, 그리고 전력 소모 제로의 <strong>자정 OLED</strong>까지. 실시간 인터랙티브 키보드로 직접 경험해보세요.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="shell theme-studio-container reveal">
+        <!-- Theme Selector Tabs -->
+        <div class="theme-tabs-wrapper" role="tablist" aria-label="키보드 테마 선택">
+          <button type="button" class="theme-tab-btn active" role="tab" aria-selected="true" data-theme="hanji">
+            <span class="theme-tab-swatch" style="background:#e9e1d2; border-color:#b83a32;"></span>
+            <div class="theme-tab-texts">
+              <span class="theme-tab-name">한지 Light</span>
+              <span class="theme-tab-desc">닥나무 &amp; 먹빛</span>
+            </div>
+          </button>
+          <button type="button" class="theme-tab-btn" role="tab" aria-selected="false" data-theme="dancheong">
+            <span class="theme-tab-swatch" style="background:#101918; border-color:#c84a3f;"></span>
+            <div class="theme-tab-texts">
+              <span class="theme-tab-name">단청 Dark</span>
+              <span class="theme-tab-desc">밤하늘 &amp; 비취</span>
+            </div>
+          </button>
+          <button type="button" class="theme-tab-btn" role="tab" aria-selected="false" data-theme="baegja">
+            <span class="theme-tab-swatch" style="background:#f5f6f8; border-color:#1e40af;"></span>
+            <div class="theme-tab-texts">
+              <span class="theme-tab-name">백자 Light</span>
+              <span class="theme-tab-desc">순백 &amp; 청화 코발트</span>
+            </div>
+          </button>
+          <button type="button" class="theme-tab-btn" role="tab" aria-selected="false" data-theme="cheongja">
+            <span class="theme-tab-swatch" style="background:#0f1e1b; border-color:#c49a45;"></span>
+            <div class="theme-tab-texts">
+              <span class="theme-tab-name">청자 Dark</span>
+              <span class="theme-tab-desc">고려 비색 &amp; 금상감</span>
+            </div>
+          </button>
+          <button type="button" class="theme-tab-btn" role="tab" aria-selected="false" data-theme="midnight">
+            <span class="theme-tab-swatch" style="background:#000000; border-color:#00e699;"></span>
+            <div class="theme-tab-texts">
+              <span class="theme-tab-name">자정 OLED</span>
+              <span class="theme-tab-desc">순수 블랙 &amp; 네온</span>
+            </div>
+          </button>
+          <button type="button" class="theme-tab-btn" role="tab" aria-selected="false" data-theme="mist">
+            <span class="theme-tab-swatch" style="background:#182230; border-color:#38bdf8;"></span>
+            <div class="theme-tab-texts">
+              <span class="theme-tab-name">안개 Glass</span>
+              <span class="theme-tab-desc">프로스티드 슬레이트</span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Live Interactive Keyboard Stage -->
+        <div class="theme-stage-card double-bezel" id="theme-stage">
+          <div class="theme-stage-header">
+            <div class="theme-info-badge" id="theme-badge">HANJI LIGHT · 한지 라이트</div>
+            <div class="theme-info-spec" id="theme-spec">닥나무 한지의 따뜻한 미색 표면(#E9E1D2)과 선명한 붓먹 텍스트, 은은한 적갈색(#B83A32) 엔터키 액센트</div>
+          </div>
+
+          <!-- Virtual Keyboard Renderer with live typing display -->
+          <div class="virtual-keyboard-display">
+            <div class="vk-input-box">
+              <div class="vk-input-row">
+                <span class="vk-input-label">타이핑 테스트:</span>
+                <span class="vk-input-text" id="vk-typed-text">아름다운 우리글 새글</span>
+                <span class="vk-input-cursor" aria-hidden="true">|</span>
+              </div>
+              <div class="vk-input-actions">
+                <button type="button" class="vk-btn-clear" id="vk-btn-clear">지우기</button>
+              </div>
+            </div>
+            
+            <div class="virtual-keyboard-body" id="vk-body" data-theme="hanji">
+              <!-- Toolbar -->
+              <div class="vk-toolbar">
+                <button type="button" class="vk-tool-btn active">ㄱ가 자판</button>
+                <button type="button" class="vk-tool-btn">클립보드</button>
+                <button type="button" class="vk-tool-btn">상용구</button>
+                <button type="button" class="vk-tool-btn">AI 교정</button>
+                <button type="button" class="vk-tool-btn">테마 설정</button>
+              </div>
+              
+              <!-- Candidate Bar -->
+              <div class="vk-candidate-bar">
+                <span class="vk-candidate active">1. 새글</span>
+                <span class="vk-candidate">2. 새글자</span>
+                <span class="vk-candidate">3. 세글</span>
+                <span class="vk-candidate">4. Saegeul</span>
+                <span class="vk-candidate">5. 훈민정음</span>
+              </div>
+
+              <!-- Key Rows (2-Set Korean Keyboard layout) -->
+              <div class="vk-keys-container">
+                <div class="vk-row">
+                  <button type="button" class="vk-key" data-key="ㅂ">ㅂ</button>
+                  <button type="button" class="vk-key" data-key="ㅈ">ㅈ</button>
+                  <button type="button" class="vk-key" data-key="ㄷ">ㄷ</button>
+                  <button type="button" class="vk-key" data-key="ㄱ">ㄱ</button>
+                  <button type="button" class="vk-key" data-key="ㅅ">ㅅ</button>
+                  <button type="button" class="vk-key" data-key="ㅛ">ㅛ</button>
+                  <button type="button" class="vk-key" data-key="ㅕ">ㅕ</button>
+                  <button type="button" class="vk-key" data-key="ㅑ">ㅑ</button>
+                  <button type="button" class="vk-key" data-key="ㅐ">ㅐ</button>
+                  <button type="button" class="vk-key" data-key="ㅔ">ㅔ</button>
+                </div>
+                <div class="vk-row">
+                  <button type="button" class="vk-key" data-key="ㅁ">ㅁ</button>
+                  <button type="button" class="vk-key" data-key="ㄴ">ㄴ</button>
+                  <button type="button" class="vk-key" data-key="ㅇ">ㅇ</button>
+                  <button type="button" class="vk-key" data-key="ㄹ">ㄹ</button>
+                  <button type="button" class="vk-key" data-key="ㅎ">ㅎ</button>
+                  <button type="button" class="vk-key" data-key="ㅗ">ㅗ</button>
+                  <button type="button" class="vk-key" data-key="ㅓ">ㅓ</button>
+                  <button type="button" class="vk-key" data-key="ㅏ">ㅏ</button>
+                  <button type="button" class="vk-key" data-key="ㅣ">ㅣ</button>
+                </div>
+                <div class="vk-row">
+                  <button type="button" class="vk-key vk-key-alt" data-action="shift">⇧</button>
+                  <button type="button" class="vk-key" data-key="ㅋ">ㅋ</button>
+                  <button type="button" class="vk-key" data-key="ㅌ">ㅌ</button>
+                  <button type="button" class="vk-key" data-key="ㅊ">ㅊ</button>
+                  <button type="button" class="vk-key" data-key="ㅍ">ㅍ</button>
+                  <button type="button" class="vk-key" data-key="ㅠ">ㅠ</button>
+                  <button type="button" class="vk-key" data-key="ㅜ">ㅜ</button>
+                  <button type="button" class="vk-key" data-key="ㅡ">ㅡ</button>
+                  <button type="button" class="vk-key vk-key-alt" data-action="backspace">⌫</button>
+                </div>
+                <div class="vk-row vk-bottom-row">
+                  <button type="button" class="vk-key vk-key-alt vk-key-mode" data-action="mode">!#1</button>
+                  <button type="button" class="vk-key vk-key-alt" data-action="lang">한/영</button>
+                  <button type="button" class="vk-key vk-key-space" data-key=" ">스페이스 (Space)</button>
+                  <button type="button" class="vk-key" data-key=".">.</button>
+                  <button type="button" class="vk-key vk-key-accent" data-action="enter">↵</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Color Tokens Palette Swatches Display -->
+          <div class="theme-palette-bar" id="theme-palette-bar">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
       </div>
     </section>
 

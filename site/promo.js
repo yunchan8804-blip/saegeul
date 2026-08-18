@@ -494,6 +494,154 @@
   }
 
   /* ==========================================================================
+     Theme Studio Interactive Simulator
+     ========================================================================== */
+  const themeData = {
+    hanji: {
+      badge: "HANJI LIGHT · 한지 라이트",
+      spec: "닥나무 한지의 따뜻한 미색 표면(#E9E1D2)과 선명한 붓먹 텍스트, 은은한 적갈색(#B83A32) 엔터키 액센트",
+      tokens: [
+        { name: "표면", val: "#E9E1D2" },
+        { name: "키캡", val: "#FAF6EC" },
+        { name: "먹빛", val: "#24201B" },
+        { name: "특수키", val: "#D7CDBE" },
+        { name: "강조(주홍)", val: "#B83A32" }
+      ]
+    },
+    dancheong: {
+      badge: "DANCHEONG DARK · 단청 다크",
+      spec: "궁궐의 야경을 연상시키는 묵색 배경(#101918)과 비취색 툴바, 붉은 단청(#C84A3F) 액센트",
+      tokens: [
+        { name: "표면", val: "#101918" },
+        { name: "키캡", val: "#253330" },
+        { name: "상아빛", val: "#F4EAD8" },
+        { name: "특수키", val: "#192623" },
+        { name: "단청홍", val: "#C84A3F" }
+      ]
+    },
+    baegja: {
+      badge: "BAEGJA LIGHT · 백자 라이트",
+      spec: "조선 백자의 맑고 고결한 순백미(#F5F6F8)와 청화 안료의 깊은 코발트 블루(#1E40AF) 액센트",
+      tokens: [
+        { name: "표면", val: "#F5F6F8" },
+        { name: "키캡", val: "#FFFFFF" },
+        { name: "슬레이트", val: "#1E293B" },
+        { name: "특수키", val: "#E2E8F0" },
+        { name: "청화 코발트", val: "#1E40AF" }
+      ]
+    },
+    cheongja: {
+      badge: "CHEONGJA DARK · 청자 다크",
+      spec: "고려 비색 청자의 신비로운 옥색 안개(#0F1E1B)와 고풍스러운 황동/황금 상감(#C49A45) 액센트",
+      tokens: [
+        { name: "비색 표면", val: "#0F1E1B" },
+        { name: "옥색 키캡", val: "#1A2F2B" },
+        { name: "미스트", val: "#E6F4F1" },
+        { name: "특수키", val: "#142421" },
+        { name: "황금 상감", val: "#C49A45" }
+      ]
+    },
+    midnight: {
+      badge: "MIDNIGHT OLED · 자정 OLED",
+      spec: "소비 전력 제로의 완전 무결한 피치 블랙(#000000)과 강렬한 네온 제이드(#00E699) 발광",
+      tokens: [
+        { name: "OLED 블랙", val: "#000000" },
+        { name: "차콜 키캡", val: "#141414" },
+        { name: "화이트", val: "#FFFFFF" },
+        { name: "다크 특수키", val: "#0C0C0C" },
+        { name: "네온 제이드", val: "#00E699" }
+      ]
+    },
+    mist: {
+      badge: "SEOUL MIST · 안개 글래스",
+      spec: "모던 프로스티드 슬레이트(#182230) 글래스모피즘과 청량한 스카이 사이언(#38BDF8) 액센트",
+      tokens: [
+        { name: "슬레이트", val: "#182230" },
+        { name: "글래스 키캡", val: "#253346" },
+        { name: "아이스", val: "#F8FAFC" },
+        { name: "특수키", val: "#1B2636" },
+        { name: "스카이 사이언", val: "#38BDF8" }
+      ]
+    }
+  };
+
+  const themeTabButtons = document.querySelectorAll(".theme-tab-btn");
+  const vkBody = document.querySelector("#vk-body");
+  const themeBadge = document.querySelector("#theme-badge");
+  const themeSpec = document.querySelector("#theme-spec");
+  const themePaletteBar = document.querySelector("#theme-palette-bar");
+  const vkTypedText = document.querySelector("#vk-typed-text");
+  const vkBtnClear = document.querySelector("#vk-btn-clear");
+  const vkKeys = document.querySelectorAll(".vk-key");
+
+  function renderThemePalette(key) {
+    const data = themeData[key];
+    if (!data || !themePaletteBar) return;
+
+    if (themeBadge) themeBadge.textContent = data.badge;
+    if (themeSpec) themeSpec.textContent = data.spec;
+
+    themePaletteBar.innerHTML = data.tokens
+      .map(
+        (t) => `
+        <div class="palette-token-item">
+          <span class="palette-token-dot" style="background:${t.val}"></span>
+          <span class="palette-token-name">${t.name}</span>
+          <span class="palette-token-val">${t.val}</span>
+        </div>
+      `
+      )
+      .join("");
+  }
+
+  themeTabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const themeKey = btn.dataset.theme;
+      themeTabButtons.forEach((b) => {
+        b.classList.remove("active");
+        b.setAttribute("aria-selected", "false");
+      });
+      btn.classList.add("active");
+      btn.setAttribute("aria-selected", "true");
+
+      if (vkBody) {
+        vkBody.setAttribute("data-theme", themeKey);
+      }
+      renderThemePalette(themeKey);
+    });
+  });
+
+  // Initial render of palette
+  renderThemePalette("hanji");
+
+  // Virtual keyboard typing interactions
+  vkKeys.forEach((key) => {
+    key.addEventListener("click", () => {
+      key.classList.add("pressed");
+      setTimeout(() => key.classList.remove("pressed"), 120);
+
+      if (!vkTypedText) return;
+      const char = key.dataset.key;
+      const action = key.dataset.action;
+
+      if (char) {
+        vkTypedText.textContent = (vkTypedText.textContent || "") + char;
+      } else if (action === "backspace") {
+        const text = vkTypedText.textContent || "";
+        vkTypedText.textContent = text.slice(0, -1);
+      } else if (action === "enter") {
+        vkTypedText.textContent = (vkTypedText.textContent || "") + " ↵ ";
+      }
+    });
+  });
+
+  if (vkBtnClear && vkTypedText) {
+    vkBtnClear.addEventListener("click", () => {
+      vkTypedText.textContent = "";
+    });
+  }
+
+  /* ==========================================================================
      Scroll Reveal Animation via IntersectionObserver
      ========================================================================== */
   if ("IntersectionObserver" in window && !reduceMotion.matches) {

@@ -52,19 +52,23 @@ object ThemeFilesManager {
                     Timber.w("Failed to decode theme file ${it.absolutePath}: ${e.message}")
                     return@decode null
                 }
-                if (theme.backgroundImage != null) {
+                val finalTheme = if (theme.backgroundImage != null) {
                     if (!File(theme.backgroundImage.croppedFilePath).exists() ||
                         !File(theme.backgroundImage.srcFilePath).exists()
                     ) {
-                        Timber.w("Cannot find background image file for theme ${theme.name}")
-                        return@decode null
+                        Timber.w("Cannot find background image file for theme ${theme.name}, preserving as color theme")
+                        theme.copy(backgroundImage = null)
+                    } else {
+                        theme
                     }
+                } else {
+                    theme
                 }
                 // Update the saved file if migration happens
                 if (migrated) {
-                    saveThemeFiles(theme)
+                    saveThemeFiles(finalTheme)
                 }
-                return@decode theme
+                return@decode finalTheme
             }.toMutableList()
     }
 

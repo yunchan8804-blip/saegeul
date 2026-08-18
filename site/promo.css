@@ -1911,6 +1911,485 @@ h1 {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Theme Studio Showcase                                                      */
+/* -------------------------------------------------------------------------- */
+
+.theme-studio-section {
+  padding-top: clamp(64px, 8vw, 120px);
+  padding-bottom: clamp(64px, 8vw, 120px);
+}
+
+.theme-studio-container {
+  display: grid;
+  gap: 32px;
+}
+
+.theme-tabs-wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.theme-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--night-soft);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--ink);
+}
+
+.theme-tab-btn:hover {
+  background: var(--night-lift);
+  border-color: rgb(225 243 255 / 35%);
+  transform: translateY(-2px);
+}
+
+.theme-tab-btn.active {
+  background: var(--night-lift);
+  border-color: var(--jade-bright);
+  box-shadow: 0 8px 24px -6px rgb(85 214 166 / 25%), inset 0 0 0 1px var(--jade-bright);
+}
+
+.theme-tab-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
+}
+
+.theme-tab-texts {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.theme-tab-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.theme-tab-desc {
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-tab-btn.active .theme-tab-desc {
+  color: var(--ink-soft);
+}
+
+/* Theme Stage Card */
+.theme-stage-card {
+  position: relative;
+  background: rgb(8 18 32 / 85%);
+  border-radius: var(--surface-radius);
+  padding: clamp(24px, 4vw, 44px);
+  box-shadow: 0 32px 80px -20px rgb(0 0 0 / 75%);
+  display: grid;
+  gap: 28px;
+}
+
+.theme-stage-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+
+.theme-info-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: var(--night-lift);
+  border: 1px solid var(--jade);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--jade-bright);
+  letter-spacing: 0.04em;
+}
+
+.theme-info-spec {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+/* Virtual Keyboard Display */
+.virtual-keyboard-display {
+  display: grid;
+  gap: 18px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.vk-input-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: rgb(4 10 18 / 75%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 16px;
+  font-size: 15px;
+}
+
+.vk-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.vk-input-label {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.vk-input-text {
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.vk-input-cursor {
+  color: var(--jade-bright);
+  animation: vk-blink 1s infinite;
+  font-weight: 300;
+}
+
+@keyframes vk-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.vk-btn-clear {
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vk-btn-clear:hover {
+  background: rgb(255 255 255 / 18%);
+  color: #fff;
+}
+
+/* Virtual Keyboard Body with CSS Tokens */
+.virtual-keyboard-body {
+  --tk-bg: #e9e1d2;
+  --tk-bar: #dfd5c4;
+  --tk-key-bg: #faf6ec;
+  --tk-key-text: #24201b;
+  --tk-key-alt-bg: #d7cdbe;
+  --tk-key-alt-text: #595045;
+  --tk-accent-bg: #b83a32;
+  --tk-accent-text: #ffffff;
+  --tk-key-shadow: 0 2px 0 rgb(0 0 0 / 12%), 0 4px 10px rgb(0 0 0 / 8%);
+  --tk-key-border: rgb(0 0 0 / 6%);
+  --tk-candidate-active: #b83a32;
+
+  background: var(--tk-bg);
+  border-radius: 24px;
+  padding: 16px;
+  box-shadow: 0 16px 40px -10px rgb(0 0 0 / 50%), inset 0 1px 1px rgb(255 255 255 / 20%);
+  display: grid;
+  gap: 10px;
+  transition: background 0.35s ease, color 0.35s ease;
+  user-select: none;
+}
+
+/* Themes Definition on Body */
+.virtual-keyboard-body[data-theme="hanji"] {
+  --tk-bg: #e9e1d2;
+  --tk-bar: #dfd5c4;
+  --tk-key-bg: #faf6ec;
+  --tk-key-text: #24201b;
+  --tk-key-alt-bg: #d7cdbe;
+  --tk-key-alt-text: #595045;
+  --tk-accent-bg: #b83a32;
+  --tk-accent-text: #ffffff;
+  --tk-key-shadow: 0 2px 0 rgb(0 0 0 / 14%), 0 3px 8px rgb(0 0 0 / 6%);
+  --tk-key-border: rgb(0 0 0 / 6%);
+  --tk-candidate-active: #b83a32;
+}
+
+.virtual-keyboard-body[data-theme="dancheong"] {
+  --tk-bg: #101918;
+  --tk-bar: #0b1211;
+  --tk-key-bg: #253330;
+  --tk-key-text: #f4ead8;
+  --tk-key-alt-bg: #192623;
+  --tk-key-alt-text: #c9bda9;
+  --tk-accent-bg: #c84a3f;
+  --tk-accent-text: #ffffff;
+  --tk-key-shadow: 0 2px 0 rgb(0 0 0 / 60%), 0 3px 8px rgb(0 0 0 / 40%);
+  --tk-key-border: rgb(255 255 255 / 8%);
+  --tk-candidate-active: #24776d;
+}
+
+.virtual-keyboard-body[data-theme="baegja"] {
+  --tk-bg: #f5f6f8;
+  --tk-bar: #eef0f3;
+  --tk-key-bg: #ffffff;
+  --tk-key-text: #1e293b;
+  --tk-key-alt-bg: #e2e8f0;
+  --tk-key-alt-text: #475569;
+  --tk-accent-bg: #1e40af;
+  --tk-accent-text: #ffffff;
+  --tk-key-shadow: 0 2px 0 rgb(0 0 0 / 8%), 0 3px 8px rgb(0 0 0 / 4%);
+  --tk-key-border: rgb(0 0 0 / 6%);
+  --tk-candidate-active: #2563eb;
+}
+
+.virtual-keyboard-body[data-theme="cheongja"] {
+  --tk-bg: #0f1e1b;
+  --tk-bar: #0a1614;
+  --tk-key-bg: #1a2f2b;
+  --tk-key-text: #e6f4f1;
+  --tk-key-alt-bg: #142421;
+  --tk-key-alt-text: #a3c4bd;
+  --tk-accent-bg: #c49a45;
+  --tk-accent-text: #1a1a1a;
+  --tk-key-shadow: 0 2px 0 rgb(0 0 0 / 70%), 0 4px 10px rgb(0 0 0 / 40%);
+  --tk-key-border: rgb(255 255 255 / 8%);
+  --tk-candidate-active: #2a7d6e;
+}
+
+.virtual-keyboard-body[data-theme="midnight"] {
+  --tk-bg: #000000;
+  --tk-bar: #080808;
+  --tk-key-bg: #141414;
+  --tk-key-text: #ffffff;
+  --tk-key-alt-bg: #0c0c0c;
+  --tk-key-alt-text: #888888;
+  --tk-accent-bg: #00e699;
+  --tk-accent-text: #000000;
+  --tk-key-shadow: 0 2px 0 rgb(0 0 0 / 90%), 0 0 12px rgb(0 230 153 / 15%);
+  --tk-key-border: rgb(255 255 255 / 10%);
+  --tk-candidate-active: #00e699;
+}
+
+.virtual-keyboard-body[data-theme="mist"] {
+  --tk-bg: #182230;
+  --tk-bar: #0f1722;
+  --tk-key-bg: #253346;
+  --tk-key-text: #f8fafc;
+  --tk-key-alt-bg: #1b2636;
+  --tk-key-alt-text: #94a3b8;
+  --tk-accent-bg: #38bdf8;
+  --tk-accent-text: #0f172a;
+  --tk-key-shadow: 0 2px 0 rgb(0 0 0 / 50%), 0 4px 12px rgb(56 189 248 / 15%);
+  --tk-key-border: rgb(255 255 255 / 10%);
+  --tk-candidate-active: #38bdf8;
+}
+
+/* Toolbar & Candidates */
+.vk-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--tk-bar);
+  border-radius: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  transition: background 0.35s ease;
+}
+
+.vk-tool-btn {
+  background: transparent;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tk-key-alt-text);
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.vk-tool-btn.active,
+.vk-tool-btn:hover {
+  background: rgb(255 255 255 / 12%);
+  color: var(--tk-key-text);
+}
+
+.vk-candidate-bar {
+  display: flex;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--tk-bar);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-x: auto;
+  scrollbar-width: none;
+  transition: background 0.35s ease;
+}
+
+.vk-candidate {
+  color: var(--tk-key-alt-text);
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.vk-candidate.active {
+  background: var(--tk-candidate-active);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Key Container & Rows */
+.vk-keys-container {
+  display: grid;
+  gap: 7px;
+}
+
+.vk-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.vk-key {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  background: var(--tk-key-bg);
+  color: var(--tk-key-text);
+  border: 1px solid var(--tk-key-border);
+  border-radius: 10px;
+  box-shadow: var(--tk-key-shadow);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.2s ease, box-shadow 0.08s ease;
+}
+
+.vk-key:hover {
+  filter: brightness(1.06);
+}
+
+.vk-key:active,
+.vk-key.pressed {
+  transform: translateY(2px) scale(0.96);
+  box-shadow: 0 0 0 transparent;
+  filter: brightness(0.92);
+}
+
+.vk-key-alt {
+  background: var(--tk-key-alt-bg);
+  color: var(--tk-key-alt-text);
+  flex: 1.4;
+  font-size: 14px;
+}
+
+.vk-key-mode {
+  flex: 1.2;
+  font-size: 12.5px;
+}
+
+.vk-key-space {
+  flex: 4.5;
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+}
+
+.vk-key-accent {
+  background: var(--tk-accent-bg);
+  color: var(--tk-accent-text);
+  flex: 1.5;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Theme Palette Bar */
+.theme-palette-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  padding-top: 14px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.palette-token-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.palette-token-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 20%);
+  flex-shrink: 0;
+}
+
+.palette-token-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.palette-token-val {
+  font-family: "Geist Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 640px) {
+  .theme-tabs-wrapper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .vk-key {
+    height: 42px;
+    font-size: 14px;
+  }
+  .vk-key-alt {
+    font-size: 12px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

@@ -57,28 +57,34 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(Theme.Cu
         listOf(
             MigrationStrategy("2.1") {
                 JsonObject(it.toMutableMap().apply {
-                    put("candidateTextColor", getValue("keyTextColor"))
-                    put("candidateLabelColor", getValue("keyTextColor"))
-                    put("candidateCommentColor", getValue("altKeyTextColor"))
+                    val keyTextColor = get("keyTextColor") ?: JsonPrimitive(-1)
+                    val altKeyTextColor = get("altKeyTextColor") ?: JsonPrimitive(-1)
+                    put("candidateTextColor", keyTextColor)
+                    put("candidateLabelColor", keyTextColor)
+                    put("candidateCommentColor", altKeyTextColor)
                 })
             },
             MigrationStrategy("2.0") {
                 JsonObject(it.toMutableMap().apply {
+                    val keyTextColor = get("keyTextColor") ?: JsonPrimitive(-1)
+                    val accentKeyBg = get("accentKeyBackgroundColor") ?: JsonPrimitive(-1)
+                    val accentKeyFg = get("accentKeyTextColor") ?: JsonPrimitive(-1)
+                    val isDark = get("isDark")?.jsonPrimitive?.boolean == true
                     if (get("backgroundImage") != null) {
-                        val popupBkgColor = if (getValue("isDark").jsonPrimitive.boolean) {
+                        val popupBkgColor = if (isDark) {
                             ThemePreset.PixelDark.popupBackgroundColor
                         } else {
                             ThemePreset.PixelLight.popupBackgroundColor
                         }
                         put("popupBackgroundColor", JsonPrimitive(popupBkgColor))
-                        put("popupTextColor", getValue("keyTextColor"))
-                        put("genericActiveBackgroundColor", getValue("accentKeyBackgroundColor"))
-                        put("genericActiveForegroundColor", getValue("accentKeyTextColor"))
+                        put("popupTextColor", keyTextColor)
+                        put("genericActiveBackgroundColor", accentKeyBg)
+                        put("genericActiveForegroundColor", accentKeyFg)
                     } else {
-                        put("popupBackgroundColor", getValue("barColor"))
-                        put("popupTextColor", getValue("keyTextColor"))
-                        put("genericActiveBackgroundColor", getValue("accentKeyBackgroundColor"))
-                        put("genericActiveForegroundColor", getValue("accentKeyTextColor"))
+                        put("popupBackgroundColor", get("barColor") ?: JsonPrimitive(-1))
+                        put("popupTextColor", keyTextColor)
+                        put("genericActiveBackgroundColor", accentKeyBg)
+                        put("genericActiveForegroundColor", accentKeyFg)
                     }
                 })
             },

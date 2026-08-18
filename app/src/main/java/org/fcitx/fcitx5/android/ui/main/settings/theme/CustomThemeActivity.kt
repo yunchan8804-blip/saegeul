@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: LGPL-2.1-or-later
- * SPDX-FileCopyrightText: Copyright 2021-2023 Fcitx5 for Android Contributors
+ * SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
  */
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
@@ -8,19 +8,27 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Parcelable
+import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.MimeTypeMap
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
 import android.widget.SeekBar
+import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -30,6 +38,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.setPadding
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -68,9 +77,12 @@ import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.constraintlayout.topToTopOf
 import splitties.views.dsl.core.add
+import splitties.views.dsl.core.horizontalLayout
+import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.seekBar
 import splitties.views.dsl.core.textView
+import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.view
 import splitties.views.dsl.core.wrapContent
 import splitties.views.dsl.core.wrapInScrollView
@@ -124,12 +136,19 @@ class CustomThemeActivity : AppCompatActivity() {
         }
     }
 
+    private fun createSectionHeader(title: String) = textView {
+        text = title
+        textSize = 13f
+        paint.isFakeBoldText = true
+        setTextColor(styledColor(android.R.attr.colorPrimary))
+        setPadding(dp(16), dp(16), dp(16), dp(6))
+    }
+
     private val variantLabel by lazy {
         createTextView(R.string.dark_keys, ripple = true)
     }
     private val variantSwitch by lazy {
         switch {
-            // Use dark keys by default
             isChecked = false
         }
     }
@@ -150,47 +169,102 @@ class CustomThemeActivity : AppCompatActivity() {
         createTextView(R.string.recrop_image, ripple = true)
     }
 
+    private val changeImageLabel by lazy {
+        createTextView(R.string.theme_choose_image, ripple = true)
+    }
+
+    private val removeImageLabel by lazy {
+        createTextView(R.string.theme_remove_image, ripple = true)
+    }
+
+    private val palettePresetContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val accentColorContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val surfaceColorContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val editorContainer by lazy {
+        verticalLayout {
+            setPadding(dp(12), dp(8), dp(12), dp(32))
+
+            // 1. Preset Palettes Section
+            add(createSectionHeader(getString(R.string.theme_style_palette)), lParams(matchParent, wrapContent))
+            add(palettePresetContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(8)
+            })
+
+            // 2. Accent / Enter Color Swatches
+            add(createSectionHeader(getString(R.string.theme_accent_key_color)), lParams(matchParent, wrapContent))
+            add(accentColorContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(8)
+            })
+
+            // 3. Keyboard Surface Color Swatches
+            add(createSectionHeader(getString(R.string.theme_keyboard_bg_color)), lParams(matchParent, wrapContent))
+            add(surfaceColorContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(8)
+            })
+
+            // 4. Keycap & Style Options
+            add(createSectionHeader(getString(R.string.theme_color_customization)), lParams(matchParent, wrapContent))
+            val variantRow = horizontalLayout {
+                gravity = Gravity.CENTER_VERTICAL
+                add(variantLabel, lParams(0, dp(48)) {
+                    weight = 1f
+                })
+                add(variantSwitch, lParams(wrapContent, wrapContent) {
+                    rightMargin = dp(16)
+                })
+            }
+            add(variantRow, lParams(matchParent, wrapContent))
+
+            // 5. Background Image Section
+            add(createSectionHeader(getString(R.string.theme_background_image)), lParams(matchParent, wrapContent))
+            add(changeImageLabel, lParams(matchParent, dp(44)))
+            add(cropLabel, lParams(matchParent, dp(44)))
+            add(removeImageLabel, lParams(matchParent, dp(44)))
+
+            val brightnessRow = horizontalLayout {
+                gravity = Gravity.CENTER_VERTICAL
+                add(brightnessLabel, lParams(0, dp(40)) {
+                    weight = 1f
+                })
+                add(brightnessValue, lParams(wrapContent, dp(40)) {
+                    rightMargin = dp(16)
+                })
+            }
+            add(brightnessRow, lParams(matchParent, wrapContent))
+            add(brightnessSeekBar, lParams(matchParent, wrapContent) {
+                leftMargin = dp(16)
+                rightMargin = dp(16)
+                bottomMargin = dp(16)
+            })
+        }
+    }
+
     private val scrollView by lazy {
-        val lineHeight = dp(48)
-        val itemMargin = dp(30)
-        constraintLayout {
-            bottomPadding = dp(24)
+        verticalLayout {
             add(previewUi.root, lParams(wrapContent, wrapContent) {
-                topOfParent()
-                centerHorizontally()
-                above(cropLabel, dp(8))
-                verticalChainStyle = packed
+                gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = dp(12)
+                bottomMargin = dp(12)
             })
-            add(cropLabel, lParams(matchConstraints, lineHeight) {
-                below(previewUi.root)
-                centerHorizontally(itemMargin)
-                above(variantLabel)
-            })
-            add(variantLabel, lParams(matchConstraints, lineHeight) {
-                below(cropLabel)
-                startOfParent(itemMargin)
-                before(variantSwitch)
-                above(brightnessLabel)
-            })
-            add(variantSwitch, lParams(wrapContent, lineHeight) {
-                topToTopOf(variantLabel)
-                endOfParent(itemMargin)
-            })
-            add(brightnessLabel, lParams(matchConstraints, lineHeight) {
-                below(variantLabel)
-                startOfParent(itemMargin)
-                before(brightnessValue)
-                above(brightnessSeekBar)
-            })
-            add(brightnessValue, lParams(wrapContent, lineHeight) {
-                topToTopOf(brightnessLabel)
-                endOfParent(itemMargin)
-            })
-            add(brightnessSeekBar, lParams(matchConstraints, wrapContent) {
-                below(brightnessLabel)
-                centerHorizontally(itemMargin)
-                bottomOfParent()
-            })
+            add(editorContainer, lParams(matchParent, wrapContent))
         }.wrapInScrollView {
             isFillViewport = true
         }
@@ -220,10 +294,10 @@ class CustomThemeActivity : AppCompatActivity() {
         var srcImageBuffer: ByteArray? = null
         var cropRect: Rect? = null
         var cropRotation: Int = 0
-        lateinit var croppedBitmap: Bitmap
-        lateinit var filteredDrawable: BitmapDrawable
-        lateinit var srcImageFile: File
-        lateinit var croppedImageFile: File
+        var croppedBitmap: Bitmap? = null
+        var filteredDrawable: BitmapDrawable? = null
+        var srcImageFile: File? = null
+        var croppedImageFile: File? = null
     }
 
     private val backgroundStates by lazy { BackgroundStates() }
@@ -235,20 +309,218 @@ class CustomThemeActivity : AppCompatActivity() {
             block(backgroundStates, theme.backgroundImage!!)
     }
 
-    private fun BackgroundStates.setKeyVariant(
-        background: Theme.Custom.CustomBackground,
-        darkKeys: Boolean
-    ) {
-        val template = if (darkKeys) ThemePreset.TransparentLight else ThemePreset.TransparentDark
-        theme = template.deriveCustomBackground(
-            theme.name,
-            background.croppedFilePath,
-            background.srcFilePath,
-            brightnessSeekBar.progress,
-            background.cropRect,
-            background.cropRotation
+    private fun updatePreview() {
+        val bgDrawable = if (theme.backgroundImage != null && backgroundStates.filteredDrawable != null) {
+            backgroundStates.filteredDrawable
+        } else {
+            null
+        }
+        previewUi.setTheme(theme, bgDrawable)
+        updateControlsVisibility()
+    }
+
+    private fun updateControlsVisibility() {
+        val hasBg = theme.backgroundImage != null
+        cropLabel.visibility = if (hasBg) View.VISIBLE else View.GONE
+        removeImageLabel.visibility = if (hasBg) View.VISIBLE else View.GONE
+        brightnessLabel.visibility = if (hasBg) View.VISIBLE else View.GONE
+        brightnessValue.visibility = if (hasBg) View.VISIBLE else View.GONE
+        brightnessSeekBar.visibility = if (hasBg) View.VISIBLE else View.GONE
+    }
+
+    private fun applyPreset(preset: Theme.Builtin) {
+        val currentBg = theme.backgroundImage
+        val custom = if (currentBg != null) {
+            preset.deriveCustomBackground(
+                name = theme.name,
+                croppedBackgroundImage = currentBg.croppedFilePath,
+                originBackgroundImage = currentBg.srcFilePath,
+                brightness = brightnessSeekBar.progress,
+                cropBackgroundRect = currentBg.cropRect,
+                cropBackgroundRotation = currentBg.cropRotation
+            )
+        } else {
+            preset.deriveCustomNoBackground(theme.name)
+        }
+        theme = custom
+        variantSwitch.isChecked = !preset.isDark
+        updatePreview()
+    }
+
+    private fun applyAccentColor(accentColor: Int, accentTextColor: Int = 0xffffffff.toInt()) {
+        theme = theme.copy(
+            accentKeyBackgroundColor = accentColor,
+            accentKeyTextColor = accentTextColor,
+            genericActiveBackgroundColor = accentColor,
+            genericActiveForegroundColor = accentTextColor
         )
-        previewUi.setTheme(theme, filteredDrawable)
+        updatePreview()
+    }
+
+    private fun applySurfaceColor(surfaceColor: Int, barColor: Int? = null) {
+        val actualBar = barColor ?: surfaceColor
+        theme = theme.copy(
+            backgroundColor = surfaceColor,
+            keyboardColor = surfaceColor,
+            barColor = actualBar,
+            popupBackgroundColor = actualBar
+        )
+        updatePreview()
+    }
+
+    private fun setKeyVariant(darkKeys: Boolean) {
+        val template = if (darkKeys) ThemePreset.TransparentLight else ThemePreset.TransparentDark
+        val bg = theme.backgroundImage
+        theme = if (bg != null) {
+            template.deriveCustomBackground(
+                theme.name,
+                bg.croppedFilePath,
+                bg.srcFilePath,
+                brightnessSeekBar.progress,
+                bg.cropRect,
+                bg.cropRotation
+            )
+        } else {
+            template.deriveCustomNoBackground(theme.name)
+        }
+        updatePreview()
+    }
+
+    private fun setupPresetPaletteRow() {
+        val presets = listOf(
+            "한지" to ThemePreset.HanjiLight,
+            "단청" to ThemePreset.DancheongDark,
+            "백자" to ThemePreset.BaegjaLight,
+            "청자" to ThemePreset.CheongjaDark,
+            "자정 OLED" to ThemePreset.MidnightOLED,
+            "안개 Glass" to ThemePreset.SeoulMistGlass,
+            "픽셀 다크" to ThemePreset.PixelDark,
+            "픽셀 라이트" to ThemePreset.PixelLight,
+            "머티리얼 다크" to ThemePreset.MaterialDark,
+            "머티리얼 라이트" to ThemePreset.MaterialLight,
+            "노르딕 다크" to ThemePreset.NordDark,
+            "노르딕 라이트" to ThemePreset.NordLight,
+            "모노카이" to ThemePreset.Monokai,
+            "딥블루" to ThemePreset.DeepBlue
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        presets.forEach { (name, preset) ->
+            val pill = TextView(this).apply {
+                text = name
+                textSize = 12f
+                paint.isFakeBoldText = true
+                setTextColor(if (preset.isDark) Color.WHITE else Color.BLACK)
+                gravity = Gravity.CENTER
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(20f)
+                    setColor(preset.accentKeyBackgroundColor)
+                    setStroke(dp(1), if (preset.isDark) Color.argb(60, 255, 255, 255) else Color.argb(40, 0, 0, 0))
+                }
+                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
+
+                setOnClickListener {
+                    applyPreset(preset)
+                }
+            }
+
+            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                rightMargin = dp(8)
+            })
+        }
+
+        palettePresetContainer.addView(row)
+    }
+
+    private fun setupAccentColorRow() {
+        val accentColors = listOf(
+            0xffb83a32.toInt() to 0xffffffff.toInt(), // 한지 적갈색
+            0xffc84a3f.toInt() to 0xffffffff.toInt(), // 단청 주홍
+            0xff1e40af.toInt() to 0xffffffff.toInt(), // 백자 코발트
+            0xffc49a45.toInt() to 0xff1a1a1a.toInt(), // 청자 금색
+            0xff00e699.toInt() to 0xff000000.toInt(), // 자정 네온 제이드
+            0xff38bdf8.toInt() to 0xff0f172a.toInt(), // 안개 스카이
+            0xff2563eb.toInt() to 0xffffffff.toInt(), // 로얄 블루
+            0xff10b981.toInt() to 0xffffffff.toInt(), // 에메랄드
+            0xffec4899.toInt() to 0xffffffff.toInt(), // 핑크 로즈
+            0xff8b5cf6.toInt() to 0xffffffff.toInt(), // 바이올렛
+            0xfff59e0b.toInt() to 0xff000000.toInt(), // 앰버 옐로우
+            0xffffffff.toInt() to 0xff000000.toInt(), // 퓨어 화이트
+            0xff212121.toInt() to 0xffffffff.toInt()  // 퓨어 블랙
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        accentColors.forEach { (bg, fg) ->
+            val circle = View(this).apply {
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(bg)
+                    setStroke(dp(2), Color.argb(80, 255, 255, 255))
+                }
+                background = shape
+                setOnClickListener {
+                    applyAccentColor(bg, fg)
+                }
+            }
+
+            row.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
+                rightMargin = dp(10)
+            })
+        }
+
+        accentColorContainer.addView(row)
+    }
+
+    private fun setupSurfaceColorRow() {
+        val surfaces = listOf(
+            0xfff5f6f8.toInt() to 0xffeef0f3.toInt(), // 백자 오프화이트
+            0xffe9e1d2.toInt() to 0xfff3eddf.toInt(), // 한지 미색
+            0xffffffff.toInt() to 0xffeeeeee.toInt(), // 퓨어 화이트
+            0xff101918.toInt() to 0xff0b1211.toInt(), // 단청 묵색
+            0xff0f1e1b.toInt() to 0xff0a1614.toInt(), // 청자 비색
+            0xff000000.toInt() to 0xff080808.toInt(), // 자정 OLED
+            0xff182230.toInt() to 0xff0f1722.toInt(), // 안개 슬레이트
+            0xff2d2d2d.toInt() to 0xff373737.toInt(), // 픽셀 다크
+            0xff263238.toInt() to 0xff21272b.toInt(), // 머티리얼 다크
+            0xff2e3440.toInt() to 0xff434c5e.toInt()  // 노르딕 다크
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        surfaces.forEach { (surf, bar) ->
+            val rect = View(this).apply {
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(8f)
+                    setColor(surf)
+                    setStroke(dp(1), Color.argb(60, 255, 255, 255))
+                }
+                background = shape
+                setOnClickListener {
+                    applySurfaceColor(surf, bar)
+                }
+            }
+
+            row.addView(rect, LinearLayout.LayoutParams(dp(44), dp(36)).apply {
+                rightMargin = dp(10)
+            })
+        }
+
+        surfaceColorContainer.addView(row)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -261,8 +533,10 @@ class CustomThemeActivity : AppCompatActivity() {
                 srcImageFile = File(it.srcFilePath)
                 cropRect = it.cropRect
                 cropRotation = it.cropRotation
-                croppedBitmap = BitmapFactory.decodeFile(it.croppedFilePath)
-                filteredDrawable = BitmapDrawable(resources, croppedBitmap)
+                if (croppedImageFile?.exists() == true) {
+                    croppedBitmap = BitmapFactory.decodeFile(it.croppedFilePath)
+                    filteredDrawable = BitmapDrawable(resources, croppedBitmap)
+                }
             }
             newCreated = false
         }
@@ -273,17 +547,11 @@ class CustomThemeActivity : AppCompatActivity() {
                 croppedImageFile = c
                 srcImageFile = s
             }
-            // Use dark keys by default
-            theme = ThemePreset.TransparentDark.deriveCustomBackground(n, c.path, s.path)
+            // Use HanjiLight as starting template for brand-new custom theme
+            theme = ThemePreset.HanjiLight.deriveCustomNoBackground(n)
         }
         previewUi = KeyboardPreviewUi(this, theme)
-        if (theme.backgroundImage == null) {
-            brightnessLabel.visibility = View.GONE
-            cropLabel.visibility = View.GONE
-            variantLabel.visibility = View.GONE
-            variantSwitch.visibility = View.GONE
-            brightnessSeekBar.visibility = View.GONE
-        }
+
         enableEdgeToEdge()
         ViewCompat.setOnApplyWindowInsetsListener(ui) { _, windowInsets ->
             val statusBars = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars())
@@ -301,65 +569,82 @@ class CustomThemeActivity : AppCompatActivity() {
         // show back button
         supportActionBar!!.setDisplayHomeAsUpEnabled(true)
         setContentView(ui)
+
+        // Setup preset rows
+        setupPresetPaletteRow()
+        setupAccentColorRow()
+        setupSurfaceColorRow()
+
+        backgroundStates.launcher = registerForActivityResult(CropContract()) {
+            when (it) {
+                CropResult.Fail -> {
+                    // Crop cancelled or failed
+                }
+                is CropResult.Success -> {
+                    if (backgroundStates.croppedImageFile == null || backgroundStates.srcImageFile == null) {
+                        val (n, c, s) = ThemeFilesManager.newCustomBackgroundImages()
+                        backgroundStates.croppedImageFile = c
+                        backgroundStates.srcImageFile = s
+                    }
+                    backgroundStates.srcImageExtension = MimeTypeMap.getSingleton()
+                        .getExtensionFromMimeType(contentResolver.getType(it.srcUri))
+                    backgroundStates.srcImageBuffer =
+                        contentResolver.openInputStream(it.srcUri)!!.use { x -> x.readBytes() }
+                    backgroundStates.cropRect = it.rect
+                    backgroundStates.cropRotation = it.rotation
+                    backgroundStates.croppedBitmap = it.bitmap
+                    backgroundStates.filteredDrawable = BitmapDrawable(resources, it.bitmap)
+
+                    val bg = Theme.Custom.CustomBackground(
+                        croppedFilePath = backgroundStates.croppedImageFile!!.absolutePath,
+                        srcFilePath = backgroundStates.srcImageFile!!.absolutePath,
+                        brightness = brightnessSeekBar.progress,
+                        cropRect = it.rect,
+                        cropRotation = it.rotation
+                    )
+                    theme = theme.copy(backgroundImage = bg)
+                    updateBackgroundState()
+                }
+            }
+        }
+
+        changeImageLabel.setOnClickListener {
+            backgroundStates.launcher.launch(CropOption.New(previewUi.intrinsicWidth, previewUi.intrinsicHeight))
+        }
+
+        cropLabel.setOnClickListener {
+            backgroundStates.launchCrop(previewUi.intrinsicWidth, previewUi.intrinsicHeight)
+        }
+
+        removeImageLabel.setOnClickListener {
+            theme = theme.copy(backgroundImage = null)
+            backgroundStates.filteredDrawable = null
+            updatePreview()
+        }
+
+        variantLabel.setOnClickListener {
+            variantSwitch.isChecked = !variantSwitch.isChecked
+        }
+        variantSwitch.setOnCheckedChangeListener { _, isChecked ->
+            setKeyVariant(darkKeys = isChecked)
+        }
+
+        brightnessSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) updateBackgroundState()
+            }
+        })
+
         whenHasBackground { background ->
             brightnessSeekBar.progress = background.brightness
             variantSwitch.isChecked = !theme.isDark
-            launcher = registerForActivityResult(CropContract()) {
-                when (it) {
-                    CropResult.Fail -> {
-                        if (newCreated) {
-                            cancel()
-                        }
-                    }
-                    is CropResult.Success -> {
-                        if (newCreated) {
-                            srcImageExtension = MimeTypeMap.getSingleton()
-                                .getExtensionFromMimeType(contentResolver.getType(it.srcUri))
-                            srcImageBuffer =
-                                contentResolver.openInputStream(it.srcUri)!!
-                                    .use { x -> x.readBytes() }
-                        }
-                        cropRect = it.rect
-                        cropRotation = it.rotation
-                        croppedBitmap = it.bitmap
-                        filteredDrawable = BitmapDrawable(resources, croppedBitmap)
-                        updateState()
-                    }
-                }
-            }
-            cropLabel.setOnClickListener {
-                launchCrop(previewUi.intrinsicWidth, previewUi.intrinsicHeight)
-            }
-            variantLabel.setOnClickListener {
-                variantSwitch.isChecked = !variantSwitch.isChecked
-            }
-            // attach OnCheckedChangeListener after calling setChecked (isChecked in kotlin)
-            variantSwitch.setOnCheckedChangeListener { _, isChecked ->
-                setKeyVariant(background, darkKeys = isChecked)
-            }
-            brightnessSeekBar.setOnSeekBarChangeListener(object :
-                SeekBar.OnSeekBarChangeListener {
-                override fun onStartTrackingTouch(bar: SeekBar) {}
-                override fun onStopTrackingTouch(bar: SeekBar) {}
-
-                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                    if (fromUser) updateState()
-                }
-            })
+            updateBackgroundState()
         }
 
-        if (newCreated) {
-            cropLabel.visibility = View.GONE
-            whenHasBackground {
-                previewUi.onSizeMeasured = { w, h ->
-                    launchCrop(w, h)
-                }
-            }
-        } else {
-            whenHasBackground {
-                updateState()
-            }
-        }
+        updateControlsVisibility()
 
         onBackPressedDispatcher.addCallback {
             cancel()
@@ -367,27 +652,28 @@ class CustomThemeActivity : AppCompatActivity() {
     }
 
     private fun BackgroundStates.launchCrop(w: Int, h: Int) {
-        if (newCreated) {
-            launcher.launch(CropOption.New(w, h))
-        } else {
+        val srcFile = srcImageFile
+        if (srcFile != null && srcFile.exists()) {
             launcher.launch(
                 CropOption.Edit(
                     width = w,
                     height = h,
-                    Uri.fromFile(srcImageFile),
+                    Uri.fromFile(srcFile),
                     initialRect = cropRect,
                     initialRotation = cropRotation
                 )
             )
+        } else {
+            launcher.launch(CropOption.New(w, h))
         }
     }
 
     @SuppressLint("SetTextI18n")
-    private fun BackgroundStates.updateState() {
+    private fun updateBackgroundState() {
         val progress = brightnessSeekBar.progress
         brightnessValue.text = "$progress%"
-        filteredDrawable.colorFilter = DarkenColorFilter(100 - progress)
-        previewUi.setBackground(filteredDrawable)
+        backgroundStates.filteredDrawable?.colorFilter = DarkenColorFilter(100 - progress)
+        updatePreview()
     }
 
     private fun cancel() {
@@ -402,20 +688,26 @@ class CustomThemeActivity : AppCompatActivity() {
         lifecycleScope.withLoadingDialog(this) {
             whenHasBackground {
                 withContext(Dispatchers.IO) {
-                    croppedImageFile.delete()
-                    croppedImageFile.outputStream().use {
-                        croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                    val cropFile = croppedImageFile
+                    val cropBmp = croppedBitmap
+                    if (cropFile != null && cropBmp != null) {
+                        cropFile.delete()
+                        cropFile.outputStream().use {
+                            cropBmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+                        }
                     }
-                    if (newCreated) {
+                    val srcFile = srcImageFile
+                    val srcBuf = srcImageBuffer
+                    if (srcFile != null && srcBuf != null) {
                         if (srcImageExtension != null) {
-                            srcImageFile = File("${srcImageFile.absolutePath}.$srcImageExtension")
+                            backgroundStates.srcImageFile = File("${srcFile.absolutePath}.$srcImageExtension")
                             theme = theme.copy(
                                 backgroundImage = it.copy(
-                                    srcFilePath = srcImageFile.absolutePath
+                                    srcFilePath = backgroundStates.srcImageFile!!.absolutePath
                                 )
                             )
                         }
-                        srcImageFile.writeBytes(srcImageBuffer!!)
+                        backgroundStates.srcImageFile!!.writeBytes(srcBuf)
                     }
                 }
             }

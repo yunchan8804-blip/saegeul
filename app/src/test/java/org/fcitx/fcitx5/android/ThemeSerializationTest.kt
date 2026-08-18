@@ -31,6 +31,39 @@ class ThemeSerializationTest {
     }
 
     @Test
+    fun koreanAndModernPresetsPreservation() {
+        val presets = listOf(
+            ThemePreset.HanjiLight,
+            ThemePreset.DancheongDark,
+            ThemePreset.BaegjaLight,
+            ThemePreset.CheongjaDark,
+            ThemePreset.MidnightOLED,
+            ThemePreset.SeoulMistGlass,
+            ThemePreset.PixelDark,
+            ThemePreset.PixelLight,
+            ThemePreset.MaterialDark,
+            ThemePreset.MaterialLight,
+            ThemePreset.NordDark,
+            ThemePreset.NordLight,
+            ThemePreset.DeepBlue,
+            ThemePreset.Monokai,
+            ThemePreset.AMOLEDBlack
+        )
+
+        for (preset in presets) {
+            val customNoBg = preset.deriveCustomNoBackground("custom-${preset.name}")
+            val (decodedNoBg, migratedNoBg) = customNoBg.toJson().toCustomTheme()
+            Assert.assertEquals("Migration shouldn't happen for ${preset.name}", false, migratedNoBg)
+            Assert.assertEquals("Round trip preserves structure for ${preset.name}", customNoBg, decodedNoBg)
+
+            val customWithBg = preset.deriveCustomBackground("custom-bg-${preset.name}", "crop.png", "src.png")
+            val (decodedWithBg, migratedWithBg) = customWithBg.toJson().toCustomTheme()
+            Assert.assertEquals("Migration shouldn't happen with BG for ${preset.name}", false, migratedWithBg)
+            Assert.assertEquals("Round trip preserves structure with BG for ${preset.name}", customWithBg, decodedWithBg)
+        }
+    }
+
+    @Test
     fun version1() {
         // Version 1.0, outdated
         val raw = """

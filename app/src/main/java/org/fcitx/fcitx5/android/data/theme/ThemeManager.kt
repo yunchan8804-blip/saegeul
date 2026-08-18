@@ -26,6 +26,10 @@ object ThemeManager {
     val BuiltinThemes = listOf(
         ThemePreset.HanjiLight,
         ThemePreset.DancheongDark,
+        ThemePreset.BaegjaLight,
+        ThemePreset.CheongjaDark,
+        ThemePreset.MidnightOLED,
+        ThemePreset.SeoulMistGlass,
         ThemePreset.MaterialLight,
         ThemePreset.MaterialDark,
         ThemePreset.PixelLight,
