@@ -78,6 +78,7 @@
         <nav>
           <a href="#install">설치와 시작</a>
           <a href="#ai">AI와 컴퓨터 연결</a>
+          <a href="#theming">테마 &amp; 시각 효과</a>
           <a href="#voice">음성, GIF, OCR</a>
           <a href="#privacy">개인정보와 데이터</a>
           <a href="#support">소스와 문제 해결</a>
@@ -87,7 +88,7 @@
       <article class="doc-copy faq-copy">
         <!-- Live FAQ Search Bar -->
         <div class="faq-search-wrapper">
-          <input type="search" id="faq-search-input" class="faq-search-input" placeholder="도움말 검색 (예: 서명, Tailscale, 오프라인, 플러그인...)" aria-label="도움말 실시간 검색">
+          <input type="search" id="faq-search-input" class="faq-search-input" placeholder="도움말 검색 (예: 서명, Tailscale, 오프라인, 테마, RGB, 슬라이스...)" aria-label="도움말 실시간 검색">
           <span id="faq-search-count" class="faq-search-count" aria-live="polite"></span>
         </div>
 
@@ -143,16 +144,17 @@
             <p>추가 API 사용료 없이 기존 Codex/Claude 구독을 모바일에서 활용합니다.</p>
           </div>
           <div class="ai-answer-panel">
-            <strong>추가 API 요금 0원 원리</strong>
-            <p>내 Windows PC에 이미 로그인된 Codex CLI 또는 Claude Code를 새글 Companion이 로컬에서 프록시합니다. 별도 유료 API 키 결제 없이 기존 구독 사용량 내에서 동작합니다.</p>
+            <strong>추가 API 요금 0원 &amp; 멀티 OS 원클릭 설치</strong>
+            <p>Windows, macOS, Linux PC에 이미 로그인된 Codex CLI 또는 Claude Code를 새글 Companion이 로컬에서 프록시합니다. 별도 유료 API 키 결제 없이 기존 구독 사용량 내에서 동작합니다.</p>
           </div>
           <div class="faq-list">
             <details open>
-              <summary>내 컴퓨터와 연결하려면 어떻게 해야 하나요?</summary>
+              <summary>내 컴퓨터(Windows/macOS/Linux)와 연결하려면 어떻게 해야 하나요?</summary>
               <div>
-                <p>1. Windows PC에서 새글 소스의 설치 스크립트 <code>scripts/install-ai-provider-companion-tray.ps1</code>을 실행해 Companion을 켭니다.</p>
-                <p>2. 휴대폰과 PC가 같은 Tailscale tailnet에 연결되어 있는지 확인합니다.</p>
-                <p>3. 새글 앱의 <strong>개인정보·AI &gt; 내 컴퓨터 연결</strong>에서 발견된 PC를 승인합니다. 연결은 Tailscale Serve HTTPS 종단간 암호화로만 통신합니다.</p>
+                <p>1. <a href="https://github.com/yunchan8804-blip/saegeul/releases">릴리스 페이지</a>에서 OS에 맞는 Companion 압축 파일(<code>saegeul-companion-windows.zip</code>, <code>macos.tar.gz</code>, <code>linux.tar.gz</code>)을 내려받아 압축을 풉니다.</p>
+                <p>2. <strong>Windows</strong>는 <code>install.bat</code> 더블클릭 (작업 스케줄러 자동 등록), <strong>macOS</strong>는 <code>install.command</code> 실행 (LaunchAgent 데몬 등록), <strong>Linux</strong>는 <code>./install.sh</code>를 실행 (systemd 서비스 등록)합니다.</p>
+                <p>3. 휴대폰과 PC가 같은 Tailscale tailnet에 연결되어 있는지 확인합니다.</p>
+                <p>4. 새글 앱의 <strong>개인정보·AI &gt; 내 컴퓨터 연결</strong>에서 발견된 PC를 승인합니다. 연결은 Tailscale Serve HTTPS 종단간 암호화로만 통신합니다.</p>
               </div>
             </details>
             <details>
@@ -165,6 +167,39 @@
               <summary>PC 없이 모바일 단독으로 AI를 쓸 수도 있나요?</summary>
               <div>
                 <p>네. <strong>개인정보·AI &gt; AI 공급자</strong>에서 OpenAI, Anthropic 또는 OpenAI 호환 API 엔드포인트의 키를 직접 등록하여 사용할 수 있습니다. 등록된 키는 Android Keystore 하드웨어 암호화 저장소에 보관됩니다.</p>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <section id="theming">
+          <div class="section-heading">
+            <h2>테마 &amp; 시각 효과 (Theme v3.0)</h2>
+            <p>초정밀 개별 키 커스텀부터 하드웨어 가속 RGB 셰이더와 터치 별빛 피직스까지 지원합니다.</p>
+          </div>
+          <div class="faq-list">
+            <details open>
+              <summary>키 하나하나의 배경색과 글자색을 다르게 지정할 수 있나요?</summary>
+              <div>
+                <p>네! 새글 테마 v3.0 엔진은 <strong>개별 키 스타일 상속 체계</strong>를 지원합니다. 스페이스바, 엔터키, 백스페이스, 쉬프트키 또는 특정 문자키마다 개별 배경색, 텍스트 색상, 모서리 라운딩 반경, 테두리 두께를 자유롭게 지정할 수 있으며, 지정하지 않은 키는 상위 전역 키 스타일 및 기본 테마 색상을 자동으로 상속받습니다.</p>
+              </div>
+            </details>
+            <details>
+              <summary>9-Patch 슬라이스(Sliced) 키캡 이미지는 어떻게 적용하나요?</summary>
+              <div>
+                <p>커스텀 테마 스튜디오에서 원하는 키캡 비트맵 이미지를 지정하고 4방향 슬라이스 마진(좌, 상, 우, 하)을 설정하면 <code>SlicedKeyDrawable</code> 엔진이 런타임에 3x3 분할 격자로 연산합니다. 모서리 왜곡 없이 키 크기에 맞춰 완벽하게 스트레칭 렌더링됩니다.</p>
+              </div>
+            </details>
+            <details>
+              <summary>RGB 크로마 백라이트나 터치 별빛 파티클을 켜면 배터리가 많이 소모되지 않나요?</summary>
+              <div>
+                <p>전혀 걱정하지 않으셔도 됩니다! 새글의 RGB 크로마 백라이트는 Android 하드웨어 가속 <code>LinearGradient</code>/<code>SweepGradient</code> 셰이더 매트릭스 변환으로 연산되며, 터치 별빛 파티클은 VSYNC 싱크 <code>Choreographer.postFrameCallback</code>과 객체 풀링 기법으로 구동됩니다. 특히 키보드가 닫히거나 타이핑이 멈추면 애니메이션과 프레임 콜백이 즉각 <strong>완전 일시정지(Zero-CPU/GPU Idle)</strong>되도록 철저히 최적화되어 있습니다.</p>
+              </div>
+            </details>
+            <details>
+              <summary>내가 만든 커스텀 테마를 백업하거나 친구에게 공유할 수 있나요?</summary>
+              <div>
+                <p>네. <strong>설정 &gt; 테마</strong>에서 내가 만든 테마를 ZIP 아카이브 파일로 손쉽게 내보내거나 가져올 수 있습니다. 이전 버전(v1.0, v2.0, v2.1)에서 작성된 테마 파일도 최신 v3.0 스키마로 데이터 손실 없이 자동 마이그레이션됩니다.</p>
               </div>
             </details>
           </div>
