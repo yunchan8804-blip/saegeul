@@ -33,17 +33,24 @@
 
 ---
 
-## 2. Windows PC Companion 설치 및 설정
+## 2. PC Companion 설치 및 설정 (Windows / macOS / Linux 지원)
 
 ### 1단계: Tailscale 네트워크 연결
-- 휴대폰과 Windows PC에 각각 [Tailscale](https://tailscale.com/)을 설치하고 동일한 계정(Tailnet)으로 로그인합니다.
+- 휴대폰과 컴퓨터에 각각 [Tailscale](https://tailscale.com/)을 설치하고 동일한 계정(Tailnet)으로 로그인합니다.
 
-### 2단계: Companion 트레이 실행
-- 새글 소스 저장소의 파워셸 설치 스크립트를 실행합니다:
-  ```powershell
-  .\scripts\install-ai-provider-companion-tray.ps1
-  ```
-- 실행되면 Windows 시스템 트레이에 새글 아이콘이 등록되고 백그라운드 프록시 데몬이 대기 상태가 됩니다.
+### 2단계: OS별 Companion 원클릭 설치 및 실행
+
+#### 🪟 Windows
+- [GitHub Releases](https://github.com/yunchan8804-blip/saegeul/releases)에서 `saegeul-companion-windows.zip`을 다운로드하여 압축을 푼 뒤 **`install.bat`**을 더블클릭합니다.
+- Windows 작업 스케줄러에 백그라운드 서비스가 등록되어 부팅 시 자동 시작됩니다.
+
+#### 🍎 macOS
+- `saegeul-companion-macos.tar.gz`를 다운로드하여 압축 해제 후 **`install.command`**를 더블클릭합니다 (또는 터미널에서 `./install.sh`).
+- macOS `LaunchAgent` 데몬으로 등록되어 로그인 시 백그라운드에서 자동 실행됩니다.
+
+#### 🐧 Linux
+- `saegeul-companion-linux.tar.gz`를 다운로드하여 압축 해제 후 터미널에서 **`./install.sh`**를 실행합니다.
+- systemd user 서비스(`saegeul-companion.service`)로 등록되어 자동 실행됩니다.
 
 ### 3단계: 휴대폰에서 기기 1회 승인
 1. 새글 키보드의 **개인정보·AI > 내 컴퓨터 연결** 메뉴를 엽니다.

@@ -81,7 +81,10 @@
                                                           └─────────────────────────┘
 ```
 
-1. **PC Companion 실행:** 소스 내 `scripts/install-ai-provider-companion-tray.ps1`을 실행하여 Windows 트레이에 Companion을 켭니다.
+1. **PC Companion 실행 (OS별 원클릭 설치 지원):**
+   - **Windows:** [Releases](https://github.com/yunchan8804-blip/saegeul/releases)에서 `saegeul-companion-windows.zip` 다운로드 후 `install.bat` 실행 (또는 `companion/windows/install.bat`)
+   - **macOS:** `saegeul-companion-macos.tar.gz` 다운로드 후 `install.command` 실행 (또는 `companion/macos/install.command`)
+   - **Linux:** `saegeul-companion-linux.tar.gz` 다운로드 후 `./install.sh` 실행 (systemd 자동 등록)
 2. **동일 Tailnet 자동 감지:** 휴대폰과 PC가 동일한 Tailscale 네트워크에 연결되어 있으면 새글이 자동으로 PC를 발견합니다.
 3. **1회 기기 승인:** 휴대폰에서 PC를 승인하면 즉시 글쓰기 AI(맞춤법 교정, 문체 변환, 실시간 번역, 자유 프롬프트)를 추가 비용 없이 쓸 수 있습니다.
 4. **보안 격리:** CLI 세션 토큰은 PC에만 남고 모바일로 복사되지 않으며, 통신 내용은 디스크 로그에 남지 않습니다.

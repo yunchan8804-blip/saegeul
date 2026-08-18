@@ -129,6 +129,9 @@ jobs:
             -SourceArchiveUrl $sourceUrl `
             -SigningCertificateSha256 "3B:08:8B:5C:6A:69:E3:6C:62:80:2E:F5:D4:33:BD:9D:84:5B:8E:98:09:27:8E:13:13:36:A5:03:DA:90:1A:66"
 
+          python3 ./scripts/package-companion-release.py
+          Copy-Item dist/companion/* $release/
+
           Get-ChildItem $release -File |
             Where-Object Name -ne "SHA256SUMS" |
             ForEach-Object {

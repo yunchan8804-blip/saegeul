@@ -271,6 +271,19 @@ class CliBoundaryTest(unittest.TestCase):
 
         self.assertEqual("alpaca-home.example.ts.net", companion.tailscale_dns_name())
 
+    def test_posix_crypt_roundtrip_and_tamper_resistance(self):
+        sample = b"secret-companion-token-12345:refresh-state"
+        encrypted = companion._crypt_posix_local_data(sample, protect=True)
+        self.assertTrue(encrypted.startswith(b"SG01"))
+        decrypted = companion._crypt_posix_local_data(encrypted, protect=False)
+        self.assertEqual(sample, decrypted)
+
+        # Tampering with ciphertext fails integrity check
+        tampered = bytearray(encrypted)
+        tampered[-1] ^= 0x01
+        with self.assertRaises(ValueError):
+            companion._crypt_posix_local_data(bytes(tampered), protect=False)
+
 
 if __name__ == "__main__":
     unittest.main()

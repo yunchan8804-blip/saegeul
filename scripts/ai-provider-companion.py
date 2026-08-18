@@ -465,14 +465,17 @@ class OAuthGrantStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         temporary.write_bytes(encrypted)
+        if os.name != "nt":
+            try:
+                os.chmod(temporary, 0o600)
+            except OSError:
+                pass
         os.replace(temporary, self.path)
-
-
-class DataBlob(ctypes.Structure):
-    _fields_ = [
-        ("cbData", wintypes.DWORD),
-        ("pbData", ctypes.POINTER(ctypes.c_ubyte)),
-    ]
+        if os.name != "nt":
+            try:
+                os.chmod(self.path, 0o600)
+            except OSError:
+                pass
 
 
 def protect_local_data(payload: bytes) -> bytes:
@@ -483,9 +486,71 @@ def unprotect_local_data(payload: bytes) -> bytes:
     return crypt_local_data(payload, protect=False)
 
 
+def _posix_key() -> bytes:
+    identifiers = [
+        str(Path.home()),
+        os.environ.get("USER", ""),
+        os.environ.get("LOGNAME", ""),
+    ]
+    for machine_id_path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+        try:
+            identifiers.append(Path(machine_id_path).read_text().strip())
+            break
+        except OSError:
+            pass
+    if sys.platform == "darwin":
+        try:
+            out = subprocess.check_output(
+                ["sysctl", "-n", "kern.uuid"], text=True, stderr=subprocess.DEVNULL
+            )
+            identifiers.append(out.strip())
+        except Exception:
+            pass
+    seed = ":".join(identifiers).encode("utf-8")
+    return hashlib.pbkdf2_hmac("sha256", seed, b"saegeul-companion-salt-v1", 100_000, dklen=32)
+
+
+def _crypt_posix_local_data(payload: bytes, protect: bool) -> bytes:
+    key = _posix_key()
+    if protect:
+        nonce = secrets.token_bytes(16)
+        keystream = bytearray()
+        counter = 0
+        while len(keystream) < len(payload):
+            block = hashlib.sha256(key + nonce + counter.to_bytes(4, "big")).digest()
+            keystream.extend(block)
+            counter += 1
+        ciphertext = bytes(p ^ k for p, k in zip(payload, keystream[: len(payload)]))
+        tag = hashlib.sha256(key + nonce + ciphertext).digest()
+        return b"SG01" + nonce + tag + ciphertext
+    else:
+        if len(payload) < 4 + 16 + 32 or not payload.startswith(b"SG01"):
+            raise ValueError("invalid or corrupted encrypted data")
+        nonce = payload[4:20]
+        tag = payload[20:52]
+        ciphertext = payload[52:]
+        expected_tag = hashlib.sha256(key + nonce + ciphertext).digest()
+        if not secrets.compare_digest(tag, expected_tag):
+            raise ValueError("integrity check failed on protected data")
+        keystream = bytearray()
+        counter = 0
+        while len(keystream) < len(ciphertext):
+            block = hashlib.sha256(key + nonce + counter.to_bytes(4, "big")).digest()
+            keystream.extend(block)
+            counter += 1
+        return bytes(c ^ k for c, k in zip(ciphertext, keystream[: len(ciphertext)]))
+
+
 def crypt_local_data(payload: bytes, protect: bool) -> bytes:
     if os.name != "nt":
-        raise OSError("the CLI companion credential store requires Windows DPAPI")
+        return _crypt_posix_local_data(payload, protect)
+
+    class DataBlob(ctypes.Structure):
+        _fields_ = [
+            ("cbData", wintypes.DWORD),
+            ("pbData", ctypes.POINTER(ctypes.c_ubyte)),
+        ]
+
     buffer = ctypes.create_string_buffer(payload)
     input_blob = DataBlob(
         len(payload),
