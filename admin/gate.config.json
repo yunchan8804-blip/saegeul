@@ -1,0 +1,42 @@
+{
+  "pages": [
+    {
+      "name": "app",
+      "path": "dist/index.html",
+      "url": "http://127.0.0.1:4173/",
+      "viewAttribute": "data-view",
+      "views": [
+        "dashboard",
+        "avenues",
+        "networks",
+        "revenue",
+        "campaigns",
+        "acquisition",
+        "guardrails",
+        "audit"
+      ],
+      "h1": "h1",
+      "brand": ".topbar__title h1"
+    }
+  ],
+  "widths": [320, 375, 390, 768, 1024, 1440],
+  "fontScales": [1, 1.3],
+  "thresholds": {
+    "contrastNormal": 4.5,
+    "contrastLarge": 3,
+    "visualDiffPct": 0.1,
+    "stackLines": 3
+  },
+  "checks": {
+    "meta": false,
+    "contrast": true,
+    "stack": true,
+    "wrap": true,
+    "rhythm": true,
+    "scaleMatrix": true,
+    "static": true,
+    "visual": false,
+    "webkit": false
+  },
+  "chromePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+}
