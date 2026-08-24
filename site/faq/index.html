@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="새글 Android 키보드 설치, 한글 플러그인, AI와 컴퓨터 연결, 개인정보, 데이터 이전 도움말.">
+  <meta name="description" content="새글 Android 키보드 단일 APK 설치, AI와 컴퓨터 연결, 개인정보, 데이터 이전 도움말.">
   <meta name="theme-color" content="#060e1a">
   <meta property="og:title" content="도움말 | 새글">
   <meta property="og:description" content="설치부터 AI와 내 컴퓨터 연결까지, 필요한 답을 바로 찾는다.">
@@ -114,19 +114,21 @@
               <summary>설치 시 "출처를 알 수 없는 앱" 또는 "안전하지 않은 앱" 경고가 뜹니다</summary>
               <div>
                 <p>Google Play Store 외부에서 APK를 직접 내려받았을 때 Google Play Protect가 아직 등록되지 않은 서명으로 인식하여 표시하는 표준 안내입니다. 앱 자체의 결함이나 악성코드가 아닙니다.</p>
-                <p>경고 창에서 <strong>자세히 보기 &gt; 무시하고 설치</strong>를 누르면 정상 설치됩니다. 설치가 차단될 경우 <strong>Play 스토어 &gt; 프로필 &gt; Play Protect &gt; 설정</strong>에서 기기 보안 검사를 일시 해제 후 설치를 완료하세요.</p>
-                <p>내려받은 파일의 무결성은 아래 공식 서명 지문으로 언제든 직접 검증할 수 있습니다.</p>
+                <p>공식 GitHub Releases가 아닌 곳에서 받은 파일은 설치하지 마세요. 설치가 차단되면 Play Protect를 끄지 말고, 릴리스의 SHA-256 체크섬과 아래 GitHub 직접 배포 APK 서명 지문이 일치하는지 먼저 확인하세요.</p>
+                <p>Google Play에서 설치한 앱은 Play가 별도 앱 서명 키로 다시 서명하므로 GitHub APK와 지문이 다릅니다.</p>
                 <div style="margin-top: 14px;">
                   <button class="button button-ghost" style="padding: 6px 14px; font-size: 12.5px;" data-copy="3B:08:8B:5C:6A:69:E3:6C:62:80:2E:F5:D4:33:BD:9D:84:5B:8E:98:09:27:8E:13:13:36:A5:03:DA:90:1A:66" data-copied-label="SHA-256 서명 지문 복사 완료!">서명 지문 복사</button>
                 </div>
               </div>
             </details>
             <details>
-              <summary>공식 서명 인증서 지문(SHA-256)을 확인하는 방법</summary>
+              <summary>배포 채널별 공식 서명 인증서 지문(SHA-256)</summary>
               <div>
-                <p>새글 사용자판과 한글 플러그인은 동일한 단일 릴리스 키로 서명됩니다.</p>
+                <p><strong>GitHub 직접 배포 APK</strong>와 호환·검증용 한글 플러그인 APK는 새글 업로드/릴리스 키로 서명됩니다.</p>
                 <p><code style="font-size: 12.5px;">3B:08:8B:5C:6A:69:E3:6C:62:80:2E:F5:D4:33:BD:9D:84:5B:8E:98:09:27:8E:13:13:36:A5:03:DA:90:1A:66</code></p>
-                <p>Android SDK 터미널에서 <code>apksigner verify --verbose --print-certs 파일명.apk</code> 명령으로 위 지문과 v1/v2/v3 서명을 직접 검증할 수 있습니다.</p>
+                <p><strong>Google Play 설치본</strong>은 Play App Signing 키로 서명됩니다.</p>
+                <p><code style="font-size: 12.5px;">9F:22:43:69:28:D5:DC:AE:08:EF:26:57:DF:D7:C3:AB:88:F6:B7:E3:04:8F:B7:1D:2D:41:E9:C2:25:6F:E9:11</code></p>
+                <p>Android SDK 터미널에서 <code>apksigner verify --verbose --print-certs 파일명.apk</code> 명령으로 설치 경로에 맞는 지문과 v1/v2/v3 서명을 직접 검증할 수 있습니다.</p>
               </div>
             </details>
             <details>

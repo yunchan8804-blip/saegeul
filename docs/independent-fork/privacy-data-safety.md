@@ -58,8 +58,8 @@
 ## 4. Play Data Safety 제출 계약
 
 기계 판독 원본은 [`play-data-safety-declaration.json`](play-data-safety-declaration.json)이며 상태는
-`READY_FOR_PLAY_CONSOLE_DRAFT`다. 공개 URL·공급자 승인·Play Console 실제 입력은 아직 외부
-게이트지만, Console에 넣을 기술 답변은 아래처럼 잠근다.
+`SUBMITTED_TO_PLAY_CONSOLE`이다. 공개 URL과 Play Console 실제 입력은 완료했고, 공급자별
+프로덕션 승인 여부는 기능 활성화 게이트로 계속 분리한다. Console에 넣은 기술 답변은 아래처럼 잠근다.
 
 전역 답변:
 
@@ -96,11 +96,11 @@ Wikimedia Commons, GIPHY, GitHub raw content, OAuth 공급자 8개다. GIPHY와 
 ## 5. 공개 릴리스 차단 조건
 
 - `DONE-PRIVACY-01` 법적 게시자 `Yun Chan`, 연락 이메일 `yunchan@chanpaca.net`, 소유 도메인 `chanpaca.net`
-- `GATE-PRIVACY-02` 소유 도메인의 공개 개인정보처리방침 URL. 활성 URL이어야 하고, 지역 제한·편집 권한 요구·PDF만 제공하는 형태는 허용하지 않는다.
+- `DONE-PRIVACY-02` 소유 도메인의 공개 개인정보처리방침 `https://saegul.chanpaca.net/privacy/`가 로그인 없이 HTML로 열린다.
 - `DONE-PRIVACY-03` 기술 공급자 집합과 6개 Data Safety 데이터 유형을 JSON 계약으로 잠금. 서비스 제공자 예외 없이 모두 `공유: 예`
 - `GATE-PRIVACY-04` GIPHY 프로덕션 승인과 미디어 복사 승인이 없으면 GIPHY를 릴리스에서 비활성화하거나 제거
-- `GATE-PRIVACY-05` 대상 연령, 아동 대상 여부, 광고 포함 여부
-- `GATE-PRIVACY-06` Play Console의 실제 Data Safety 항목을 이 표와 대조한 검토 증거
-- `GATE-PRIVACY-07` 공개 개인정보처리방침 URL이 앱 About와 Play listing에서 열리고, 앱 내 고지와 내용이 일치하는 실기기 증거
+- `DONE-PRIVACY-05` 대상 연령 13세 이상, 아동 대상 아님, 광고 없음으로 Play Console에 제출
+- `DONE-PRIVACY-06` Play Console의 실제 Data Safety 6개 데이터 유형과 전역 답변을 이 표와 대조 완료
+- `GATE-PRIVACY-07` 공개 개인정보처리방침 URL과 Play listing 입력은 확인했다. 앱 About에서 열리는 경로와 앱 내 고지 일치는 Play 서명 설치본을 사용한 실기기 증거가 남아 있다.
 
 이 조건이 닫히기 전에는 Play 배포를 `PASS`로 표시하지 않는다.
