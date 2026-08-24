@@ -15,43 +15,89 @@ export interface PolicyFinding {
   message: string;
 }
 
+const blockedVenueIds: Record<string, PolicyCode> = {
+  "settings-entry": "DESTINATION_INTERRUPT",
+  "ime-surface": "IME_SURFACE",
+  "first-launch": "FIRST_LAUNCH_INTERRUPT",
+  "permission-interstitial": "PERMISSION_INTERRUPT",
+};
+
+function pushBlock(
+  findings: PolicyFinding[],
+  code: PolicyCode,
+  message: string,
+) {
+  if (findings.some((finding) => finding.code === code)) return;
+  findings.push({ code, level: "block", message });
+}
+
 export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
   const target = `${avenue.screen} ${avenue.trigger}`.toLowerCase();
   const findings: PolicyFinding[] = [];
+  const blockedById = blockedVenueIds[avenue.id];
+
+  if (blockedById === "DESTINATION_INTERRUPT") {
+    pushBlock(
+      findings,
+      "DESTINATION_INTERRUPT",
+      "사용자가 요청한 목적지보다 먼저 전면 광고를 표시할 수 없어.",
+    );
+  }
+  if (blockedById === "IME_SURFACE") {
+    pushBlock(
+      findings,
+      "IME_SURFACE",
+      "IME 입력 표면에는 광고를 배치할 수 없어.",
+    );
+  }
+  if (blockedById === "PERMISSION_INTERRUPT") {
+    pushBlock(
+      findings,
+      "PERMISSION_INTERRUPT",
+      "권한 요청 전후에 광고를 끼워 넣을 수 없어.",
+    );
+  }
+  if (blockedById === "FIRST_LAUNCH_INTERRUPT") {
+    pushBlock(
+      findings,
+      "FIRST_LAUNCH_INTERRUPT",
+      "첫 실행 콘텐츠보다 먼저 전면 광고를 표시할 수 없어.",
+    );
+  }
 
   if (
     avenue.format === "interstitial" &&
     /(설정.*열|설정.*진입|settings.*entry)/i.test(target)
   ) {
-    findings.push({
-      code: "DESTINATION_INTERRUPT",
-      level: "block",
-      message: "사용자가 요청한 목적지보다 먼저 전면 광고를 표시할 수 없어.",
-    });
+    pushBlock(
+      findings,
+      "DESTINATION_INTERRUPT",
+      "사용자가 요청한 목적지보다 먼저 전면 광고를 표시할 수 없어.",
+    );
   }
   if (/(키보드 입력|ime|composition)/i.test(target)) {
-    findings.push({
-      code: "IME_SURFACE",
-      level: "block",
-      message: "IME 입력 표면에는 광고를 배치할 수 없어.",
-    });
+    pushBlock(
+      findings,
+      "IME_SURFACE",
+      "IME 입력 표면에는 광고를 배치할 수 없어.",
+    );
   }
   if (/(권한|permission)/i.test(target)) {
-    findings.push({
-      code: "PERMISSION_INTERRUPT",
-      level: "block",
-      message: "권한 요청 전후에 광고를 끼워 넣을 수 없어.",
-    });
+    pushBlock(
+      findings,
+      "PERMISSION_INTERRUPT",
+      "권한 요청 전후에 광고를 끼워 넣을 수 없어.",
+    );
   }
   if (
     /(첫 실행|first launch)/i.test(target) &&
     avenue.format === "interstitial"
   ) {
-    findings.push({
-      code: "FIRST_LAUNCH_INTERRUPT",
-      level: "block",
-      message: "첫 실행 콘텐츠보다 먼저 전면 광고를 표시할 수 없어.",
-    });
+    pushBlock(
+      findings,
+      "FIRST_LAUNCH_INTERRUPT",
+      "첫 실행 콘텐츠보다 먼저 전면 광고를 표시할 수 없어.",
+    );
   }
   if (!avenue.requiresConsent) {
     findings.push({

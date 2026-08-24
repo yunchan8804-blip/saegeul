@@ -881,6 +881,9 @@ svg {
   gap: 24px;
   margin-bottom: 22px;
 }
+.page-intro--follow {
+  margin-top: 28px;
+}
 .page-intro h2 {
   margin-top: 13px;
   max-width: 660px;

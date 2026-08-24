@@ -19,4 +19,17 @@ describe("AVENUE policy engine", () => {
     const avenue = { ...seedAvenues[0], requiresConsent: false };
     expect(evaluateAvenue(avenue).map((item) => item.code)).toContain("CONSENT_REQUIRED");
   });
+
+  it("still blocks settings-entry after the trigger copy is renamed", () => {
+    const avenue = {
+      ...seedAvenues.find((item) => item.id === "settings-entry")!,
+      screen: "정보 > 개발자 응원",
+      trigger: "사용자가 보상형 광고 버튼을 직접 선택",
+      format: "rewarded" as const,
+    };
+    expect(canPublish(avenue)).toBe(false);
+    expect(evaluateAvenue(avenue).map((item) => item.code)).toContain(
+      "DESTINATION_INTERRUPT",
+    );
+  });
 });

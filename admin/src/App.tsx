@@ -59,6 +59,17 @@ import {
   type CampaignCommand,
   type CampaignPlan,
 } from "./domain/campaign";
+import {
+  demoLedgerFixture,
+  reconcileLedgers,
+  unconnectedLedger,
+  type Reconciliation,
+  type SourceVariance,
+} from "./domain/revenue";
+import {
+  evaluateServing,
+  localDemoSignedConfig,
+} from "./domain/serving";
 
 type ViewId =
   | "dashboard"
@@ -128,6 +139,58 @@ function formatWon(value: number) {
     currency: "KRW",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatMoneyMicros(valueMicros: number, currencyCode: string) {
+  const negative = valueMicros < 0;
+  const major = Math.trunc(Math.abs(valueMicros) / 1_000_000);
+  let formatted: string;
+  try {
+    formatted = new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency: currencyCode,
+      maximumFractionDigits: currencyCode === "KRW" ? 0 : 2,
+    }).format(major);
+  } catch {
+    formatted = `${major} ${currencyCode}`;
+  }
+  return negative ? `-${formatted}` : formatted;
+}
+
+function ledgerFieldLabel(
+  reconciliation: Reconciliation,
+  field: "estimated" | "confirmed" | "deposited",
+) {
+  if (reconciliation.connection === "unconnected") return "미연결";
+  const amount = reconciliation[field];
+  if (!amount) return "-";
+  return formatMoneyMicros(amount.valueMicros, amount.currencyCode);
+}
+
+function sourceStatusLabel(row: SourceVariance) {
+  if (row.status === "unmatched") return "미대사";
+  if (row.status === "pending") {
+    return row.confirmedMicros === 0 ? "보고 대기" : "입금 대기";
+  }
+  return "차이 확인";
+}
+
+function evaluateDemoServing(
+  avenues: Avenue[],
+  killSwitch: boolean,
+  venueId: string,
+  nowMs = Date.now(),
+) {
+  return evaluateServing({
+    config: localDemoSignedConfig(avenues, {
+      nowMs,
+      globalKillSwitch: killSwitch,
+      version: Math.max(1, ...avenues.map((item) => item.version)),
+    }),
+    lastAcceptedVersion: 0,
+    nowMs,
+    venueId,
+  });
 }
 
 function formatLabel(format: AvenueFormat) {
@@ -398,6 +461,8 @@ function Dashboard({
 }) {
   const active = avenues.filter((avenue) => avenue.status === "active").length;
   const blocked = avenues.filter((avenue) => !canPublish(avenue));
+  const liveRevenue = useMemo(() => reconcileLedgers(unconnectedLedger()), []);
+  const liveEstimated = ledgerFieldLabel(liveRevenue, "estimated");
   return (
     <>
       <section className="hero-grid" aria-label="운영 요약">
@@ -431,9 +496,8 @@ function Dashboard({
         <div className="metric-rack instrument-panel">
           <Metric
             label="오늘 예상 수익"
-            value={formatWon(18420)}
-            delta="12.8%"
-            up
+            value={liveEstimated}
+            delta="원장 미연결"
           />
           <Metric
             label="운영 AVENUE"
@@ -455,8 +519,8 @@ function Dashboard({
           </span>
           <div>
             <small>수익화 · 앱 안</small>
-            <strong>{formatWon(18420)}</strong>
-            <span>오늘 예상 수익 · 데모</span>
+            <strong>{liveEstimated}</strong>
+            <span>오늘 예상 수익 · 미연결</span>
           </div>
         </div>
         <div className="growth-loop__net">
@@ -859,17 +923,13 @@ function Networks() {
 }
 
 function Revenue() {
-  const rows = [
-    ["Google AdMob", "₩54,820", "₩51,940", "₩2,880", "보고 대기"],
-    ["AppLovin", "₩16,410", "₩15,992", "₩418", "직접 수금"],
-    ["Unity Ads", "₩11,308", "₩11,102", "₩206", "직접 수금"],
-    ["기타 조정", "-", "-₩420", "₩420", "무효 트래픽"],
-  ];
+  const live = useMemo(() => reconcileLedgers(unconnectedLedger()), []);
+  const demo = useMemo(() => reconcileLedgers(demoLedgerFixture()), []);
   return (
-    <section>
+    <section data-ledger-connection={live.connection}>
       <div className="page-intro">
         <div>
-          <Badge tone="warn">예상 데이터</Badge>
+          <Badge tone="warn">미연결</Badge>
           <h2>예상액과 실제 입금을 분리해</h2>
           <p>ILRD 원장, 네트워크 확정 보고서, 은행 입금을 세 단계로 대사해.</p>
         </div>
@@ -877,56 +937,134 @@ function Revenue() {
           <DownloadSimple /> CSV 내보내기
         </Button>
       </div>
-      <div className="reconcile-hero instrument-panel">
+      <div
+        className="reconcile-hero instrument-panel"
+        data-ledger-empty={live.empty || undefined}
+      >
         <div>
           <span>이번 달 예상 수익</span>
-          <strong>{formatWon(82538)}</strong>
-          <small>데모, KRW 정규화</small>
+          <strong>{ledgerFieldLabel(live, "estimated")}</strong>
+          <small>연결된 광고 계정 없음</small>
         </div>
         <CaretRight />
         <div>
           <span>네트워크 확정액</span>
-          <strong>{formatWon(78614)}</strong>
-          <small>95.2% 대사됨</small>
+          <strong>{ledgerFieldLabel(live, "confirmed")}</strong>
+          <small>보고 API 미연결</small>
         </div>
         <CaretRight />
         <div>
           <span>입금 완료</span>
-          <strong>{formatWon(0)}</strong>
-          <small>다음 지급 주기</small>
+          <strong>{ledgerFieldLabel(live, "deposited")}</strong>
+          <small>지급 명세 없음</small>
         </div>
       </div>
-      <div className="ledger-table">
-        <div className="ledger-row ledger-head">
-          <span>수요원</span>
-          <span>ILRD 합계</span>
-          <span>확정 보고</span>
-          <span>차이</span>
-          <span>수금 책임</span>
-        </div>
-        {rows.map((row) => (
-          <div className="ledger-row" key={row[0]}>
-            {row.map((cell, index) =>
-              index === 4 ? (
-                <Badge
-                  key={cell}
-                  tone={cell === "보고 대기" ? "warn" : "neutral"}
-                >
-                  {cell}
-                </Badge>
-              ) : (
-                <span key={cell}>{cell}</span>
-              ),
-            )}
-          </div>
-        ))}
-      </div>
+      {live.empty ? (
+        <EmptyState
+          title="연결된 수익 원장이 없어"
+          description="광고 계정과 보고 API가 붙기 전에는 예상 KRW 합계를 채우지 않아."
+        />
+      ) : (
+        <LedgerTable reconciliation={live} />
+      )}
       <Notice>
         <strong>원화로 덮어쓰지 않아.</strong> 원본 통화와 micros 값을 보존하고,
         보고용 환산 통화는 별도 필드로 저장해야 월말 환율과 조정을 다시 계산할
         수 있어.
       </Notice>
+      <div className="page-intro page-intro--follow">
+        <div>
+          <Badge tone="info">데모</Badge>
+          <h2>같은 대사기로 본 예시 원장</h2>
+          <p>
+            아래 숫자는 로컬 데모 픽스처를 같은 대사 함수에 넣은 결과야. 운영
+            원장이 아니야.
+          </p>
+        </div>
+      </div>
+      <div className="reconcile-hero instrument-panel" data-ledger-demo="true">
+        <div>
+          <span>이번 달 예상 수익</span>
+          <strong>{ledgerFieldLabel(demo, "estimated")}</strong>
+          <small>
+            {demo.estimated
+              ? `${demo.estimated.valueMicros} micros · ${demo.estimated.currencyCode}`
+              : "비어 있음"}
+          </small>
+        </div>
+        <CaretRight />
+        <div>
+          <span>네트워크 확정액</span>
+          <strong>{ledgerFieldLabel(demo, "confirmed")}</strong>
+          <small>
+            {demo.pending.length
+              ? `대기 ${demo.pending.length}건`
+              : "대기 없음"}
+          </small>
+        </div>
+        <CaretRight />
+        <div>
+          <span>입금 완료</span>
+          <strong>{ledgerFieldLabel(demo, "deposited")}</strong>
+          <small>
+            {demo.unmatched.length
+              ? `미대사 ${demo.unmatched.length}건`
+              : "미대사 없음"}
+          </small>
+        </div>
+      </div>
+      <LedgerTable reconciliation={demo} />
     </section>
+  );
+}
+
+function LedgerTable({ reconciliation }: { reconciliation: Reconciliation }) {
+  return (
+    <div className="ledger-table">
+      <div className="ledger-row ledger-head">
+        <span>수요원</span>
+        <span>ILRD 합계</span>
+        <span>확정 보고</span>
+        <span>차이</span>
+        <span>수금 책임</span>
+      </div>
+      {reconciliation.perSource.map((row) => {
+        const status = sourceStatusLabel(row);
+        return (
+          <div className="ledger-row" key={`${row.source}-${row.currencyCode}`}>
+            <span>
+              {row.source}
+              {row.currencyCode !== "KRW" ? ` · ${row.currencyCode}` : ""}
+            </span>
+            <span>
+              {formatMoneyMicros(row.estimatedMicros, row.currencyCode)}
+            </span>
+            <span>
+              {row.confirmedMicros === 0 && row.status === "pending"
+                ? "-"
+                : formatMoneyMicros(row.confirmedMicros, row.currencyCode)}
+            </span>
+            <span>
+              {formatMoneyMicros(
+                row.estimatedMinusConfirmedMicros,
+                row.currencyCode,
+              )}
+            </span>
+            <Badge
+              tone={
+                status === "보고 대기" || status === "입금 대기"
+                  ? "warn"
+                  : status === "미대사"
+                    ? "danger"
+                    : "neutral"
+              }
+            >
+              {status}
+            </Badge>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1353,6 +1491,16 @@ function Guardrails({
   killSwitch: boolean;
   setKillSwitch: (value: boolean) => void;
 }) {
+  const supportServing = evaluateDemoServing(
+    avenues,
+    killSwitch,
+    "support-rewarded",
+  );
+  const settingsServing = evaluateDemoServing(
+    avenues,
+    killSwitch,
+    "settings-entry",
+  );
   const checks = [
     [
       "설정 진입 전면 광고",
@@ -1420,6 +1568,14 @@ function Guardrails({
           <div className="console-row">
             <span>발행 차단</span>
             <strong>{avenues.filter((a) => !canPublish(a)).length}</strong>
+          </div>
+          <div className="console-row">
+            <span>응원 송출</span>
+            <strong>{supportServing.allow ? "허용" : "거부"}</strong>
+          </div>
+          <div className="console-row">
+            <span>설정 진입 송출</span>
+            <strong>{settingsServing.allow ? "허용" : "차단"}</strong>
           </div>
           <div className="console-row">
             <span>결정 필요</span>
@@ -1796,7 +1952,7 @@ function AvenueEditor({
               <Button
                 variant="primary"
                 type="submit"
-                disabled={findings.some((finding) => finding.level === "block")}
+                disabled={!canPublish(draft)}
               >
                 구성 저장
               </Button>
