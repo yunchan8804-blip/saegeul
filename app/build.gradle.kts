@@ -339,6 +339,11 @@ fcitxComponent {
 val bundleHangulEngineAssets = tasks.register<Copy>("bundleHangulEngineAssets") {
     group = "build"
     description = "Copy Hangul engine assets into the main app so Play user builds include Korean input."
+    // A clean checkout has no generated plugin assets yet. Depending on the plugin descriptor
+    // task guarantees its CMake install has populated src/main/assets before this Copy task
+    // decides whether it has any sources. Without this edge, warm local builds pass while CI
+    // reports NO-SOURCE and produces a main bundle without the Hangul engine.
+    dependsOn(":plugin:hangul:generateDataDescriptor")
     from(project(":plugin:hangul").file("src/main/assets")) {
         exclude("descriptor.json")
     }
