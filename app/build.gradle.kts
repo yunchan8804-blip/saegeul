@@ -5,6 +5,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.configure
@@ -240,6 +241,19 @@ android {
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = true
     }
+
+    sourceSets {
+        getByName("debug") {
+            jniLibs.directories.add(
+                layout.buildDirectory.dir("hangulEngine/debug/jniLibs").get().asFile.absolutePath
+            )
+        }
+        getByName("release") {
+            jniLibs.directories.add(
+                layout.buildDirectory.dir("hangulEngine/release/jniLibs").get().asFile.absolutePath
+            )
+        }
+    }
 }
 
 extensions.configure<ApplicationAndroidComponentsExtension> {
@@ -259,6 +273,28 @@ extensions.configure<ApplicationAndroidComponentsExtension> {
             task.name == "check" || task.name == "assemble$variantName"
         }.configureEach {
             dependsOn(verifyTask)
+        }
+
+        if (variant.name == "debug" || variant.name == "release") {
+            val hangulJni = tasks.register<Copy>("bundleHangulEngineJni$variantName") {
+                group = "build"
+                description =
+                    "Copy the Hangul native addon into the main app for ${variant.name}."
+                dependsOn(":plugin:hangul:strip${variantName}DebugSymbols")
+                from(
+                    project(":plugin:hangul").layout.buildDirectory.dir(
+                        "intermediates/stripped_native_libs/${variant.name}/" +
+                            "strip${variantName}DebugSymbols/out/lib"
+                    )
+                )
+                into(layout.buildDirectory.dir("hangulEngine/${variant.name}/jniLibs"))
+            }
+            tasks.matching {
+                it.name == "merge${variantName}JniLibFolders" ||
+                    it.name == "merge${variantName}NativeLibs"
+            }.configureEach {
+                dependsOn(hangulJni)
+            }
         }
     }
 }
@@ -298,6 +334,20 @@ fcitxComponent {
         "usr/share/opencc"
     )
     installPrebuiltAssets = true
+}
+
+val bundleHangulEngineAssets = tasks.register<Copy>("bundleHangulEngineAssets") {
+    group = "build"
+    description = "Copy Hangul engine assets into the main app so Play user builds include Korean input."
+    from(project(":plugin:hangul").file("src/main/assets")) {
+        exclude("descriptor.json")
+    }
+    into(layout.projectDirectory.dir("src/main/assets"))
+    mustRunAfter("installFcitxComponent")
+    mustRunAfter("deleteFcitxComponentExcludeFiles")
+}
+tasks.named("generateDataDescriptor") {
+    dependsOn(bundleHangulEngineAssets)
 }
 
 ksp {

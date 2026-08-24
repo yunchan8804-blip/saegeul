@@ -112,7 +112,7 @@
 - `pinyin.lua`
 - Anthy, Chewing, Jyutping, Rime, Sayura, Thai, Unikey 등 미사용 언어 플러그인
 
-Fcitx5 핵심 코어와 libhangul 기반 한글 플러그인은 유지하며, 현재 빌드 그래프는 `app`과 `plugin:hangul`만을 제품 APK로 산출합니다.
+Fcitx5 핵심 코어와 libhangul 기반 한글 모듈은 유지한다. 사용자 메인 APK/AAB에는 한글 엔진을 동봉하고, `plugin:hangul` APK는 이전 배포 호환과 독립 검증용 산출물로만 유지한다. 자세한 계약은 [`hangul-play-distribution.md`](hangul-play-distribution.md)다.
 
 ---
 
@@ -127,7 +127,7 @@ Fcitx5 핵심 코어와 libhangul 기반 한글 플러그인은 유지하며, �
 5. 기존 앱 이름·applicationId·FileProvider·IPC·플러그인 ID의 공개 경계 잔존 0개
 6. 공식 Fcitx 배포·후원·스토어 링크를 독립 제품 링크처럼 표시한 잔존 0개
 7. APK/AAB 설치와 정상 실행
-8. 한글 플러그인 자동 검색 및 바인딩
+8. 메인 APK/AAB의 내장 한글 엔진 검색 및 바인딩
 9. 두벌식 한글 조합·확정 무결성
 10. 명시적 내보내기/가져오기 데이터 이전
 11. 공개 개인정보처리방침·앱 내 고지·Data Safety 답변 일치

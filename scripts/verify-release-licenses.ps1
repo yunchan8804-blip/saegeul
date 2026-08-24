@@ -82,7 +82,7 @@ try {
         "fcitx5-chinese-addons|" +
         "pinyin\.lua|" +
         "assets/usr/share/opencc/|" +
-        "assets/usr/share/fcitx5/(?:chttrans|pinyin|pinyinhelper|punctuation|table|inputmethod)/|" +
+        "assets/usr/share/fcitx5/(?:chttrans|pinyin|pinyinhelper|punctuation|table)/|" +
         "assets/usr/share/fcitx5/addon/(?:chttrans|fullwidth|pinyin|pinyinhelper|punctuation|table)\.conf"
     )
     $forbiddenEntries = @(
@@ -92,6 +92,23 @@ try {
     if ($forbiddenEntries.Count -ne 0) {
         $names = $forbiddenEntries | ForEach-Object { $_.FullName }
         throw "Excluded Chinese Addons content is still packaged: $($names -join ', ')."
+    }
+
+    $allowedInputMethods = @(
+        "assets/usr/share/fcitx5/inputmethod/hangul.conf"
+    )
+    $unexpectedInputMethods = @(
+        $archive.Entries |
+            Where-Object {
+                $_.FullName.StartsWith(
+                    "assets/usr/share/fcitx5/inputmethod/",
+                    [StringComparison]::Ordinal
+                ) -and $_.FullName -notin $allowedInputMethods
+            }
+    )
+    if ($unexpectedInputMethods.Count -ne 0) {
+        $names = $unexpectedInputMethods | ForEach-Object { $_.FullName }
+        throw "Unexpected input methods are packaged: $($names -join ', ')."
     }
 
     $reader = [IO.StreamReader]::new($metadataEntry.Open())

@@ -97,12 +97,14 @@
 ## 📦 다운로드 및 설치 (Quick Start)
 
 ### 1. 다운로드
-[GitHub Releases](https://github.com/yunchan8804-blip/saegeul/releases)에서 동일한 버전 태그의 APK 2개를 함께 내려받습니다.
-- **새글 메인 앱:** `net.chanpaca.saegeul-vX.Y.Z.apk`
-- **한글 플러그인:** `net.chanpaca.saegeul.plugin.hangul-vX.Y.Z.apk`
+[GitHub Releases](https://github.com/yunchan8804-blip/saegeul/releases)에서 최신 **새글 메인 앱 APK**를 내려받습니다.
+- **필수:** `net.chanpaca.saegeul-vX.Y.Z.apk`
+- **선택:** `net.chanpaca.saegeul.plugin.hangul-vX.Y.Z.apk`는 이전 배포 호환과 독립 검증용입니다.
+
+최신 메인 앱에는 libhangul 기반 한글 엔진이 포함되어 있어 별도 플러그인을 설치할 필요가 없습니다.
 
 ### 2. 설치 및 Play Protect
-- 다운로드한 두 APK를 순서대로 설치합니다.
+- 다운로드한 메인 APK를 설치합니다.
 - 설치 시 *"출처를 알 수 없는 앱"* 또는 *"Play Protect 경고"*가 뜰 경우, **자세히 보기 > 무시하고 설치**를 누릅니다.
 
 ### 3. 활성화 및 기본 키보드 설정
@@ -151,15 +153,18 @@
 git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git
 cd saegeul
 
-# 2. 메인 앱 및 한글 플러그인 릴리스 APK 빌드
-./gradlew :app:assembleRelease :plugin:hangul:assembleRelease
+# 2. 한글 엔진이 포함된 메인 앱 릴리스 APK 빌드
+./gradlew :app:assembleRelease
+
+# 선택: 호환용 한글 플러그인 APK도 별도로 빌드
+./gradlew :plugin:hangul:assembleRelease
 ```
 
 ### 아키텍처별 빌드 지정 (선택)
 특정 ABI(예: `arm64-v8a`)만 빌드하려는 경우 `-PbuildABI` 플래그를 사용합니다.
 
 ```bash
-./gradlew :app:assembleRelease :plugin:hangul:assembleRelease -PbuildABI=arm64-v8a
+./gradlew :app:assembleRelease -PbuildABI=arm64-v8a
 ```
 
 ---

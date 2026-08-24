@@ -102,11 +102,11 @@ class FcitxTest {
     }
 
     @Test
-    fun testInstalledHangulPluginComposesTwoSetText(): Unit = runBlocking {
+    fun testBundledHangulEngineComposesTwoSetText(): Unit = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val available = fcitx.availableIme().map { it.uniqueName }.toSet()
         Assert.assertTrue(
-            "The separately installed Hangul plugin was not discovered.",
+            "The Hangul engine bundled in the main app was not discovered.",
             available.contains("hangul")
         )
 

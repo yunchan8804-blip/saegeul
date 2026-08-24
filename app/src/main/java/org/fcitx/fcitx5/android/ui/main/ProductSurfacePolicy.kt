@@ -4,7 +4,12 @@
  */
 package org.fcitx.fcitx5.android.ui.main
 
-/** Keeps the public product surface separate from low-level development controls. */
+/**
+ * Keeps the public product surface separate from low-level development controls.
+ *
+ * Hangul is a product engine, not a developer plugin. User builds hide the plugin
+ * manager; Play user builds bundle Hangul into the main AAB instead.
+ */
 internal data class ProductSurfacePolicy(
     val showRawEngineSettings: Boolean,
     val showPluginManager: Boolean,

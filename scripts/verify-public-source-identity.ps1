@@ -72,12 +72,18 @@ function Test-PublicSourceIdentity {
     $productIdentityPath = Join-Path $ResolvedSourceRoot `
         "build-logic/convention/src/main/kotlin/ProductIdentity.kt"
     $settingsPath = Join-Path $ResolvedSourceRoot "settings.gradle.kts"
+    $koreanPlayListingPath = Join-Path $ResolvedSourceRoot `
+        "app/src/main/play/listings/ko-KR/full-description.txt"
+    $englishPlayListingPath = Join-Path $ResolvedSourceRoot `
+        "app/src/main/play/listings/en-US/full-description.txt"
 
     $readme = Get-TextFile -Path $readmePath
     $siteIndex = Get-TextFile -Path $siteIndexPath
     $privacy = Get-TextFile -Path $privacyPath
     $productIdentity = Get-TextFile -Path $productIdentityPath
     $settings = Get-TextFile -Path $settingsPath
+    $koreanPlayListing = Get-TextFile -Path $koreanPlayListingPath
+    $englishPlayListing = Get-TextFile -Path $englishPlayListingPath
 
     foreach ($required in @(
         $ExpectedProductName,
@@ -85,6 +91,7 @@ function Test-PublicSourceIdentity {
         $ExpectedApplicationId,
         $ExpectedRepositoryUrl,
         $ExpectedPrivacyPolicyUrl,
+        "한글 엔진이 포함되어 있어 별도 플러그인을 설치할 필요가 없습니다.",
         "비공식 독립 포크",
         "제휴",
         "보증"
@@ -94,7 +101,8 @@ function Test-PublicSourceIdentity {
     foreach ($required in @(
         $ExpectedProductName,
         $ExpectedKoreanProductName,
-        $ExpectedRepositoryUrl
+        $ExpectedRepositoryUrl,
+        "한글 엔진이 앱에 포함되어 있어 별도 플러그인은 필요하지 않습니다."
     )) {
         Assert-Contains -Content $siteIndex -Expected $required -Surface "site/index.html"
     }
@@ -107,8 +115,26 @@ function Test-PublicSourceIdentity {
     Assert-Contains -Content $productIdentity `
         -Expected "const val applicationId = `"$ExpectedApplicationId`"" `
         -Surface "ProductIdentity.kt"
+    Assert-Contains -Content $koreanPlayListing `
+        -Expected "한글 엔진이 앱에 포함되어 있어 별도 플러그인을 설치할 필요가 없다." `
+        -Surface "ko-KR Play listing"
+    Assert-Contains -Content $englishPlayListing `
+        -Expected "The Hangul engine is included, so Korean input requires no separate plugin." `
+        -Surface "en-US Play listing"
 
-    $publicSurfacePaths = @($readmePath)
+    foreach ($staleListingClaim in @(
+        "한글 플러그인이 필요",
+        "Hangul Plugin is required"
+    )) {
+        if (
+            $koreanPlayListing.Contains($staleListingClaim, [StringComparison]::OrdinalIgnoreCase) -or
+            $englishPlayListing.Contains($staleListingClaim, [StringComparison]::OrdinalIgnoreCase)
+        ) {
+            throw "Play listing still requires the separate Hangul plugin: '$staleListingClaim'."
+        }
+    }
+
+    $publicSurfacePaths = @($readmePath, $koreanPlayListingPath, $englishPlayListingPath)
     foreach ($relativeDirectory in @("site", ".github/workflows")) {
         $directory = Join-Path $ResolvedSourceRoot $relativeDirectory
         if (Test-Path -LiteralPath $directory -PathType Container) {
@@ -142,6 +168,27 @@ function Test-PublicSourceIdentity {
     }
     if ($violations.Count -ne 0) {
         throw "Forbidden upstream public identity remains:`n$($violations -join "`n")"
+    }
+
+    $stalePluginRequirements = @(
+        "메인 앱과 한글 플러그인 APK를 함께 설치합니다.",
+        "동일 태그의 APK 2개를 설치합니다.",
+        "두 APK를 같은 태그에서 함께 설치해야",
+        "메인 앱과 한글 플러그인을 모두 설치해야"
+    )
+    $stalePluginRequirementViolations = [Collections.Generic.List[string]]::new()
+    foreach ($path in $publicSurfacePaths | Sort-Object -Unique) {
+        $content = Get-Content -LiteralPath $path -Raw
+        foreach ($claim in $stalePluginRequirements) {
+            if ($content.Contains($claim, [StringComparison]::Ordinal)) {
+                $relativePath = [IO.Path]::GetRelativePath($ResolvedSourceRoot, $path).Replace("\", "/")
+                $stalePluginRequirementViolations.Add("${relativePath}: $claim")
+            }
+        }
+    }
+    if ($stalePluginRequirementViolations.Count -ne 0) {
+        throw "Public surfaces still require the separate Hangul plugin:`n" +
+            ($stalePluginRequirementViolations -join "`n")
     }
 
     $pluginIncludes = @(

@@ -6,7 +6,7 @@ voice, OCR, GIF, and AI writing tools.
 
 <b>First independent release</b>
 <ul>
-<li>The separate Saegeul Hangul Plugin is required for Korean input.</li>
+<li>The Hangul engine is included, so Korean input requires no separate plugin.</li>
 <li>Unused Chinese and other language engines are not included.</li>
 <li>Clipboard history is off by default and excluded from backup and migration.</li>
 <li>Voice, OCR, GIF, and AI features use the network only when the user explicitly enables or invokes them.</li>

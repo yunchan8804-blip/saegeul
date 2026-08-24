@@ -172,9 +172,9 @@ jobs:
             cat <<'TRAILER'
           설치할 때 Play Protect가 "안전하지 않은 앱"으로 경고하면 자세히 > 무시하고 설치를 누르면 돼. Google Play를 거치지 않은 앱이라 뜨는 경고이고, 자세한 절차와 서명 지문 확인 방법은 https://saegul.chanpaca.net/faq/ 에 있어.
 
-          - 사용자 앱: `net.chanpaca.saegeul`
-          - 한글 플러그인: `net.chanpaca.saegeul.plugin.hangul`
-          - 두 APK를 같은 태그에서 함께 설치해야 한글 엔진이 잡혀
+          - 사용자 앱: `net.chanpaca.saegeul` (한글 엔진 내장)
+          - 최신 사용자 앱은 메인 APK 하나만 설치하면 한글 입력 가능
+          - 한글 플러그인 APK는 이전 배포 호환과 독립 검증용으로만 함께 제공
           - 동일 태그 전체 소스, SBOM, SHA256SUMS 동시 제공
 
           새글은 Fcitx5 기반의 비공식 독립 포크이며 원 프로젝트와 제휴·보증 관계가 없어.

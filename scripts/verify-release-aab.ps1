@@ -17,15 +17,37 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $archive = [IO.Compression.ZipFile]::OpenRead($resolvedAabPath)
 try {
+    $requiredHangulAssets = @(
+        "base/assets/usr/share/fcitx5/addon/hangul.conf",
+        "base/assets/usr/share/fcitx5/inputmethod/hangul.conf",
+        "base/assets/usr/share/fcitx5/hangul/completion.txt",
+        "base/assets/usr/share/libhangul/hanja/hanja.txt"
+    )
     foreach ($entryName in @(
+        "base/assets/descriptor.json",
         "base/assets/legal/NOTICE.txt",
         "base/assets/legal/FORK-NOTICE.txt",
         "base/assets/legal/DATA-PRIVACY.txt",
         "base/res/raw/aboutlibraries.json"
-    )) {
+    ) + $requiredHangulAssets) {
         $entry = $archive.GetEntry($entryName)
         if ($null -eq $entry -or $entry.Length -eq 0) {
             throw "Required AAB entry '$entryName' is missing or empty."
+        }
+    }
+
+    $descriptorEntry = $archive.GetEntry("base/assets/descriptor.json")
+    $descriptorReader = [IO.StreamReader]::new($descriptorEntry.Open())
+    try {
+        $descriptor = $descriptorReader.ReadToEnd() | ConvertFrom-Json
+    } finally {
+        $descriptorReader.Dispose()
+    }
+    $descriptorPaths = @($descriptor.files.PSObject.Properties.Name)
+    foreach ($entryName in $requiredHangulAssets) {
+        $assetPath = $entryName.Substring("base/assets/".Length)
+        if ($assetPath -notin $descriptorPaths) {
+            throw "Bundled Hangul asset '$assetPath' is missing from descriptor.json."
         }
     }
 
@@ -40,6 +62,12 @@ try {
     )
     if ($packagedAbis.Count -eq 0) {
         throw "The AAB does not contain native libraries."
+    }
+    foreach ($abi in $packagedAbis) {
+        $hangulLibrary = $archive.GetEntry("base/lib/$abi/libhangul.so")
+        if ($null -eq $hangulLibrary -or $hangulLibrary.Length -eq 0) {
+            throw "The AAB is missing the bundled Hangul engine for ABI '$abi'."
+        }
     }
 
     $normalizedExpectedAbis = @(
@@ -65,7 +93,7 @@ try {
         "fcitx5-chinese-addons|" +
         "pinyin\.lua|" +
         "base/assets/usr/share/opencc/|" +
-        "base/assets/usr/share/fcitx5/(?:chttrans|pinyin|pinyinhelper|punctuation|table|inputmethod)/|" +
+        "base/assets/usr/share/fcitx5/(?:chttrans|pinyin|pinyinhelper|punctuation|table)/|" +
         "base/assets/usr/share/fcitx5/addon/(?:chttrans|fullwidth|pinyin|pinyinhelper|punctuation|table)\.conf"
     )
     $forbiddenEntries = @(
@@ -77,13 +105,31 @@ try {
         throw "Excluded Chinese Addons content is still packaged: $($forbiddenEntries -join ', ')."
     }
 
+    $unexpectedInputMethods = @(
+        $archive.Entries |
+            Where-Object {
+                $_.FullName.StartsWith(
+                    "base/assets/usr/share/fcitx5/inputmethod/",
+                    [StringComparison]::Ordinal
+                ) -and
+                -not $_.FullName.EndsWith("/") -and
+                $_.FullName -ne "base/assets/usr/share/fcitx5/inputmethod/hangul.conf"
+            } |
+            ForEach-Object { $_.FullName }
+    )
+    if ($unexpectedInputMethods.Count -ne 0) {
+        throw "Unexpected input methods are packaged: $($unexpectedInputMethods -join ', ')."
+    }
+
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resolvedAabPath).Hash.ToLowerInvariant()
     Write-Output "AAB structure audit: PASS"
     Write-Output "AAB: $resolvedAabPath"
     Write-Output "SHA-256: $hash"
     Write-Output "Native ABIs: $($packagedAbis -join ', ')"
+    Write-Output "Bundled Hangul assets, descriptor, and native engine: PASS"
     Write-Output "Legal and privacy assets: PASS"
     Write-Output "Excluded Chinese Addons entries: 0"
+    Write-Output "Unexpected input methods: 0"
 } finally {
     $archive.Dispose()
 }
