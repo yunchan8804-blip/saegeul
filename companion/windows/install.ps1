@@ -55,6 +55,8 @@ if (-not $executable) {
 $trayProject = if ($repoRoot) { Join-Path $repoRoot "tools\SaegeulAiCompanionTray\SaegeulAiCompanionTray.csproj" } else { $null }
 if ($BuildWpfTray -and $trayProject -and (Test-Path $trayProject) -and (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     Write-Host "[*] Building WPF System Tray application..." -ForegroundColor Yellow
+    Stop-Process -Name "SaegeulAiCompanionTray" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
     $trayPublishDir = Join-Path $InstallDir "tray"
     dotnet publish $trayProject -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o $trayPublishDir
     if ($LASTEXITCODE -eq 0) {

@@ -29,4 +29,23 @@ object BufferedHangulMode {
     fun mustAvoidClipboard(capabilities: CapabilityFlags): Boolean =
         capabilities.has(CapabilityFlag.Password) ||
             capabilities.has(CapabilityFlag.Sensitive)
+
+    private val KNOWN_COMPAT_PREFIXES = listOf(
+        "com.microsoft.",
+        "net.dot.",
+        "com.unity3d.",
+        "com.valvesoftware.",
+        "com.termux",
+        "com.realvnc.",
+        "com.teamviewer.",
+        "com.anydesk.",
+        "com.parsecgaming.",
+        "com.moonlightstream."
+    )
+
+    fun isKnownCompatibilityTarget(packageName: String?): Boolean {
+        if (packageName.isNullOrBlank()) return false
+        val lower = packageName.lowercase()
+        return KNOWN_COMPAT_PREFIXES.any { lower.startsWith(it) || lower.contains(it) }
+    }
 }

@@ -39,6 +39,7 @@ internal sealed class TrayController : IDisposable
     private bool _disposed;
     private GatewayState _state = GatewayState.Starting;
     private string _lastDetail = "시작 준비 중";
+    private DashboardWindow? _dashboard;
 
     public TrayController(CompanionOptions options, Dispatcher dispatcher, Action shutdown)
     {
@@ -55,16 +56,19 @@ internal sealed class TrayController : IDisposable
         _stopItem.Click += async (_, _) => await SetDesiredRunningAsync(false);
         _restartItem.Click += async (_, _) => await RestartAsync();
 
-        var openStatusItem = new Forms.ToolStripMenuItem("로컬 상태 열기");
+        var openDashboardItem = new Forms.ToolStripMenuItem("대시보드 열기");
+        openDashboardItem.Click += (_, _) => ShowDashboard();
+        var openStatusItem = new Forms.ToolStripMenuItem("웹 상태(JSON) 열기");
         openStatusItem.Click += (_, _) => OpenLocalStatus();
         var exitItem = new Forms.ToolStripMenuItem("트레이 종료 (게이트웨이 중지)");
         exitItem.Click += (_, _) => _dispatcher.Invoke(_shutdown);
 
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add(new Forms.ToolStripMenuItem("Saegeul AI") { Enabled = false });
+        menu.Items.Add(new Forms.ToolStripMenuItem("새글 AI Companion") { Enabled = false });
         menu.Items.Add(_statusItem);
         menu.Items.Add(_backendsItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Items.Add(openDashboardItem);
         menu.Items.Add(_startItem);
         menu.Items.Add(_stopItem);
         menu.Items.Add(_restartItem);
@@ -75,14 +79,28 @@ internal sealed class TrayController : IDisposable
         _notifyIcon = new Forms.NotifyIcon
         {
             ContextMenuStrip = menu,
-            Text = "Saegeul AI · 시작 중",
+            Text = "새글 AI · 시작 중",
             Visible = true,
             Icon = CreateStatusIcon(Color.Goldenrod)
         };
-        _notifyIcon.DoubleClick += (_, _) => ShowStatusBalloon();
+        _notifyIcon.DoubleClick += (_, _) => ShowDashboard();
 
         _pollTimer = new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Background,
             async (_, _) => await PollAsync(), dispatcher);
+    }
+
+    public void ShowDashboard()
+    {
+        _dispatcher.Invoke(() =>
+        {
+            if (_dashboard == null || !_dashboard.IsLoaded)
+            {
+                _dashboard = new DashboardWindow(this, _options);
+            }
+            _dashboard.Show();
+            _dashboard.WindowState = System.Windows.WindowState.Normal;
+            _dashboard.Activate();
+        });
     }
 
     public void Start()
@@ -106,7 +124,7 @@ internal sealed class TrayController : IDisposable
         }
     }
 
-    private async Task RestartAsync()
+    internal async Task RestartAsync()
     {
         _desiredRunning = true;
         await StopOwnedCompanionAsync();
@@ -265,6 +283,7 @@ internal sealed class TrayController : IDisposable
             GatewayState.Stopped => Color.Gray,
             _ => Color.IndianRed
         });
+        _dashboard?.UpdateStatus(stateText, state == GatewayState.Running, backends ?? "Codex · Claude · Ollama");
         if (changed && state is GatewayState.Running or GatewayState.Error)
             ShowStatusBalloon();
     }

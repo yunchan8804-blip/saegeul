@@ -389,6 +389,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(ClipboardWindow())
                 }
+                clipboardButton.setOnLongClickListener {
+                    if (!canOpenEditorTool()) return@setOnLongClickListener true
+                    windowManager.attachWindow(org.fcitx.fcitx5.android.tab.UnifiedTabExtensionWindow(org.fcitx.fcitx5.android.tab.TabId.CLIPBOARD))
+                    true
+                }
                 bufferedHangulButton.setOnClickListener {
                     if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(BufferedHangulWindow())
@@ -455,9 +460,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(GifSearchWindow())
                 }
+                gifButton.setOnLongClickListener {
+                    if (!canOpenEditorTool()) return@setOnLongClickListener true
+                    windowManager.attachWindow(org.fcitx.fcitx5.android.tab.UnifiedTabExtensionWindow(org.fcitx.fcitx5.android.tab.TabId.MEDIA))
+                    true
+                }
                 moreButton.setOnClickListener {
                     if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(StatusAreaWindow())
+                }
+                moreButton.setOnLongClickListener {
+                    if (!canOpenEditorTool()) return@setOnLongClickListener true
+                    windowManager.attachWindow(org.fcitx.fcitx5.android.tab.UnifiedTabExtensionWindow(org.fcitx.fcitx5.android.tab.TabId.SETTINGS))
+                    true
                 }
             }
             clipboardUi.suggestionView.apply {
