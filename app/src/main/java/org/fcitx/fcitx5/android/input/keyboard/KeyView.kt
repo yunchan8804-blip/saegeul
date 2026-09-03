@@ -139,6 +139,14 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         val glowDef = theme.keyGlowEffect
         val glowColor = customStyle?.keyGlowColor ?: (if (glowDef?.enabled == true) glowDef.glowColor else null)
 
+        val translucency = theme.lightingEffect?.keyTranslucency ?: 0f
+        fun applyTranslucency(c: Int): Int {
+            if (translucency <= 0.01f) return c
+            val currentAlpha = Color.alpha(c)
+            val newAlpha = ((1.0f - translucency * 0.65f) * currentAlpha).toInt().coerceIn(25, 255)
+            return androidx.core.graphics.ColorUtils.setAlphaComponent(c, newAlpha)
+        }
+
         val slicedImageDef = customStyle?.slicedImage
         val slicedDrawable = if (slicedImageDef != null) {
             val file = java.io.File(slicedImageDef.imagePath)
@@ -161,22 +169,24 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             appearanceView.background = slicedDrawable
             setupPressHighlight()
         } else if (glowColor != null) {
-            val bkgColor = customStyle?.keyBackgroundColor ?: when (def.variant) {
+            val rawBkgColor = customStyle?.keyBackgroundColor ?: when (def.variant) {
                 Variant.Normal, Variant.AltForeground -> theme.keyBackgroundColor
                 Variant.Alternative -> theme.altKeyBackgroundColor
                 Variant.Accent -> theme.accentKeyBackgroundColor
             }
+            val bkgColor = applyTranslucency(rawBkgColor)
             val glowWidth = dp(glowDef?.glowRadius ?: 4f).toInt()
             appearanceView.background = glowingKeyBackgroundDrawable(
                 bkgColor, glowColor, customRadius, glowWidth, hMargin, vMargin
             )
             setupPressHighlight()
         } else if ((bordered && def.border != Border.Off) || def.border == Border.On || customStyle?.keyBackgroundColor != null) {
-            val bkgColor = customStyle?.keyBackgroundColor ?: when (def.variant) {
+            val rawBkgColor = customStyle?.keyBackgroundColor ?: when (def.variant) {
                 Variant.Normal, Variant.AltForeground -> theme.keyBackgroundColor
                 Variant.Alternative -> theme.altKeyBackgroundColor
                 Variant.Accent -> theme.accentKeyBackgroundColor
             }
+            val bkgColor = applyTranslucency(rawBkgColor)
             val borderOrShadowWidth = dp(1)
             val borderColor = customStyle?.keyBorderColor ?: theme.keyShadowColor
             appearanceView.background = if (borderStroke || customStyle?.keyBorderColor != null) borderedKeyBackgroundDrawable(

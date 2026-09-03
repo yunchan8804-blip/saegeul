@@ -198,7 +198,21 @@ class CustomThemeActivity : AppCompatActivity() {
         }
     }
 
-    private val rgbModeContainer by lazy {
+    private val ambientModeContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val ambientDirectionContainer by lazy {
+        HorizontalScrollView(this).apply {
+            isFillViewport = true
+            isHorizontalScrollBarEnabled = false
+        }
+    }
+
+    private val reactiveModeContainer by lazy {
         HorizontalScrollView(this).apply {
             isFillViewport = true
             isHorizontalScrollBarEnabled = false
@@ -233,7 +247,82 @@ class CustomThemeActivity : AppCompatActivity() {
         }
     }
 
+    // Fine-tuning Controls: Ambient Speed
+    private val ambientSpeedLabel by lazy { createTextView(R.string.theme_rgb_speed) }
+    private val ambientSpeedValue by lazy { createTextView() }
+    private val ambientSpeedSeekBar by lazy {
+        seekBar {
+            max = 300 // 0.2x ~ 3.0x -> 20 ~ 300
+            progress = 100
+        }
+    }
+
+    // Fine-tuning Controls: Ambient Intensity / Brightness
+    private val ambientIntensityLabel by lazy { createTextView(R.string.theme_rgb_intensity) }
+    private val ambientIntensityValue by lazy { createTextView() }
+    private val ambientIntensitySeekBar by lazy {
+        seekBar {
+            max = 100 // 10% ~ 100%
+            progress = 80
+        }
+    }
+
+    // Fine-tuning Controls: Key Translucency (Pudding Keycaps)
+    private val keyTranslucencyLabel by lazy { createTextView(R.string.theme_key_translucency) }
+    private val keyTranslucencyValue by lazy { createTextView() }
+    private val keyTranslucencySeekBar by lazy {
+        seekBar {
+            max = 60 // 0% ~ 60%
+            progress = 0
+        }
+    }
+
+    // Fine-tuning Controls: Particle Count
+    private val particleCountLabel by lazy { createTextView(R.string.theme_particle_count) }
+    private val particleCountValue by lazy { createTextView() }
+    private val particleCountSeekBar by lazy {
+        seekBar {
+            max = 28 // 4 ~ 28
+            progress = 8
+        }
+    }
+
+    // Fine-tuning Controls: Particle Lifetime
+    private val particleLifetimeLabel by lazy { createTextView(R.string.theme_particle_lifetime) }
+    private val particleLifetimeValue by lazy { createTextView() }
+    private val particleLifetimeSeekBar by lazy {
+        seekBar {
+            max = 1200 // 200ms ~ 1200ms
+            progress = 450
+        }
+    }
+
+    // Fine-tuning Controls: Particle Speed
+    private val particleSpeedLabel by lazy { createTextView(R.string.theme_particle_speed) }
+    private val particleSpeedValue by lazy { createTextView() }
+    private val particleSpeedSeekBar by lazy {
+        seekBar {
+            max = 300 // 0.3x ~ 3.0x
+            progress = 100
+        }
+    }
+
+    // Fine-tuning Controls: Key Glow Radius
+    private val glowRadiusLabel by lazy { createTextView(R.string.theme_key_glow_radius) }
+    private val glowRadiusValue by lazy { createTextView() }
+    private val glowRadiusSeekBar by lazy {
+        seekBar {
+            max = 16 // 2dp ~ 16dp
+            progress = 4
+        }
+    }
+
     private var selectedKeyTarget = "ALL"
+
+    // Sub-containers for grouped visibility
+    private lateinit var ambientControlsLayout: LinearLayout
+    private lateinit var particleControlsLayout: LinearLayout
+    private lateinit var glowControlsLayout: LinearLayout
 
     private val editorContainer by lazy {
         verticalLayout {
@@ -245,25 +334,122 @@ class CustomThemeActivity : AppCompatActivity() {
                 bottomMargin = dp(8)
             })
 
-            // 2. RGB Chroma Backlight Section
+            // 2. Ambient RGB Backlight Section
             add(createSectionHeader(getString(R.string.theme_rgb_backlight)), lParams(matchParent, wrapContent))
-            add(rgbModeContainer, lParams(matchParent, wrapContent) {
+            add(ambientModeContainer, lParams(matchParent, wrapContent) {
+                bottomMargin = dp(6)
+            })
+
+            ambientControlsLayout = verticalLayout {
+                // Direction
+                add(createTextView(R.string.theme_rgb_direction), lParams(matchParent, dp(36)))
+                add(ambientDirectionContainer, lParams(matchParent, wrapContent) {
+                    bottomMargin = dp(6)
+                })
+
+                // Speed
+                val speedRow = horizontalLayout {
+                    gravity = Gravity.CENTER_VERTICAL
+                    add(ambientSpeedLabel, lParams(0, dp(36)) { weight = 1f })
+                    add(ambientSpeedValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
+                }
+                add(speedRow, lParams(matchParent, wrapContent))
+                add(ambientSpeedSeekBar, lParams(matchParent, wrapContent) {
+                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+                })
+
+                // Intensity
+                val intensityRow = horizontalLayout {
+                    gravity = Gravity.CENTER_VERTICAL
+                    add(ambientIntensityLabel, lParams(0, dp(36)) { weight = 1f })
+                    add(ambientIntensityValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
+                }
+                add(intensityRow, lParams(matchParent, wrapContent))
+                add(ambientIntensitySeekBar, lParams(matchParent, wrapContent) {
+                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+                })
+
+                // Key Translucency
+                val transRow = horizontalLayout {
+                    gravity = Gravity.CENTER_VERTICAL
+                    add(keyTranslucencyLabel, lParams(0, dp(36)) { weight = 1f })
+                    add(keyTranslucencyValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
+                }
+                add(transRow, lParams(matchParent, wrapContent))
+                add(keyTranslucencySeekBar, lParams(matchParent, wrapContent) {
+                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+                })
+            }
+            add(ambientControlsLayout, lParams(matchParent, wrapContent))
+
+            // 3. Keypress Reactive Animation Section
+            add(createSectionHeader(getString(R.string.theme_rgb_reactive_title)), lParams(matchParent, wrapContent))
+            add(reactiveModeContainer, lParams(matchParent, wrapContent) {
                 bottomMargin = dp(8)
             })
 
-            // 3. Touch Particle & Sparkle Section
+            // 4. Touch Particle & Sparkle Section
             add(createSectionHeader(getString(R.string.theme_particle_effect)), lParams(matchParent, wrapContent))
             add(particleModeContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(8)
+                bottomMargin = dp(6)
             })
 
-            // 4. Keycap Glow & Aura Section
+            particleControlsLayout = verticalLayout {
+                // Count
+                val pCountRow = horizontalLayout {
+                    gravity = Gravity.CENTER_VERTICAL
+                    add(particleCountLabel, lParams(0, dp(36)) { weight = 1f })
+                    add(particleCountValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
+                }
+                add(pCountRow, lParams(matchParent, wrapContent))
+                add(particleCountSeekBar, lParams(matchParent, wrapContent) {
+                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+                })
+
+                // Lifetime
+                val pLifeRow = horizontalLayout {
+                    gravity = Gravity.CENTER_VERTICAL
+                    add(particleLifetimeLabel, lParams(0, dp(36)) { weight = 1f })
+                    add(particleLifetimeValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
+                }
+                add(pLifeRow, lParams(matchParent, wrapContent))
+                add(particleLifetimeSeekBar, lParams(matchParent, wrapContent) {
+                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+                })
+
+                // Speed
+                val pSpeedRow = horizontalLayout {
+                    gravity = Gravity.CENTER_VERTICAL
+                    add(particleSpeedLabel, lParams(0, dp(36)) { weight = 1f })
+                    add(particleSpeedValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
+                }
+                add(pSpeedRow, lParams(matchParent, wrapContent))
+                add(particleSpeedSeekBar, lParams(matchParent, wrapContent) {
+                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+                })
+            }
+            add(particleControlsLayout, lParams(matchParent, wrapContent))
+
+            // 5. Keycap Glow & Aura Section
             add(createSectionHeader(getString(R.string.theme_key_glow_effect)), lParams(matchParent, wrapContent))
             add(glowColorContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(8)
+                bottomMargin = dp(6)
             })
 
-            // 5. Per-Key Custom Studio Section
+            glowControlsLayout = verticalLayout {
+                val glowRadRow = horizontalLayout {
+                    gravity = Gravity.CENTER_VERTICAL
+                    add(glowRadiusLabel, lParams(0, dp(36)) { weight = 1f })
+                    add(glowRadiusValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
+                }
+                add(glowRadRow, lParams(matchParent, wrapContent))
+                add(glowRadiusSeekBar, lParams(matchParent, wrapContent) {
+                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+                })
+            }
+            add(glowControlsLayout, lParams(matchParent, wrapContent))
+
+            // 6. Per-Key Custom Studio Section
             add(createSectionHeader(getString(R.string.theme_per_key_customization)), lParams(matchParent, wrapContent))
             add(perKeyTargetContainer, lParams(matchParent, wrapContent) {
                 bottomMargin = dp(4)
@@ -272,19 +458,19 @@ class CustomThemeActivity : AppCompatActivity() {
                 bottomMargin = dp(8)
             })
 
-            // 6. Accent / Enter Color Swatches
+            // 7. Accent / Enter Color Swatches
             add(createSectionHeader(getString(R.string.theme_accent_key_color)), lParams(matchParent, wrapContent))
             add(accentColorContainer, lParams(matchParent, wrapContent) {
                 bottomMargin = dp(8)
             })
 
-            // 7. Keyboard Surface Color Swatches
+            // 8. Keyboard Surface Color Swatches
             add(createSectionHeader(getString(R.string.theme_keyboard_bg_color)), lParams(matchParent, wrapContent))
             add(surfaceColorContainer, lParams(matchParent, wrapContent) {
                 bottomMargin = dp(8)
             })
 
-            // 8. Keycap & Style Options
+            // 9. Keycap & Style Options
             add(createSectionHeader(getString(R.string.theme_color_customization)), lParams(matchParent, wrapContent))
             val variantRow = horizontalLayout {
                 gravity = Gravity.CENTER_VERTICAL
@@ -297,7 +483,7 @@ class CustomThemeActivity : AppCompatActivity() {
             }
             add(variantRow, lParams(matchParent, wrapContent))
 
-            // 9. Background Image Section
+            // 10. Background Image Section
             add(createSectionHeader(getString(R.string.theme_background_image)), lParams(matchParent, wrapContent))
             add(changeImageLabel, lParams(matchParent, dp(44)))
             add(cropLabel, lParams(matchParent, dp(44)))
@@ -383,6 +569,7 @@ class CustomThemeActivity : AppCompatActivity() {
         updateControlsVisibility()
     }
 
+    @SuppressLint("SetTextI18n")
     private fun updateControlsVisibility() {
         val hasBg = theme.backgroundImage != null
         cropLabel.visibility = if (hasBg) View.VISIBLE else View.GONE
@@ -390,6 +577,32 @@ class CustomThemeActivity : AppCompatActivity() {
         brightnessLabel.visibility = if (hasBg) View.VISIBLE else View.GONE
         brightnessValue.visibility = if (hasBg) View.VISIBLE else View.GONE
         brightnessSeekBar.visibility = if (hasBg) View.VISIBLE else View.GONE
+
+        val hasAmbient = (theme.lightingEffect?.effectiveAmbientMode ?: "off") != "off"
+        ambientControlsLayout.visibility = if (hasAmbient) View.VISIBLE else View.GONE
+
+        val hasParticle = (theme.particleEffect?.type ?: "off") != "off"
+        particleControlsLayout.visibility = if (hasParticle) View.VISIBLE else View.GONE
+
+        val hasGlow = theme.keyGlowEffect?.enabled == true
+        glowControlsLayout.visibility = if (hasGlow) View.VISIBLE else View.GONE
+
+        // Sync slider values
+        theme.lightingEffect?.let { l ->
+            ambientSpeedValue.text = "%.1fx".format(l.speed)
+            ambientIntensityValue.text = "${(l.intensity * 100).toInt()}%"
+            keyTranslucencyValue.text = "${(l.keyTranslucency * 100).toInt()}%"
+        }
+
+        theme.particleEffect?.let { p ->
+            particleCountValue.text = "${p.particleCount}개"
+            particleLifetimeValue.text = "${p.lifetimeMs}ms"
+            particleSpeedValue.text = "%.1fx".format(p.speed)
+        }
+
+        theme.keyGlowEffect?.let { g ->
+            glowRadiusValue.text = "${g.glowRadius.toInt()}dp"
+        }
     }
 
     private fun applyPreset(preset: Theme.Builtin) {
@@ -409,6 +622,11 @@ class CustomThemeActivity : AppCompatActivity() {
         theme = custom
         variantSwitch.isChecked = !preset.isDark
         updatePreview()
+        setupAmbientModeRow()
+        setupAmbientDirectionRow()
+        setupReactiveModeRow()
+        setupParticleModeRow()
+        setupGlowColorRow()
     }
 
     private fun applyAccentColor(accentColor: Int, accentTextColor: Int = 0xffffffff.toInt()) {
@@ -500,94 +718,11 @@ class CustomThemeActivity : AppCompatActivity() {
             })
         }
 
+        palettePresetContainer.removeAllViews()
         palettePresetContainer.addView(row)
     }
 
-    private fun setupAccentColorRow() {
-        val accentColors = listOf(
-            0xffb83a32.toInt() to 0xffffffff.toInt(), // 한지 적갈색
-            0xffc84a3f.toInt() to 0xffffffff.toInt(), // 단청 주홍
-            0xff1e40af.toInt() to 0xffffffff.toInt(), // 백자 코발트
-            0xffc49a45.toInt() to 0xff1a1a1a.toInt(), // 청자 금색
-            0xff00e699.toInt() to 0xff000000.toInt(), // 자정 네온 제이드
-            0xff38bdf8.toInt() to 0xff0f172a.toInt(), // 안개 스카이
-            0xff2563eb.toInt() to 0xffffffff.toInt(), // 로얄 블루
-            0xff10b981.toInt() to 0xffffffff.toInt(), // 에메랄드
-            0xffec4899.toInt() to 0xffffffff.toInt(), // 핑크 로즈
-            0xff8b5cf6.toInt() to 0xffffffff.toInt(), // 바이올렛
-            0xfff59e0b.toInt() to 0xff000000.toInt(), // 앰버 옐로우
-            0xffffffff.toInt() to 0xff000000.toInt(), // 퓨어 화이트
-            0xff212121.toInt() to 0xffffffff.toInt()  // 퓨어 블랙
-        )
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
-        accentColors.forEach { (bg, fg) ->
-            val circle = View(this).apply {
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(bg)
-                    setStroke(dp(2), Color.argb(80, 255, 255, 255))
-                }
-                background = shape
-                setOnClickListener {
-                    applyAccentColor(bg, fg)
-                }
-            }
-
-            row.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
-                rightMargin = dp(10)
-            })
-        }
-
-        accentColorContainer.addView(row)
-    }
-
-    private fun setupSurfaceColorRow() {
-        val surfaces = listOf(
-            0xfff5f6f8.toInt() to 0xffeef0f3.toInt(), // 백자 오프화이트
-            0xffe9e1d2.toInt() to 0xfff3eddf.toInt(), // 한지 미색
-            0xffffffff.toInt() to 0xffeeeeee.toInt(), // 퓨어 화이트
-            0xff101918.toInt() to 0xff0b1211.toInt(), // 단청 묵색
-            0xff0f1e1b.toInt() to 0xff0a1614.toInt(), // 청자 비색
-            0xff000000.toInt() to 0xff080808.toInt(), // 자정 OLED
-            0xff182230.toInt() to 0xff0f1722.toInt(), // 안개 슬레이트
-            0xff2d2d2d.toInt() to 0xff373737.toInt(), // 픽셀 다크
-            0xff263238.toInt() to 0xff21272b.toInt(), // 머티리얼 다크
-            0xff2e3440.toInt() to 0xff434c5e.toInt()  // 노르딕 다크
-        )
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
-        surfaces.forEach { (surf, bar) ->
-            val rect = View(this).apply {
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(8f)
-                    setColor(surf)
-                    setStroke(dp(1), Color.argb(60, 255, 255, 255))
-                }
-                background = shape
-                setOnClickListener {
-                    applySurfaceColor(surf, bar)
-                }
-            }
-
-            row.addView(rect, LinearLayout.LayoutParams(dp(44), dp(36)).apply {
-                rightMargin = dp(10)
-            })
-        }
-
-        surfaceColorContainer.addView(row)
-    }
-
-    private fun setupRgbModeRow() {
+    private fun setupAmbientModeRow() {
         val modes = listOf(
             getString(R.string.theme_rgb_mode_off) to "off",
             getString(R.string.theme_rgb_mode_wave) to "rgb_wave",
@@ -601,17 +736,15 @@ class CustomThemeActivity : AppCompatActivity() {
             getString(R.string.theme_rgb_mode_fire) to "fire_ember",
             getString(R.string.theme_rgb_mode_supernova) to "supernova",
             getString(R.string.theme_rgb_mode_sakura) to "sakura_breeze",
-            getString(R.string.theme_rgb_mode_frost) to "frost_crystal",
-            getString(R.string.theme_rgb_mode_reactive_ripple) to "reactive_ripple",
-            getString(R.string.theme_rgb_mode_reactive_fade) to "reactive_fade",
-            getString(R.string.theme_rgb_mode_reactive_firework) to "reactive_firework",
-            getString(R.string.theme_rgb_mode_reactive_laser) to "reactive_laser"
+            getString(R.string.theme_rgb_mode_frost) to "frost_crystal"
         )
 
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(12), dp(4), dp(12), dp(4))
         }
+
+        val currentAmbient = theme.lightingEffect?.effectiveAmbientMode ?: "off"
 
         modes.forEach { (label, modeKey) ->
             val pill = TextView(this).apply {
@@ -622,7 +755,7 @@ class CustomThemeActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 setPadding(dp(14), dp(8), dp(14), dp(8))
 
-                val isCurrent = (theme.lightingEffect?.mode ?: "off") == modeKey
+                val isCurrent = currentAmbient == modeKey
                 val shape = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
                     cornerRadius = dp(20f)
@@ -632,6 +765,7 @@ class CustomThemeActivity : AppCompatActivity() {
                 background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
 
                 setOnClickListener {
+                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
                     val defaultSpeed = when (modeKey) {
                         "neon_pulse" -> 1.5f
                         "matrix_flow" -> 1.2f
@@ -640,14 +774,16 @@ class CustomThemeActivity : AppCompatActivity() {
                         else -> 1.0f
                     }
                     theme = theme.copy(
-                        lightingEffect = Theme.Custom.LightingEffectDef(
+                        lightingEffect = currentDef.copy(
                             mode = modeKey,
-                            speed = defaultSpeed,
-                            intensity = 0.85f
+                            speed = if (currentDef.speed == 1.0f) defaultSpeed else currentDef.speed
                         )
                     )
+                    ambientSpeedSeekBar.progress = (theme.lightingEffect!!.speed * 100).toInt()
+                    ambientIntensitySeekBar.progress = (theme.lightingEffect!!.intensity * 100).toInt()
+                    keyTranslucencySeekBar.progress = (theme.lightingEffect!!.keyTranslucency * 100).toInt()
                     updatePreview()
-                    setupRgbModeRow()
+                    setupAmbientModeRow()
                 }
             }
 
@@ -656,8 +792,111 @@ class CustomThemeActivity : AppCompatActivity() {
             })
         }
 
-        rgbModeContainer.removeAllViews()
-        rgbModeContainer.addView(row)
+        ambientModeContainer.removeAllViews()
+        ambientModeContainer.addView(row)
+    }
+
+    private fun setupAmbientDirectionRow() {
+        val directions = listOf(
+            getString(R.string.theme_rgb_dir_left_to_right) to "left_to_right",
+            getString(R.string.theme_rgb_dir_right_to_left) to "right_to_left",
+            getString(R.string.theme_rgb_dir_top_to_bottom) to "top_to_bottom",
+            getString(R.string.theme_rgb_dir_bottom_to_top) to "bottom_to_top",
+            getString(R.string.theme_rgb_dir_diagonal) to "diagonal",
+            getString(R.string.theme_rgb_dir_radial) to "radial"
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        val currentDir = theme.lightingEffect?.direction ?: "left_to_right"
+
+        directions.forEach { (label, dirKey) ->
+            val pill = TextView(this).apply {
+                text = label
+                textSize = 11f
+                paint.isFakeBoldText = true
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(dp(12), dp(6), dp(12), dp(6))
+
+                val isCurrent = currentDir == dirKey
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(16f)
+                    setColor(if (isCurrent) Color.parseColor("#6366F1") else Color.parseColor("#27272A"))
+                    setStroke(dp(1), if (isCurrent) Color.parseColor("#818CF8") else Color.parseColor("#3F3F46"))
+                }
+                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
+
+                setOnClickListener {
+                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
+                    theme = theme.copy(lightingEffect = currentDef.copy(direction = dirKey))
+                    updatePreview()
+                    setupAmbientDirectionRow()
+                }
+            }
+
+            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                rightMargin = dp(6)
+            })
+        }
+
+        ambientDirectionContainer.removeAllViews()
+        ambientDirectionContainer.addView(row)
+    }
+
+    private fun setupReactiveModeRow() {
+        val reactives = listOf(
+            getString(R.string.theme_reactive_mode_off) to "off",
+            getString(R.string.theme_reactive_mode_ripple) to "ripple",
+            getString(R.string.theme_reactive_mode_fade) to "fade",
+            getString(R.string.theme_reactive_mode_firework) to "firework",
+            getString(R.string.theme_reactive_mode_laser) to "laser"
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        val currentReactive = theme.lightingEffect?.effectiveReactiveMode ?: "off"
+
+        reactives.forEach { (label, modeKey) ->
+            val pill = TextView(this).apply {
+                text = label
+                textSize = 12f
+                paint.isFakeBoldText = true
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+
+                val isCurrent = currentReactive == modeKey
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(20f)
+                    setColor(if (isCurrent) Color.parseColor("#EC4899") else Color.parseColor("#27272A"))
+                    setStroke(dp(1), if (isCurrent) Color.parseColor("#F472B6") else Color.parseColor("#3F3F46"))
+                }
+                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
+
+                setOnClickListener {
+                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
+                    theme = theme.copy(lightingEffect = currentDef.copy(reactiveMode = modeKey))
+                    updatePreview()
+                    setupReactiveModeRow()
+                }
+            }
+
+            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                rightMargin = dp(8)
+            })
+        }
+
+        reactiveModeContainer.removeAllViews()
+        reactiveModeContainer.addView(row)
     }
 
     private fun setupParticleModeRow() {
@@ -693,13 +932,17 @@ class CustomThemeActivity : AppCompatActivity() {
                 background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
 
                 setOnClickListener {
+                    val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
                     theme = theme.copy(
-                        particleEffect = Theme.Custom.ParticleEffectDef(
+                        particleEffect = currentP.copy(
                             type = typeKey,
                             particleCount = if (typeKey == "cosmic_ripple") 6 else 10,
                             lifetimeMs = 500L
                         )
                     )
+                    particleCountSeekBar.progress = theme.particleEffect!!.particleCount
+                    particleLifetimeSeekBar.progress = theme.particleEffect!!.lifetimeMs.toInt()
+                    particleSpeedSeekBar.progress = (theme.particleEffect!!.speed * 100).toInt()
                     updatePreview()
                     setupParticleModeRow()
                 }
@@ -744,8 +987,10 @@ class CustomThemeActivity : AppCompatActivity() {
                     theme = if (isOff) {
                         theme.copy(keyGlowEffect = null)
                     } else {
-                        theme.copy(keyGlowEffect = Theme.Custom.KeyGlowDef(enabled = true, glowColor = colorVal, glowRadius = 4f))
+                        val curRadius = theme.keyGlowEffect?.glowRadius ?: 4f
+                        theme.copy(keyGlowEffect = Theme.Custom.KeyGlowDef(enabled = true, glowColor = colorVal, glowRadius = curRadius))
                     }
+                    glowRadiusSeekBar.progress = (theme.keyGlowEffect?.glowRadius ?: 4f).toInt()
                     updatePreview()
                     setupGlowColorRow()
                 }
@@ -861,6 +1106,192 @@ class CustomThemeActivity : AppCompatActivity() {
         perKeyColorContainer.addView(colorRow)
     }
 
+    private fun setupAccentColorRow() {
+        val accentColors = listOf(
+            0xffb83a32.toInt() to 0xffffffff.toInt(), // 한지 적갈색
+            0xffc84a3f.toInt() to 0xffffffff.toInt(), // 단청 주홍
+            0xff1e40af.toInt() to 0xffffffff.toInt(), // 백자 코발트
+            0xffc49a45.toInt() to 0xff1a1a1a.toInt(), // 청자 금색
+            0xff00e699.toInt() to 0xff000000.toInt(), // 자정 네온 제이드
+            0xff38bdf8.toInt() to 0xff0f172a.toInt(), // 안개 스카이
+            0xff2563eb.toInt() to 0xffffffff.toInt(), // 로얄 블루
+            0xff10b981.toInt() to 0xffffffff.toInt(), // 에메랄드
+            0xffec4899.toInt() to 0xffffffff.toInt(), // 핑크 로즈
+            0xff8b5cf6.toInt() to 0xffffffff.toInt(), // 바이올렛
+            0xfff59e0b.toInt() to 0xff000000.toInt(), // 앰버 옐로우
+            0xffffffff.toInt() to 0xff000000.toInt(), // 퓨어 화이트
+            0xff212121.toInt() to 0xffffffff.toInt()  // 퓨어 블랙
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        accentColors.forEach { (bg, fg) ->
+            val circle = View(this).apply {
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(bg)
+                    setStroke(dp(2), Color.argb(80, 255, 255, 255))
+                }
+                background = shape
+                setOnClickListener {
+                    applyAccentColor(bg, fg)
+                }
+            }
+
+            row.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
+                rightMargin = dp(10)
+            })
+        }
+
+        accentColorContainer.removeAllViews()
+        accentColorContainer.addView(row)
+    }
+
+    private fun setupSurfaceColorRow() {
+        val surfaces = listOf(
+            0xfff5f6f8.toInt() to 0xffeef0f3.toInt(), // 백자 오프화이트
+            0xffe9e1d2.toInt() to 0xfff3eddf.toInt(), // 한지 미색
+            0xffffffff.toInt() to 0xffeeeeee.toInt(), // 퓨어 화이트
+            0xff101918.toInt() to 0xff0b1211.toInt(), // 단청 묵색
+            0xff0f1e1b.toInt() to 0xff0a1614.toInt(), // 청자 비색
+            0xff000000.toInt() to 0xff080808.toInt(), // 자정 OLED
+            0xff182230.toInt() to 0xff0f1722.toInt(), // 안개 슬레이트
+            0xff2d2d2d.toInt() to 0xff373737.toInt(), // 픽셀 다크
+            0xff263238.toInt() to 0xff21272b.toInt(), // 머티리얼 다크
+            0xff2e3440.toInt() to 0xff434c5e.toInt()  // 노르딕 다크
+        )
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        surfaces.forEach { (surf, bar) ->
+            val rect = View(this).apply {
+                val shape = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(8f)
+                    setColor(surf)
+                    setStroke(dp(1), Color.argb(60, 255, 255, 255))
+                }
+                background = shape
+                setOnClickListener {
+                    applySurfaceColor(surf, bar)
+                }
+            }
+
+            row.addView(rect, LinearLayout.LayoutParams(dp(44), dp(36)).apply {
+                rightMargin = dp(10)
+            })
+        }
+
+        surfaceColorContainer.removeAllViews()
+        surfaceColorContainer.addView(row)
+    }
+
+    private fun setupSeekBars() {
+        // Ambient Speed
+        ambientSpeedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val speed = (progress.coerceAtLeast(20) / 100f)
+                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
+                    theme = theme.copy(lightingEffect = currentDef.copy(speed = speed))
+                    updatePreview()
+                }
+            }
+        })
+
+        // Ambient Intensity
+        ambientIntensitySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val intensity = (progress.coerceAtLeast(10) / 100f)
+                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
+                    theme = theme.copy(lightingEffect = currentDef.copy(intensity = intensity))
+                    updatePreview()
+                }
+            }
+        })
+
+        // Key Translucency
+        keyTranslucencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val trans = (progress / 100f)
+                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
+                    theme = theme.copy(lightingEffect = currentDef.copy(keyTranslucency = trans))
+                    updatePreview()
+                }
+            }
+        })
+
+        // Particle Count
+        particleCountSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val count = progress.coerceAtLeast(3)
+                    val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
+                    theme = theme.copy(particleEffect = currentP.copy(particleCount = count))
+                    updatePreview()
+                }
+            }
+        })
+
+        // Particle Lifetime
+        particleLifetimeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val lifetime = progress.coerceAtLeast(200).toLong()
+                    val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
+                    theme = theme.copy(particleEffect = currentP.copy(lifetimeMs = lifetime))
+                    updatePreview()
+                }
+            }
+        })
+
+        // Particle Speed
+        particleSpeedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val speed = (progress.coerceAtLeast(30) / 100f)
+                    val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
+                    theme = theme.copy(particleEffect = currentP.copy(speed = speed))
+                    updatePreview()
+                }
+            }
+        })
+
+        // Glow Radius
+        glowRadiusSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val radius = progress.coerceAtLeast(2).toFloat()
+                    val currentG = theme.keyGlowEffect ?: Theme.Custom.KeyGlowDef(enabled = true)
+                    theme = theme.copy(keyGlowEffect = currentG.copy(glowRadius = radius))
+                    updatePreview()
+                }
+            }
+        })
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // recover from bundle
@@ -910,12 +1341,15 @@ class CustomThemeActivity : AppCompatActivity() {
 
         // Setup preset rows
         setupPresetPaletteRow()
-        setupRgbModeRow()
+        setupAmbientModeRow()
+        setupAmbientDirectionRow()
+        setupReactiveModeRow()
         setupParticleModeRow()
         setupGlowColorRow()
         setupPerKeyRow()
         setupAccentColorRow()
         setupSurfaceColorRow()
+        setupSeekBars()
 
         backgroundStates.launcher = registerForActivityResult(CropContract()) {
             when (it) {
@@ -984,6 +1418,21 @@ class CustomThemeActivity : AppCompatActivity() {
             brightnessSeekBar.progress = background.brightness
             variantSwitch.isChecked = !theme.isDark
             updateBackgroundState()
+        }
+
+        // Initialize SeekBars with theme properties
+        theme.lightingEffect?.let { l ->
+            ambientSpeedSeekBar.progress = (l.speed * 100).toInt()
+            ambientIntensitySeekBar.progress = (l.intensity * 100).toInt()
+            keyTranslucencySeekBar.progress = (l.keyTranslucency * 100).toInt()
+        }
+        theme.particleEffect?.let { p ->
+            particleCountSeekBar.progress = p.particleCount
+            particleLifetimeSeekBar.progress = p.lifetimeMs.toInt()
+            particleSpeedSeekBar.progress = (p.speed * 100).toInt()
+        }
+        theme.keyGlowEffect?.let { g ->
+            glowRadiusSeekBar.progress = g.glowRadius.toInt()
         }
 
         updateControlsVisibility()

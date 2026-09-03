@@ -131,8 +131,22 @@ sealed class Theme : Parcelable {
             val speed: Float = 1.0f,
             val intensity: Float = 0.8f,
             val direction: String = "left_to_right",
-            val customColors: List<Int>? = null
-        ) : Parcelable
+            val customColors: List<Int>? = null,
+            val reactiveMode: String = "off",
+            val keyTranslucency: Float = 0.0f
+        ) : Parcelable {
+            val effectiveAmbientMode: String
+                get() = when {
+                    mode.startsWith("reactive_") -> "off"
+                    else -> mode
+                }
+
+            val effectiveReactiveMode: String
+                get() = when {
+                    mode.startsWith("reactive_") -> mode.removePrefix("reactive_")
+                    else -> reactiveMode
+                }
+        }
 
         @Parcelize
         @Serializable

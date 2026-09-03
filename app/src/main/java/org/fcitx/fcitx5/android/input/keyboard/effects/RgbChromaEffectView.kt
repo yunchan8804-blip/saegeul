@@ -31,7 +31,7 @@ import kotlin.random.Random
 
 /**
  * High-performance, Hardware-accelerated RGB Chroma Backlight & Reactive Mechanical Keyboard Animation Engine.
- * Supports 16+ signature ambient and reactive lighting modes synchronized via Choreographer.
+ * Supports signature ambient lighting and responsive reactive key animations with fluid easing.
  */
 class RgbChromaEffectView(
     context: Context,
@@ -45,7 +45,6 @@ class RgbChromaEffectView(
         style = Paint.Style.STROKE
     }
     private val shaderMatrix = Matrix()
-    private val tempRect = RectF()
     private val starPath = Path()
 
     private var phase = 0f
@@ -130,32 +129,50 @@ class RgbChromaEffectView(
     )
 
     // Starlight fixed star points
-    private class StarPoint(val xRatio: Float, val yRatio: Float, val size: Float, val phaseOffset: Float, val color: Int)
-    private val starPoints = List(36) { index ->
+    private class StarPoint(
+        val xRatio: Float,
+        val yRatio: Float,
+        val size: Float,
+        val phaseOffset: Float,
+        val color: Int,
+        val isCross: Boolean
+    )
+
+    private val starPoints = List(42) { index ->
         val rand = Random(index * 1337 + 42)
         StarPoint(
             xRatio = rand.nextFloat(),
             yRatio = rand.nextFloat(),
-            size = rand.nextFloat() * 3.5f + 1.5f,
+            size = rand.nextFloat() * 3.5f + 1.8f,
             phaseOffset = rand.nextFloat() * (PI * 2).toFloat(),
-            color = when (index % 4) {
+            color = when (index % 5) {
                 0 -> Color.parseColor("#FFFFFF")
                 1 -> Color.parseColor("#67E8F9")
                 2 -> Color.parseColor("#FDE047")
-                else -> Color.parseColor("#F472B6")
-            }
+                3 -> Color.parseColor("#F472B6")
+                else -> Color.parseColor("#A78BFA")
+            },
+            isCross = index % 3 == 0
         )
     }
 
     // Matrix Rain column state
-    private class MatrixColumn(var xRatio: Float, var yProgress: Float, var speed: Float, var length: Float)
-    private val matrixColumns = List(28) { index ->
+    private class MatrixColumn(
+        var xRatio: Float,
+        var yProgress: Float,
+        var speed: Float,
+        var length: Float,
+        var glitchOffset: Float
+    )
+
+    private val matrixColumns = List(32) { index ->
         val rand = Random(index * 997 + 17)
         MatrixColumn(
-            xRatio = (index + 0.5f) / 28f,
+            xRatio = (index + 0.5f) / 32f,
             yProgress = rand.nextFloat(),
-            speed = rand.nextFloat() * 0.4f + 0.3f,
-            length = rand.nextFloat() * 0.4f + 0.25f
+            speed = rand.nextFloat() * 0.45f + 0.35f,
+            length = rand.nextFloat() * 0.4f + 0.25f,
+            glitchOffset = rand.nextFloat() * 10f
         )
     }
 
@@ -180,8 +197,13 @@ class RgbChromaEffectView(
 
     fun updateEffect(newDef: Theme.Custom.LightingEffectDef?) {
         effectDef = newDef
-        val mode = newDef?.mode ?: "off"
-        if (mode == "off" || newDef == null) {
+        val ambientMode = newDef?.effectiveAmbientMode ?: "off"
+        val reactiveMode = newDef?.effectiveReactiveMode ?: "off"
+
+        val hasAmbient = ambientMode != "off"
+        val hasReactive = reactiveMode != "off"
+
+        if (!hasAmbient && !hasReactive && reactiveEvents.isEmpty()) {
             stopLoop()
             visibility = GONE
             invalidate()
@@ -198,28 +220,21 @@ class RgbChromaEffectView(
      */
     fun spawnReactiveKeyEffect(x: Float, y: Float) {
         val def = effectDef ?: return
-        val mode = def.mode
-        if (mode == "off") return
+        val reactiveMode = def.effectiveReactiveMode
+        if (reactiveMode == "off") return
 
         val now = SystemClock.uptimeMillis()
-        val palette = getActivePalette(mode, def)
+        val ambientMode = def.effectiveAmbientMode
+        val palette = getActivePalette(if (ambientMode != "off") ambientMode else "rainbow", def)
         val colorIndex = ((phase * palette.size).toInt()) % palette.size
         val dynamicColor = palette[colorIndex]
 
-        val effectType = when (mode) {
-            "reactive_ripple" -> "ripple"
-            "reactive_fade" -> "fade"
-            "reactive_firework" -> "firework"
-            "reactive_laser" -> "laser"
-            else -> "ripple" // General subtle ripple for ambient modes
-        }
-
-        val duration = when (effectType) {
-            "ripple" -> 600L
+        val duration = when (reactiveMode) {
+            "ripple" -> 650L
             "fade" -> 500L
-            "firework" -> 450L
-            "laser" -> 400L
-            else -> 500L
+            "firework" -> 500L
+            "laser" -> 450L
+            else -> 550L
         }
 
         reactiveEvents.add(
@@ -228,11 +243,12 @@ class RgbChromaEffectView(
                 y = y,
                 startTimeMs = now,
                 durationMs = duration,
-                type = effectType,
+                type = reactiveMode,
                 color = dynamicColor
             )
         )
 
+        if (visibility != VISIBLE) visibility = VISIBLE
         startLoop()
         invalidate()
     }
@@ -254,7 +270,8 @@ class RgbChromaEffectView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (effectDef != null && effectDef?.mode != "off") {
+        val def = effectDef
+        if (def != null && (def.effectiveAmbientMode != "off" || def.effectiveReactiveMode != "off")) {
             startLoop()
         }
     }
@@ -266,7 +283,8 @@ class RgbChromaEffectView(
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
-        if (visibility == VISIBLE && effectDef != null && effectDef?.mode != "off") {
+        val def = effectDef
+        if (visibility == VISIBLE && def != null && (def.effectiveAmbientMode != "off" || def.effectiveReactiveMode != "off")) {
             startLoop()
         } else {
             stopLoop()
@@ -276,7 +294,10 @@ class RgbChromaEffectView(
     override fun doFrame(frameTimeNanos: Long) {
         isFrameCallbackPosted = false
         val def = effectDef
-        if (def == null || def.mode == "off" || visibility != VISIBLE || !isAttachedToWindow) {
+        val ambientMode = def?.effectiveAmbientMode ?: "off"
+        val reactiveMode = def?.effectiveReactiveMode ?: "off"
+
+        if (def == null || (ambientMode == "off" && reactiveMode == "off" && reactiveEvents.isEmpty()) || visibility != VISIBLE || !isAttachedToWindow) {
             return
         }
 
@@ -288,14 +309,14 @@ class RgbChromaEffectView(
         }
         lastFrameTimeMs = now
 
-        val speed = def.speed.coerceIn(0.2f, 4.0f)
-        val phaseDelta = (dt * speed * 0.4f)
+        val speed = (def.speed).coerceIn(0.2f, 3.5f)
+        val phaseDelta = (dt * speed * 0.35f)
         phase = (phase + phaseDelta) % 1.0f
 
         // Advance Matrix rain columns
-        if (def.mode == "matrix_flow") {
+        if (ambientMode == "matrix_flow") {
             for (col in matrixColumns) {
-                col.yProgress = (col.yProgress + dt * col.speed * speed * 0.6f) % 1.2f
+                col.yProgress = (col.yProgress + dt * col.speed * speed * 0.6f) % 1.25f
             }
         }
 
@@ -312,8 +333,8 @@ class RgbChromaEffectView(
 
         invalidate()
 
-        // Continue animation loop
-        if (isAttachedToWindow && visibility == VISIBLE) {
+        // Continue animation loop if active
+        if (isAttachedToWindow && visibility == VISIBLE && (ambientMode != "off" || reactiveEvents.isNotEmpty())) {
             isFrameCallbackPosted = true
             Choreographer.getInstance().postFrameCallback(this)
         }
@@ -336,36 +357,32 @@ class RgbChromaEffectView(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val def = effectDef ?: return
-        val mode = def.mode
-        if (mode == "off") return
-
         val w = width.toFloat()
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
 
+        val ambientMode = def.effectiveAmbientMode
         val intensity = (def.intensity.coerceIn(0.1f, 1.0f) * 255).toInt()
-        val palette = getActivePalette(mode, def)
-        val isRightToLeft = def.direction == "right_to_left"
+        val palette = getActivePalette(ambientMode, def)
+        val direction = def.direction
 
-        // 1. Render Ambient Base Lighting Layer
-        when (mode) {
-            "rgb_wave" -> renderRainbowWave(canvas, w, h, palette, intensity, isRightToLeft)
-            "rgb_breathe" -> renderBreathing(canvas, w, h, palette, intensity)
-            "cyberpunk" -> renderCyberpunk(canvas, w, h, palette, intensity, isRightToLeft)
-            "matrix_flow" -> renderMatrixFlow(canvas, w, h, intensity)
-            "neon_pulse" -> renderNeonPulse(canvas, w, h, palette, intensity, isRightToLeft)
-            "aurora" -> renderAurora(canvas, w, h, palette, intensity)
-            "starlight" -> renderStarlight(canvas, w, h, intensity)
-            "ocean_tide" -> renderOceanTide(canvas, w, h, palette, intensity)
-            "fire_ember" -> renderFireEmber(canvas, w, h, palette, intensity)
-            "supernova" -> renderSupernova(canvas, w, h, palette, intensity)
-            "sakura_breeze" -> renderSakuraBreeze(canvas, w, h, palette, intensity)
-            "frost_crystal" -> renderFrostCrystal(canvas, w, h, palette, intensity)
-            "reactive_ripple", "reactive_fade", "reactive_firework", "reactive_laser" -> {
-                // Subtle glowing ambient base for reactive modes
-                renderSubtleReactiveBase(canvas, w, h, palette, (intensity * 0.35f).toInt())
+        // 1. Render Ambient Base Lighting Layer (if active)
+        if (ambientMode != "off") {
+            when (ambientMode) {
+                "rgb_wave" -> renderRainbowWave(canvas, w, h, palette, intensity, direction)
+                "rgb_breathe" -> renderBreathing(canvas, w, h, palette, intensity)
+                "cyberpunk" -> renderCyberpunk(canvas, w, h, palette, intensity, direction)
+                "matrix_flow" -> renderMatrixFlow(canvas, w, h, intensity)
+                "neon_pulse" -> renderNeonPulse(canvas, w, h, palette, intensity, direction)
+                "aurora" -> renderAurora(canvas, w, h, palette, intensity)
+                "starlight" -> renderStarlight(canvas, w, h, intensity)
+                "ocean_tide" -> renderOceanTide(canvas, w, h, palette, intensity)
+                "fire_ember" -> renderFireEmber(canvas, w, h, palette, intensity)
+                "supernova" -> renderSupernova(canvas, w, h, palette, intensity)
+                "sakura_breeze" -> renderSakuraBreeze(canvas, w, h, palette, intensity, direction)
+                "frost_crystal" -> renderFrostCrystal(canvas, w, h, palette, intensity)
+                else -> renderRainbowWave(canvas, w, h, palette, intensity, direction)
             }
-            else -> renderRainbowWave(canvas, w, h, palette, intensity, isRightToLeft)
         }
 
         // 2. Render Reactive Mechanical Keypress Pulses
@@ -373,19 +390,42 @@ class RgbChromaEffectView(
     }
 
     /**
-     * 🌈 Rainbow Wave: 360-degree seamless linear spectrum flow.
+     * 🌈 Rainbow Wave: 360-degree seamless spectrum flow with multi-direction & ambient bloom support.
      */
-    private fun renderRainbowWave(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int, rtl: Boolean) {
-        val shift = if (rtl) (1f - phase) * w else phase * w
-        val x0 = shift - w
-        val x1 = shift + w
+    private fun renderRainbowWave(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int, direction: String) {
+        val shader = when (direction) {
+            "right_to_left" -> {
+                val shift = (1f - phase) * w
+                LinearGradient(shift - w, 0f, shift + w, 0f, palette, null, Shader.TileMode.REPEAT)
+            }
+            "top_to_bottom" -> {
+                val shift = phase * h
+                LinearGradient(0f, shift - h, 0f, shift + h, palette, null, Shader.TileMode.REPEAT)
+            }
+            "bottom_to_top" -> {
+                val shift = (1f - phase) * h
+                LinearGradient(0f, shift - h, 0f, shift + h, palette, null, Shader.TileMode.REPEAT)
+            }
+            "diagonal" -> {
+                val len = w + h
+                val shift = phase * len
+                LinearGradient(shift - len, 0f, shift + len, h, palette, null, Shader.TileMode.REPEAT)
+            }
+            "radial" -> {
+                val cx = w / 2f
+                val cy = h / 2f
+                val sweep = SweepGradient(cx, cy, palette, null)
+                shaderMatrix.reset()
+                shaderMatrix.postRotate(phase * 360f, cx, cy)
+                sweep.setLocalMatrix(shaderMatrix)
+                sweep
+            }
+            else -> { // "left_to_right"
+                val shift = phase * w
+                LinearGradient(shift - w, 0f, shift + w, 0f, palette, null, Shader.TileMode.REPEAT)
+            }
+        }
 
-        val shader = LinearGradient(
-            x0, 0f, x1, 0f,
-            palette,
-            null,
-            Shader.TileMode.REPEAT
-        )
         fillPaint.shader = shader
         fillPaint.alpha = intensity
         canvas.drawRect(0f, 0f, w, h, fillPaint)
@@ -395,9 +435,9 @@ class RgbChromaEffectView(
      * 💓 Breathing: Luxury S-curve breath flow with 100% smooth color interpolation and dual radial ambiance.
      */
     private fun renderBreathing(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int) {
-        // Smooth Cosine S-Curve breath envelope: [0.15 .. 1.0]
+        // Smooth Cosine S-Curve breath envelope: [0.18 .. 1.0]
         val breathEnvelope = ((1.0 - cos(phase * PI * 2.0)) / 2.0).toFloat()
-        val currentAlpha = (breathEnvelope * intensity).toInt().coerceIn(30, 255)
+        val currentAlpha = ((0.18f + breathEnvelope * 0.82f) * intensity).toInt().coerceIn(10, 255)
 
         // Seamless interpolated color transition between palette points
         val floatIndex = phase * (palette.size - 1)
@@ -409,16 +449,16 @@ class RgbChromaEffectView(
         // Center primary radiant glow
         val cx = w / 2f
         val cy = h / 2f
-        val radius = max(w, h) * 0.75f
+        val radius = max(w, h) * 0.8f
 
         val shader = RadialGradient(
             cx, cy, radius,
             intArrayOf(
                 ColorUtils.setAlphaComponent(blendedColor, currentAlpha),
-                ColorUtils.setAlphaComponent(blendedColor, (currentAlpha * 0.5f).toInt()),
+                ColorUtils.setAlphaComponent(blendedColor, (currentAlpha * 0.6f).toInt()),
                 ColorUtils.setAlphaComponent(blendedColor, 0)
             ),
-            floatArrayOf(0f, 0.55f, 1f),
+            floatArrayOf(0f, 0.5f, 1f),
             Shader.TileMode.CLAMP
         )
 
@@ -428,12 +468,13 @@ class RgbChromaEffectView(
     }
 
     /**
-     * ⚡ Cyberpunk Neon: Diagonal dual-wave neon pulse.
+     * ⚡ Cyberpunk Neon: Diagonal dual-wave neon pulse with vibrant color clash.
      */
-    private fun renderCyberpunk(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int, rtl: Boolean) {
-        val shift = if (rtl) (1f - phase) * (w + h) else phase * (w + h)
+    private fun renderCyberpunk(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int, direction: String) {
+        val len = w + h
+        val shift = if (direction == "right_to_left") (1f - phase) * len else phase * len
         val shader = LinearGradient(
-            shift - (w + h), 0f, shift + (w + h), h,
+            shift - len, 0f, shift + len, h,
             palette,
             null,
             Shader.TileMode.REPEAT
@@ -449,10 +490,12 @@ class RgbChromaEffectView(
     private fun renderMatrixFlow(canvas: Canvas, w: Float, h: Float, intensity: Int) {
         fillPaint.shader = null
         fillPaint.color = Color.parseColor("#021208")
-        fillPaint.alpha = (intensity * 0.5f).toInt()
+        fillPaint.alpha = (intensity * 0.55f).toInt()
         canvas.drawRect(0f, 0f, w, h, fillPaint)
 
         strokePaint.strokeCap = Paint.Cap.ROUND
+        val density = resources.displayMetrics.density
+
         for (col in matrixColumns) {
             val cx = col.xRatio * w
             val headY = col.yProgress * h
@@ -460,30 +503,36 @@ class RgbChromaEffectView(
 
             val grad = LinearGradient(
                 cx, tailY, cx, headY,
-                intArrayOf(Color.TRANSPARENT, Color.parseColor("#00FF66"), Color.parseColor("#FFFFFF")),
-                floatArrayOf(0f, 0.85f, 1f),
+                intArrayOf(Color.TRANSPARENT, Color.parseColor("#00CC55"), Color.parseColor("#00FF88"), Color.WHITE),
+                floatArrayOf(0f, 0.6f, 0.9f, 1f),
                 Shader.TileMode.CLAMP
             )
             strokePaint.shader = grad
-            strokePaint.strokeWidth = 3f * resources.displayMetrics.density
+            strokePaint.strokeWidth = 3.2f * density
             strokePaint.alpha = intensity
             canvas.drawLine(cx, tailY, cx, headY, strokePaint)
+
+            // White glow drop head
+            fillPaint.shader = null
+            fillPaint.color = Color.WHITE
+            fillPaint.alpha = intensity
+            canvas.drawCircle(cx, headY, 2.2f * density, fillPaint)
         }
     }
 
     /**
      * 💫 Neon Pulse: High-luminance horizontal scanning laser line.
      */
-    private fun renderNeonPulse(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int, rtl: Boolean) {
-        val pulseX = if (rtl) (1f - phase) * w else phase * w
-        val beamWidth = w * 0.35f
+    private fun renderNeonPulse(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int, direction: String) {
+        val pulseX = if (direction == "right_to_left") (1f - phase) * w else phase * w
+        val beamWidth = w * 0.38f
         val color1 = palette[0]
         val color2 = palette[min(1, palette.size - 1)]
 
         val shader = LinearGradient(
             pulseX - beamWidth, 0f, pulseX + beamWidth, 0f,
             intArrayOf(Color.TRANSPARENT, color1, color2, Color.WHITE, color2, color1, Color.TRANSPARENT),
-            floatArrayOf(0f, 0.25f, 0.45f, 0.5f, 0.55f, 0.75f, 1f),
+            floatArrayOf(0f, 0.22f, 0.44f, 0.5f, 0.56f, 0.78f, 1f),
             Shader.TileMode.CLAMP
         )
         fillPaint.shader = shader
@@ -495,12 +544,12 @@ class RgbChromaEffectView(
      * 🌌 Aurora Borealis: Organic flowing wave of emerald and royal violet curtains.
      */
     private fun renderAurora(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int) {
-        val waveOffset1 = sin(phase * PI * 2.0).toFloat() * w * 0.25f
-        val waveOffset2 = cos(phase * PI * 2.0).toFloat() * h * 0.3f
+        val waveOffset1 = sin(phase * PI * 2.0).toFloat() * w * 0.28f
+        val waveOffset2 = cos(phase * PI * 2.0).toFloat() * h * 0.35f
 
         val shader = LinearGradient(
-            w * 0.2f + waveOffset1, 0f,
-            w * 0.8f - waveOffset1, h + waveOffset2,
+            w * 0.15f + waveOffset1, 0f,
+            w * 0.85f - waveOffset1, h + waveOffset2,
             palette,
             null,
             Shader.TileMode.MIRROR
@@ -515,11 +564,11 @@ class RgbChromaEffectView(
      */
     private fun renderStarlight(canvas: Canvas, w: Float, h: Float, intensity: Int) {
         fillPaint.shader = null
-        fillPaint.color = Color.parseColor("#050814")
-        fillPaint.alpha = (intensity * 0.6f).toInt()
+        fillPaint.color = Color.parseColor("#040716")
+        fillPaint.alpha = (intensity * 0.65f).toInt()
         canvas.drawRect(0f, 0f, w, h, fillPaint)
 
-        fillPaint.shader = null
+        val density = resources.displayMetrics.density
         for (star in starPoints) {
             val starX = star.xRatio * w
             val starY = star.yRatio * h
@@ -529,8 +578,13 @@ class RgbChromaEffectView(
 
             fillPaint.color = star.color
             fillPaint.alpha = starAlpha
-            val curRadius = star.size * (0.6f + twinkle * 0.6f) * resources.displayMetrics.density
-            drawStar(canvas, starX, starY, curRadius, phase * 360f + star.phaseOffset)
+            val curRadius = star.size * (0.6f + twinkle * 0.65f) * density
+
+            if (star.isCross) {
+                drawCrossStar(canvas, starX, starY, curRadius, phase * 180f + star.phaseOffset)
+            } else {
+                drawStar(canvas, starX, starY, curRadius, phase * 360f + star.phaseOffset)
+            }
         }
     }
 
@@ -538,7 +592,7 @@ class RgbChromaEffectView(
      * 🌊 Ocean Tide: Deep abyss wave surging with emerald tide and white surf.
      */
     private fun renderOceanTide(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int) {
-        val tideProgress = sin(phase * PI * 2.0).toFloat() * 0.3f + 0.5f
+        val tideProgress = sin(phase * PI * 2.0).toFloat() * 0.35f + 0.5f
         val shader = LinearGradient(
             0f, h * (1f - tideProgress),
             w, h * tideProgress,
@@ -587,8 +641,8 @@ class RgbChromaEffectView(
     /**
      * 🌸 Pastel Sakura: Calming soft spring breeze gradient.
      */
-    private fun renderSakuraBreeze(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int) {
-        val shift = phase * w
+    private fun renderSakuraBreeze(canvas: Canvas, w: Float, h: Float, palette: IntArray, intensity: Int, direction: String) {
+        val shift = if (direction == "right_to_left") (1f - phase) * w else phase * w
         val shader = LinearGradient(
             shift - w, 0f, shift + w, h,
             palette,
@@ -617,21 +671,6 @@ class RgbChromaEffectView(
     }
 
     /**
-     * Subtle Ambient Glow for Reactive Modes.
-     */
-    private fun renderSubtleReactiveBase(canvas: Canvas, w: Float, h: Float, palette: IntArray, alpha: Int) {
-        val shader = LinearGradient(
-            0f, 0f, w, h,
-            palette,
-            null,
-            Shader.TileMode.MIRROR
-        )
-        fillPaint.shader = shader
-        fillPaint.alpha = alpha
-        canvas.drawRect(0f, 0f, w, h, fillPaint)
-    }
-
-    /**
      * 🎯 Render Reactive Per-Key Mechanical Keyboard Pulses (Ripple, Fade, Firework, Laser).
      */
     private fun renderReactiveEvents(canvas: Canvas, w: Float, h: Float, palette: IntArray) {
@@ -642,15 +681,16 @@ class RgbChromaEffectView(
         for (ev in reactiveEvents) {
             val elapsed = now - ev.startTimeMs
             if (elapsed >= ev.durationMs || elapsed < 0L) continue
-            val progress = (elapsed.toFloat() / ev.durationMs.toFloat()).coerceIn(0f, 1f)
-            val alpha = ((1.0f - progress) * 255).toInt().coerceIn(0, 255)
+            val rawProgress = (elapsed.toFloat() / ev.durationMs.toFloat()).coerceIn(0f, 1f)
+            val alpha = ((1.0f - rawProgress) * 255).toInt().coerceIn(0, 255)
 
             when (ev.type) {
                 "ripple" -> {
-                    // Circular expanding ripple wave
+                    // Ease-out expansion curve: 1 - (1 - p)^3
+                    val pEase = 1.0f - (1.0f - rawProgress) * (1.0f - rawProgress) * (1.0f - rawProgress)
                     val maxRadius = max(w, h) * 0.85f
-                    val curRadius = progress * maxRadius
-                    val strokeWidth = (6f + (1f - progress) * 14f) * density
+                    val curRadius = pEase * maxRadius
+                    val strokeWidth = (4f + (1f - rawProgress) * 10f) * density
 
                     strokePaint.shader = null
                     strokePaint.color = ev.color
@@ -659,18 +699,18 @@ class RgbChromaEffectView(
                     canvas.drawCircle(ev.x, ev.y, curRadius, strokePaint)
 
                     // Secondary inner radiant flash
-                    if (progress < 0.4f) {
-                        val innerProgress = progress / 0.4f
-                        val innerAlpha = ((1.0f - innerProgress) * 180).toInt()
+                    if (rawProgress < 0.35f) {
+                        val innerProgress = rawProgress / 0.35f
+                        val innerAlpha = ((1.0f - innerProgress) * 200).toInt()
                         fillPaint.shader = null
                         fillPaint.color = Color.WHITE
                         fillPaint.alpha = innerAlpha
-                        canvas.drawCircle(ev.x, ev.y, 25f * density * (1f + innerProgress), fillPaint)
+                        canvas.drawCircle(ev.x, ev.y, 22f * density * (1f + innerProgress), fillPaint)
                     }
                 }
                 "fade" -> {
-                    // Key glow spot that gently fades out
-                    val spotRadius = (32f + progress * 24f) * density
+                    // Soft Gaussian-like Key glow spot that gently fades out
+                    val spotRadius = (36f + rawProgress * 30f) * density
                     val shader = RadialGradient(
                         ev.x, ev.y, spotRadius,
                         intArrayOf(ColorUtils.setAlphaComponent(ev.color, alpha), Color.TRANSPARENT),
@@ -682,30 +722,31 @@ class RgbChromaEffectView(
                     canvas.drawCircle(ev.x, ev.y, spotRadius, fillPaint)
                 }
                 "firework" -> {
-                    // Starburst sparks in 8 radial rays
-                    val sparkDist = progress * 70f * density
-                    val rayCount = 8
+                    // Starburst sparks in 10 radial rays with air drag friction
+                    val pEase = 1.0f - (1.0f - rawProgress) * (1.0f - rawProgress)
+                    val sparkDist = pEase * 80f * density
+                    val rayCount = 10
                     strokePaint.shader = null
                     strokePaint.color = ev.color
                     strokePaint.alpha = alpha
-                    strokePaint.strokeWidth = 2.5f * density
+                    strokePaint.strokeWidth = 2.8f * density
 
                     for (i in 0 until rayCount) {
                         val angle = (i * PI * 2.0 / rayCount).toFloat()
-                        val rx1 = ev.x + cos(angle) * (sparkDist * 0.2f)
-                        val ry1 = ev.y + sin(angle) * (sparkDist * 0.2f)
+                        val rx1 = ev.x + cos(angle) * (sparkDist * 0.25f)
+                        val ry1 = ev.y + sin(angle) * (sparkDist * 0.25f)
                         val rx2 = ev.x + cos(angle) * sparkDist
                         val ry2 = ev.y + sin(angle) * sparkDist
                         canvas.drawLine(rx1, ry1, rx2, ry2, strokePaint)
                     }
                 }
                 "laser" -> {
-                    // Horizontal & vertical cross laser line
-                    val laserAlpha = ((1.0f - progress) * 230).toInt()
+                    // High-luminance horizontal & vertical cross laser line
+                    val laserAlpha = ((1.0f - rawProgress) * 240).toInt()
                     strokePaint.shader = null
                     strokePaint.color = ev.color
                     strokePaint.alpha = laserAlpha
-                    strokePaint.strokeWidth = 3f * density
+                    strokePaint.strokeWidth = 3.2f * density
 
                     // Horizontal laser beam
                     canvas.drawLine(0f, ev.y, w, ev.y, strokePaint)
@@ -716,7 +757,7 @@ class RgbChromaEffectView(
                     fillPaint.shader = null
                     fillPaint.color = Color.WHITE
                     fillPaint.alpha = laserAlpha
-                    canvas.drawCircle(ev.x, ev.y, 8f * density, fillPaint)
+                    canvas.drawCircle(ev.x, ev.y, 9f * density, fillPaint)
                 }
             }
         }
@@ -726,6 +767,24 @@ class RgbChromaEffectView(
         starPath.reset()
         val innerRadius = radius * 0.42f
         val points = 5
+        val step = PI / points
+        val rotRad = Math.toRadians(rotation.toDouble())
+
+        for (i in 0 until (points * 2)) {
+            val r = if (i % 2 == 0) radius else innerRadius
+            val a = i * step - PI / 2.0 + rotRad
+            val x = (cx + cos(a) * r).toFloat()
+            val y = (cy + sin(a) * r).toFloat()
+            if (i == 0) starPath.moveTo(x, y) else starPath.lineTo(x, y)
+        }
+        starPath.close()
+        canvas.drawPath(starPath, fillPaint)
+    }
+
+    private fun drawCrossStar(canvas: Canvas, cx: Float, cy: Float, radius: Float, rotation: Float) {
+        starPath.reset()
+        val innerRadius = radius * 0.2f
+        val points = 4
         val step = PI / points
         val rotRad = Math.toRadians(rotation.toDouble())
 
