@@ -258,6 +258,14 @@
     <string name="none">없음</string>
     <string name="theme_migrated">테마가 현재 버전으로 이전되었습니다</string>
     <string name="keep_keyboard_letters_uppercase">키보드 글자를 대문자로 유지</string>
+    <string name="buffered_hangul_title">한글 버퍼 호환 모드</string>
+    <string name="buffered_hangul_off">일반 실시간 조합 (끄기)</string>
+    <string name="buffered_hangul_off_desc">일반적인 앱에서 글자 단위로 실시간 조합합니다 (표준 권장)</string>
+    <string name="buffered_hangul_paste_desc">버퍼에 모은 후 클립보드 붙여넣기로 전달합니다 (오피스/에디터)</string>
+    <string name="buffered_hangul_ctrl_v_desc">버퍼에 모은 후 Ctrl+V 단축키로 전달합니다 (원격 데스크톱/VNC)</string>
+    <string name="buffered_hangul_direct_desc">조합창 없이 음절 단위로 직접 커밋합니다 (터미널/게임)</string>
+    <string name="buffered_hangul_toast_off">한글 버퍼 호환 모드: 끄기 (일반 조합)</string>
+    <string name="buffered_hangul_toast_on">한글 버퍼 호환 모드: %s</string>
     <string name="choose_input_method">입력기 선택</string>
     <string name="edit_clipboard">클립보드 편집</string>
     <string name="clipboard_edit_text_hint">클립보드 내용</string>

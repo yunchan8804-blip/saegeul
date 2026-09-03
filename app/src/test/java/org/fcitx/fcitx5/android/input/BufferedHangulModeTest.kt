@@ -68,4 +68,12 @@ class BufferedHangulModeTest {
             BufferedHangulMode.mustAvoidClipboard(CapabilityFlags(CapabilityFlag.Multiline))
         )
     }
+
+    @Test
+    fun verifyBufferedInputTransportEnumIntegrity() {
+        assertEquals(3, BufferedInputTransport.entries.size)
+        assertEquals(BufferedInputTransport.SystemPaste, BufferedInputTransport.valueOf("SystemPaste"))
+        assertEquals(BufferedInputTransport.CtrlV, BufferedInputTransport.valueOf("CtrlV"))
+        assertEquals(BufferedInputTransport.DirectCommit, BufferedInputTransport.valueOf("DirectCommit"))
+    }
 }

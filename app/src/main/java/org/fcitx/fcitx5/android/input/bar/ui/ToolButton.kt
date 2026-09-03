@@ -56,6 +56,10 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         image.imageResource = icon
     }
 
+    fun setIconTint(@ColorInt color: Int) {
+        image.imageTintList = ColorStateList.valueOf(color)
+    }
+
     fun setPressHighlightColor(@ColorInt color: Int) {
         background = if (disableAnimation) {
             circlePressHighlightDrawable(color)

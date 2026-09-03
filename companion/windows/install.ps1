@@ -19,7 +19,11 @@ if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 }
 
-$repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path -ErrorAction SilentlyContinue
+$repoRoot = $null
+try {
+    $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..") -ErrorAction Stop).Path
+} catch {}
+
 $sourceScript = $null
 if ($repoRoot -and (Test-Path (Join-Path $repoRoot "scripts\ai-provider-companion.py"))) {
     $sourceScript = Join-Path $repoRoot "scripts\ai-provider-companion.py"
@@ -38,15 +42,17 @@ if ($sourceScript -ne $targetCompanion) {
     Copy-Item -Path $sourceScript -Destination $targetCompanion -Force
 }
 
-$pythonExe = (Get-Command python.exe -ErrorAction SilentlyContinue)?.Source
-$pythonwExe = (Get-Command pythonw.exe -ErrorAction SilentlyContinue)?.Source
+$pythonCmd = Get-Command python.exe -ErrorAction SilentlyContinue
+$pythonwCmd = Get-Command pythonw.exe -ErrorAction SilentlyContinue
+$pythonExe = if ($pythonCmd) { $pythonCmd.Source } else { $null }
+$pythonwExe = if ($pythonwCmd) { $pythonwCmd.Source } else { $null }
 $executable = $pythonwExe
 if (-not $executable) {
     $executable = $pythonExe
 }
 
 # Optional WPF Tray build if .NET SDK is available
-$trayProject = Join-Path $repoRoot "tools\SaegeulAiCompanionTray\SaegeulAiCompanionTray.csproj" -ErrorAction SilentlyContinue
+$trayProject = if ($repoRoot) { Join-Path $repoRoot "tools\SaegeulAiCompanionTray\SaegeulAiCompanionTray.csproj" } else { $null }
 if ($BuildWpfTray -and $trayProject -and (Test-Path $trayProject) -and (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     Write-Host "[*] Building WPF System Tray application..." -ForegroundColor Yellow
     $trayPublishDir = Join-Path $InstallDir "tray"

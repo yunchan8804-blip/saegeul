@@ -54,6 +54,8 @@ import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.FlexboxExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.GridExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
+import org.fcitx.fcitx5.android.input.BufferedHangulWindow
+import org.fcitx.fcitx5.android.input.BufferedInputTransport
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
@@ -182,6 +184,27 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 else -> {}
             }
         }
+
+    private val bufferedHangulInputPref = prefs.advanced.bufferedHangulInput
+    private val bufferedHangulTransportPref = prefs.advanced.bufferedHangulTransport
+
+    @Keep
+    private val onBufferedHangulInputChangeListener =
+        ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+            updateBufferedHangulButtonVisual()
+        }
+
+    @Keep
+    private val onBufferedHangulTransportChangeListener =
+        ManagedPreference.OnChangeListener<BufferedInputTransport> { _, _ ->
+            updateBufferedHangulButtonVisual()
+        }
+
+    private fun updateBufferedHangulButtonVisual() {
+        val isEnabled = bufferedHangulInputPref.getValue()
+        val color = if (isEnabled) theme.accentKeyBackgroundColor else theme.altKeyTextColor
+        idleUi.buttonsUi.bufferedHangulButton.setIconTint(color)
+    }
 
     private fun launchClipboardTimeoutJob() {
         clipboardTimeoutJob?.cancel()
@@ -366,6 +389,26 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(ClipboardWindow())
                 }
+                bufferedHangulButton.setOnClickListener {
+                    if (!canOpenEditorTool()) return@setOnClickListener
+                    windowManager.attachWindow(BufferedHangulWindow())
+                }
+                bufferedHangulButton.setOnLongClickListener {
+                    if (!canOpenEditorTool()) return@setOnLongClickListener true
+                    val currentEnabled = prefs.advanced.bufferedHangulInput.getValue()
+                    val newEnabled = !currentEnabled
+                    prefs.advanced.bufferedHangulInput.setValue(newEnabled)
+                    val toastMsg = if (newEnabled) {
+                        context.getString(
+                            R.string.buffered_hangul_toast_on,
+                            context.getString(prefs.advanced.bufferedHangulTransport.getValue().stringRes)
+                        )
+                    } else {
+                        context.getString(R.string.buffered_hangul_toast_off)
+                    }
+                    android.widget.Toast.makeText(context, toastMsg, android.widget.Toast.LENGTH_SHORT).show()
+                    true
+                }
                 quickPhraseButton.setOnClickListener {
                     if (!canOpenEditorTool()) return@setOnClickListener
                     service.postFcitxJob {
@@ -543,6 +586,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.addOnUpdateListener(onClipboardUpdateListener)
         clipboardSuggestion.registerOnChangeListener(onClipboardSuggestionUpdateListener)
         clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
+        bufferedHangulInputPref.registerOnChangeListener(onBufferedHangulInputChangeListener)
+        bufferedHangulTransportPref.registerOnChangeListener(onBufferedHangulTransportChangeListener)
+        updateBufferedHangulButtonVisual()
     }
 
     override fun onStartInput(
@@ -550,6 +596,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         capFlags: CapabilityFlags,
         restarting: Boolean
     ) {
+        updateBufferedHangulButtonVisual()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }

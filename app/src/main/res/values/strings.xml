@@ -258,6 +258,14 @@
     <string name="buffered_input_transport_system_paste" tools:ignore="MissingTranslation">System paste (standard editors)</string>
     <string name="buffered_input_transport_ctrl_v" tools:ignore="MissingTranslation">Ctrl+V (remote and raw-key apps)</string>
     <string name="buffered_input_transport_direct_commit" tools:ignore="MissingTranslation">Direct commit (no clipboard)</string>
+    <string name="buffered_hangul_title">Hangul Buffer Compatibility</string>
+    <string name="buffered_hangul_off">Standard Composing (Off)</string>
+    <string name="buffered_hangul_off_desc">Standard real-time composing text for general Android apps</string>
+    <string name="buffered_hangul_paste_desc">Collects composition in buffer and delivers via system paste</string>
+    <string name="buffered_hangul_ctrl_v_desc">Delivers via Ctrl+V key event (Remote Desktop/VNC)</string>
+    <string name="buffered_hangul_direct_desc">Directly commits syllables without composing span (Games/Terminals)</string>
+    <string name="buffered_hangul_toast_off">Hangul Buffer Compatibility: Off</string>
+    <string name="buffered_hangul_toast_on">Hangul Buffer Compatibility: %s</string>
     <string name="choose_input_method">Choose input method</string>
     <string name="edit_clipboard">Edit clipboard</string>
     <string name="clipboard_edit_text_hint">Clipboard content</string>
