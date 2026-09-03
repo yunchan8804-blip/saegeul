@@ -176,6 +176,7 @@ abstract class BaseKeyboard(
             val x = ev.getX(pointerIndex)
             val y = ev.getY(pointerIndex)
             particleOverlayView.spawnTouchBurst(x, y)
+            rgbEffectView.spawnReactiveKeyEffect(x, y)
         }
         return super.dispatchTouchEvent(ev)
     }

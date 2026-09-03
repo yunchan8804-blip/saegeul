@@ -58,7 +58,7 @@
 ## 4. Play Data Safety 제출 계약
 
 기계 판독 원본은 [`play-data-safety-declaration.json`](play-data-safety-declaration.json)이며 상태는
-`SUBMITTED_TO_PLAY_CONSOLE`이다. 공개 URL과 Play Console 실제 입력은 완료했고, 공급자별
+`READY_FOR_PLAY_CONSOLE_DRAFT`이다. 공개 URL과 Play Console 실제 입력은 완료했고, 공급자별
 프로덕션 승인 여부는 기능 활성화 게이트로 계속 분리한다. Console에 넣은 기술 답변은 아래처럼 잠근다.
 
 전역 답변:

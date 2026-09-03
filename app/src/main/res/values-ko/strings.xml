@@ -213,6 +213,17 @@
     <string name="theme_rgb_mode_cyberpunk">⚡ 사이버펑크 네온</string>
     <string name="theme_rgb_mode_matrix">🟢 매트릭스 플로우</string>
     <string name="theme_rgb_mode_pulse">💫 네온 펄스</string>
+    <string name="theme_rgb_mode_aurora">🌌 오로라 보레알리스</string>
+    <string name="theme_rgb_mode_starlight">⭐ 별빛 스타라이트</string>
+    <string name="theme_rgb_mode_ocean">🌊 오션 웨이브</string>
+    <string name="theme_rgb_mode_fire">🔥 화염 &amp; 불씨</string>
+    <string name="theme_rgb_mode_supernova">🪐 코스믹 은하</string>
+    <string name="theme_rgb_mode_sakura">🌸 벚꽃 바람</string>
+    <string name="theme_rgb_mode_frost">🧊 크리스탈 서리</string>
+    <string name="theme_rgb_mode_reactive_ripple">🎯 리액티브 파동</string>
+    <string name="theme_rgb_mode_reactive_fade">💡 리액티브 키 페이드</string>
+    <string name="theme_rgb_mode_reactive_firework">🎆 리액티브 스파크</string>
+    <string name="theme_rgb_mode_reactive_laser">⚡ 리액티브 십자 레이저</string>
     <string name="theme_particle_effect">터치 스파클링 &amp; 파티클 피드백</string>
     <string name="theme_particle_mode_off">끄기</string>
     <string name="theme_particle_mode_star">⭐ 별빛 스파클링</string>

@@ -165,7 +165,25 @@ class RedTeamPerKeyAndEffectsTest {
 
     @Test
     fun testAllRgbChromaAndParticleModesValid() {
-        val supportedChromaModes = listOf("off", "rgb_wave", "rgb_breathe", "neon_pulse", "cyberpunk", "matrix_flow")
+        val supportedChromaModes = listOf(
+            "off",
+            "rgb_wave",
+            "rgb_breathe",
+            "neon_pulse",
+            "cyberpunk",
+            "matrix_flow",
+            "aurora",
+            "starlight",
+            "ocean_tide",
+            "fire_ember",
+            "supernova",
+            "sakura_breeze",
+            "frost_crystal",
+            "reactive_ripple",
+            "reactive_fade",
+            "reactive_firework",
+            "reactive_laser"
+        )
         val supportedParticleModes = listOf("off", "star_sparkle", "glowing_dust", "neon_burst", "cosmic_ripple")
 
         for (mode in supportedChromaModes) {
@@ -181,5 +199,52 @@ class RedTeamPerKeyAndEffectsTest {
             assertTrue(def.particleCount > 0)
             assertTrue(def.lifetimeMs > 0L)
         }
+    }
+
+    @Test
+    fun testLightingEffectModesSerializationAndRoundtrip() {
+        val base = ThemePreset.MidnightOLED.deriveCustomNoBackground("Multi-Mode Chroma")
+        val modes = listOf(
+            "off", "rgb_wave", "rgb_breathe", "neon_pulse", "cyberpunk", "matrix_flow",
+            "aurora", "starlight", "ocean_tide", "fire_ember", "supernova",
+            "sakura_breeze", "frost_crystal", "reactive_ripple", "reactive_fade",
+            "reactive_firework", "reactive_laser"
+        )
+
+        for (mode in modes) {
+            val theme = base.copy(
+                lightingEffect = Theme.Custom.LightingEffectDef(
+                    mode = mode,
+                    speed = 1.25f,
+                    intensity = 0.9f,
+                    direction = "left_to_right"
+                )
+            )
+            val json = theme.toJson()
+            val (decoded, _) = json.toCustomTheme()
+            assertNotNull(decoded.lightingEffect)
+            assertEquals(mode, decoded.lightingEffect?.mode)
+            assertEquals(1.25f, decoded.lightingEffect?.speed ?: 0f, 0.001f)
+            assertEquals(0.9f, decoded.lightingEffect?.intensity ?: 0f, 0.001f)
+        }
+    }
+
+    @Test
+    fun testLightingEffectDefWithCustomColors() {
+        val customColors = listOf(0xFFFF0055.toInt(), 0xFF00FF66.toInt(), 0xFF00CCFF.toInt())
+        val base = ThemePreset.MidnightOLED.deriveCustomNoBackground("Custom Colors Theme")
+        val theme = base.copy(
+            lightingEffect = Theme.Custom.LightingEffectDef(
+                mode = "rgb_wave",
+                speed = 2.0f,
+                intensity = 1.0f,
+                customColors = customColors
+            )
+        )
+        val json = theme.toJson()
+        val (decoded, _) = json.toCustomTheme()
+        assertNotNull(decoded.lightingEffect)
+        assertEquals(3, decoded.lightingEffect?.customColors?.size)
+        assertEquals(customColors, decoded.lightingEffect?.customColors)
     }
 }

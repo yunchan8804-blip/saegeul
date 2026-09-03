@@ -190,6 +190,17 @@
     <string name="theme_rgb_mode_cyberpunk">⚡ Cyberpunk Neon</string>
     <string name="theme_rgb_mode_matrix">🟢 Matrix Flow</string>
     <string name="theme_rgb_mode_pulse">💫 Neon Pulse</string>
+    <string name="theme_rgb_mode_aurora">🌌 Aurora Borealis</string>
+    <string name="theme_rgb_mode_starlight">⭐ Starlight Twinkle</string>
+    <string name="theme_rgb_mode_ocean">🌊 Ocean Tide</string>
+    <string name="theme_rgb_mode_fire">🔥 Fire Ember</string>
+    <string name="theme_rgb_mode_supernova">🪐 Cosmic Supernova</string>
+    <string name="theme_rgb_mode_sakura">🌸 Pastel Sakura</string>
+    <string name="theme_rgb_mode_frost">🧊 Frost Glaze</string>
+    <string name="theme_rgb_mode_reactive_ripple">🎯 Reactive Ripple</string>
+    <string name="theme_rgb_mode_reactive_fade">💡 Reactive Key Fade</string>
+    <string name="theme_rgb_mode_reactive_firework">🎆 Reactive Spark</string>
+    <string name="theme_rgb_mode_reactive_laser">⚡ Reactive Laser Cross</string>
     <string name="theme_particle_effect">Touch Particle &amp; Sparkle Feedback</string>
     <string name="theme_particle_mode_off">Off</string>
     <string name="theme_particle_mode_star">⭐ Star Sparkles</string>

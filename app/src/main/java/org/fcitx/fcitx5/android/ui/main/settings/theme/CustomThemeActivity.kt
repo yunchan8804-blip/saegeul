@@ -594,7 +594,18 @@ class CustomThemeActivity : AppCompatActivity() {
             getString(R.string.theme_rgb_mode_breathe) to "rgb_breathe",
             getString(R.string.theme_rgb_mode_cyberpunk) to "cyberpunk",
             getString(R.string.theme_rgb_mode_matrix) to "matrix_flow",
-            getString(R.string.theme_rgb_mode_pulse) to "neon_pulse"
+            getString(R.string.theme_rgb_mode_pulse) to "neon_pulse",
+            getString(R.string.theme_rgb_mode_aurora) to "aurora",
+            getString(R.string.theme_rgb_mode_starlight) to "starlight",
+            getString(R.string.theme_rgb_mode_ocean) to "ocean_tide",
+            getString(R.string.theme_rgb_mode_fire) to "fire_ember",
+            getString(R.string.theme_rgb_mode_supernova) to "supernova",
+            getString(R.string.theme_rgb_mode_sakura) to "sakura_breeze",
+            getString(R.string.theme_rgb_mode_frost) to "frost_crystal",
+            getString(R.string.theme_rgb_mode_reactive_ripple) to "reactive_ripple",
+            getString(R.string.theme_rgb_mode_reactive_fade) to "reactive_fade",
+            getString(R.string.theme_rgb_mode_reactive_firework) to "reactive_firework",
+            getString(R.string.theme_rgb_mode_reactive_laser) to "reactive_laser"
         )
 
         val row = LinearLayout(this).apply {
@@ -621,10 +632,17 @@ class CustomThemeActivity : AppCompatActivity() {
                 background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
 
                 setOnClickListener {
+                    val defaultSpeed = when (modeKey) {
+                        "neon_pulse" -> 1.5f
+                        "matrix_flow" -> 1.2f
+                        "starlight" -> 1.0f
+                        "rgb_breathe" -> 0.85f
+                        else -> 1.0f
+                    }
                     theme = theme.copy(
                         lightingEffect = Theme.Custom.LightingEffectDef(
                             mode = modeKey,
-                            speed = if (modeKey == "neon_pulse") 1.5f else 1.0f,
+                            speed = defaultSpeed,
                             intensity = 0.85f
                         )
                     )
