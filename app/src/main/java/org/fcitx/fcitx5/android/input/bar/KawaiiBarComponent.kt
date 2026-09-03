@@ -124,6 +124,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var isClipboardFresh: Boolean = false
     private var isInlineSuggestionPresent: Boolean = false
     private var inlineSuggestionGeneration = 0L
+    private val aiPredictor by lazy {
+        org.fcitx.fcitx5.android.input.ai.AiContextualPredictor(
+            org.fcitx.fcitx5.android.input.ai.PersonalizedLexiconModel(),
+            org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine()
+        )
+    }
     private var isCapabilityFlagsPassword: Boolean = false
     private var isKeyboardLayoutNumber: Boolean = false
     private var isToolbarManuallyToggled: Boolean = false
