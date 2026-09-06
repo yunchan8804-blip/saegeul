@@ -57,6 +57,9 @@ ALLOWED_REDIRECT_URIS = {
     "net.chanpaca.saegeul.oauth:/callback",
     "net.chanpaca.saegeul.debug.oauth:/callback",
 }
+DEFAULT_AGY_MODEL = "gemini-3.8-flash-high"
+DEFAULT_AGY_EFFORT = "high"
+AGY_EFFORT_CHOICES = ("low", "medium", "high")
 OAUTH_CLIENT_ID = "saegeul-android-public"
 OAUTH_SCOPES = "openid offline_access ai.invoke"
 ACCESS_TOKEN_TTL_SECONDS = 60 * 60
@@ -636,7 +639,12 @@ class CliBackendRunner:
     MODEL_CLAUDE = "claude"
     MODEL_AGY = "agy"
 
-    def __init__(self, sandbox_dir: Path):
+    def __init__(
+        self,
+        sandbox_dir: Path,
+        agy_model: str = DEFAULT_AGY_MODEL,
+        agy_effort: str = DEFAULT_AGY_EFFORT,
+    ):
         self.sandbox_dir = sandbox_dir
         self.sandbox_dir.mkdir(parents=True, exist_ok=True)
         # The packaged app's WindowsApps codex.exe can be visible to PATH but deny direct
@@ -644,6 +652,8 @@ class CliBackendRunner:
         self.codex = find_executable("codex.cmd", "codex", "codex.exe")
         self.claude = find_executable("claude.exe", "claude")
         self.agy = find_executable("agy.exe", "agy.cmd", "agy")
+        self.agy_model = agy_model
+        self.agy_effort = agy_effort
         self.available = self._detect_available()
         self._slot = threading.BoundedSemaphore(1)
 
@@ -778,6 +788,10 @@ class CliBackendRunner:
             "--disable-slash-commands",
             "--output-format",
             "text",
+            "--model",
+            self.agy_model,
+            "--effort",
+            self.agy_effort,
         ]
         result = run_quiet(
             command,
@@ -1160,7 +1174,7 @@ def normalized_computer_name(value: str) -> str:
 
 def run_cli_gateway(args: argparse.Namespace) -> None:
     sandbox = Path(args.sandbox_dir).expanduser().resolve()
-    runner = CliBackendRunner(sandbox)
+    runner = CliBackendRunner(sandbox, agy_model=args.agy_model, agy_effort=args.agy_effort)
     origin = public_origin(args.public_origin) if args.public_origin else tailscale_origin(
         args.tailscale_https_port
     )
@@ -1194,6 +1208,8 @@ def run_cli_gateway(args: argparse.Namespace) -> None:
         )
         print(f"Verified provider: {manifest.get('display_name', 'Computer AI')}")
         print(f"CLI backends: {', '.join(sorted(runner.available))}")
+        if CliBackendRunner.MODEL_AGY in runner.available:
+            print(f"AGY model: {runner.agy_model} (effort={runner.agy_effort})")
         advertise(
             normalized_computer_name(args.name),
             local_ipv4(args.address),
@@ -1338,6 +1354,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sandbox-dir",
         default=str(Path(tempfile.gettempdir()) / "saegeul-ai-cli-sandbox"),
+    )
+    parser.add_argument(
+        "--agy-model",
+        default=os.environ.get("FCITX_AI_AGY_MODEL", DEFAULT_AGY_MODEL),
+        help="agy session model id",
+    )
+    parser.add_argument(
+        "--agy-effort",
+        choices=AGY_EFFORT_CHOICES,
+        default=os.environ.get("FCITX_AI_AGY_EFFORT", DEFAULT_AGY_EFFORT),
+        help="agy reasoning effort",
     )
     return parser.parse_args()
 

@@ -341,6 +341,78 @@ class CliBoundaryTest(unittest.TestCase):
                 )
                 self.assertEqual('{"suggestions":["오늘 점심 뭐 먹을래?"]}', result)
 
+    def test_run_agy_uses_default_model_and_effort(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.agy = "agy.exe"
+            runner.agy_model = companion.DEFAULT_AGY_MODEL
+            runner.agy_effort = companion.DEFAULT_AGY_EFFORT
+
+            completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="hello", stderr="")
+            with mock.patch.object(companion, "run_quiet", return_value=completed) as mocked:
+                result = runner._run_agy("prompt text")
+                self.assertEqual("hello", result)
+                command = mocked.call_args.args[0]
+                self.assertIn("--model", command)
+                self.assertIn("--effort", command)
+                self.assertEqual("gemini-3.8-flash-high", command[command.index("--model") + 1])
+                self.assertEqual("high", command[command.index("--effort") + 1])
+
+    def test_run_agy_uses_configured_model_and_effort(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.agy = "agy.exe"
+            runner.agy_model = "gemini-3.8-flash-low"
+            runner.agy_effort = "low"
+
+            completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="hello", stderr="")
+            with mock.patch.object(companion, "run_quiet", return_value=completed) as mocked:
+                runner._run_agy("prompt text")
+                command = mocked.call_args.args[0]
+                self.assertEqual("gemini-3.8-flash-low", command[command.index("--model") + 1])
+                self.assertEqual("low", command[command.index("--effort") + 1])
+
+    def test_cli_backend_runner_init_accepts_agy_model_and_effort(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            with mock.patch.object(companion, "find_executable", return_value=None), mock.patch.object(
+                companion.CliBackendRunner, "_detect_available", return_value={companion.CliBackendRunner.MODEL_AGY}
+            ):
+                runner = companion.CliBackendRunner(
+                    Path(sandbox), agy_model="gemini-3.8-flash-low", agy_effort="low"
+                )
+                self.assertEqual("gemini-3.8-flash-low", runner.agy_model)
+                self.assertEqual("low", runner.agy_effort)
+
+            with mock.patch.object(companion, "find_executable", return_value=None), mock.patch.object(
+                companion.CliBackendRunner, "_detect_available", return_value={companion.CliBackendRunner.MODEL_AGY}
+            ):
+                runner = companion.CliBackendRunner(Path(sandbox))
+                self.assertEqual(companion.DEFAULT_AGY_MODEL, runner.agy_model)
+                self.assertEqual(companion.DEFAULT_AGY_EFFORT, runner.agy_effort)
+
+
+class ParseArgsAgyOptionsTest(unittest.TestCase):
+    def parse(self, argv: list[str]) -> "companion.argparse.Namespace":
+        with mock.patch.object(sys, "argv", ["ai-provider-companion.py", *argv]):
+            return companion.parse_args()
+
+    def test_agy_model_and_effort_defaults(self):
+        args = self.parse([])
+        self.assertEqual(companion.DEFAULT_AGY_MODEL, args.agy_model)
+        self.assertEqual(companion.DEFAULT_AGY_EFFORT, args.agy_effort)
+
+    def test_agy_model_and_effort_can_be_overridden(self):
+        args = self.parse(["--agy-model", "gemini-3.8-flash-low", "--agy-effort", "low"])
+        self.assertEqual("gemini-3.8-flash-low", args.agy_model)
+        self.assertEqual("low", args.agy_effort)
+
+    def test_invalid_agy_effort_is_rejected(self):
+        with self.assertRaises(SystemExit):
+            with mock.patch.object(sys, "stderr"):
+                self.parse(["--agy-effort", "ultra"])
+
 
 if __name__ == "__main__":
     unittest.main()
