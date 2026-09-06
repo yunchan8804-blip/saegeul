@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Collects recent typing context within a sliding window per application package.
- * Triggers augmentation callback when contextual sentence boundaries (punctuation, newline) are met.
+ * Triggers augmentation callback when contextual sentence boundaries are met.
  */
 class UserTypingContextCollector(
     private val maxSentencesPerPackage: Int = 5,
@@ -13,20 +13,19 @@ class UserTypingContextCollector(
     private val onTriggerAugmentation: (packageName: String, context: String) -> Unit = { _, _ -> },
     private val onSentenceCommitted: ((packageName: String, sentence: String) -> Unit)? = null
 ) {
-    // Per-package committed sentence history (sliding window)
     private val historyMap = ConcurrentHashMap<String, ArrayDeque<String>>()
-
-    // Per-package current pending uncommitted/partial sentence buffer
     private val pendingBufferMap = ConcurrentHashMap<String, StringBuilder>()
 
     companion object {
-        private val SENTENCE_TERMINATORS = setOf('.', '?', '!', '\n')
+        private val SENTENCE_TERMINATORS = setOf('.', '?', '!', '\n', '。', '？', '！')
+        private val KOREAN_ENDINGS = listOf(
+            "습니다", "드립니다", "세요", "할까요", "인가요", "네요", "죠",
+            "해요", "이요", "요",
+            "ㅋㅋㅋ", "ㅋㅋ", "ㅎㅎ", "ㅠㅠ", "ㅜㅜ"
+        )
+        private const val MIN_FLUSH_CHARS = 4
     }
 
-    /**
-     * Records text committed by the user.
-     * Can be called word-by-word or sentence-by-sentence as IME commits text.
-     */
     @Synchronized
     fun recordCommittedText(packageName: String, text: String) {
         if (text.isEmpty() || text.all { it.isWhitespace() }) return
@@ -35,51 +34,36 @@ class UserTypingContextCollector(
         buffer.append(text)
 
         val currentText = buffer.toString()
-        // Check if there is any sentence boundary in the buffer
-        val lastTerminatorIdx = currentText.indexOfLast { it in SENTENCE_TERMINATORS }
+        val boundary = findSentenceBoundary(currentText) ?: return
 
-        if (lastTerminatorIdx >= 0) {
-            val completedSentence = currentText.substring(0, lastTerminatorIdx + 1).trim()
-            val remaining = currentText.substring(lastTerminatorIdx + 1)
+        val completedSentence = currentText.substring(0, boundary).trim()
+        val remaining = currentText.substring(boundary)
 
-            buffer.clear()
-            if (remaining.isNotBlank()) {
-                buffer.append(remaining)
-            }
-
-            if (completedSentence.isNotBlank()) {
-                onSentenceCommitted?.invoke(packageName, completedSentence)
-
-                val deque = historyMap.getOrPut(packageName) { ArrayDeque() }
-                deque.addLast(completedSentence)
-                while (deque.size > maxSentencesPerPackage) {
-                    deque.removeFirst()
-                }
-
-                if (completedSentence.length >= minTriggerChars) {
-                    val fullContext = getRecentContext(packageName)
-                    onTriggerAugmentation(packageName, fullContext)
-                }
-            }
+        buffer.clear()
+        if (remaining.isNotBlank()) {
+            buffer.append(remaining)
         }
+
+        emitSentence(packageName, completedSentence)
     }
 
     /**
-     * Explicitly trigger augmentation with whatever is currently in buffer/history.
+     * Flushes leftover Korean chat text that never got Latin punctuation.
+     * Used when the editor closes or the user sends a message.
      */
     @Synchronized
-    fun triggerNow(packageName: String): Boolean {
-        val buffer = pendingBufferMap[packageName]
-        if (buffer != null && buffer.isNotBlank()) {
-            val pending = buffer.toString().trim()
-            buffer.clear()
-            val deque = historyMap.getOrPut(packageName) { ArrayDeque() }
-            deque.addLast(pending)
-            while (deque.size > maxSentencesPerPackage) {
-                deque.removeFirst()
-            }
-        }
+    fun flushPending(packageName: String): Boolean {
+        val buffer = pendingBufferMap[packageName] ?: return false
+        val pending = buffer.toString().trim()
+        if (pending.length < MIN_FLUSH_CHARS) return false
+        buffer.clear()
+        emitSentence(packageName, pending)
+        return true
+    }
 
+    @Synchronized
+    fun triggerNow(packageName: String): Boolean {
+        if (flushPending(packageName)) return true
         val context = getRecentContext(packageName)
         if (context.length >= minTriggerChars) {
             onTriggerAugmentation(packageName, context)
@@ -88,9 +72,6 @@ class UserTypingContextCollector(
         return false
     }
 
-    /**
-     * Gets combined recent context string (newline-joined sentences, capped at maxCharLength).
-     */
     @Synchronized
     fun getRecentContext(packageName: String): String {
         val deque = historyMap[packageName] ?: return ""
@@ -102,17 +83,11 @@ class UserTypingContextCollector(
         }
     }
 
-    /**
-     * Returns list of sentences in the sliding window.
-     */
     @Synchronized
     fun getSentences(packageName: String): List<String> {
         return historyMap[packageName]?.toList() ?: emptyList()
     }
 
-    /**
-     * Clears context for given package or all packages.
-     */
     @Synchronized
     fun clear(packageName: String? = null) {
         if (packageName != null) {
@@ -122,5 +97,31 @@ class UserTypingContextCollector(
             historyMap.clear()
             pendingBufferMap.clear()
         }
+    }
+
+    private fun emitSentence(packageName: String, sentence: String) {
+        if (sentence.isBlank()) return
+        onSentenceCommitted?.invoke(packageName, sentence)
+        val deque = historyMap.getOrPut(packageName) { ArrayDeque() }
+        deque.addLast(sentence)
+        while (deque.size > maxSentencesPerPackage) {
+            deque.removeFirst()
+        }
+        if (sentence.length >= minTriggerChars) {
+            onTriggerAugmentation(packageName, getRecentContext(packageName))
+        }
+    }
+
+    private fun findSentenceBoundary(text: String): Int? {
+        val punctIdx = text.indexOfLast { it in SENTENCE_TERMINATORS }
+        if (punctIdx >= 0) return punctIdx + 1
+
+        val trimmed = text.trimEnd()
+        for (ending in KOREAN_ENDINGS) {
+            if (trimmed.endsWith(ending)) {
+                return trimmed.length
+            }
+        }
+        return null
     }
 }

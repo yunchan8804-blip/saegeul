@@ -1560,6 +1560,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /** Text-inspection actions do not read password/private editors, even when fully offline. */
+    private fun flushTypingDnaForCurrentEditor() {
+        if (!allowsTextInspectionFeatures()) return
+        val pkg = currentInputEditorInfo?.packageName ?: return
+        if (pkg.isBlank()) return
+        userTypingContextCollector.flushPending(pkg)
+    }
+
     fun allowsTextInspectionFeatures(): Boolean =
         DirectBootInputPolicy.allowsTextInspection(
             isDirectBootMode = isDirectBootInputMode,
@@ -3704,6 +3711,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        flushTypingDnaForCurrentEditor()
         cancelInternalPromptCapture(discardPreStartCallbacks = true)
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
@@ -3731,6 +3739,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         Timber.d("onFinishInput")
+        flushTypingDnaForCurrentEditor()
         engineRestartEditorRehydrationGate.onFinishInput()
         cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()

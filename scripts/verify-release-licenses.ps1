@@ -132,7 +132,11 @@ try {
 
     $missingContent = @(
         $licenses |
-            Where-Object { [string]::IsNullOrWhiteSpace($_.content) }
+            Where-Object {
+                [string]::IsNullOrWhiteSpace(
+                    (Get-OptionalPropertyValue -InputObject $_ -Name "content")
+                )
+            }
     )
     if ($missingContent.Count -ne 0) {
         $names = $missingContent | ForEach-Object {
@@ -199,7 +203,12 @@ try {
                     (Get-OptionalPropertyValue -InputObject $_ -Name "spdxId") -eq $spdxId
                 }
         )
-        $shortTexts = @($matches | Where-Object { $_.content.Length -lt 1000 })
+        $shortTexts = @(
+            $matches |
+                Where-Object {
+                    ((Get-OptionalPropertyValue -InputObject $_ -Name "content") ?? "").Length -lt 1000
+                }
+        )
         if ($matches.Count -eq 0 -or $shortTexts.Count -ne 0) {
             throw "A full '$spdxId' license text is not embedded in the APK."
         }

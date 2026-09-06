@@ -9,17 +9,22 @@ import org.junit.Test
 class UserTypingContextCollectorTest {
 
     private val triggeredContexts = mutableListOf<Pair<String, String>>()
+    private val committedSentences = mutableListOf<Pair<String, String>>()
     private lateinit var collector: UserTypingContextCollector
 
     @Before
     fun setUp() {
         triggeredContexts.clear()
+        committedSentences.clear()
         collector = UserTypingContextCollector(
             maxSentencesPerPackage = 3,
             maxCharLength = 150,
             minTriggerChars = 5,
             onTriggerAugmentation = { pkg, ctx ->
                 triggeredContexts.add(pkg to ctx)
+            },
+            onSentenceCommitted = { pkg, sentence ->
+                committedSentences.add(pkg to sentence)
             }
         )
     }
@@ -98,5 +103,43 @@ class UserTypingContextCollectorTest {
 
         collector.clear("com.kakao.talk")
         assertTrue(collector.getRecentContext("com.kakao.talk").isEmpty())
+    }
+
+    @Test
+    fun koreanEndingWithoutLatinPunctuationIsCollectedForTypingDna() {
+        collector.recordCommittedText("com.kakao.talk", "확인했습니다")
+        assertEquals(1, committedSentences.size)
+        assertEquals("확인했습니다", committedSentences[0].second)
+
+        collector.recordCommittedText("com.kakao.talk", "완전 고마워 ㅋㅋ")
+        assertEquals("완전 고마워 ㅋㅋ", committedSentences[1].second)
+    }
+
+    @Test
+    fun casualKoreanWithoutPeriodStaysPendingUntilFlush() {
+        collector.recordCommittedText("com.kakao.talk", "오늘 저녁에 만나자")
+        assertTrue(committedSentences.isEmpty())
+
+        val flushed = collector.flushPending("com.kakao.talk")
+        assertTrue(flushed)
+        assertEquals("오늘 저녁에 만나자", committedSentences.single().second)
+        assertEquals("오늘 저녁에 만나자", collector.getRecentContext("com.kakao.talk"))
+    }
+
+    @Test
+    fun triggerNowAlsoRecordsPendingSentenceForTypingDna() {
+        collector.recordCommittedText("com.kakao.talk", "내일 판교에서 보자")
+        assertTrue(committedSentences.isEmpty())
+
+        assertTrue(collector.triggerNow("com.kakao.talk"))
+        assertEquals("내일 판교에서 보자", committedSentences.single().second)
+        assertEquals(1, triggeredContexts.size)
+    }
+
+    @Test
+    fun flushIgnoresTinyFragments() {
+        collector.recordCommittedText("com.kakao.talk", "ㅇㅋ")
+        assertFalse(collector.flushPending("com.kakao.talk"))
+        assertTrue(committedSentences.isEmpty())
     }
 }
