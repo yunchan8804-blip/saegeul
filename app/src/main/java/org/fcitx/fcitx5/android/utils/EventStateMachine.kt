@@ -30,7 +30,8 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
     var currentState = initialState
         private set
 
-    private val enableDebugLog: Boolean by AppPrefs.getInstance().internal.verboseLog
+    private val enableDebugLog: Boolean
+        get() = runCatching { AppPrefs.getInstance().internal.verboseLog.getValue() }.getOrDefault(false)
 
     /**
      * Push an event that may trigger a transition of state
@@ -74,7 +75,8 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
 // DSL
 class TransitionEventBuilder<State : Any, B : EventStateMachine.BooleanStateKey> {
 
-    private val enableDebugLog: Boolean by AppPrefs.getInstance().internal.verboseLog
+    private val enableDebugLog: Boolean
+        get() = runCatching { AppPrefs.getInstance().internal.verboseLog.getValue() }.getOrDefault(false)
 
     private var raw: ((State, State, (B) -> Boolean?) -> State)? = null
 

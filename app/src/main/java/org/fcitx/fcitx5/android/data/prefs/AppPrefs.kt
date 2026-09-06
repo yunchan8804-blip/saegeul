@@ -340,6 +340,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             "horizontal_candidate_style",
             HorizontalCandidateMode.AutoFillWidth
         )
+        val twoRowCandidateBar get() = candidates.twoRowCandidateBar
         val expandedCandidateStyle = enumList(
             R.string.expanded_candidate_style,
             "expanded_candidate_style",
@@ -373,6 +374,13 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             R.string.show_candidates_window,
             "show_candidates_window",
             FloatingCandidatesMode.InputDevice
+        )
+
+        val twoRowCandidateBar = switch(
+            R.string.two_row_candidate_bar,
+            "two_row_candidate_bar",
+            false,
+            R.string.two_row_candidate_bar_summary
         )
 
         val orientation = enumList(

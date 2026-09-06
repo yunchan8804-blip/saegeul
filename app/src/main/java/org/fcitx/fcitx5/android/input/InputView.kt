@@ -126,6 +126,10 @@ class InputView(
         windowManager.attachWindow(DynamicPhraseWindow(template, editor))
     }
 
+    fun refreshContextualCandidates() {
+        horizontalCandidate.refreshContextualCandidatesIfNeeded()
+    }
+
     private fun setupScope() {
         scope += this@InputView.wrapToUniqueComponent()
         scope += service.wrapToUniqueComponent()
@@ -639,6 +643,10 @@ class InputView(
 
     fun updateSelection(start: Int, end: Int) {
         broadcaster.onSelectionUpdate(start, end)
+    }
+
+    fun postRefreshContextualCandidates(delayMs: Long = 16L) {
+        horizontalCandidate.postRefreshContextualCandidates(delayMs)
     }
 
     @RequiresApi(Build.VERSION_CODES.R)

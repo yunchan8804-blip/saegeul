@@ -83,7 +83,7 @@
 
                 <Grid Margin="0,4">
                     <TextBlock Text="활성 AI 백엔드" FontSize="12" Foreground="#8892B0"/>
-                    <TextBlock x:Name="BackendSummaryText" Text="Codex · Claude · Ollama" FontSize="12" FontWeight="SemiBold" Foreground="#34D399" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="BackendSummaryText" Text="Codex · Claude · AGY" FontSize="12" FontWeight="SemiBold" Foreground="#34D399" HorizontalAlignment="Right"/>
                 </Grid>
             </StackPanel>
         </Border>

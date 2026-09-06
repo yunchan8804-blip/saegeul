@@ -63,7 +63,7 @@ object AiProviderDiscoveryManifestCodec {
         }
         require(providerIdPattern.matches(wire.providerId)) { "Invalid provider ID" }
         require(wire.displayName.trim().isNotEmpty()) { "Provider name is empty" }
-        require(wire.oauth.redirectUri == AiProviderProfile.oauthRedirectUri) {
+        require(wire.oauth.redirectUri in AiProviderProfile.allowedRedirectUris) {
             "This computer has not registered the app redirect URI"
         }
         val capabilities = wire.capabilities.map(String::trim).filter(String::isNotEmpty).toSet()

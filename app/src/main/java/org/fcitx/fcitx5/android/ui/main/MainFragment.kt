@@ -20,10 +20,16 @@ import org.fcitx.fcitx5.android.utils.navigateWithAnim
 class MainFragment : PaddingPreferenceFragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
+    private var typingDnaCardPreference: org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardPreference? = null
 
     override fun onStart() {
         super.onStart()
         viewModel.enableAboutButton()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        typingDnaCardPreference?.refresh()
     }
 
     override fun onStop() {
@@ -42,8 +48,12 @@ class MainFragment : PaddingPreferenceFragment() {
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        val ctx = requireContext()
         val productSurfaces = ProductSurfacePolicy.forBuild(BuildConfig.SHOW_DEVELOPER_SURFACES)
-        preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
+        preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
+            val dnaCard = org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardPreference(ctx)
+            typingDnaCardPreference = dnaCard
+            addPreference(dnaCard)
             addCategory(R.string.languages_and_input) {
                 addDestinationPreference(
                     R.string.input_methods,

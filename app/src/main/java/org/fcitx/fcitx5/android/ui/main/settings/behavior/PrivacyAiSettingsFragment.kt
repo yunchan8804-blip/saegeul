@@ -77,6 +77,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     private lateinit var clearGifProviderPreference: Preference
     private lateinit var giphyProviderPreference: Preference
     private lateinit var clearGiphyProviderPreference: Preference
+    private lateinit var typingDnaPreference: Preference
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
@@ -195,6 +196,62 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     }
                 }
                 addPreference(clearGiphyProviderPreference)
+            }
+            addCategory("AI 언어 지문 (Typing DNA)") {
+                typingDnaPreference = Preference(ctx).apply {
+                    title = "내 언어 지문 리포트"
+                    icon = themedPreferenceIcon(R.drawable.ic_baseline_auto_awesome_24)
+                    isSelectable = false
+                }
+                addPreference(typingDnaPreference)
+                addPreference(
+                    title = "AI 언어 지문 상세 그래프 대시보드 보기",
+                    summary = "학습 진행 레벨, 데이터 축적 현황 및 톤 밸런스 그래프를 확인합니다.",
+                    onClick = {
+                        ctx.startActivity(android.content.Intent(ctx, org.fcitx.fcitx5.android.ui.main.ai.TypingDnaDashboardActivity::class.java))
+                    }
+                )
+                addPreference(
+                    title = "지금 언어 지문 분석 및 동기화",
+                    summary = "최근 타이핑 데이터를 바탕으로 내 말투와 어휘 습관을 즉시 업데이트합니다.",
+                    onClick = {
+                        runCatching {
+                            org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.triggerInstantTypingDnaSync()
+                        }
+                        val repo = org.fcitx.fcitx5.android.input.ai.TypingDnaRepository(
+                            java.io.File(ctx.filesDir, "typing_dna.json")
+                        )
+                        val summary = repo.getSummary()
+                        Toast.makeText(
+                            ctx,
+                            "언어 지문 분석 완료 (분석 문장: ${summary.totalSentences}개)",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        refreshSummaries()
+                    }
+                )
+                addPreference(
+                    title = "언어 지문 전체 초기화 (Zero-Knowledge)",
+                    summary = "학습된 모든 말투, 종결 어미, 나만의 표현을 기기에서 영구 삭제합니다.",
+                    onClick = {
+                        AlertDialog.Builder(ctx)
+                            .setTitle("언어 지문 초기화")
+                            .setMessage("학습된 말투, 종결 어미, 나만의 표현을 기기에서 완전히 삭제하시겠습니까?")
+                            .setPositiveButton(R.string.delete) { _, _ ->
+                                val repo = org.fcitx.fcitx5.android.input.ai.TypingDnaRepository(
+                                    java.io.File(ctx.filesDir, "typing_dna.json")
+                                )
+                                repo.clear()
+                                runCatching {
+                                    org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.typingDnaVault?.purge()
+                                }
+                                refreshSummaries()
+                                Toast.makeText(ctx, "언어 지문이 안전하게 초기화되었습니다.", Toast.LENGTH_SHORT).show()
+                            }
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show()
+                    }
+                )
             }
             addCategory(R.string.privacy_local_data) {
                 usagePreference = Preference(ctx).apply {
@@ -340,6 +397,18 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         }
         clearGiphyProviderPreference.isVisible =
             gifProvider.giphyCredentialState != GiphyCredentialState.Missing
+
+        if (::typingDnaPreference.isInitialized) {
+            val repo = org.fcitx.fcitx5.android.input.ai.TypingDnaRepository(
+                java.io.File(ctx.filesDir, "typing_dna.json")
+            )
+            val s = repo.getStats(forceReload = true)
+            typingDnaPreference.summary = if (!s.hasLearnedData) {
+                "아직 학습된 언어 지문이 없습니다. 키보드를 사용하면 자동으로 내 말투가 학습됩니다."
+            } else {
+                "Lv.${s.level} ${s.levelTitle} · 문장 ${s.totalSentences}개 · 단어쌍 ${s.bigramsCount}개 · 어미 ${s.endingsCount}개"
+            }
+        }
     }
 
     private fun showProviderModeDialog() {
@@ -347,14 +416,16 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .setTitle(R.string.ai_auth_mode_title)
             .setItems(
                 arrayOf(
+                    "Google Gemini (추천 · 무료 API 키)",
+                    "OpenAI (API 키)",
                     getString(R.string.ai_auth_mode_auto_discovery),
-                    getString(R.string.ai_auth_mode_api_key),
                     getString(R.string.ai_auth_mode_advanced)
                 )
             ) { _, which ->
                 when (which) {
-                    0 -> startActivity(AiProviderSetupActivity.createIntent(requireContext()))
+                    0 -> showGeminiProviderDialog()
                     1 -> showOpenAiProviderDialog()
+                    2 -> startActivity(AiProviderSetupActivity.createIntent(requireContext()))
                     else -> showAdvancedProviderModeDialog()
                 }
             }
@@ -530,6 +601,91 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         }
     )
 
+    private fun showGeminiProviderDialog() {
+        val ctx = requireContext()
+        val store = AiProviderCredentialStore(ctx)
+        val configured = store.load()?.takeIf {
+            it.kind == AiProviderKind.Gemini && it.authMode == AiAuthMode.ApiKey
+        }
+        val apiKey = EditText(ctx).apply {
+            hint = if (configured == null) {
+                "Google AI Studio API Key (AIzaSy...)"
+            } else {
+                getString(R.string.ai_provider_key_unchanged_hint)
+            }
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+            }
+            maxLines = 1
+            isSaveEnabled = false
+        }
+        val horizontal = ctx.dp(20)
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
+            isFocusableInTouchMode = true
+            addView(TextView(ctx).apply {
+                text = "Google AI Studio(aistudio.google.com)에서 발급받은 무료 API 키를 입력하세요.\n초고속 Gemini 2.0 Flash 모델로 실시간 AI 문맥 제안 및 문장 다듬기가 활성화됩니다."
+                textSize = 13f
+                setPadding(0, 0, 0, ctx.dp(8))
+            })
+            addView(apiKey)
+        }
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle("Google Gemini (AI Studio)")
+            .setMessage("API 키는 기기 내 Android Keystore로 안전하게 암호화되어 저장됩니다.")
+            .setView(container)
+            .setPositiveButton(R.string.save, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.window?.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+            )
+            container.requestFocus()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val key = apiKey.text.toString().trim().ifEmpty {
+                    configured?.apiKey.orEmpty()
+                }
+                val profile = AiProviderProfile(
+                    kind = AiProviderKind.Gemini,
+                    displayName = "Google Gemini",
+                    baseUrl = AiProviderProfile.GEMINI_BASE_URL,
+                    authMode = AiAuthMode.ApiKey,
+                    apiKey = key,
+                    fastModel = "gemini-2.0-flash",
+                    balancedModel = "gemini-2.0-flash",
+                    qualityModel = "gemini-2.0-flash",
+                    capabilities = setOf("chat_completions")
+                )
+                val validated = runCatching { profile.validate() }
+                    .onFailure { error ->
+                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
+                    }.getOrNull() ?: return@setOnClickListener
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                replaceProviderProfile(validated) { result ->
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                    result.onSuccess {
+                        apiKey.text?.clear()
+                        dialog.dismiss()
+                        refreshSummaries()
+                        Toast.makeText(
+                            ctx,
+                            "Google Gemini 설정이 저장되었습니다.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }.onFailure { error ->
+                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
+                    }
+                }
+            }
+        }
+        dialog.setOnDismissListener { apiKey.text?.clear() }
+        dialog.show()
+    }
+
     private fun showOpenAiProviderDialog() {
         val ctx = requireContext()
         val store = AiProviderCredentialStore(ctx)
@@ -687,10 +843,10 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val key = apiKey.text.toString().trim().ifEmpty { custom?.apiKey.orEmpty() }
                 val profile = AiProviderProfile(
-                    kind = if (baseUrl.text.toString().trimEnd('/') == AiProviderProfile.OPENAI_BASE_URL) {
-                        AiProviderKind.OpenAI
-                    } else {
-                        AiProviderKind.OpenAICompatible
+                    kind = when (baseUrl.text.toString().trimEnd('/')) {
+                        AiProviderProfile.OPENAI_BASE_URL -> AiProviderKind.OpenAI
+                        AiProviderProfile.GEMINI_BASE_URL -> AiProviderKind.Gemini
+                        else -> AiProviderKind.OpenAICompatible
                     },
                     displayName = name.text.toString(),
                     baseUrl = baseUrl.text.toString(),

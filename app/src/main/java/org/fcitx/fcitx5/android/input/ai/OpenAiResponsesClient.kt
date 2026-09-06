@@ -41,7 +41,8 @@ class OpenAiResponsesClient(
     suspend fun generate(
         action: AiAction,
         input: String,
-        customInstruction: String? = null
+        customInstruction: String? = null,
+        tierOverride: AiModelTier? = null
     ): AiGenerationResult =
         withContext(Dispatchers.IO) {
             val cleanInput = input.trim()
@@ -51,39 +52,76 @@ class OpenAiResponsesClient(
                 "Create a new message from the explicit writing request."
             }
             val validated = profile.validate()
-            val model = validated.model(action.tier)
-            val request = buildJsonObject {
-                put("model", model)
-                put("instructions", action.developerInstruction(customInstruction))
-                put("input", requestInput)
-                put("store", false)
-                put("max_output_tokens", MAX_OUTPUT_TOKENS)
-                put("reasoning", buildJsonObject { put("effort", "none") })
-                put("text", buildJsonObject {
-                    put("verbosity", "low")
-                    put("format", buildJsonObject {
-                        put("type", "json_schema")
-                        put("name", "fcitx_ai_suggestions")
-                        put("strict", true)
-                        put("schema", buildJsonObject {
-                            put("type", "object")
-                            put("additionalProperties", false)
-                            put("properties", buildJsonObject {
-                                put("suggestions", buildJsonObject {
-                                    put("type", "array")
-                                    put("minItems", action.maxSuggestions)
-                                    put("maxItems", action.maxSuggestions)
-                                    put("items", buildJsonObject { put("type", "string") })
-                                })
-                            })
-                            put("required", buildJsonArray { add("suggestions") })
+            val model = validated.model(tierOverride ?: action.tier)
+            val isChatCompletions = validated.kind == AiProviderKind.Gemini ||
+                validated.baseUrl.endsWith("/chat/completions") ||
+                validated.baseUrl.contains("googleapis.com") ||
+                (validated.capabilities.contains("chat_completions") && !validated.capabilities.contains("responses"))
+
+            val targetUrl = if (isChatCompletions) {
+                validated.chatCompletionsEndpoint
+            } else {
+                validated.responsesEndpoint
+            }
+
+            val request = if (isChatCompletions) {
+                buildJsonObject {
+                    put("model", model)
+                    put("messages", buildJsonArray {
+                        add(buildJsonObject {
+                            put("role", "system")
+                            put("content", """
+                                You are a helpful Korean keyboard writing assistant.
+                                You MUST respond ONLY with a valid JSON object matching this schema:
+                                {"suggestions": ["suggestion 1", "suggestion 2", ...]}
+                                Output raw JSON only. Do not output markdown code blocks.
+                            """.trimIndent())
+                        })
+                        add(buildJsonObject {
+                            put("role", "user")
+                            put("content", action.developerInstruction(customInstruction) + "\n\nInput text:\n" + requestInput)
                         })
                     })
-                })
+                    put("max_tokens", MAX_OUTPUT_TOKENS)
+                    put("temperature", 0.7)
+                    put("response_format", buildJsonObject {
+                        put("type", "json_object")
+                    })
+                }
+            } else {
+                buildJsonObject {
+                    put("model", model)
+                    put("instructions", action.developerInstruction(customInstruction))
+                    put("input", requestInput)
+                    put("store", false)
+                    put("max_output_tokens", MAX_OUTPUT_TOKENS)
+                    put("reasoning", buildJsonObject { put("effort", "none") })
+                    put("text", buildJsonObject {
+                        put("verbosity", "low")
+                        put("format", buildJsonObject {
+                            put("type", "json_schema")
+                            put("name", "fcitx_ai_suggestions")
+                            put("strict", true)
+                            put("schema", buildJsonObject {
+                                put("type", "object")
+                                put("additionalProperties", false)
+                                put("properties", buildJsonObject {
+                                    put("suggestions", buildJsonObject {
+                                        put("type", "array")
+                                        put("minItems", action.maxSuggestions)
+                                        put("maxItems", action.maxSuggestions)
+                                        put("items", buildJsonObject { put("type", "string") })
+                                    })
+                                })
+                                put("required", buildJsonArray { add("suggestions") })
+                            })
+                        })
+                    })
+                }
             }
             val authorization = authorizationProvider.authorizationHeader(validated)
             val response = try {
-                transport.post(validated.responsesEndpoint, authorization, request.toString())
+                transport.post(targetUrl, authorization, request.toString())
             } catch (exception: AiHttpStatusException) {
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
                     throw authorizationProvider.onUnauthorized(validated)
@@ -122,15 +160,31 @@ class OpenAiResponsesClient(
             if (containsRefusal(root["output"] as? JsonArray)) {
                 throw AiResponseRefusedException()
             }
-            val outputText = root.string("output_text").takeIf(String::isNotBlank)
+
+            // 1. Standard Chat Completions choices[0].message.content
+            val choiceContent = (root["choices"] as? JsonArray)?.firstOrNull()?.let { choice ->
+                ((choice as? JsonObject)?.get("message") as? JsonObject)?.string("content")
+            }
+
+            // 2. Legacy / experimental output_text or output
+            val outputText = choiceContent?.takeIf(String::isNotBlank)
+                ?: root.string("output_text").takeIf(String::isNotBlank)
                 ?: extractOutputText(root["output"] as? JsonArray)
                 ?: throw AiProviderException("AI response contained no text")
+
             val normalizedSuggestions = parseSuggestions(outputText)
                 .map(String::trim)
                 .filter(String::isNotEmpty)
                 .distinct()
-            if (normalizedSuggestions.size < maxSuggestions) {
-                throw AiSuggestionContractException()
+
+            if (choiceContent != null) {
+                if (normalizedSuggestions.isEmpty()) {
+                    throw AiSuggestionContractException()
+                }
+            } else {
+                if (normalizedSuggestions.size < maxSuggestions) {
+                    throw AiSuggestionContractException()
+                }
             }
             val suggestions = normalizedSuggestions.take(maxSuggestions)
             return AiGenerationResult(
@@ -172,13 +226,25 @@ class OpenAiResponsesClient(
                 .removePrefix("```")
                 .removeSuffix("```")
                 .trim()
-            return runCatching {
-                val array = JSON.parseToJsonElement(trimmed).jsonObject["suggestions"] as JsonArray
-                array.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
-            }.getOrElse {
-                throw AiSuggestionContractException()
+            val parsedObj = runCatching {
+                val element = JSON.parseToJsonElement(trimmed)
+                if (element is JsonObject) {
+                    val array = element["suggestions"] as? JsonArray
+                        ?: element["items"] as? JsonArray
+                        ?: element["candidates"] as? JsonArray
+                    array?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                } else if (element is JsonArray) {
+                    element.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                } else {
+                    null
+                }
+            }.getOrNull()
+            if (!parsedObj.isNullOrEmpty()) {
+                return parsedObj
             }
+            throw AiSuggestionContractException()
         }
+
 
         private fun JsonObject.string(name: String): String =
             (get(name) as? JsonPrimitive)?.contentOrNull.orEmpty()

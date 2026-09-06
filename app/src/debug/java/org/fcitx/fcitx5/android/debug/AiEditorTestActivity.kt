@@ -87,11 +87,20 @@ class AiEditorTestActivity : Activity() {
             },
             button("Reject commit", "Select commit-rejection mode") {
                 switchMode(HostMode.RejectCommit)
+            },
+            button("Stale extract", "Select stale extracted-selection mode") {
+                switchMode(HostMode.StaleExtractedSelection)
             }
         ))
         addView(buttonRow(
-            button("Stale extract", "Select stale extracted-selection mode") {
-                switchMode(HostMode.StaleExtractedSelection)
+            button("이메일 칸", "Email input field test") {
+                switchMode(HostMode.Email)
+            },
+            button("전화번호 칸", "Phone number field test") {
+                switchMode(HostMode.Phone)
+            },
+            button("URL 칸", "URL input field test") {
+                switchMode(HostMode.Url)
             }
         ))
         addView(buttonRow(
@@ -104,6 +113,28 @@ class AiEditorTestActivity : Activity() {
             }
         ))
         addView(buttonRow(
+            button("Clear", "Clear text") {
+                editor.setText("")
+                editor.setSelection(0)
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).restartInput(editor)
+            },
+            button("뭘 하고 시프지", "Set text to 뭘 하고 시프지") {
+                editor.setText("뭘 하고 시프지")
+                editor.setSelection("뭘 하고 시프지".length)
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).restartInput(editor)
+            },
+            button("문장 오타 테스트", "Set text to 뭘 하고 시프지 내가 어떻게 알아") {
+                editor.setText("뭘 하고 시프지 내가 어떻게 알아")
+                editor.setSelection("뭘 하고 시프지 내가 어떻게 알아".length)
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).restartInput(editor)
+            }
+        ))
+        addView(buttonRow(
+            button("난 그걸하고 시프니까", "Set text to 난 그걸하고 시프니까") {
+                editor.setText("난 그걸하고 시프니까")
+                editor.setSelection("난 그걸하고 시프니까".length)
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).restartInput(editor)
+            },
             button("Move cursor", "Move cursor to create a stale editor target") {
                 moveCursorToCreateStaleTarget()
             },
@@ -206,12 +237,37 @@ class AiEditorTestActivity : Activity() {
         editor = nextMode.createEditor(this).apply {
             id = View.generateViewId()
             gravity = Gravity.TOP or Gravity.START
-            inputType = InputType.TYPE_CLASS_TEXT or
-                InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            isSingleLine = false
-            minLines = 8
-            maxLines = Int.MAX_VALUE
+            when (nextMode) {
+                HostMode.Email -> {
+                    inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                    isSingleLine = true
+                    minLines = 1
+                    maxLines = 1
+                    hint = "이메일 주소를 입력하세요"
+                }
+                HostMode.Phone -> {
+                    inputType = InputType.TYPE_CLASS_PHONE
+                    isSingleLine = true
+                    minLines = 1
+                    maxLines = 1
+                    hint = "전화번호를 입력하세요"
+                }
+                HostMode.Url -> {
+                    inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+                    isSingleLine = true
+                    minLines = 1
+                    maxLines = 1
+                    hint = "URL 주소를 입력하세요"
+                }
+                else -> {
+                    inputType = InputType.TYPE_CLASS_TEXT or
+                        InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                        InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                    isSingleLine = false
+                    minLines = 8
+                    maxLines = Int.MAX_VALUE
+                }
+            }
             setHorizontallyScrolling(false)
             setTextSize(17f)
             setPadding(dp(12), dp(12), dp(12), dp(12))
@@ -248,6 +304,9 @@ class AiEditorTestActivity : Activity() {
             HostMode.NoExtractedText -> FALLBACK_TEXT
             HostMode.RejectCommit -> REJECT_COMMIT_TEXT
             HostMode.StaleExtractedSelection -> NORMAL_TEXT
+            HostMode.Email -> ""
+            HostMode.Phone -> ""
+            HostMode.Url -> ""
         }
         editor.setText(text)
         val cursor = when (mode) {
@@ -339,6 +398,21 @@ class AiEditorTestActivity : Activity() {
             stateName = "stale-extract",
             accessibilityName = "stale extracted selection",
             description = "getExtractedText reports a different cursor. AI must wait instead of mixing source and target."
+        ),
+        Email(
+            stateName = "email",
+            accessibilityName = "email input",
+            description = "Email address input field. Conversational sentence AI is blocked, email domain chips available."
+        ),
+        Phone(
+            stateName = "phone",
+            accessibilityName = "phone number input",
+            description = "Phone number input field. Conversational sentence AI is completely blocked."
+        ),
+        Url(
+            stateName = "url",
+            accessibilityName = "url input",
+            description = "URL/URI input field. Sentence AI blocked, domain chips (.com, .co.kr, etc.) available."
         );
 
         fun createEditor(context: Context): TestEditText = when (this) {
@@ -346,6 +420,9 @@ class AiEditorTestActivity : Activity() {
             NoExtractedText -> NoExtractedTextEditText(context)
             RejectCommit -> RejectCommitEditText(context)
             StaleExtractedSelection -> StaleExtractedSelectionEditText(context)
+            Email -> TestEditText(context)
+            Phone -> TestEditText(context)
+            Url -> TestEditText(context)
         }
     }
 

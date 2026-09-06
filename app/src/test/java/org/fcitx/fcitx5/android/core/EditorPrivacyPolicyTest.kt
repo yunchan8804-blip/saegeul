@@ -60,4 +60,84 @@ class EditorPrivacyPolicyTest {
         assertFalse(EditorPrivacyPolicy.forbidsTextInspection(ordinary))
         assertFalse(EditorPrivacyPolicy.forbidsTextInspection(email))
     }
+
+    @Test
+    fun testEmailFieldDetection() {
+        val emailVariation = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+        val webEmailVariation = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
+        }
+        val emailCapability = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT
+        }
+        val flags = CapabilityFlags.fromEditorInfo(emailVariation)
+        val hintEmail = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT
+            hintText = "이메일을 입력하세요"
+        }
+
+        assertTrue(EditorPrivacyPolicy.isEmailAddressField(emailVariation))
+        assertTrue(EditorPrivacyPolicy.isEmailAddressField(webEmailVariation))
+        assertTrue(EditorPrivacyPolicy.isEmailAddressField(emailCapability, flags))
+        assertTrue(EditorPrivacyPolicy.isEmailAddressField(hintEmail))
+        assertFalse(EditorPrivacyPolicy.isConversationalTextField(emailVariation))
+    }
+
+    @Test
+    fun testPhoneAndNumericFieldDetection() {
+        val phoneField = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_PHONE
+        }
+        val numberField = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+        }
+        val dateField = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_DATETIME
+        }
+        val phoneHintField = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT
+            hintText = "휴대전화 번호 (-없이 입력)"
+        }
+
+        assertTrue(EditorPrivacyPolicy.isPhoneField(phoneField))
+        assertTrue(EditorPrivacyPolicy.isPhoneField(phoneHintField))
+        assertTrue(EditorPrivacyPolicy.isNumericField(numberField))
+        assertTrue(EditorPrivacyPolicy.isNumericField(dateField))
+
+        assertFalse(EditorPrivacyPolicy.isConversationalTextField(phoneField))
+        assertFalse(EditorPrivacyPolicy.isConversationalTextField(numberField))
+        assertFalse(EditorPrivacyPolicy.isConversationalTextField(phoneHintField))
+    }
+
+    @Test
+    fun testUrlFieldDetection() {
+        val urlField = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+        }
+        assertTrue(EditorPrivacyPolicy.isUrlField(urlField))
+        assertFalse(EditorPrivacyPolicy.isConversationalTextField(urlField))
+    }
+
+    @Test
+    fun testConversationalTextFieldAllowed() {
+        val normalChat = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        val plainText = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT
+        }
+        val filterSearch = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_FILTER
+        }
+        val noSuggestions = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+
+        assertTrue(EditorPrivacyPolicy.isConversationalTextField(normalChat))
+        assertTrue(EditorPrivacyPolicy.isConversationalTextField(plainText))
+        assertFalse(EditorPrivacyPolicy.isConversationalTextField(filterSearch))
+        assertFalse(EditorPrivacyPolicy.isConversationalTextField(noSuggestions))
+    }
 }

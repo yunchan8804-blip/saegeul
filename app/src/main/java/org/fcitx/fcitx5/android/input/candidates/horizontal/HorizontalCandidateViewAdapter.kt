@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: LGPL-2.1-or-later
- * SPDX-FileCopyrightText: Copyright 2021-2024 Fcitx5 for Android Contributors
+ * SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
  */
 
 package org.fcitx.fcitx5.android.input.candidates.horizontal
@@ -19,8 +19,10 @@ import splitties.dimensions.dp
 import splitties.views.dsl.core.wrapContent
 import splitties.views.setPaddingDp
 
-open class HorizontalCandidateViewAdapter(val theme: Theme) :
-    RecyclerView.Adapter<CandidateViewHolder>() {
+open class HorizontalCandidateViewAdapter(
+    val theme: Theme,
+    var rowHeightDp: Int = KawaiiBarComponent.HEIGHT
+) : RecyclerView.Adapter<CandidateViewHolder>() {
 
     init {
         setHasStableIds(true)
@@ -47,11 +49,11 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
         val ui = CandidateItemUi(parent.context, theme)
         ui.root.apply {
-            minimumWidth = dp(40)
-            setPaddingDp(10, 0, 10, 0)
+            minimumWidth = dp(36)
+            setPaddingDp(6, 0, 6, 0)
             layoutParams = FlexboxLayoutManager.LayoutParams(
                 wrapContent,
-                dp(KawaiiBarComponent.HEIGHT)
+                dp(rowHeightDp)
             )
         }
         return CandidateViewHolder(ui)
@@ -59,6 +61,11 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
 
     @CallSuper
     override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
+        val targetHeight = holder.itemView.dp(rowHeightDp)
+        if (holder.itemView.layoutParams?.height != targetHeight) {
+            holder.itemView.layoutParams?.height = targetHeight
+            holder.itemView.requestLayout()
+        }
         holder.update(position, candidates[position])
     }
 

@@ -216,6 +216,9 @@ class CommonKeyActionListener :
                 }
                 else -> {}
             }
+            if (service.allowsTextInspectionFeatures()) {
+                horizontalCandidate.postRefreshContextualCandidates(32L)
+            }
         }
     }
 }

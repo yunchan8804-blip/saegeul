@@ -520,7 +520,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         TitleUi(context, theme)
     }
 
-    private val barStateMachine = KawaiiBarStateMachine.new {
+    val barStateMachine = KawaiiBarStateMachine.new {
         switchUiByState(it)
     }
 
@@ -569,16 +569,17 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private fun switchUiByState(state: KawaiiBarStateMachine.State) {
-        updateBarHeight()
         val index = state.ordinal
-        if (view.displayedChild == index) return
-        val new = view.getChildAt(index)
-        if (new != titleUi.root) {
-            titleUi.setReturnButtonOnClickListener { }
-            titleUi.setTitle("")
-            titleUi.removeExtension()
+        if (view.displayedChild != index) {
+            val new = view.getChildAt(index)
+            if (new != titleUi.root) {
+                titleUi.setReturnButtonOnClickListener { }
+                titleUi.setTitle("")
+                titleUi.removeExtension()
+            }
+            view.displayedChild = index
         }
-        view.displayedChild = index
+        updateBarHeight()
     }
 
     override val view by lazy {
@@ -701,11 +702,28 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
-        barStateMachine.push(PreeditUpdated, PreeditEmpty to empty)
+        if (empty && service.allowsTextInspectionFeatures()) {
+            val hasContextual = service.getContextualSentencePredictions().isNotEmpty() || service.getContextualWordPredictions().isNotEmpty()
+            barStateMachine.push(PreeditUpdated, PreeditEmpty to empty, CandidateEmpty to !hasContextual)
+        } else {
+            barStateMachine.push(PreeditUpdated, PreeditEmpty to empty)
+        }
     }
 
     override fun onCandidateUpdate(data: CandidateListEvent.Data) {
-        barStateMachine.push(CandidatesUpdated, CandidateEmpty to data.candidates.isEmpty())
+        val hasNative = data.candidates.isNotEmpty()
+        val hasContextual = service.getContextualSentencePredictions().isNotEmpty() || service.getContextualWordPredictions().isNotEmpty()
+        val isEmpty = !hasNative && !hasContextual
+        barStateMachine.push(CandidatesUpdated, CandidateEmpty to isEmpty)
+    }
+
+    override fun onSelectionUpdate(start: Int, end: Int) {
+        if (service.allowsTextInspectionFeatures()) {
+            val hasContextual = service.getContextualSentencePredictions().isNotEmpty() || service.getContextualWordPredictions().isNotEmpty()
+            if (hasContextual) {
+                barStateMachine.push(CandidatesUpdated, CandidateEmpty to false)
+            }
+        }
     }
 
     override fun onWindowAttached(window: InputWindow) {
@@ -803,7 +821,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             ToolbarLayoutPolicy.TOUCH_TARGET_DP * ToolbarLayoutPolicy.EXPANDED_ROWS
     }
 
-    private fun updateBarHeight() {
+    var isCandidateTwoRow: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                updateBarHeight()
+            }
+        }
+
+    fun updateBarHeight() {
         // Re-evaluate the explicit row state on every surface transition. Overflow itself never
         // changes IME height: the compact toolbar scrolls horizontally until the user expands it.
         toolbarNeedsSecondRow = idleUi.buttonsUi.needsSecondRow()
@@ -813,7 +839,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         )
         // Candidate/preedit and other transient bar states inherit the toolbar height selected for
         // this editor. This prevents the editor viewport from jumping 48 dp on every composition.
-        val targetHeight = context.dp(toolbarHeightSession.heightDp)
+        val targetHeight = if (isCandidateTwoRow && view.displayedChild == 1) {
+            context.dp(60)
+        } else {
+            context.dp(toolbarHeightSession.heightDp)
+        }
         val params = view.layoutParams ?: return
         if (params.height == targetHeight) return
         params.height = targetHeight

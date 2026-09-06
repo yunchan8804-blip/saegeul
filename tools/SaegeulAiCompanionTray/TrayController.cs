@@ -48,7 +48,7 @@ internal sealed class TrayController : IDisposable
         _shutdown = shutdown;
 
         _statusItem = new Forms.ToolStripMenuItem("상태: 시작 중") { Enabled = false };
-        _backendsItem = new Forms.ToolStripMenuItem("Codex·Claude 확인 중") { Enabled = false };
+        _backendsItem = new Forms.ToolStripMenuItem("Codex·Claude·AGY 확인 중") { Enabled = false };
         _startItem = new Forms.ToolStripMenuItem("게이트웨이 시작");
         _stopItem = new Forms.ToolStripMenuItem("게이트웨이 중지");
         _restartItem = new Forms.ToolStripMenuItem("게이트웨이 재시작");
@@ -270,7 +270,7 @@ internal sealed class TrayController : IDisposable
         };
         _statusItem.Text = $"상태: {stateText} · {_lastDetail}";
         _backendsItem.Text = string.IsNullOrWhiteSpace(backends)
-            ? "Codex·Claude 상태 확인 중"
+            ? "Codex·Claude·AGY 상태 확인 중"
             : $"백엔드: {backends}";
         _startItem.Enabled = state is GatewayState.Stopped or GatewayState.Error;
         _stopItem.Enabled = state is not GatewayState.Stopped;
@@ -283,7 +283,7 @@ internal sealed class TrayController : IDisposable
             GatewayState.Stopped => Color.Gray,
             _ => Color.IndianRed
         });
-        _dashboard?.UpdateStatus(stateText, state == GatewayState.Running, backends ?? "Codex · Claude · Ollama");
+        _dashboard?.UpdateStatus(stateText, state == GatewayState.Running, backends ?? "Codex · Claude · AGY");
         if (changed && state is GatewayState.Running or GatewayState.Error)
             ShowStatusBalloon();
     }

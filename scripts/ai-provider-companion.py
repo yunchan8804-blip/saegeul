@@ -52,7 +52,11 @@ PUBLIC_ORIGIN_VERIFY_MAX_DELAY_SECONDS = 3.0
 # Avoid Windows' Hyper-V/WSL excluded ranges, which commonly cover 8790-9200.
 DEFAULT_GATEWAY_PORT = 9211
 DEFAULT_TAILSCALE_HTTPS_PORT = 9210
-DEFAULT_REDIRECT_URI = "net.chanpaca.saegeul.debug.oauth:/callback"
+DEFAULT_REDIRECT_URI = "net.chanpaca.saegeul.oauth:/callback"
+ALLOWED_REDIRECT_URIS = {
+    "net.chanpaca.saegeul.oauth:/callback",
+    "net.chanpaca.saegeul.debug.oauth:/callback",
+}
 OAUTH_CLIENT_ID = "saegeul-android-public"
 OAUTH_SCOPES = "openid offline_access ai.invoke"
 ACCESS_TOKEN_TTL_SECONDS = 60 * 60
@@ -271,8 +275,16 @@ class AuthorizationCode:
 class LocalOAuthState:
     """Issues short-lived companion tokens without exposing either CLI's login session."""
 
-    def __init__(self, redirect_uri: str, state_path: Path | None = None):
+    def __init__(
+        self,
+        redirect_uri: str,
+        state_path: Path | None = None,
+        allowed_redirect_uris: set[str] | None = None,
+    ):
         self.redirect_uri = redirect_uri
+        self.allowed_redirect_uris = (
+            set(allowed_redirect_uris) if allowed_redirect_uris else {redirect_uri}
+        )
         self._lock = threading.Lock()
         self._requests: dict[str, AuthorizationRequest] = {}
         self._codes: dict[str, AuthorizationCode] = {}
@@ -293,7 +305,8 @@ class LocalOAuthState:
             raise ValueError("unsupported response_type")
         if one("client_id") != OAUTH_CLIENT_ID:
             raise ValueError("unknown client_id")
-        if one("redirect_uri") != self.redirect_uri:
+        requested_redirect_uri = one("redirect_uri")
+        if requested_redirect_uri not in self.allowed_redirect_uris:
             raise ValueError("redirect_uri mismatch")
         if one("code_challenge_method") != "S256":
             raise ValueError("PKCE S256 is required")
@@ -310,7 +323,7 @@ class LocalOAuthState:
             raise ValueError("unsupported scope")
         request_id = secrets.token_urlsafe(32)
         request = AuthorizationRequest(
-            redirect_uri=self.redirect_uri,
+            redirect_uri=requested_redirect_uri,
             state=state,
             code_challenge=challenge,
             scope=" ".join(scope for scope in OAUTH_SCOPES.split() if scope in requested_scopes),
@@ -621,6 +634,7 @@ def pkce_challenge(verifier: str) -> str:
 class CliBackendRunner:
     MODEL_CODEX = "codex"
     MODEL_CLAUDE = "claude"
+    MODEL_AGY = "agy"
 
     def __init__(self, sandbox_dir: Path):
         self.sandbox_dir = sandbox_dir
@@ -629,6 +643,7 @@ class CliBackendRunner:
         # CreateProcess access. Prefer the npm command shim used by the user's logged-in CLI.
         self.codex = find_executable("codex.cmd", "codex", "codex.exe")
         self.claude = find_executable("claude.exe", "claude")
+        self.agy = find_executable("agy.exe", "agy.cmd", "agy")
         self.available = self._detect_available()
         self._slot = threading.BoundedSemaphore(1)
 
@@ -647,11 +662,21 @@ class CliBackendRunner:
                         available.add(self.MODEL_CLAUDE)
                 except json.JSONDecodeError:
                     pass
+        if self.agy:
+            result = run_quiet([self.agy, "models"], environment, timeout=15)
+            if result and result.returncode == 0 and ("gemini" in result.stdout.lower() or "models" in result.stdout.lower()):
+                available.add(self.MODEL_AGY)
         if not available:
-            raise ValueError("Codex or Claude Code is not logged in on this computer")
+            raise ValueError("Codex, Claude Code, or AGY is not logged in on this computer")
         return available
 
     def model_mapping(self) -> dict[str, str]:
+        if self.MODEL_AGY in self.available:
+            # AGY powered by Gemini Flash is ultra-fast and ideal for realtime proofreading & word suggestions
+            fast_model = self.MODEL_AGY
+            balanced_model = self.MODEL_AGY if self.MODEL_CLAUDE not in self.available else self.MODEL_CLAUDE
+            quality_model = self.MODEL_CODEX if self.MODEL_CODEX in self.available else self.MODEL_AGY
+            return {"fast": fast_model, "balanced": balanced_model, "quality": quality_model}
         if self.available == {self.MODEL_CODEX}:
             return {"fast": self.MODEL_CODEX, "balanced": self.MODEL_CODEX, "quality": self.MODEL_CODEX}
         if self.available == {self.MODEL_CLAUDE}:
@@ -674,6 +699,8 @@ class CliBackendRunner:
             prompt = cli_prompt(instructions, input_text)
             if model == self.MODEL_CODEX:
                 output = self._run_codex(prompt)
+            elif model == self.MODEL_AGY:
+                output = self._run_agy(prompt)
             else:
                 output = self._run_claude(prompt)
             return normalize_suggestions(output, expected_suggestions)
@@ -742,12 +769,38 @@ class CliBackendRunner:
         except json.JSONDecodeError as error:
             raise RuntimeError("Claude Code returned invalid JSON") from error
 
+    def _run_agy(self, prompt: str) -> str:
+        assert self.agy
+        command = [
+            self.agy,
+            "-p",
+            prompt,
+            "--disable-slash-commands",
+            "--output-format",
+            "text",
+        ]
+        result = run_quiet(
+            command,
+            cli_environment(),
+            cwd=self.sandbox_dir,
+            timeout=CLI_TIMEOUT_SECONDS,
+        )
+        if result is None or result.returncode != 0:
+            raise RuntimeError("AGY non-interactive request failed")
+        return result.stdout.strip()
+
 
 def find_executable(*names: str) -> str | None:
     for name in names:
         executable = shutil.which(name)
         if executable and not executable.lower().endswith(".ps1"):
             return executable
+        if os.name == "nt":
+            local_app_data = os.environ.get("LOCALAPPDATA")
+            if local_app_data:
+                winget_candidate = Path(local_app_data) / "Microsoft" / "WinGet" / "Links" / name
+                if winget_candidate.is_file() and not winget_candidate.name.lower().endswith(".ps1"):
+                    return str(winget_candidate)
     return None
 
 
@@ -850,12 +903,18 @@ class CliGateway:
         redirect_uri: str,
         display_name: str,
         oauth_state_path: Path | None = None,
+        allowed_redirect_uris: set[str] | None = None,
     ):
         self.origin = origin.rstrip("/")
         self.runner = runner
         self.redirect_uri = redirect_uri
         self.display_name = display_name
-        self.oauth = LocalOAuthState(redirect_uri, oauth_state_path)
+        self.allowed_redirect_uris = (
+            set(allowed_redirect_uris) if allowed_redirect_uris else {redirect_uri}
+        )
+        self.oauth = LocalOAuthState(
+            redirect_uri, oauth_state_path, allowed_redirect_uris=self.allowed_redirect_uris
+        )
 
     def manifest(self) -> dict:
         models = self.runner.model_mapping()
@@ -1106,12 +1165,17 @@ def run_cli_gateway(args: argparse.Namespace) -> None:
         args.tailscale_https_port
     )
     oauth_state_path = Path(args.oauth_state_path).expanduser().resolve()
+    display_name = args.display_name
+    if not display_name:
+        labels = [("AGY" if b == "agy" else b.capitalize()) for b in sorted(runner.available)]
+        display_name = f"컴퓨터 {' + '.join(labels)}"
     gateway = CliGateway(
         origin,
         runner,
         args.redirect_uri,
-        args.display_name,
+        display_name,
         oauth_state_path,
+        allowed_redirect_uris={args.redirect_uri, *ALLOWED_REDIRECT_URIS},
     )
     server = http.server.ThreadingHTTPServer(
         ("127.0.0.1", args.gateway_port), CliGatewayRequestHandler
@@ -1251,7 +1315,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--address", help="local IPv4 address to advertise")
     parser.add_argument(
         "--display-name",
-        default="컴퓨터 Codex + Claude",
+        default=None,
         help="AI service name shown in the Android confirmation dialog",
     )
     parser.add_argument("--gateway-port", type=int, default=DEFAULT_GATEWAY_PORT)

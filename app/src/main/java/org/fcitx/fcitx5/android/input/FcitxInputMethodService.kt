@@ -99,6 +99,12 @@ import org.fcitx.fcitx5.android.input.ai.AiSourceKind
 import org.fcitx.fcitx5.android.input.ai.AiSourceScope
 import org.fcitx.fcitx5.android.input.ai.AiSuggestionApplyResult
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
+import org.fcitx.fcitx5.android.core.CandidateWord
+import org.fcitx.fcitx5.android.input.ai.AiContextualPredictor
+import org.fcitx.fcitx5.android.input.ai.AiSentenceCompletionPrefetcher
+import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
+import org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor
+import org.fcitx.fcitx5.android.input.ai.PersonalizedLexiconModel
 import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
@@ -133,6 +139,26 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
 
 class FcitxInputMethodService : LifecycleInputMethodService() {
+
+    fun triggerInstantTypingDnaSync() {
+        val drained = typingDnaVault.drain()
+        val pending = drained.filterValues { it.isNotEmpty() }
+        if (pending.isNotEmpty()) {
+            pending.forEach { (category, sentences) ->
+                val persona = typingDnaProfiler.profileOnDevice(category, sentences)
+                typingDnaCompiler.compilePersona(
+                    persona,
+                    persist = true,
+                    analyzedSentenceCount = sentences.size
+                )
+            }
+            runCatching { personalizedStore.save() }
+        } else {
+            runCatching {
+                typingDnaCompiler.compileFullProfile(typingDnaRepository.load())
+            }
+        }
+    }
 
     val isDirectBootInputMode: Boolean
         get() = FcitxApplication.getInstance().isDirectBootMode
@@ -181,7 +207,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    private var capabilityFlags = CapabilityFlags.DefaultFlags
+    internal var capabilityFlags = CapabilityFlags.DefaultFlags
 
     private val selection = CursorTracker()
 
@@ -624,6 +650,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onCreate() {
+        activeInstance = this
         fcitx = FcitxDaemon.connect(javaClass.name)
         observedFcitxEngineGeneration = fcitx.engineGeneration.value
         lifecycleScope.launch {
@@ -878,6 +905,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             ic.deleteSurroundingText(before, after)
         }
+        inputView?.postRefreshContextualCandidates(16L)
     }
 
     private fun handleBackspaceKey() {
@@ -2120,6 +2148,434 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return commitTextToEditor(text, 1)
     }
 
+    val morphologyEngine by lazy { org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine() }
+
+    val personalizedStore by lazy {
+        val file = java.io.File(filesDir, "personalized_sentences.json")
+        org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore(storageFile = file, morphology = morphologyEngine).apply {
+            load()
+        }
+    }
+
+    val reinforcementTracker by lazy {
+        org.fcitx.fcitx5.android.input.ai.ReinforcementTracker(store = personalizedStore)
+    }
+
+    val personalizedAugmenter by lazy {
+        org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceAugmenter(
+            store = personalizedStore,
+            llmCaller = { prompt ->
+                runCatching {
+                    val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
+                    if (profile != null) {
+                        val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile)
+                        kotlinx.coroutines.runBlocking {
+                            client.generate(org.fcitx.fcitx5.android.input.ai.AiAction.Custom, prompt).suggestions.firstOrNull()
+                        }
+                    } else null
+                }.getOrNull()
+            },
+            fallbackSynthesizer = { ctx ->
+                val intent = contextualPredictor.semanticPredictor.inferIntent(ctx)
+                contextualPredictor.semanticPredictor.predictNextSentences(ctx, limit = 3).map {
+                    org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceRecord(
+                        sentence = it.text,
+                        intent = intent,
+                        score = 1.0f
+                    )
+                }
+            }
+        )
+    }
+
+    val personalizedLexiconModel by lazy {
+        org.fcitx.fcitx5.android.input.ai.PersonalizedLexiconModel()
+    }
+
+    val typingDnaRepository by lazy {
+        org.fcitx.fcitx5.android.input.ai.TypingDnaRepository(
+            java.io.File(filesDir, "typing_dna.json")
+        )
+    }
+
+    val typingDnaProfiler by lazy {
+        org.fcitx.fcitx5.android.input.ai.TypingDnaProfiler(
+            llmCaller = { prompt ->
+                runCatching {
+                    val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
+                    if (profile != null) {
+                        val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile)
+                        kotlinx.coroutines.runBlocking {
+                            client.generate(
+                                action = org.fcitx.fcitx5.android.input.ai.AiAction.Custom,
+                                input = prompt,
+                                customInstruction = "Extract Korean typing DNA and output pure JSON object as instructed.",
+                                tierOverride = org.fcitx.fcitx5.android.input.ai.AiModelTier.Fast
+                            ).suggestions.firstOrNull()
+                        }
+                    } else null
+                }.getOrNull()
+            }
+        )
+    }
+
+    val typingDnaCompiler: org.fcitx.fcitx5.android.input.ai.TypingDnaCompiler by lazy {
+        org.fcitx.fcitx5.android.input.ai.TypingDnaCompiler(
+            collocationModel = contextualPredictor.collocationModel,
+            lexiconModel = personalizedLexiconModel,
+            sentenceStore = personalizedStore,
+            vault = typingDnaVault,
+            repository = typingDnaRepository
+        ).apply {
+            runCatching {
+                compileFullProfile(typingDnaRepository.load())
+            }
+        }
+    }
+
+    val typingDnaVault: org.fcitx.fcitx5.android.input.ai.TypingDnaVault by lazy {
+        org.fcitx.fcitx5.android.input.ai.TypingDnaVault(
+            thresholdPerCategory = 15,
+            onBatchReady = { category, sentences ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val personaDna = typingDnaProfiler.profile(category, sentences)
+                    typingDnaCompiler.compilePersona(personaDna)
+                    personalizedStore.save()
+                }
+            }
+        )
+    }
+
+    val userTypingContextCollector by lazy {
+        org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector(
+            onTriggerAugmentation = { pkg, ctx ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val augmented = personalizedAugmenter.augmentContext(pkg, ctx)
+                    if (augmented) {
+                        personalizedStore.save()
+                    }
+                }
+            },
+            onSentenceCommitted = { pkg, sentence ->
+                typingDnaVault.recordSentence(pkg, sentence)
+            }
+        )
+    }
+
+    val contextualPredictor: org.fcitx.fcitx5.android.input.ai.AiContextualPredictor by lazy {
+        org.fcitx.fcitx5.android.input.ai.AiContextualPredictor(
+            lexicon = personalizedLexiconModel,
+            morphology = morphologyEngine,
+            semanticPredictor = org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor(),
+            prefetcher = org.fcitx.fcitx5.android.input.ai.AiSentenceCompletionPrefetcher(
+                clientProvider = {
+                    runCatching {
+                        val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
+                        if (profile != null) org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile) else null
+                    }.getOrNull()
+                },
+                onPrefetchCompleted = { _, _ ->
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        if (allowsTextInspectionFeatures() && currentInputConnection != null) {
+                            inputView?.refreshContextualCandidates()
+                        }
+                    }
+                }
+            ),
+            personalizedStore = personalizedStore
+        )
+    }
+
+    private fun getEmailDomainPredictions(
+        beforeCursor: String,
+        activePreedit: String,
+        limit: Int
+    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
+        val emailDomains = listOf(
+            "gmail.com",
+            "naver.com",
+            "kakao.com",
+            "daum.net",
+            "icloud.com",
+            "outlook.com"
+        )
+        val trimmedBefore = beforeCursor.trim()
+        val atIndex = trimmedBefore.lastIndexOf('@')
+
+        val results = mutableListOf<org.fcitx.fcitx5.android.input.ai.AiPrediction>()
+
+        if (atIndex >= 0) {
+            val queryDomain = (trimmedBefore.substring(atIndex + 1) + activePreedit).trim().lowercase()
+            val matched = if (queryDomain.isEmpty()) {
+                emailDomains
+            } else {
+                emailDomains.filter { it.startsWith(queryDomain) }
+            }
+            matched.take(limit).forEachIndexed { idx, domain ->
+                results.add(
+                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
+                        text = domain,
+                        confidenceScore = 0.99f - (idx * 0.01f),
+                        isSentenceCompletion = false,
+                        source = "email_domain",
+                        badge = "📧"
+                    )
+                )
+            }
+        } else {
+            emailDomains.take(limit).forEachIndexed { idx, domain ->
+                results.add(
+                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
+                        text = "@$domain",
+                        confidenceScore = 0.98f - (idx * 0.01f),
+                        isSentenceCompletion = false,
+                        source = "email_domain",
+                        badge = "📧"
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    private fun getUrlDomainPredictions(
+        beforeCursor: String,
+        activePreedit: String,
+        limit: Int
+    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
+        val tlds = listOf(".com", ".co.kr", ".net", ".kr", ".org")
+        val results = mutableListOf<org.fcitx.fcitx5.android.input.ai.AiPrediction>()
+        val trimmed = (beforeCursor.trim() + activePreedit.trim()).lowercase()
+        val lastDotIndex = trimmed.lastIndexOf('.')
+        val queryExt = if (lastDotIndex >= 0 && lastDotIndex >= trimmed.length - 6) {
+            trimmed.substring(lastDotIndex)
+        } else {
+            ""
+        }
+        val matched = if (queryExt.isNotEmpty() && queryExt != ".") {
+            tlds.filter { it.startsWith(queryExt) }
+        } else {
+            tlds
+        }
+        if (!tlds.any { trimmed.endsWith(it) }) {
+            matched.take(limit).forEachIndexed { idx, tld ->
+                results.add(
+                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
+                        text = tld,
+                        confidenceScore = 0.95f - (idx * 0.01f),
+                        isSentenceCompletion = false,
+                        source = "url_tld",
+                        badge = ""
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    private fun getRawContextualPredictions(limit: Int): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
+        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return emptyList()
+
+        val isEmail = EditorPrivacyPolicy.isEmailAddressField(currentInputEditorInfo, capabilityFlags)
+        val isPhone = EditorPrivacyPolicy.isPhoneField(currentInputEditorInfo, capabilityFlags)
+        val isNumeric = EditorPrivacyPolicy.isNumericField(currentInputEditorInfo, capabilityFlags)
+        val isUrl = EditorPrivacyPolicy.isUrlField(currentInputEditorInfo, capabilityFlags)
+        val isConversational = EditorPrivacyPolicy.isConversationalTextField(currentInputEditorInfo, capabilityFlags)
+
+        val ic = currentInputConnection ?: return emptyList()
+        val beforeCursor = ic.getTextBeforeCursor(2048, 0)?.toString().orEmpty()
+
+        val activePreedit = composingText.toString().trim().ifEmpty {
+            runCatching {
+                fcitx.runImmediately {
+                    clientPreeditCached.toString().ifEmpty { inputPanelCached.preedit.toString() }
+                }
+            }.getOrDefault("").trim()
+        }
+
+        // 1. Phone or pure numeric inputs -> strictly no conversational predictions
+        if (isPhone || isNumeric) {
+            return emptyList()
+        }
+
+        // 2. Email field -> smart email domain suggestions, zero sentence completions
+        if (isEmail) {
+            return getEmailDomainPredictions(beforeCursor, activePreedit, limit)
+        }
+
+        // 3. URL field -> web domain suggestions, zero sentence completions
+        if (isUrl) {
+            return getUrlDomainPredictions(beforeCursor, activePreedit, limit)
+        }
+
+        // 4. Non-conversational text field (e.g. search filter with NO_SUGGESTIONS) -> emptyList()
+        if (!isConversational) {
+            return emptyList()
+        }
+
+        val pkgName = currentInputEditorInfo.packageName
+        val currentImeName = runCatching { fcitx.runImmediately { inputMethodEntryCached.uniqueName } }.getOrDefault("unknown")
+
+        android.util.Log.i("SaegulPredict", "getRawContextualPredictions: IME='$currentImeName', activePreedit='$activePreedit', beforeCursor='$beforeCursor'")
+
+        return if (activePreedit.isNotEmpty()) {
+            val results = contextualPredictor.predict(
+                currentStroke = activePreedit,
+                contextBeforeCursor = beforeCursor,
+                packageName = pkgName,
+                limit = limit
+            )
+            android.util.Log.i("SaegulPredict", "predict with activePreedit='$activePreedit' -> ${results.map { it.text }}")
+            results
+        } else if (beforeCursor.isNotBlank()) {
+            if (beforeCursor.endsWith(" ") || beforeCursor.endsWith("\n") || beforeCursor.endsWith("\t")) {
+                val results = contextualPredictor.predict(
+                    currentStroke = "",
+                    contextBeforeCursor = beforeCursor,
+                    packageName = pkgName,
+                    limit = limit
+                )
+                android.util.Log.i("SaegulPredict", "predict with trailing ws -> ${results.map { it.text }}")
+                results
+            } else {
+                val lastWs = beforeCursor.lastIndexOfAny(charArrayOf(' ', '\n', '\t', '\r'))
+                val (ctx, stroke) = if (lastWs >= 0) {
+                    beforeCursor.substring(0, lastWs).trim() to beforeCursor.substring(lastWs + 1).trim()
+                } else {
+                    "" to beforeCursor.trim()
+                }
+
+                val strokeResults = contextualPredictor.predict(
+                    currentStroke = stroke,
+                    contextBeforeCursor = beforeCursor,
+                    packageName = pkgName,
+                    limit = limit
+                )
+                android.util.Log.i("SaegulPredict", "predict with stroke='$stroke' -> ${strokeResults.map { it.text }}")
+
+                if (strokeResults.isNotEmpty()) {
+                    strokeResults
+                } else {
+                    val fallback = contextualPredictor.predict(
+                        currentStroke = "",
+                        contextBeforeCursor = beforeCursor,
+                        packageName = pkgName,
+                        limit = limit
+                    )
+                    android.util.Log.i("SaegulPredict", "predict fallback -> ${fallback.map { it.text }}")
+                    fallback
+                }
+            }
+        } else {
+            emptyList()
+        }
+    }
+
+    fun getContextualSentencePredictions(limit: Int = 2): List<CandidateWord> {
+        val predictions = getRawContextualPredictions(limit = 10)
+        return predictions.filter { it.isSentenceCompletion }.take(limit).mapIndexed { index, pred ->
+            CandidateWord(
+                label = (index + 1).toString(),
+                text = pred.text,
+                comment = pred.badge
+            )
+        }
+    }
+
+    fun getContextualWordPredictions(limit: Int = 4): List<CandidateWord> {
+        val predictions = getRawContextualPredictions(limit = 10)
+        return predictions.filter { !it.isSentenceCompletion }.take(limit).mapIndexed { index, pred ->
+            CandidateWord(
+                label = (index + 1).toString(),
+                text = pred.text,
+                comment = pred.badge
+            )
+        }
+    }
+
+    fun commitContextualSentence(sentence: String): Boolean {
+        if (!allowsTextInspectionFeatures()) return false
+        finishCompositionForDirectAction()
+        val ic = currentInputConnection ?: return false
+        val beforeCursor = ic.getTextBeforeCursor(512, 0)?.toString().orEmpty()
+
+        if (!sentence.contains(" ")) {
+            val lastSentence = beforeCursor
+                .substringAfterLast('.')
+                .substringAfterLast('?')
+                .substringAfterLast('!')
+                .substringAfterLast('\n')
+                .trim()
+            if (lastSentence.isNotEmpty()) {
+                val typoPairs = contextualPredictor.typoEngine.findTypoCorrectionsInSentence(lastSentence)
+                val matchingPair = typoPairs.firstOrNull { it.second == sentence }
+                if (matchingPair != null && !lastSentence.endsWith(matchingPair.first)) {
+                    val correctedSentence = contextualPredictor.typoEngine.correctSentence(lastSentence)
+                    if (correctedSentence != null) {
+                        val trailingSpaces = beforeCursor.length - beforeCursor.trimEnd().length
+                        val deleteLen = lastSentence.length + trailingSpaces
+                        ic.deleteSurroundingText(deleteLen, 0)
+                        val textToCommit = if (correctedSentence.endsWith(" ") || correctedSentence.endsWith("\n")) correctedSentence else "$correctedSentence "
+                        val committed = commitTextToEditor(textToCommit, textToCommit.length)
+                        if (committed) {
+                            reinforcementTracker.onCandidateSelected(sentence, currentInputEditorInfo.packageName)
+                            userTypingContextCollector.recordCommittedText(currentInputEditorInfo.packageName, textToCommit)
+                        }
+                        return committed
+                    }
+                }
+            }
+        }
+
+        val isEmailField = EditorPrivacyPolicy.isEmailAddressField(currentInputEditorInfo, capabilityFlags)
+        val isEmailDomain = sentence.startsWith("@") || sentence.endsWith(".com") || sentence.endsWith(".net") || sentence.endsWith(".co.kr") || sentence.endsWith(".io") || sentence.endsWith(".org")
+        val isUrlField = EditorPrivacyPolicy.isUrlField(currentInputEditorInfo, capabilityFlags)
+        val isUrlTld = sentence.startsWith(".") && (sentence.endsWith(".com") || sentence.endsWith(".net") || sentence.endsWith(".org") || sentence.endsWith(".kr") || sentence.endsWith(".co.kr") || sentence.endsWith(".io"))
+
+        if (isUrlField && isUrlTld && beforeCursor.endsWith(".")) {
+            ic.deleteSurroundingText(1, 0)
+        }
+
+        if (isEmailField && beforeCursor.contains("@")) {
+            val afterAt = beforeCursor.substringAfterLast('@')
+            val deleteLen = if (sentence.startsWith("@")) {
+                afterAt.length + 1
+            } else if (afterAt.isNotEmpty() && sentence.startsWith(afterAt)) {
+                afterAt.length
+            } else {
+                0
+            }
+            if (deleteLen > 0) {
+                ic.deleteSurroundingText(deleteLen, 0)
+            }
+            val committed = commitTextToEditor(sentence, sentence.length)
+            if (committed) {
+                reinforcementTracker.onCandidateSelected(sentence, currentInputEditorInfo.packageName)
+                userTypingContextCollector.recordCommittedText(currentInputEditorInfo.packageName, sentence)
+            }
+            return committed
+        }
+
+        val overlapLengthInBeforeCursor = if (isEmailField || isUrlField) {
+            0
+        } else {
+            contextualPredictor.typoEngine.calculateReplacementOverlap(beforeCursor, sentence)
+        }
+
+        if (overlapLengthInBeforeCursor > 0) {
+            ic.deleteSurroundingText(overlapLengthInBeforeCursor, 0)
+        }
+
+        val shouldAppendSpace = !isEmailField && !isUrlField && !isEmailDomain && !isUrlTld && !sentence.endsWith(" ") && !sentence.endsWith("\n")
+        val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
+        val committed = commitTextToEditor(textToCommit, textToCommit.length)
+        if (committed) {
+            reinforcementTracker.onCandidateSelected(sentence, currentInputEditorInfo.packageName)
+            userTypingContextCollector.recordCommittedText(currentInputEditorInfo.packageName, textToCommit)
+        }
+        return committed
+    }
+
     fun captureTypoRecoverySnapshot(): TypoRecoverySnapshot? {
         if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return null
         if (!finishCompositionForDirectAction()) return null
@@ -2194,15 +2650,23 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
                 dispatched = ic.finishComposingText() && dispatched
             }
+            if (dispatched) {
+                if (text.isNotBlank() && allowsTextInspectionFeatures()) {
+                    val pkg = currentInputEditorInfo.packageName
+                    userTypingContextCollector.recordCommittedText(pkg, text)
+                    contextualPredictor.learnSentence(text, pkg)
+                }
+                inputView?.postRefreshContextualCandidates(16L)
+            }
             return dispatched
         }
         // committed text should replace composing (if any), replace selected range (if any),
         // or simply prepend before cursor
         val start = if (composing.isEmpty()) selection.latest.start else composing.start
         resetComposingState()
-        if (cursor == -1) {
+        val dispatchedResult = if (cursor == -1) {
             selection.predict(start + text.length)
-            return ic.commitText(text, 1)
+            ic.commitText(text, 1)
         } else {
             val target = start + cursor
             selection.predict(target)
@@ -2211,8 +2675,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 dispatched = commitText(text, 1) && dispatched
                 dispatched = setSelection(target, target) && dispatched
             }
-            return dispatched
+            dispatched
         }
+        if (dispatchedResult) {
+            if (text.isNotBlank() && allowsTextInspectionFeatures()) {
+                val pkg = currentInputEditorInfo.packageName
+                userTypingContextCollector.recordCommittedText(pkg, text)
+                contextualPredictor.learnSentence(text, pkg)
+            }
+            inputView?.postRefreshContextualCandidates(16L)
+        }
+        return dispatchedResult
     }
 
     private fun handleBufferedHangulForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
@@ -3129,6 +3602,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         composingText = text
         ic.endBatchEdit()
+        inputView?.postRefreshContextualCandidates(16L)
     }
 
     /**
@@ -3292,6 +3766,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onDestroy() {
+        if (activeInstance === this) {
+            activeInstance = null
+        }
         SensitivePhraseSession.lock()
         recreateInputViewPrefs.forEach {
             it.unregisterOnChangeListener(recreateInputViewListener)
@@ -3334,6 +3811,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Suppress("ConstPropertyName")
     companion object {
+        @Volatile
+        var activeInstance: FcitxInputMethodService? = null
+            private set
+
         private const val KOREAN_PARTICLE_CONTEXT_CHARACTERS = 64
         val DeleteSurroundingFlag = "${BuildConfig.APPLICATION_ID}.DELETE_SURROUNDING"
         private const val SNIPPET_CONTEXT_CHARS = 128

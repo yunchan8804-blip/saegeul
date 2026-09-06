@@ -179,6 +179,13 @@
             android:taskAffinity=""
             android:theme="@style/Theme.OAuthDialog" />
 
+        <activity
+            android:name=".ui.main.ai.TypingDnaDashboardActivity"
+            android:exported="false"
+            android:label="AI 언어 지문 대시보드"
+            android:parentActivityName=".ui.main.MainActivity"
+            android:theme="@style/Theme.TypingDnaDashboard" />
+
         <!-- Local-network discovery is only a hint; trusted configuration is fetched over HTTPS. -->
         <activity
             android:name=".input.ai.AiProviderSetupActivity"

@@ -25,10 +25,10 @@ object KawaiiBarStateMachine {
     enum class TransitionEvent(val builder: TransitionBuildBlock<State, BooleanKey>) :
         EventStateMachine.TransitionEvent<State, BooleanKey> by BuildTransitionEvent(builder) {
         PreeditUpdated({
-            from(Candidate) transitTo Idle on (PreeditEmpty to true)
-            from(Idle) transitTo Candidate onF {
-                it(PreeditEmpty) == false && it(CandidateEmpty) == false
+            from(Candidate) transitTo Idle onF {
+                it(PreeditEmpty) == true && it(CandidateEmpty) == true
             }
+            from(Idle) transitTo Candidate on (CandidateEmpty to false)
         }),
         CandidatesUpdated({
             from(Idle) transitTo Candidate on (CandidateEmpty to false)

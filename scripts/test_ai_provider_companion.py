@@ -32,6 +32,31 @@ class LocalOAuthStateTest(unittest.TestCase):
             "scope": [companion.OAUTH_SCOPES],
         }
 
+    def test_multiple_allowed_redirect_uris(self):
+        oauth = companion.LocalOAuthState(
+            companion.DEFAULT_REDIRECT_URI,
+            allowed_redirect_uris=companion.ALLOWED_REDIRECT_URIS,
+        )
+        for redirect_uri in companion.ALLOWED_REDIRECT_URIS:
+            verifier = "x" * 64
+            query = self.authorization_query(verifier)
+            query["redirect_uri"] = [redirect_uri]
+            request_id = oauth.begin_authorization(query)
+            redirect = oauth.finish_authorization(request_id, True)
+            self.assertTrue(redirect.startswith(redirect_uri))
+            parsed = companion.urllib.parse.urlsplit(redirect)
+            code = companion.urllib.parse.parse_qs(parsed.query)["code"][0]
+            tokens = oauth.exchange(
+                {
+                    "grant_type": ["authorization_code"],
+                    "client_id": [companion.OAUTH_CLIENT_ID],
+                    "redirect_uri": [redirect_uri],
+                    "code": [code],
+                    "code_verifier": [verifier],
+                }
+            )
+            self.assertTrue(oauth.accepts(f"Bearer {tokens['access_token']}"))
+
     def test_pkce_authorization_code_refresh_and_revoke(self):
         oauth = companion.LocalOAuthState(companion.DEFAULT_REDIRECT_URI)
         verifier = "v" * 64
@@ -283,6 +308,38 @@ class CliBoundaryTest(unittest.TestCase):
         tampered[-1] ^= 0x01
         with self.assertRaises(ValueError):
             companion._crypt_posix_local_data(bytes(tampered), protect=False)
+
+    def test_agy_model_mapping_prioritizes_gemini_flash_for_fast_tier(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.codex = "codex.cmd"
+            runner.claude = "claude.exe"
+            runner.agy = "agy.exe"
+            runner.available = {companion.CliBackendRunner.MODEL_AGY, companion.CliBackendRunner.MODEL_CLAUDE}
+            mapping = runner.model_mapping()
+            self.assertEqual(companion.CliBackendRunner.MODEL_AGY, mapping["fast"])
+            self.assertEqual(companion.CliBackendRunner.MODEL_CLAUDE, mapping["balanced"])
+            self.assertEqual(companion.CliBackendRunner.MODEL_AGY, mapping["quality"])
+
+    def test_agy_generate_dispatches_properly(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.codex = None
+            runner.claude = None
+            runner.agy = "agy.exe"
+            runner.available = {companion.CliBackendRunner.MODEL_AGY}
+            runner._slot = companion.threading.BoundedSemaphore(1)
+
+            with mock.patch.object(runner, "_run_agy", return_value='{"suggestions": ["오늘 점심 뭐 먹을래?"]}'):
+                result = runner.generate(
+                    companion.CliBackendRunner.MODEL_AGY,
+                    "Return exactly 1 suggestion(s).",
+                    "오눌 점심 머먹을래?",
+                    1,
+                )
+                self.assertEqual('{"suggestions":["오늘 점심 뭐 먹을래?"]}', result)
 
 
 if __name__ == "__main__":

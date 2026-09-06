@@ -32,4 +32,78 @@ object EditorPrivacyPolicy {
             else -> false
         }
     }
+
+    fun isEmailAddressField(
+        info: EditorInfo,
+        capabilities: CapabilityFlags = CapabilityFlags.fromEditorInfo(info)
+    ): Boolean {
+        if (capabilities.has(CapabilityFlag.Email)) return true
+        val inputClass = info.inputType and InputType.TYPE_MASK_CLASS
+        val variation = info.inputType and InputType.TYPE_MASK_VARIATION
+        if (inputClass == InputType.TYPE_CLASS_TEXT &&
+            (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS)
+        ) {
+            return true
+        }
+        val text = "${info.hintText} ${info.label}".lowercase()
+        return text.contains("이메일") || text.contains("email")
+    }
+
+    fun isPhoneField(
+        info: EditorInfo,
+        capabilities: CapabilityFlags = CapabilityFlags.fromEditorInfo(info)
+    ): Boolean {
+        if (capabilities.has(CapabilityFlag.Dialable)) return true
+        val inputClass = info.inputType and InputType.TYPE_MASK_CLASS
+        if (inputClass == InputType.TYPE_CLASS_PHONE) return true
+        val text = "${info.hintText} ${info.label}".lowercase()
+        return text.contains("전화번호") || text.contains("휴대폰") || text.contains("휴대전화") || text.contains("phone")
+    }
+
+    fun isNumericField(
+        info: EditorInfo,
+        capabilities: CapabilityFlags = CapabilityFlags.fromEditorInfo(info)
+    ): Boolean {
+        if (capabilities.has(CapabilityFlag.Number) || capabilities.has(CapabilityFlag.Digit)) return true
+        val inputClass = info.inputType and InputType.TYPE_MASK_CLASS
+        return inputClass == InputType.TYPE_CLASS_NUMBER || inputClass == InputType.TYPE_CLASS_DATETIME
+    }
+
+    fun isUrlField(
+        info: EditorInfo,
+        capabilities: CapabilityFlags = CapabilityFlags.fromEditorInfo(info)
+    ): Boolean {
+        if (capabilities.has(CapabilityFlag.Url)) return true
+        val inputClass = info.inputType and InputType.TYPE_MASK_CLASS
+        val variation = info.inputType and InputType.TYPE_MASK_VARIATION
+        return inputClass == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_URI
+    }
+
+    /**
+     * Determines whether the editor is a conversational, prose, or free-form text entry field.
+     * Non-conversational fields include passwords, phone numbers, numeric inputs, emails, URLs,
+     * or fields with explicit NO_SUGGESTIONS flags.
+     */
+    fun isConversationalTextField(
+        info: EditorInfo,
+        capabilities: CapabilityFlags = CapabilityFlags.fromEditorInfo(info)
+    ): Boolean {
+        if (forbidsTextInspection(info, capabilities)) return false
+        if (isPhoneField(info, capabilities)) return false
+        if (isNumericField(info, capabilities)) return false
+        if (isEmailAddressField(info, capabilities)) return false
+        if (isUrlField(info, capabilities)) return false
+
+        val inputClass = info.inputType and InputType.TYPE_MASK_CLASS
+        if (inputClass != InputType.TYPE_CLASS_TEXT) return false
+
+        val variation = info.inputType and InputType.TYPE_MASK_VARIATION
+        if (variation == InputType.TYPE_TEXT_VARIATION_FILTER) return false
+
+        val flags = info.inputType and InputType.TYPE_MASK_FLAGS
+        if (flags.hasFlag(InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)) return false
+
+        return true
+    }
 }

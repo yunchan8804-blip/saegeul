@@ -65,6 +65,18 @@ class AiProviderDiscoveryManifestTest {
     }
 
     @Test
+    fun `manifest accepts both release and debug redirect URIs`() {
+        for (redirectUri in AiProviderProfile.allowedRedirectUris) {
+            val manifest = validManifest().replace(
+                AiProviderProfile.oauthRedirectUri,
+                redirectUri
+            )
+            val verified = AiProviderDiscoveryManifestCodec.decode(manifest, MANIFEST_URL)
+            assertEquals("home-ai", verified.providerId)
+        }
+    }
+
+    @Test
     fun `manifest requires Responses capability and fixed well-known path`() {
         assertTrue(runCatching {
             AiProviderDiscoveryManifestCodec.decode(

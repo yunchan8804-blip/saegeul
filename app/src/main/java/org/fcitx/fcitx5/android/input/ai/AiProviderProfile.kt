@@ -10,7 +10,8 @@ import java.net.URI
 
 enum class AiProviderKind {
     OpenAI,
-    OpenAICompatible
+    OpenAICompatible,
+    Gemini
 }
 
 enum class AiAuthMode {
@@ -36,13 +37,17 @@ data class AiProviderProfile(
     val oauthClientId: String = "",
     val oauthScopes: String = DEFAULT_OAUTH_SCOPES,
     val capabilities: Set<String> = DEFAULT_CAPABILITIES,
-    val fastModel: String = "gpt-5.6-luna",
-    val balancedModel: String = "gpt-5.6-terra",
-    val qualityModel: String = "gpt-5.6-sol"
+    val fastModel: String = "gpt-4o-mini",
+    val balancedModel: String = "gpt-4o-mini",
+    val qualityModel: String = "gpt-4o"
 ) {
     fun normalized(): AiProviderProfile = copy(
         displayName = displayName.trim().ifEmpty {
-            if (kind == AiProviderKind.OpenAI) "OpenAI" else "OpenAI compatible"
+            when (kind) {
+                AiProviderKind.OpenAI -> "OpenAI"
+                AiProviderKind.Gemini -> "Google Gemini"
+                AiProviderKind.OpenAICompatible -> "OpenAI compatible"
+            }
         }.take(80),
         baseUrl = normalizeBaseUrl(baseUrl),
         apiKey = apiKey.trim(),
@@ -58,9 +63,24 @@ data class AiProviderProfile(
         capabilities = capabilities.map(String::trim)
             .filter(CAPABILITY_PATTERN::matches)
             .toSet(),
-        fastModel = fastModel.trim().ifEmpty { "gpt-5.6-luna" }.take(120),
-        balancedModel = balancedModel.trim().ifEmpty { "gpt-5.6-terra" }.take(120),
-        qualityModel = qualityModel.trim().ifEmpty { "gpt-5.6-sol" }.take(120)
+        fastModel = fastModel.trim().ifEmpty {
+            when (kind) {
+                AiProviderKind.Gemini -> "gemini-2.0-flash"
+                else -> "gpt-4o-mini"
+            }
+        }.take(120),
+        balancedModel = balancedModel.trim().ifEmpty {
+            when (kind) {
+                AiProviderKind.Gemini -> "gemini-2.0-flash"
+                else -> "gpt-4o-mini"
+            }
+        }.take(120),
+        qualityModel = qualityModel.trim().ifEmpty {
+            when (kind) {
+                AiProviderKind.Gemini -> "gemini-2.0-flash"
+                else -> "gpt-4o"
+            }
+        }.take(120)
     )
 
     fun validate(): AiProviderProfile {
@@ -102,8 +122,8 @@ data class AiProviderProfile(
                 require(profile.oauthScopes.isNotEmpty()) { "OAuth scopes are empty" }
             }
         }
-        require("responses" in profile.capabilities) {
-            "Provider does not declare Responses support"
+        require("responses" in profile.capabilities || "chat_completions" in profile.capabilities) {
+            "Provider does not declare Responses or Chat Completions support"
         }
         return profile
     }
@@ -117,16 +137,34 @@ data class AiProviderProfile(
     val responsesEndpoint: String
         get() = "${normalized().baseUrl}/responses"
 
+    val chatCompletionsEndpoint: String
+        get() {
+            val base = normalized().baseUrl.trimEnd('/')
+            return when {
+                base.endsWith("/chat/completions") -> base
+                base.endsWith("/responses") -> base.removeSuffix("/responses") + "/chat/completions"
+                else -> "$base/chat/completions"
+            }
+        }
+
     val isConfigured: Boolean
         get() = runCatching { validate() }.isSuccess
 
     companion object {
         const val OPENAI_BASE_URL = "https://api.openai.com/v1"
+        const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
         const val DEFAULT_OAUTH_SCOPES = "openid offline_access"
         val DEFAULT_CAPABILITIES = setOf("responses")
         private val CAPABILITY_PATTERN = Regex("^[a-z][a-z0-9._-]{0,63}$")
         val oauthRedirectUri: String
             get() = BuildConfig.AI_OAUTH_REDIRECT_URI
+
+        val allowedRedirectUris: Set<String>
+            get() = setOf(
+                BuildConfig.AI_OAUTH_REDIRECT_URI,
+                "net.chanpaca.saegeul.oauth:/callback",
+                "net.chanpaca.saegeul.debug.oauth:/callback"
+            )
 
         internal fun normalizeBaseUrl(value: String): String = value.trim()
             .ifEmpty { OPENAI_BASE_URL }
@@ -149,7 +187,7 @@ object AiOAuthCallbackContract {
             clientId == validated.oauthClientId &&
             authorizationEndpoint == validated.oauthAuthorizationEndpoint &&
             tokenEndpoint == validated.oauthTokenEndpoint &&
-            redirectUri == AiProviderProfile.oauthRedirectUri
+            redirectUri in AiProviderProfile.allowedRedirectUris
     }
 }
 
