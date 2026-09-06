@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import java.io.File
 
 /**
@@ -11,11 +14,13 @@ import java.io.File
  * Manages incremental accumulation, knowledge evolution, and atomic persistence.
  */
 class TypingDnaRepository(
-    private val storageFile: File
+    private val storageFile: File,
+    private val cipher: VaultCipher = PlainVaultCipher
 ) {
 
     private var cachedProfile: TypingDnaProfile? = null
     private var lastLoadedTimestamp: Long = 0L
+    private val vaultFile = VaultFile(storageFile, cipher, VaultFile.aadFor(storageFile.name))
 
     @Synchronized
     fun load(forceReload: Boolean = false): TypingDnaProfile {
@@ -31,7 +36,10 @@ class TypingDnaRepository(
             return fresh
         }
 
-        val jsonStr = runCatching { storageFile.readText() }.getOrDefault("")
+        val jsonStr = runCatching {
+            vaultFile.migrateIfLegacy()
+            vaultFile.readText()
+        }.getOrNull() ?: ""
         val profile = TypingDnaProfile.fromJson(jsonStr)
         cachedProfile = profile
         lastLoadedTimestamp = currentMod
@@ -42,8 +50,7 @@ class TypingDnaRepository(
     fun save(profile: TypingDnaProfile) {
         cachedProfile = profile
         runCatching {
-            storageFile.parentFile?.mkdirs()
-            storageFile.writeText(profile.toJson())
+            vaultFile.writeText(profile.toJson())
             lastLoadedTimestamp = storageFile.lastModified()
         }
     }
@@ -99,9 +106,7 @@ class TypingDnaRepository(
         cachedProfile = TypingDnaProfile()
         lastLoadedTimestamp = 0L
         runCatching {
-            if (storageFile.exists()) {
-                storageFile.delete()
-            }
+            vaultFile.delete()
         }
     }
 

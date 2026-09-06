@@ -73,6 +73,23 @@ class TypingDnaVaultTest {
     }
 
     @Test
+    fun stagingFileRehydratesAfterNewVaultInstance() {
+        val staging = java.io.File.createTempFile("typing_dna_pending", ".json").apply { deleteOnExit() }
+        val first = TypingDnaVault(thresholdPerCategory = 15, stagingFile = staging)
+        first.recordSentence("com.kakao.talk", "친구야 오늘 저녁에 만나자 ㅋㅋ")
+        first.recordSentence("com.slack", "배포 모니터링 부탁드립니다.")
+        assertTrue(staging.exists() && staging.length() > 2)
+
+        val second = TypingDnaVault(thresholdPerCategory = 15, stagingFile = staging)
+        assertEquals(1, second.getSentences(TypingDnaVault.CATEGORY_MESSENGER).size)
+        assertEquals(1, second.getSentences(TypingDnaVault.CATEGORY_WORK).size)
+
+        second.drain()
+        val third = TypingDnaVault(thresholdPerCategory = 15, stagingFile = staging)
+        assertEquals(0, third.totalBufferedCount())
+    }
+
+    @Test
     fun testDrainReturnsBufferedSentencesWithoutDispatchingCallback() {
         var callbackCount = 0
         val vault = TypingDnaVault(

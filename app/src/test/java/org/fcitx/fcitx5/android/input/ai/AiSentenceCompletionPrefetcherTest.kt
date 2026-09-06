@@ -123,7 +123,6 @@ class AiSentenceCompletionPrefetcherTest {
         prefetcher.putPredictions(testContext, llmProposals)
 
         val predictor = AiContextualPredictor(
-            lexicon = PersonalizedLexiconModel(),
             morphology = ChoseongMorphologyEngine(),
             prefetcher = prefetcher
         )

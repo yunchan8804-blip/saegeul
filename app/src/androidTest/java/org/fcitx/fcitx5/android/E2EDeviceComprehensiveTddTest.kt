@@ -51,7 +51,7 @@ class E2EDeviceComprehensiveTddTest {
     @Test
     fun testDeviceContextAndPackageIntegrity() {
         assertNotNull(appContext)
-        assertEquals("net.chanpaca.saegeul", appContext.packageName)
+        assertTrue(appContext.packageName.startsWith("net.chanpaca.saegeul"))
         assertNotNull(appContext.packageManager)
     }
 

@@ -10,6 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 
 /**
@@ -47,7 +48,6 @@ class SemanticSentenceRecommendationE2ETest {
         semanticPredictor = KoreanSemanticSentencePredictor()
         prefetcher = AiSentenceCompletionPrefetcher(clientProvider = null)
         contextualPredictor = AiContextualPredictor(
-            lexicon = PersonalizedLexiconModel(maxCapacity = 1000),
             morphology = ChoseongMorphologyEngine(),
             semanticPredictor = semanticPredictor,
             prefetcher = prefetcher
@@ -84,6 +84,7 @@ class SemanticSentenceRecommendationE2ETest {
         return editor.commitText(textToCommit)
     }
 
+    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
     @Test
     fun testE2E_WorkAndDeploymentFlow() {
         val editor = MockEditor("서버 작업 마무리되었고 머지 요청드렸습니다. 배포 준비 중인데 ")
@@ -107,6 +108,7 @@ class SemanticSentenceRecommendationE2ETest {
         assertTrue(editor.textBeforeCursor.contains(topCandidate.text))
     }
 
+    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
     @Test
     fun testE2E_SchedulingWithEntitySlotFilling() {
         val editor = MockEditor("내일 판교에서 3시 회의")
@@ -124,6 +126,7 @@ class SemanticSentenceRecommendationE2ETest {
         assertTrue(editor.textBeforeCursor.endsWith(" "))
     }
 
+    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
     @Test
     fun testE2E_NuancePolarityRejectionGuard() {
         val editor = MockEditor("정말 죄송하지만 이번 주말에는 선약이 있어서 참석이 어렵습니다.")
@@ -144,22 +147,35 @@ class SemanticSentenceRecommendationE2ETest {
 
     @Test
     fun testE2E_ToneConsistencyAcrossStyles() {
+        // Sentence-line tone consistency is now carried by input_continuation, which appends a
+        // tone-matching ending onto a personal-n-gram-trained continuable input.
         // 1. Honorific
-        val honorificEditor = MockEditor("부장님, 기획안 검토 후 연락 부탁드립니다.")
+        contextualPredictor.learnSentence("회의 참석하겠습니다", "com.kakao.talk")
+        val honorificEditor = MockEditor("회의 참석")
         val honorificCandidates = getContextualCandidateWords(honorificEditor)
         assertTrue(honorificCandidates.isNotEmpty())
-        assertTrue(honorificCandidates.any { it.text.endsWith("습니다.") || it.text.endsWith("드립니다.") || it.text.endsWith("세요.") })
+        assertTrue(honorificCandidates.any {
+            it.text.startsWith("회의 참석") &&
+                (it.text.endsWith("습니다") || it.text.endsWith("드립니다") || it.text.endsWith("세요"))
+        })
 
         // 2. Informal
-        val informalEditor = MockEditor("야 어디야? 밥 먹자 ㅋㅋ")
+        contextualPredictor.learnSentence("뭐 확인했어", "com.kakao.talk")
+        val informalEditor = MockEditor("뭐 확인")
         val informalCandidates = getContextualCandidateWords(informalEditor)
         assertTrue(informalCandidates.isNotEmpty())
-        assertTrue(informalCandidates.any { it.text.endsWith("!") || it.text.endsWith("?") || it.text.contains("먹고") || it.text.contains("갈래") })
+        assertTrue(informalCandidates.any {
+            it.text.startsWith("뭐 확인") &&
+                (it.text.endsWith("할게") || it.text.endsWith("했어") || it.text.endsWith("하자"))
+        })
     }
 
     @Test
     fun testE2E_StrokeVsBlankPriorities() {
         val context = "오늘 회의 내용 "
+        // "내용" is not a 하다-명사, so the sentence-line result here only comes from
+        // input_continuation's personal-n-gram chaining, which needs this trained first.
+        contextualPredictor.learnSentence("오늘 회의 내용 정리했습니다", "com.kakao.talk")
 
         // 1. Blank stroke: Full sentences should have top confidence
         val blankPredictions = contextualPredictor.predict(
@@ -183,6 +199,7 @@ class SemanticSentenceRecommendationE2ETest {
         assertTrue(strokePredictions.any { it.text.contains("회의") })
     }
 
+    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
     @Test
     fun testE2E_DesignpacaBadgeIntegrity() {
         val editor = MockEditor("오후 3시에 회의 가능하실까요?")
@@ -218,6 +235,7 @@ class SemanticSentenceRecommendationE2ETest {
         }
     }
 
+    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
     @Test
     fun testE2E_CompositeMultiEntityAndMealSynthesis() {
         // 1. Time + Place + Topic

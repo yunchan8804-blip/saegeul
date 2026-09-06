@@ -23,7 +23,6 @@ class TypingDnaProfilerAndCompilerTest {
     val tempFolder = TemporaryFolder()
 
     private lateinit var collocationModel: KoreanCollocationModel
-    private lateinit var lexiconModel: PersonalizedLexiconModel
     private lateinit var sentenceStore: PersonalizedSentenceStore
     private lateinit var vault: TypingDnaVault
     private lateinit var repoFile: File
@@ -34,14 +33,12 @@ class TypingDnaProfilerAndCompilerTest {
     @Before
     fun setUp() {
         collocationModel = KoreanCollocationModel()
-        lexiconModel = PersonalizedLexiconModel()
         sentenceStore = PersonalizedSentenceStore()
         vault = TypingDnaVault()
         repoFile = tempFolder.newFile("typing_dna_test.json")
         repository = TypingDnaRepository(repoFile)
         compiler = TypingDnaCompiler(
             collocationModel = collocationModel,
-            lexiconModel = lexiconModel,
             sentenceStore = sentenceStore,
             vault = vault,
             repository = repository

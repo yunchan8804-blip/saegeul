@@ -215,13 +215,19 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     title = "지금 언어 지문 분석 및 동기화",
                     summary = "최근 타이핑 데이터를 바탕으로 내 말투와 어휘 습관을 즉시 업데이트합니다.",
                     onClick = {
-                        runCatching {
-                            org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.triggerInstantTypingDnaSync()
+                        val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
+                        val ime = org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance
+                        if (ime != null) {
+                            runCatching { ime.triggerInstantTypingDnaSync() }
+                        } else {
+                            org.fcitx.fcitx5.android.input.ai.TypingDnaInstantSync.persistOnly(
+                                app.typingDnaVault,
+                                app.typingDnaRepository,
+                                sentenceStoreFile = java.io.File(ctx.filesDir, "personalized_sentences.json"),
+                                cipher = app.vaultCipher
+                            )
                         }
-                        val repo = org.fcitx.fcitx5.android.input.ai.TypingDnaRepository(
-                            java.io.File(ctx.filesDir, "typing_dna.json")
-                        )
-                        val summary = repo.getSummary()
+                        val summary = app.typingDnaRepository.getSummary(forceReload = true)
                         Toast.makeText(
                             ctx,
                             "언어 지문 분석 완료 (분석 문장: ${summary.totalSentences}개)",
@@ -238,13 +244,10 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                             .setTitle("언어 지문 초기화")
                             .setMessage("학습된 말투, 종결 어미, 나만의 표현을 기기에서 완전히 삭제하시겠습니까?")
                             .setPositiveButton(R.string.delete) { _, _ ->
-                                val repo = org.fcitx.fcitx5.android.input.ai.TypingDnaRepository(
-                                    java.io.File(ctx.filesDir, "typing_dna.json")
-                                )
-                                repo.clear()
-                                runCatching {
-                                    org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.typingDnaVault?.purge()
-                                }
+                                val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
+                                app.typingDnaRepository.clear()
+                                app.typingDnaVault.purge()
+                                app.personalNgramModel.clear()
                                 refreshSummaries()
                                 Toast.makeText(ctx, "언어 지문이 안전하게 초기화되었습니다.", Toast.LENGTH_SHORT).show()
                             }
@@ -399,10 +402,8 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             gifProvider.giphyCredentialState != GiphyCredentialState.Missing
 
         if (::typingDnaPreference.isInitialized) {
-            val repo = org.fcitx.fcitx5.android.input.ai.TypingDnaRepository(
-                java.io.File(ctx.filesDir, "typing_dna.json")
-            )
-            val s = repo.getStats(forceReload = true)
+            val s = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
+                .typingDnaRepository.getStats(forceReload = true)
             typingDnaPreference.summary = if (!s.hasLearnedData) {
                 "아직 학습된 언어 지문이 없습니다. 키보드를 사용하면 자동으로 내 말투가 학습됩니다."
             } else {

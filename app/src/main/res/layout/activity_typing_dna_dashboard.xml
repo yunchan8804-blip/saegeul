@@ -19,8 +19,8 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:contentDescription="AI 언어 지문 대시보드"
-            app:title="AI 언어 지문 대시보드"
+            android:contentDescription="@string/vault_title"
+            app:title="@string/vault_title"
             app:navigationIcon="@drawable/ic_baseline_arrow_back_24"
             app:navigationContentDescription="뒤로" />
 
@@ -41,7 +41,7 @@
             android:paddingTop="16dp"
             android:paddingBottom="24dp">
 
-            <!-- Hero Level Card -->
+            <!-- Hero Card: big learned-word count + level badge -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -60,8 +60,19 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
+                        android:gravity="top"
                         android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tv_vault_hero_number"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:contentDescription="학습 어절 수"
+                            android:text="0"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="40sp"
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tv_level_badge"
@@ -75,18 +86,45 @@
                             android:textSize="13sp"
                             android:textStyle="bold" />
 
-                        <TextView
-                            android:id="@+id/tv_level_title"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:text="새싹 학습자"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:textSize="18sp"
-                            android:textStyle="bold" />
-
                     </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tv_vault_hero_subtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="13sp"
+                        tools:text="12일째 학습 중 · 어절쌍 342개 · 문장 58개" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Level Detail Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke_color">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:id="@+id/tv_level_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="새싹 학습자"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/tv_level_desc"
@@ -114,6 +152,472 @@
                         android:text="다음 레벨까지 문장 15개 필요"
                         android:textColor="?android:attr/textColorTertiary"
                         android:textSize="11sp" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Security Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke_color">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_baseline_lock_24"
+                            app:tint="?attr/colorPrimary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/vault_security_title"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tv_vault_security_subtitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textColor="?attr/colorPrimary"
+                                android:textSize="12sp"
+                                tools:text="TEE 하드웨어 키" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/vault_security_body_line1"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/vault_security_body_line2"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="12sp" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Integrity Card: acceptance/personal-hit/keystroke/typo metrics -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke_color">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:id="@+id/vault_integrity_grid"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tv_vault_accept_rate"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0%"
+                                    android:textColor="?attr/colorPrimary"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/vault_metric_accept_rate"
+                                    android:textColor="?android:attr/textColorSecondary"
+                                    android:textSize="12sp" />
+
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tv_vault_personal_hits"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0%"
+                                    android:textColor="?attr/colorPrimary"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/vault_metric_personal_hits"
+                                    android:textColor="?android:attr/textColorSecondary"
+                                    android:textSize="12sp" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tv_vault_keystrokes_saved"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0"
+                                    android:textColor="?attr/colorPrimary"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/vault_metric_keystrokes_saved"
+                                    android:textColor="?android:attr/textColorSecondary"
+                                    android:textSize="12sp" />
+
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tv_vault_typos_fixed"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0"
+                                    android:textColor="?attr/colorPrimary"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/vault_metric_typos_fixed"
+                                    android:textColor="?android:attr/textColorSecondary"
+                                    android:textSize="12sp" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tv_vault_integrity_empty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:gravity="center"
+                        android:padding="24dp"
+                        android:text="@string/vault_integrity_empty"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="13sp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                </FrameLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Growth Timeline Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke_color">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <org.fcitx.fcitx5.android.ui.main.ai.VaultTimelineView
+                        android:id="@+id/vault_timeline_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="내 언어 금고 성장 타임라인" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Frequent Words Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_vault_words"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke_color">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="10dp"
+                        android:text="@string/vault_frequent_words_title"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chip_group_vault_words"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:chipSpacingHorizontal="6dp"
+                        app:chipSpacingVertical="4dp" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Category Distribution Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke_color">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/vault_category_title"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="56dp"
+                            android:layout_height="wrap_content"
+                            android:text="@string/vault_category_messenger"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="10dp"
+                            android:layout_marginHorizontal="8dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_dna_metric_chip"
+                            android:orientation="horizontal"
+                            android:weightSum="1">
+
+                            <View
+                                android:id="@+id/vault_cat_messenger_fill"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="0"
+                                android:background="@drawable/bg_dna_level_badge" />
+
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_vault_cat_messenger_pct"
+                            android:layout_width="36dp"
+                            android:layout_height="wrap_content"
+                            android:gravity="end"
+                            android:text="0%"
+                            android:textColor="?android:attr/textColorPrimary"
+                            android:textSize="12sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="56dp"
+                            android:layout_height="wrap_content"
+                            android:text="@string/vault_category_work"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="10dp"
+                            android:layout_marginHorizontal="8dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_dna_metric_chip"
+                            android:orientation="horizontal"
+                            android:weightSum="1">
+
+                            <View
+                                android:id="@+id/vault_cat_work_fill"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="0"
+                                android:background="@drawable/bg_dna_level_badge" />
+
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_vault_cat_work_pct"
+                            android:layout_width="36dp"
+                            android:layout_height="wrap_content"
+                            android:gravity="end"
+                            android:text="0%"
+                            android:textColor="?android:attr/textColorPrimary"
+                            android:textSize="12sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="56dp"
+                            android:layout_height="wrap_content"
+                            android:text="@string/vault_category_general"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="10dp"
+                            android:layout_marginHorizontal="8dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_dna_metric_chip"
+                            android:orientation="horizontal"
+                            android:weightSum="1">
+
+                            <View
+                                android:id="@+id/vault_cat_general_fill"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="0"
+                                android:background="@drawable/bg_dna_level_badge" />
+
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_vault_cat_general_pct"
+                            android:layout_width="36dp"
+                            android:layout_height="wrap_content"
+                            android:gravity="end"
+                            android:text="0%"
+                            android:textColor="?android:attr/textColorPrimary"
+                            android:textSize="12sp" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 
@@ -280,6 +784,29 @@
                 </com.google.android.material.card.MaterialCardView>
 
             </LinearLayout>
+
+            <!-- Ngram Learning Progress -->
+            <TextView
+                android:id="@+id/tv_dash_ngram_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:gravity="center"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp"
+                tools:text="학습 어절 128개 · 어절쌍 342개 · 분석 대기 문장 3개" />
+
+            <TextView
+                android:id="@+id/tv_dash_last_learned"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:gravity="center"
+                android:textColor="?android:attr/textColorTertiary"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="마지막 학습 5분 전"
+                tools:visibility="visible" />
 
             <!-- Chart Card -->
             <com.google.android.material.card.MaterialCardView

@@ -379,7 +379,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val twoRowCandidateBar = switch(
             R.string.two_row_candidate_bar,
             "two_row_candidate_bar",
-            false,
+            true,
             R.string.two_row_candidate_bar_summary
         )
 

@@ -16,20 +16,20 @@ import org.junit.Test
  */
 class RecommendationBadgeEliminationTest {
 
-    private lateinit var lexicon: PersonalizedLexiconModel
+    private lateinit var ngram: PersonalNgramModel
     private lateinit var morphology: ChoseongMorphologyEngine
     private lateinit var predictor: AiContextualPredictor
 
     @Before
     fun setUp() {
-        lexicon = PersonalizedLexiconModel()
+        ngram = PersonalNgramModel()
         morphology = ChoseongMorphologyEngine()
         predictor = AiContextualPredictor(
-            lexicon = lexicon,
             morphology = morphology,
             semanticPredictor = KoreanSemanticSentencePredictor(),
             prefetcher = null,
-            personalizedStore = null
+            personalizedStore = null,
+            ngram = ngram
         )
     }
 
@@ -70,8 +70,8 @@ class RecommendationBadgeEliminationTest {
 
     @Test
     fun `word candidates should have empty badge or domain specific badge but never 추천`() {
-        lexicon.recordTransition("내일", "만나요", "com.test.app")
-        lexicon.recordTransition("내일", "만나요", "com.test.app")
+        ngram.learn("내일 만나요", "com.test.app")
+        ngram.learn("내일 만나요", "com.test.app")
 
         val results = predictor.predict(
             currentStroke = "",

@@ -21,4 +21,9 @@ data class PersonalizedSentenceRecord(
     var useCount: Int = 0,
     var lastUsedTimestamp: Long = System.currentTimeMillis(),
     val packageName: String? = null
-)
+) {
+    companion object {
+        const val SOURCE_USER_PHRASE = "user_phrase"
+        const val SOURCE_SYNTHETIC_LLM = "synthetic_llm"
+    }
+}

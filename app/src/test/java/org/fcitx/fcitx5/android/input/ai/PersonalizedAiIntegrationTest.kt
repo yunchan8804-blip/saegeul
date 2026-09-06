@@ -19,7 +19,7 @@ class PersonalizedAiIntegrationTest {
     private lateinit var storeFile: File
     private lateinit var morphology: ChoseongMorphologyEngine
     private lateinit var semanticPredictor: KoreanSemanticSentencePredictor
-    private lateinit var lexicon: PersonalizedLexiconModel
+    private lateinit var ngram: PersonalNgramModel
     private lateinit var store: PersonalizedSentenceStore
     private lateinit var tracker: ReinforcementTracker
     private lateinit var collector: UserTypingContextCollector
@@ -30,30 +30,33 @@ class PersonalizedAiIntegrationTest {
         storeFile = tempFolder.newFile("test_integration_store.json")
         morphology = ChoseongMorphologyEngine()
         semanticPredictor = KoreanSemanticSentencePredictor()
-        lexicon = PersonalizedLexiconModel(maxCapacity = 500)
+        ngram = PersonalNgramModel()
         store = PersonalizedSentenceStore(storageFile = storeFile, morphology = morphology, maxCapacity = 100)
         tracker = ReinforcementTracker(store = store)
         collector = UserTypingContextCollector()
 
         predictor = AiContextualPredictor(
-            lexicon = lexicon,
             morphology = morphology,
             semanticPredictor = semanticPredictor,
             prefetcher = null,
-            personalizedStore = store
+            personalizedStore = store,
+            ngram = ngram
         )
     }
 
     @Test
     fun testPersonalizedSentenceAppearsWithMyStyleBadge() {
-        // Preload a personalized synthetic sentence into the store
+        // Preload a personalized sentence into the store. The sentence line only surfaces the
+        // user's own SOURCE_USER_PHRASE records now, so it must be marked as such explicitly
+        // (the default source is synthetic_llm, which no longer reaches the sentence line).
         store.upsert(
             PersonalizedSentenceRecord(
                 sentence = "판교 카카오 아지트 1층 로비에서 뵙겠습니다.",
                 intent = ContextualIntent.Scheduling,
                 tone = KoreanTone.Honorific,
                 keywords = listOf("판교", "카카오", "로비", "미팅"),
-                score = 3.0f
+                score = 3.0f,
+                source = PersonalizedSentenceRecord.SOURCE_USER_PHRASE
             )
         )
 
@@ -74,8 +77,8 @@ class PersonalizedAiIntegrationTest {
 
     @Test
     fun testSeparateWordAndSentenceCandidates() {
-        // Add a word transition to lexicon
-        lexicon.recordTransition("내일", "판교에서", "com.kakao.talk")
+        // Add a word transition to the personal n-gram model
+        ngram.learn("내일 판교에서", "com.kakao.talk")
 
         // Add a sentence to personalized store
         store.upsert(

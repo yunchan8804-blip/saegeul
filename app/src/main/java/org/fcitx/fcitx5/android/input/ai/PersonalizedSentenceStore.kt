@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -17,10 +20,12 @@ import kotlin.math.max
 class PersonalizedSentenceStore(
     private val storageFile: File? = null,
     private val morphology: ChoseongMorphologyEngine = ChoseongMorphologyEngine(),
-    private val maxCapacity: Int = 500
+    private val maxCapacity: Int = 500,
+    private val cipher: VaultCipher = PlainVaultCipher
 ) {
 
     private val records = LinkedHashMap<String, PersonalizedSentenceRecord>()
+    private val vaultFile: VaultFile? = storageFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
 
     @Synchronized
     fun size(): Int = records.size
@@ -115,7 +120,7 @@ class PersonalizedSentenceStore(
 
     @Synchronized
     fun save() {
-        val file = storageFile ?: return
+        val vf = vaultFile ?: return
         val array = JSONArray()
         records.values.forEach { r ->
             val obj = JSONObject().apply {
@@ -133,20 +138,17 @@ class PersonalizedSentenceStore(
             }
             array.put(obj)
         }
-        val tempFile = File(file.parentFile, "${file.name}.tmp")
-        tempFile.writeText(array.toString(2), Charsets.UTF_8)
-        if (tempFile.exists()) {
-            if (file.exists()) file.delete()
-            tempFile.renameTo(file)
-        }
+        vf.writeText(array.toString(2))
     }
 
     @Synchronized
     fun load() {
-        val file = storageFile ?: return
-        if (!file.exists() || file.length() == 0L) return
+        val vf = vaultFile ?: return
+        if (!vf.exists()) return
         try {
-            val content = file.readText(Charsets.UTF_8)
+            vf.migrateIfLegacy()
+            val content = vf.readText() ?: return
+            if (content.isBlank()) return
             val array = JSONArray(content)
             records.clear()
             for (i in 0 until array.length()) {

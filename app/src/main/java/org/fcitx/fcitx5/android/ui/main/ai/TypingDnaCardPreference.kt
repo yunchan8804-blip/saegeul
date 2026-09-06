@@ -13,8 +13,6 @@ import androidx.preference.PreferenceViewHolder
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
-import java.io.File
 
 /**
  * Embedded home card preference for MainFragment.
@@ -53,7 +51,7 @@ class TypingDnaCardPreference @JvmOverloads constructor(
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
         val ctx = context
-        val repo = TypingDnaRepository(File(ctx.filesDir, "typing_dna.json"))
+        val repo = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typingDnaRepository
         val stats = repo.getStats(forceReload = true)
 
         val card = holder.itemView.findViewById<MaterialCardView>(R.id.card_typing_dna)
@@ -72,10 +70,25 @@ class TypingDnaCardPreference @JvmOverloads constructor(
         tvLevelBadge?.text = "Lv.${stats.level}"
         tvLevelBadge?.contentDescription = "학습 레벨 ${stats.level}"
         tvTitle?.text = "${stats.levelTitle} · 온디바이스 학습 중"
-        tvSummary?.text = if (stats.totalSentences == 0) {
-            "키보드를 사용하면 내 말투와 어휘 습관이 이곳에 축적됩니다."
-        } else {
-            "분석 문장 ${stats.totalSentences}개 · 단어쌍 ${stats.bigramsCount}개 · 종결어미 ${stats.endingsCount}개"
+        val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
+        val ngramStats = app.personalNgramModel.stats()
+        val pending = app.typingDnaVault.totalBufferedCount()
+        tvSummary?.text = buildString {
+            if (stats.totalSentences == 0) {
+                append("키보드를 사용하면 내 말투와 어휘 습관이 이곳에 축적됩니다.")
+                if (ngramStats.unigrams >= 1) {
+                    append(ctx.getString(R.string.typing_dna_card_ngram_suffix, ngramStats.unigrams))
+                }
+            } else {
+                append("분석 문장 ${stats.totalSentences}개 · 단어쌍 ${stats.bigramsCount}개 · 종결어미 ${stats.endingsCount}개")
+                append(ctx.getString(R.string.typing_dna_card_ngram_suffix, ngramStats.unigrams))
+            }
+            if (pending >= 1) {
+                append(ctx.getString(R.string.typing_dna_card_pending_suffix, pending))
+            }
+            if (app.vaultCipher.isHardwareBacked) {
+                append(ctx.getString(R.string.typing_dna_card_hardware_suffix))
+            }
         }
         progressBar?.progress = stats.levelProgressPercent
 

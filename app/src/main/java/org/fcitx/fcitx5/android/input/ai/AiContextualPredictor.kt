@@ -4,12 +4,18 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
+import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+
 data class AiPrediction(
     val text: String,
     val confidenceScore: Float,
     val isSentenceCompletion: Boolean = false,
     val source: String = "local_ai",
-    val badge: String = "✨ AI완성"
+    val badge: String = "✨ AI완성",
+    val replaceLength: Int = 0
 )
 
 /**
@@ -18,14 +24,34 @@ data class AiPrediction(
  * and built-in Korean conversational templates for sub-5ms instant suggestions.
  */
 class AiContextualPredictor(
-    private val lexicon: PersonalizedLexiconModel,
     private val morphology: ChoseongMorphologyEngine,
     val semanticPredictor: KoreanSemanticSentencePredictor = KoreanSemanticSentencePredictor(),
     val prefetcher: AiSentenceCompletionPrefetcher? = null,
     val personalizedStore: PersonalizedSentenceStore? = null,
     val typoEngine: KoreanTypoCorrectionEngine = KoreanTypoCorrectionEngine(),
-    val collocationModel: KoreanCollocationModel = KoreanCollocationModel()
+    val collocationModel: KoreanCollocationModel = KoreanCollocationModel(),
+    private val ngram: PersonalNgramModel = PersonalNgramModel(),
+    private val typoCorrector: KeyboardAwareTypoCorrector? = null,
+    private val baseVocabulary: BaseKoreanVocabulary? = null,
+    private val correctionStore: CorrectionPatternStore? = null,
+    private val sentenceContinuation: KoreanSentenceContinuation? = null
 ) {
+
+    companion object {
+        // The only sources allowed to produce a full-sentence (isSentenceCompletion=true)
+        // candidate: input_continuation (learned/typed-prefix continuation), personalized_style
+        // (the user's own SOURCE_USER_PHRASE sentences), and llm_cached (LLM-generated
+        // continuation of the user's own context, or corrections of what the user typed).
+        // Only hardcoded-content sources are blocked from the sentence line at the end of predict().
+        private val SENTENCE_LINE_SOURCE_BLOCKLIST = setOf("collocation_next_word", "base_lexicon")
+    }
+
+    // Falls back to this predictor's own ngram/collocationModel when no explicit instance is
+    // wired in, so callers that don't pass sentenceContinuation still get input-preserving
+    // completions. Created once and cached, never per predict() call.
+    private val effectiveSentenceContinuation: KoreanSentenceContinuation by lazy {
+        sentenceContinuation ?: KoreanSentenceContinuation(ngram = ngram, collocation = collocationModel)
+    }
 
     private val baseKoreanLexicon = listOf(
         "안녕하세요", "감사합니다", "고맙습니다", "반갑습니다", "오늘", "내일", "모레", "어제",
@@ -86,6 +112,75 @@ class AiContextualPredictor(
         val cleanStroke = currentStroke.trim()
         val cleanContext = contextBeforeCursor.trim()
         val hasTrailingSpace = contextBeforeCursor.endsWith(" ") || contextBeforeCursor.endsWith("\n")
+        val lastWordInContext = cleanContext
+            .substringAfterLast(' ')
+            .substringAfterLast('\n')
+            .substringAfterLast('\t')
+            .substringAfterLast('\r')
+            .trim()
+
+        // -2. Keyboard-Aware Typo Correction (top-priority, ahead of the legacy typo_* sources below)
+        val typoTarget: Pair<String, Int>? = when {
+            cleanStroke.isNotBlank() -> cleanStroke to cleanStroke.length
+            hasTrailingSpace && lastWordInContext.isNotBlank() -> {
+                val trailingSpaces = contextBeforeCursor.length - contextBeforeCursor.trimEnd().length
+                lastWordInContext to (lastWordInContext.length + trailingSpaces)
+            }
+            else -> null
+        }
+        // A `typed` fragment the new keyboard-aware engine already handled must not also be
+        // re-corrected by the legacy word/sentence typo engine below, which knows nothing about
+        // the full vocabulary and can produce a lower-confidence, sometimes nonsensical rewrite
+        // for the very same fragment (e.g. blindly swapping a "-함니다" ending).
+        var newEngineHandledTyped: String? = null
+        if (typoCorrector != null && typoTarget != null) {
+            val (typed, replaceLen) = typoTarget
+            if (DubeolsikKeyMap.keySequence(typed).length >= 3) {
+                val personalHits = correctionStore?.lookup(typed, 2).orEmpty()
+                if (personalHits.isNotEmpty()) {
+                    newEngineHandledTyped = typed
+                    personalHits.forEachIndexed { idx, hit ->
+                        addPrediction(
+                            AiPrediction(
+                                text = hit.corrected,
+                                confidenceScore = 0.998f - idx * 0.001f,
+                                isSentenceCompletion = false,
+                                source = "typo_personal",
+                                badge = "✏️",
+                                replaceLength = replaceLen
+                            )
+                        )
+                    }
+                } else {
+                    val isKnownWord = baseVocabulary?.contains(typed) == true || ngram.unigramCount(typed) >= 2f
+                    if (!isKnownWord) {
+                        val ctxProb = ngram.predictNext(contextBeforeCursor, packageName, 20)
+                            .associate { it.word to it.probability }
+                        val corrections = typoCorrector.correct(
+                            typed,
+                            limit = 2,
+                            contextBoost = { w -> 1.5f * (ctxProb[w] ?: 0f) }
+                        )
+                        if (corrections.isNotEmpty()) {
+                            newEngineHandledTyped = typed
+                        }
+                        corrections.forEachIndexed { idx, correction ->
+                            val confidence = if (correction.cost <= 0.6f) 0.996f else 0.994f - idx * 0.002f
+                            addPrediction(
+                                AiPrediction(
+                                    text = correction.word,
+                                    confidenceScore = confidence,
+                                    isSentenceCompletion = false,
+                                    source = "typo_keyboard",
+                                    badge = "✏️",
+                                    replaceLength = replaceLen
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // -1. Realtime Typo Correction (Top-priority sentence & word suggestion for mistyped text)
         val baseSentence = cleanContext
@@ -114,6 +209,7 @@ class AiContextualPredictor(
         var sentenceCorrectedText: String? = null
         if (currentSentence.isNotBlank()) {
             val sentenceTypoPairs = typoEngine.findTypoCorrectionsInSentence(currentSentence)
+                .filter { (coreWord, _) -> coreWord != newEngineHandledTyped }
             if (sentenceTypoPairs.isNotEmpty()) {
                 val corrected = typoEngine.correctSentence(currentSentence)
                 if (corrected != null && corrected != currentSentence) {
@@ -147,12 +243,6 @@ class AiContextualPredictor(
         if (cleanStroke.isNotBlank()) {
             typoCandidates.add(cleanStroke)
         }
-        val lastWordInContext = cleanContext
-            .substringAfterLast(' ')
-            .substringAfterLast('\n')
-            .substringAfterLast('\t')
-            .substringAfterLast('\r')
-            .trim()
         if (lastWordInContext.isNotBlank()) {
             if (!hasTrailingSpace) {
                 typoCandidates.add(lastWordInContext)
@@ -167,6 +257,7 @@ class AiContextualPredictor(
         }
 
         typoCandidates.distinct().forEach { candidateWord ->
+            if (candidateWord == newEngineHandledTyped) return@forEach
             val corrections = typoEngine.correct(candidateWord)
             corrections.forEach { correctedWord ->
                 addPrediction(
@@ -201,13 +292,16 @@ class AiContextualPredictor(
             fullContext
         }
 
-        // 0. Personalized Learned & Synthetic Sentences (Priority: ✨)
+        // 0. Personalized Learned Sentences (Priority: ✨). Only the user's own previously
+        // typed sentences (SOURCE_USER_PHRASE) reach the sentence line — synthetic/LLM-authored
+        // records are content templates, not something the user actually typed, so they are
+        // excluded here to keep the sentence line entirely user-data-driven.
         if (personalizedStore != null && (cleanStroke.isNotBlank() || normalizedFullContext.isNotBlank())) {
             val personalMatches = personalizedStore.query(
                 queryChoseong = cleanStroke,
                 context = normalizedFullContext,
                 limit = limit
-            )
+            ).filter { it.source == PersonalizedSentenceRecord.SOURCE_USER_PHRASE }
             personalMatches.forEach { record ->
                 val score = (0.96f + (record.score * 0.01f)).coerceAtMost(0.999f)
                 addPrediction(
@@ -267,21 +361,48 @@ class AiContextualPredictor(
             prefetcher.schedulePrefetch(normalizedFullContext)
         }
 
-        // 2. On-Device Semantic Intent & Context Predictions (Entire written text context)
-        if (normalizedFullContext.isNotBlank()) {
-            val semanticProposals = semanticPredictor.predictNextSentences(normalizedFullContext, cleanStroke, limit = limit)
-            semanticProposals.forEach { proposal ->
-                addPrediction(
-                    AiPrediction(
-                        text = proposal.text,
-                        confidenceScore = proposal.confidenceScore,
-                        isSentenceCompletion = proposal.isCompleteSentence,
-                        source = "semantic_sentence",
-                        badge = proposal.badge
-                    )
+        // 1-B. Input-Preserving Sentence Continuation (keeps typed word(s) as a literal prefix,
+        // e.g. "회의 참석" -> "회의 참석하겠습니다", instead of an unrelated fixed template).
+        run {
+            val committedWords = cleanContext.split(Regex("\\s+")).filter { it.isNotBlank() }
+            val contextTail = (if (cleanStroke.isNotBlank()) committedWords + cleanStroke else committedWords)
+                .takeLast(3)
+            if (contextTail.isNotEmpty()) {
+                val continuationTone = if (normalizedFullContext.isNotBlank()) {
+                    if (semanticPredictor.inferTone(normalizedFullContext) == KoreanTone.Informal) {
+                        ContinuationTone.Informal
+                    } else {
+                        ContinuationTone.Honorific
+                    }
+                } else if (TypingDnaVault.categorizePackage(packageName) == TypingDnaVault.CATEGORY_MESSENGER) {
+                    ContinuationTone.Informal
+                } else {
+                    ContinuationTone.Honorific
+                }
+                val continuedSentences = effectiveSentenceContinuation.continuations(
+                    contextTail,
+                    continuationTone,
+                    packageName,
+                    3
                 )
+                continuedSentences.forEachIndexed { idx, text ->
+                    addPrediction(
+                        AiPrediction(
+                            text = text,
+                            confidenceScore = 0.985f - idx * 0.005f,
+                            isSentenceCompletion = true,
+                            source = "input_continuation",
+                            badge = "✨ AI완성"
+                        )
+                    )
+                }
             }
         }
+
+        // 2. semantic_sentence is intentionally NOT consumed here: KoreanSemanticSentencePredictor's
+        // intent-classified proposals are fixed content templates unrelated to what the user typed,
+        // so they never reach the sentence line. semanticPredictor.inferTone() above (and below) is
+        // still used for tone inference, which is not a content template.
 
         val isInformal = semanticPredictor.inferTone(normalizedFullContext) == KoreanTone.Informal
 
@@ -332,23 +453,51 @@ class AiContextualPredictor(
             }
         }
 
-        // 3. Personalized N-gram Context Predictions
-        if (cleanContext.isNotBlank()) {
-            val lastWord = cleanContext.split(Regex("\\s+")).lastOrNull() ?: cleanContext
-            val transitions = lexicon.getTransitions(lastWord, packageName)
+        // 3. Personal N-gram Context Predictions
+        val ngramCandidates = if (cleanStroke.isBlank()) {
+            ngram.predictNext(contextBeforeCursor, packageName, 4)
+        } else {
+            ngram.complete(cleanStroke, contextBeforeCursor, packageName, 4)
+        }
+        ngramCandidates.forEachIndexed { idx, candidate ->
+            val score = when {
+                candidate.evidence >= 2f -> 0.99f - idx * 0.005f
+                candidate.evidence >= 1f -> 0.975f - idx * 0.005f
+                else -> 0.94f - idx * 0.005f
+            }
+            addPrediction(
+                AiPrediction(
+                    text = candidate.word,
+                    confidenceScore = score,
+                    isSentenceCompletion = false,
+                    source = "personal_ngram",
+                    badge = "⭐"
+                )
+            )
+        }
 
-            transitions.forEach { candidate ->
-                if (cleanStroke.isBlank() || candidate.word.startsWith(cleanStroke) || morphology.matchesChoseong(candidate.word, cleanStroke)) {
-                    val score = (0.92f + (candidate.frequency * 0.02f)).coerceAtMost(0.99f)
-                    addPrediction(
-                        AiPrediction(
-                            candidate.word,
-                            score,
-                            isSentenceCompletion = candidate.word.contains(" "),
-                            badge = "⭐"
-                        )
+        // 3-B. Base Korean Vocabulary Completion (bundled TSV, right after personal n-gram)
+        if (cleanStroke.isNotBlank() && baseVocabulary != null) {
+            val personalWords = ngramCandidates.map { it.word }.toSet()
+            val baseCtxProb = ngram.predictNext(contextBeforeCursor, packageName, 20)
+                .associate { it.word to it.probability }
+            val vocabCandidates = baseVocabulary.completions(cleanStroke, 8)
+                .filter { (word, _) -> word !in personalWords }
+                .map { (word, prior) -> Triple(word, prior, prior * (1f + 3f * (baseCtxProb[word] ?: 0f))) }
+                .sortedByDescending { it.third }
+                .take(4)
+            vocabCandidates.forEachIndexed { idx, (word, _, _) ->
+                val ctxP = baseCtxProb[word] ?: 0f
+                val confidence = if (ctxP > 0f) 0.955f - idx * 0.005f else 0.93f - idx * 0.005f
+                addPrediction(
+                    AiPrediction(
+                        text = word,
+                        confidenceScore = confidence,
+                        isSentenceCompletion = false,
+                        source = "base_vocab",
+                        badge = ""
                     )
-                }
+                )
             }
         }
 
@@ -366,6 +515,7 @@ class AiContextualPredictor(
                             template,
                             score,
                             isSentenceCompletion = isSentence,
+                            source = "base_lexicon",
                             badge = if (isSentence) "✨ AI완성" else "✨ AI단어"
                         )
                     )
@@ -373,22 +523,20 @@ class AiContextualPredictor(
             }
         }
 
+        // Sentence-line whitelist: only sources backed by the user's own data or model output
+        // may appear as a full-sentence candidate. This blocks hardcoded content templates
+        // (collocation_next_word, baseKoreanLexicon, etc.) that occasionally produce a
+        // multi-word string long enough to be marked isSentenceCompletion=true from leaking
+        // into the sentence line. Word-line candidates are unaffected.
         val words = results.filter { !it.isSentenceCompletion }.sortedByDescending { it.confidenceScore }.take(limit)
-        val sentences = results.filter { it.isSentenceCompletion }.sortedByDescending { it.confidenceScore }.take(limit)
+        val sentences = results
+            .filter { it.isSentenceCompletion && it.source !in SENTENCE_LINE_SOURCE_BLOCKLIST }
+            .sortedByDescending { it.confidenceScore }
+            .take(limit)
         return (words + sentences).sortedByDescending { it.confidenceScore }
     }
 
     fun learnSentence(sentence: String, packageName: String) {
-        val words = sentence.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-        if (words.size < 2) {
-            if (words.isNotEmpty()) {
-                lexicon.recordTransition("", words[0], packageName)
-            }
-            return
-        }
-
-        for (i in 0 until words.size - 1) {
-            lexicon.recordTransition(words[i], words[i + 1], packageName)
-        }
+        ngram.learn(sentence, packageName)
     }
 }

@@ -95,6 +95,18 @@ class HorizontalCandidateComponent :
     private var nativeCandidateCount = 0
     private var nativeCandidates: List<CandidateWord> = emptyList()
     private var currentCapFlags: CapabilityFlags = CapabilityFlags.DefaultFlags
+    private var preeditEmpty: Boolean = true
+
+    // Whether this component currently renders at least one candidate (word row + sentence row
+    // combined). KawaiiBarComponent collapses its suggestion row when this is false.
+    var hasVisibleCandidates: Boolean = false
+        private set
+
+    private fun setHasVisibleCandidates(value: Boolean) {
+        if (hasVisibleCandidates == value) return
+        hasVisibleCandidates = value
+        bar.onCandidatesVisibilityChanged(value)
+    }
 
     private fun mergeCandidates(
         nativeList: List<CandidateWord>,
@@ -404,11 +416,16 @@ class HorizontalCandidateComponent :
             }
 
             bar.isCandidateTwoRow = true
-            bar.barStateMachine.push(
-                KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
-                KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
-            )
+            // 유휴 상태(preedit 없음)에서 native 후보도 없다면, 문맥 후보만으로 CandidateEmpty를
+            // false로 밀어붙이지 않는다(이중 안전장치). native 후보가 있는 경로는 그대로 둔다.
+            if (!(preeditEmpty && nativeCandidates.isEmpty())) {
+                bar.barStateMachine.push(
+                    KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
+                    KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
+                )
+            }
             applyFillStyle(topCandidates.size)
+            setHasVisibleCandidates(topCandidates.isNotEmpty() || bottomCandidates.isNotEmpty())
         } else {
             val candidates = mergeCandidates(nativeCandidates, contextualWords, contextualSentences)
             wordAdapter.updateCandidates(candidates, candidates.size)
@@ -425,16 +442,22 @@ class HorizontalCandidateComponent :
                 hairlineDivider.visibility = View.GONE
                 sentenceRecyclerView.visibility = View.GONE
                 bar.isCandidateTwoRow = false
-                bar.barStateMachine.push(
-                    KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
-                    KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
-                )
+                // 유휴 상태(preedit 없음)에서 native 후보도 없다면, 문맥 후보만으로 CandidateEmpty를
+                // false로 밀어붙이지 않는다(이중 안전장치). native 후보가 있는 경로는 그대로 둔다.
+                if (!(preeditEmpty && nativeCandidates.isEmpty())) {
+                    bar.barStateMachine.push(
+                        KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
+                        KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
+                    )
+                }
                 applyFillStyle(candidates.size)
+                setHasVisibleCandidates(true)
             } else {
                 wordRecyclerView.visibility = View.GONE
                 hairlineDivider.visibility = View.GONE
                 sentenceRecyclerView.visibility = View.GONE
                 bar.isCandidateTwoRow = false
+                setHasVisibleCandidates(false)
                 bar.barStateMachine.push(
                     KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
                     KawaiiBarStateMachine.BooleanKey.CandidateEmpty to true
@@ -504,6 +527,7 @@ class HorizontalCandidateComponent :
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
+        preeditEmpty = empty
         if (service.allowsTextInspectionFeatures()) {
             postRefreshContextualCandidates(16L)
         }

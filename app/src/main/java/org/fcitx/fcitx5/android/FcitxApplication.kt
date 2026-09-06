@@ -16,12 +16,22 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
+import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
+import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher
+import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
+import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
+import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.ui.main.LogActivity
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.Locales
@@ -29,11 +39,60 @@ import org.fcitx.fcitx5.android.utils.setupForest
 import org.fcitx.fcitx5.android.utils.startActivity
 import org.fcitx.fcitx5.android.utils.userManager
 import timber.log.Timber
+import java.io.File
 import kotlin.system.exitProcess
 
 class FcitxApplication : Application() {
 
     val coroutineScope = MainScope() + CoroutineName("FcitxApplication")
+
+    val typingDnaRepository: TypingDnaRepository by lazy {
+        TypingDnaRepository(File(filesDir, "typing_dna.json"), cipher = vaultCipher)
+    }
+
+    val typingDnaVault: TypingDnaVault by lazy {
+        TypingDnaVault(stagingFile = File(filesDir, "typing_dna_pending.json"), cipher = vaultCipher)
+    }
+
+    val personalNgramModel: PersonalNgramModel by lazy {
+        PersonalNgramModel(storeFile = File(filesDir, "personal_ngram.json"), cipher = vaultCipher)
+    }
+
+    val vaultCipher: KeystoreVaultCipher by lazy { KeystoreVaultCipher() }
+
+    val predictionMetricsStore: PredictionMetricsStore by lazy {
+        PredictionMetricsStore(storeFile = File(filesDir, "prediction_metrics.json"), cipher = vaultCipher)
+    }
+
+    val baseKoreanVocabulary: BaseKoreanVocabulary by lazy {
+        BaseKoreanVocabulary { assets.open("ko_base_vocab.tsv").reader(Charsets.UTF_8) }
+    }
+
+    val correctionPatternStore: CorrectionPatternStore by lazy {
+        CorrectionPatternStore(storeFile = File(filesDir, "personal_corrections.json"), cipher = vaultCipher)
+    }
+
+    val typoCorrector: KeyboardAwareTypoCorrector by lazy {
+        KeyboardAwareTypoCorrector(substitutionCost = correctionPatternStore::personalizedSubstitutionCost)
+    }
+
+    /**
+     * 기본 어휘 TSV와 개인 n-gram 유니그램을 오타 교정 트라이에 미리 채워 둔다.
+     * 실패해도 앱 기동에는 영향이 없어야 하므로 예외는 삼키지 않고 로그만 남긴다.
+     */
+    fun warmUpLanguageAssets() {
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                baseKoreanVocabulary.load()
+                baseKoreanVocabulary.forEachWord { word, prior -> typoCorrector.addWord(word, prior) }
+                personalNgramModel.forEachUnigram { word, count ->
+                    typoCorrector.addWord(word, PersonalNgramModel.personalPrior(count))
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to warm up language assets")
+            }
+        }
+    }
 
     private val shutdownReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -149,6 +208,7 @@ class FcitxApplication : Application() {
             null,
             ContextCompat.RECEIVER_EXPORTED
         )
+        warmUpLanguageAssets()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

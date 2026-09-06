@@ -406,6 +406,7 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 - 생성 스크립트는 `lang_code=ko`와 현대 한글 표제어만 허용하고 한 entry당 정의를 최대 4개로
   제한한다. 결과는 deterministic sorted binary index이며 원본 URL·원본 checksum·dump/extract date와
   wiktextract commit을 attribution asset에 고정한다.
+- 오타 교정·어절 완성의 기본 어휘 `app/src/main/assets/ko_base_vocab.tsv`는 hermitdave/FrequencyWords의 OpenSubtitles 2016 `ko_50k`에서 `scripts/build-ko-base-vocab.py`로 상위 3만 어절을 추출한 것이며 CC BY-SA 4.0으로 `assets/legal/NOTICE.txt`에 고지한다. 기기 밖으로 나가지 않는다.
 - 데이터는 CC BY-SA 4.0으로 표기하고 각 결과에서 정확한 한국어 위키낱말사전 문서 URL을 열어
   출처·기여자 이력에 도달할 수 있게 한다. 정의는 읽기 전용이며 `commitText`를 호출하지 않는다.
 - password·sensitive·`NoSpellCheck` editor에서는 query capture와 조회를 차단한다. 선택 영역 또는

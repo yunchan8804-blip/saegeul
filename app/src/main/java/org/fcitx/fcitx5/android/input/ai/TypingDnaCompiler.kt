@@ -7,12 +7,11 @@ package org.fcitx.fcitx5.android.input.ai
 /**
  * 0ms Local Knowledge Compiler:
  * Compiles distilled [TypingDnaProfile] knowledge into the high-speed Tier-1 runtime engines
- * ([KoreanCollocationModel], [PersonalizedLexiconModel], [PersonalizedSentenceStore]),
+ * ([KoreanCollocationModel], [PersonalizedSentenceStore]),
  * and irreversibly purges the raw staging buffer in [TypingDnaVault] to enforce zero-leak privacy.
  */
 class TypingDnaCompiler(
     private val collocationModel: KoreanCollocationModel,
-    private val lexiconModel: PersonalizedLexiconModel,
     private val sentenceStore: PersonalizedSentenceStore,
     private val vault: TypingDnaVault? = null,
     private val repository: TypingDnaRepository? = null
@@ -41,12 +40,7 @@ class TypingDnaCompiler(
         }
         collocationModel.injectDynamicBigrams(bigramMap, isInformal)
 
-        // 2. Inject transitions into PersonalizedLexiconModel
-        for (bg in persona.frequentBigrams) {
-            lexiconModel.recordTransition(bg.prev, bg.next, persona.category)
-        }
-
-        // 3. Upsert canned sentences into PersonalizedSentenceStore
+        // 2. Upsert canned sentences into PersonalizedSentenceStore
         for (phrase in persona.cannedPhrases) {
             val tone = if (isInformal) KoreanTone.Informal else KoreanTone.Honorific
             sentenceStore.upsert(
@@ -54,6 +48,7 @@ class TypingDnaCompiler(
                     sentence = phrase,
                     intent = ContextualIntent.General,
                     tone = tone,
+                    source = PersonalizedSentenceRecord.SOURCE_USER_PHRASE,
                     score = 1.5f,
                     useCount = 1
                 )

@@ -15,6 +15,7 @@ import android.view.inputmethod.InlineSuggestion
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ViewAnimator
 import android.widget.inline.InlineContentView
 import androidx.annotation.Keep
@@ -124,18 +125,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var isClipboardFresh: Boolean = false
     private var isInlineSuggestionPresent: Boolean = false
     private var inlineSuggestionGeneration = 0L
-    private val aiPredictor by lazy {
-        org.fcitx.fcitx5.android.input.ai.AiContextualPredictor(
-            org.fcitx.fcitx5.android.input.ai.PersonalizedLexiconModel(),
-            org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine()
-        )
-    }
     private var isCapabilityFlagsPassword: Boolean = false
     private var isKeyboardLayoutNumber: Boolean = false
     private var isToolbarManuallyToggled: Boolean = false
     private var hasStartedInput: Boolean = false
     private var expandToolbarForEditor: Boolean = expandToolbarByDefault
     private var toolbarNeedsSecondRow: Boolean = false
+    private var lastPreeditEmpty: Boolean = true
+    private var lastCandidateListEmpty: Boolean = true
+
+    // Suggestion row (candidateUi.root) visibility, latched to avoid flicker when preedit
+    // momentarily empties out mid-composition. See onCandidatesVisibilityChanged().
+    private var candidateRowVisible: Boolean = false
+    private var candidateRowCollapseRunnable: Runnable? = null
     private var toolbarHeightSession = ToolbarHeightSession.start(
         toolbarVisible = expandToolbarForEditor,
         needsSecondRow = false
@@ -508,6 +510,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private val candidateUi by lazy {
         CandidateUi(context, theme, horizontalCandidate.view).apply {
+            // Idle state (no candidates yet) starts collapsed; onCandidatesVisibilityChanged()
+            // expands it as soon as HorizontalCandidateComponent reports a visible candidate.
+            root.visibility = View.GONE
             expandButton.apply {
                 swipeEnabled = true
                 swipeThresholdY = dp(HEIGHT.toFloat())
@@ -518,6 +523,23 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private val titleUi by lazy {
         TitleUi(context, theme)
+    }
+
+    // Normal (non-Title) mode always shows two stacked rows: the tool row on top and the
+    // candidate row below it. Neither row is ever hidden by the other; the initial heights here
+    // are placeholders that updateBarHeight() immediately corrects once real state is known.
+    private val normalRoot: LinearLayout by lazy {
+        LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(
+                idleUi.root,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, context.dp(HEIGHT))
+            )
+            addView(
+                candidateUi.root,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, context.dp(HEIGHT))
+            )
+        }
     }
 
     val barStateMachine = KawaiiBarStateMachine.new {
@@ -565,14 +587,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     // should be used with setExpandButtonToAttach or setExpandButtonToDetach
     private fun setExpandButtonEnabled(enabled: Boolean) {
-        candidateUi.expandButton.visibility = if (enabled) View.VISIBLE else View.INVISIBLE
+        candidateUi.expandButton.visibility = if (enabled) View.VISIBLE else View.GONE
     }
 
     private fun switchUiByState(state: KawaiiBarStateMachine.State) {
-        val index = state.ordinal
+        // Idle and Candidate both display normalRoot (tool row + candidate row, always visible
+        // together). Only Title swaps the whole bar out for the extended-window title row.
+        val index = if (state == KawaiiBarStateMachine.State.Title) TITLE_CHILD_INDEX else NORMAL_CHILD_INDEX
         if (view.displayedChild != index) {
-            val new = view.getChildAt(index)
-            if (new != titleUi.root) {
+            if (index != TITLE_CHILD_INDEX) {
                 titleUi.setReturnButtonOnClickListener { }
                 titleUi.setTitle("")
                 titleUi.removeExtension()
@@ -587,9 +610,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             backgroundColor =
                 if (ThemeManager.prefs.keyBorder.getValue()) Color.TRANSPARENT
                 else theme.barColor
-            add(idleUi.root, lParams(matchParent, matchParent))
-            add(candidateUi.root, lParams(matchParent, matchParent))
+            add(normalRoot, lParams(matchParent, matchParent))
             add(titleUi.root, lParams(matchParent, matchParent))
+            addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {}
+                override fun onViewDetachedFromWindow(v: View) {
+                    cancelCandidateRowCollapse()
+                }
+            })
         }
     }
 
@@ -702,9 +730,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
+        lastPreeditEmpty = empty
         if (empty && service.allowsTextInspectionFeatures()) {
-            val hasContextual = service.getContextualSentencePredictions().isNotEmpty() || service.getContextualWordPredictions().isNotEmpty()
-            barStateMachine.push(PreeditUpdated, PreeditEmpty to empty, CandidateEmpty to !hasContextual)
+            // 유휴 상태(preedit 없음)에서는 문맥 후보 유무와 무관하게 native 후보 유무만으로
+            // CandidateEmpty를 판단한다. 문맥 예측이 계속 non-empty를 돌려주더라도 KawaiiBar가
+            // Candidate 상태에 고착되지 않게 하기 위함이다.
+            barStateMachine.push(PreeditUpdated, PreeditEmpty to empty, CandidateEmpty to lastCandidateListEmpty)
         } else {
             barStateMachine.push(PreeditUpdated, PreeditEmpty to empty)
         }
@@ -712,6 +743,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onCandidateUpdate(data: CandidateListEvent.Data) {
         val hasNative = data.candidates.isNotEmpty()
+        lastCandidateListEmpty = !hasNative
         val hasContextual = service.getContextualSentencePredictions().isNotEmpty() || service.getContextualWordPredictions().isNotEmpty()
         val isEmpty = !hasNative && !hasContextual
         barStateMachine.push(CandidatesUpdated, CandidateEmpty to isEmpty)
@@ -719,9 +751,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onSelectionUpdate(start: Int, end: Int) {
         if (service.allowsTextInspectionFeatures()) {
-            val hasContextual = service.getContextualSentencePredictions().isNotEmpty() || service.getContextualWordPredictions().isNotEmpty()
-            if (hasContextual) {
-                barStateMachine.push(CandidatesUpdated, CandidateEmpty to false)
+            if (lastPreeditEmpty) {
+                barStateMachine.push(CandidatesUpdated, CandidateEmpty to lastCandidateListEmpty)
+            } else {
+                val hasContextual = service.getContextualSentencePredictions().isNotEmpty() || service.getContextualWordPredictions().isNotEmpty()
+                if (hasContextual) {
+                    barStateMachine.push(CandidatesUpdated, CandidateEmpty to false)
+                }
             }
         }
     }
@@ -819,6 +855,18 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         const val HEIGHT = ToolbarLayoutPolicy.TOUCH_TARGET_DP
         const val EXPANDED_HEIGHT =
             ToolbarLayoutPolicy.TOUCH_TARGET_DP * ToolbarLayoutPolicy.EXPANDED_ROWS
+
+        // ViewAnimator child indices for the top-level bar view.
+        private const val NORMAL_CHILD_INDEX = 0
+        private const val TITLE_CHILD_INDEX = 1
+
+        // Height of the candidate row when HorizontalCandidateComponent renders both the
+        // word-level and sentence-level rows (see HorizontalCandidateComponent.isCandidateTwoRow).
+        private const val CANDIDATE_TWO_ROW_HEIGHT_DP = 60
+
+        // Debounce delay before collapsing the suggestion row after candidates disappear, so a
+        // single empty frame mid-composition doesn't cause a visible collapse/expand flicker.
+        private const val CANDIDATE_ROW_COLLAPSE_DELAY_MS = 120L
     }
 
     var isCandidateTwoRow: Boolean = false
@@ -829,6 +877,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
 
+    private fun setRowHeight(row: View, heightDp: Int) {
+        val heightPx = context.dp(heightDp)
+        val params = row.layoutParams as? LinearLayout.LayoutParams ?: return
+        if (params.height == heightPx) return
+        params.height = heightPx
+        row.layoutParams = params
+    }
+
     fun updateBarHeight() {
         // Re-evaluate the explicit row state on every surface transition. Overflow itself never
         // changes IME height: the compact toolbar scrolls horizontally until the user expands it.
@@ -837,12 +893,18 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             toolbarVisible = isToolbarRequested(),
             expanded = toolbarNeedsSecondRow
         )
-        // Candidate/preedit and other transient bar states inherit the toolbar height selected for
-        // this editor. This prevents the editor viewport from jumping 48 dp on every composition.
-        val targetHeight = if (isCandidateTwoRow && view.displayedChild == 1) {
-            context.dp(60)
-        } else {
+        val toolRowHeightDp = toolbarHeightSession.heightDp
+        val candidateRowHeightDp = if (isCandidateTwoRow) CANDIDATE_TWO_ROW_HEIGHT_DP else HEIGHT
+        setRowHeight(idleUi.root, toolRowHeightDp)
+        setRowHeight(candidateUi.root, candidateRowHeightDp)
+        // Normal mode stacks both rows, so the bar height is their sum. When the suggestion row
+        // is collapsed (no candidates), it contributes zero height. Title mode keeps its
+        // pre-existing height contract (unrelated to candidate row height).
+        val targetHeight = if (view.displayedChild == TITLE_CHILD_INDEX) {
             context.dp(toolbarHeightSession.heightDp)
+        } else {
+            val visibleCandidateRowHeightDp = if (candidateRowVisible) candidateRowHeightDp else 0
+            context.dp(toolRowHeightDp + visibleCandidateRowHeightDp)
         }
         val params = view.layoutParams ?: return
         if (params.height == targetHeight) return
@@ -853,6 +915,39 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     fun onKeyboardLayoutSwitched(isNumber: Boolean) {
         isKeyboardLayoutNumber = isNumber
         evalIdleUiState()
+    }
+
+    /**
+     * Called by HorizontalCandidateComponent whenever the set of candidates it actually renders
+     * (word row + sentence row combined) transitions between empty and non-empty. Expanding the
+     * suggestion row happens immediately; collapsing it is debounced so a single empty frame
+     * mid-composition doesn't cause a visible flicker.
+     */
+    fun onCandidatesVisibilityChanged(hasCandidates: Boolean) {
+        if (hasCandidates) {
+            cancelCandidateRowCollapse()
+            setCandidateRowVisible(true)
+        } else {
+            if (candidateRowCollapseRunnable != null || !candidateRowVisible) return
+            val runnable = Runnable {
+                candidateRowCollapseRunnable = null
+                setCandidateRowVisible(false)
+            }
+            candidateRowCollapseRunnable = runnable
+            view.postDelayed(runnable, CANDIDATE_ROW_COLLAPSE_DELAY_MS)
+        }
+    }
+
+    private fun cancelCandidateRowCollapse() {
+        candidateRowCollapseRunnable?.let { view.removeCallbacks(it) }
+        candidateRowCollapseRunnable = null
+    }
+
+    private fun setCandidateRowVisible(visible: Boolean) {
+        if (candidateRowVisible == visible) return
+        candidateRowVisible = visible
+        candidateUi.root.visibility = if (visible) View.VISIBLE else View.GONE
+        updateBarHeight()
     }
 
 }

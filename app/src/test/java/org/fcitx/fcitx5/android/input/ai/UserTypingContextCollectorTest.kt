@@ -107,12 +107,68 @@ class UserTypingContextCollectorTest {
 
     @Test
     fun koreanEndingWithoutLatinPunctuationIsCollectedForTypingDna() {
+        // Korean-ending boundaries are now confirmed lazily: they only close once the
+        // following chunk starts with whitespace, so a trailing space chunk is needed here.
         collector.recordCommittedText("com.kakao.talk", "확인했습니다")
+        collector.recordCommittedText("com.kakao.talk", " ")
         assertEquals(1, committedSentences.size)
         assertEquals("확인했습니다", committedSentences[0].second)
 
         collector.recordCommittedText("com.kakao.talk", "완전 고마워 ㅋㅋ")
+        collector.recordCommittedText("com.kakao.talk", " ")
         assertEquals("완전 고마워 ㅋㅋ", committedSentences[1].second)
+    }
+
+    @Test
+    fun multiCharacterCommitWithKoreanEndingEmitsImmediately() {
+        // Paste, buffered-Hangul segments, and candidate selections commit multiple characters
+        // at once, unlike the per-syllable engine path, so a Korean ending emits right away.
+        collector.recordCommittedText("com.kakao.talk", "확인했습니다")
+        assertEquals(1, committedSentences.size)
+        assertEquals("확인했습니다", committedSentences[0].second)
+    }
+
+    @Test
+    fun perSyllableCommitDoesNotSplitInsideWord() {
+        listOf("요", "즘", " ", "어", "때", "요", " ").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+        assertEquals(1, committedSentences.size)
+        assertEquals("요즘 어때요", committedSentences[0].second)
+    }
+
+    @Test
+    fun perSyllableCommitWithoutTrailingSpaceWaitsForFlush() {
+        listOf("필", "요", "한", " ", "자", "료", " ", "보", "내", "주", "세", "요").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+        assertTrue(committedSentences.isEmpty())
+
+        val flushed = collector.flushPending("com.kakao.talk")
+        assertTrue(flushed)
+        assertEquals("필요한 자료 보내주세요", committedSentences.single().second)
+    }
+
+    @Test
+    fun punctuationStillSplitsImmediately() {
+        listOf("오", "늘", " ", "뭐", "해", "?").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+        assertEquals(1, committedSentences.size)
+        assertEquals("오늘 뭐해?", committedSentences[0].second)
+    }
+
+    @Test
+    fun hasPendingReflectsBuffer() {
+        // No Korean ending here, so the buffer stays pending (does not emit immediately)
+        // regardless of the multi-character-commit rule.
+        assertFalse(collector.hasPending("com.kakao.talk"))
+
+        collector.recordCommittedText("com.kakao.talk", "테스트문장")
+        assertTrue(collector.hasPending("com.kakao.talk"))
+
+        collector.flushPending("com.kakao.talk")
+        assertFalse(collector.hasPending("com.kakao.talk"))
     }
 
     @Test
@@ -134,6 +190,16 @@ class UserTypingContextCollectorTest {
         assertTrue(collector.triggerNow("com.kakao.talk"))
         assertEquals("내일 판교에서 보자", committedSentences.single().second)
         assertEquals(1, triggeredContexts.size)
+    }
+
+    @Test
+    fun flushAllPendingDrainsEveryPackage() {
+        collector.recordCommittedText("com.kakao.talk", "오늘 저녁에 만나자")
+        collector.recordCommittedText("com.slack", "내일 판교에서 보자")
+        assertEquals(2, collector.flushAllPending())
+        val committedTexts = committedSentences.map { it.second }
+        assertTrue(committedTexts.contains("오늘 저녁에 만나자"))
+        assertTrue(committedTexts.contains("내일 판교에서 보자"))
     }
 
     @Test

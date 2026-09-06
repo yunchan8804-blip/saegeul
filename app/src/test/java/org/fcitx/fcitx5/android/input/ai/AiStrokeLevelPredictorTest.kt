@@ -19,14 +19,12 @@ import org.junit.Test
 class AiStrokeLevelPredictorTest {
 
     private lateinit var predictor: AiContextualPredictor
-    private lateinit var lexicon: PersonalizedLexiconModel
     private lateinit var morphology: ChoseongMorphologyEngine
 
     @Before
     fun setUp() {
-        lexicon = PersonalizedLexiconModel(maxCapacity = 1000)
         morphology = ChoseongMorphologyEngine()
-        predictor = AiContextualPredictor(lexicon, morphology)
+        predictor = AiContextualPredictor(morphology)
     }
 
     @Test
@@ -100,14 +98,14 @@ class AiStrokeLevelPredictorTest {
 
     @Test
     fun testLRUCapacityPruningAndMemorySafety() {
-        val smallLexicon = PersonalizedLexiconModel(maxCapacity = 50)
-        val smallPredictor = AiContextualPredictor(smallLexicon, morphology)
+        val smallNgram = PersonalNgramModel(maxUnigrams = 50)
+        val smallPredictor = AiContextualPredictor(morphology, ngram = smallNgram)
 
         for (i in 0 until 500) {
             smallPredictor.learnSentence("단어_$i 다음단어_$i", packageName = "com.test")
         }
 
-        assertEquals(50, smallLexicon.size())
+        assertTrue(smallNgram.stats().unigrams <= 50)
     }
 
     @Test

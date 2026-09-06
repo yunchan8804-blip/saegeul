@@ -16,3 +16,11 @@ About > Open Source Licenses
 
 This NOTICE supplements, and does not replace, the individual license and
 copyright notices shipped with each component.
+
+BUNDLED LANGUAGE DATA
+
+- ko_base_vocab.tsv (Korean word frequency list, top 30,000 entries)
+  Source: hermitdave/FrequencyWords, OpenSubtitles 2016 "ko_50k"
+  https://github.com/hermitdave/FrequencyWords
+  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
+  Used on-device only, for Korean typo correction and word completion.

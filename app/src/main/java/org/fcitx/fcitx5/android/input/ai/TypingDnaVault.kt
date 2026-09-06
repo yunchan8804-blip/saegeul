@@ -4,6 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -15,7 +21,9 @@ import java.util.concurrent.ConcurrentHashMap
 class TypingDnaVault(
     private val thresholdPerCategory: Int = 15,
     private val maxCapacityPerCategory: Int = 50,
-    private val onBatchReady: ((category: String, sentences: List<String>) -> Unit)? = null
+    private val stagingFile: File? = null,
+    onBatchReady: ((category: String, sentences: List<String>) -> Unit)? = null,
+    private val cipher: VaultCipher = PlainVaultCipher
 ) {
 
     companion object {
@@ -59,6 +67,19 @@ class TypingDnaVault(
     // Category -> Deque of scrubbed sentences
     private val categoryBuffers = ConcurrentHashMap<String, ArrayDeque<String>>()
 
+    @Volatile
+    private var batchReadyCallback: ((category: String, sentences: List<String>) -> Unit)? = onBatchReady
+
+    private val vaultFile: VaultFile? = stagingFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
+
+    init {
+        rehydrateFromStaging()
+    }
+
+    fun setOnBatchReady(callback: ((category: String, sentences: List<String>) -> Unit)?) {
+        batchReadyCallback = callback
+    }
+
     /**
      * Records a committed sentence into the vault after scrubbing all PII.
      * Returns true if a batch threshold was reached and callback was dispatched.
@@ -83,9 +104,11 @@ class TypingDnaVault(
             deque.removeFirst()
         }
 
+        persistStaging()
+
         if (deque.size >= thresholdPerCategory) {
             val batch = deque.toList()
-            onBatchReady?.invoke(category, batch)
+            batchReadyCallback?.invoke(category, batch)
             return true
         }
 
@@ -136,7 +159,7 @@ class TypingDnaVault(
         val snapshot = snapshot()
         snapshot.forEach { (category, sentences) ->
             if (sentences.isNotEmpty()) {
-                onBatchReady?.invoke(category, sentences)
+                batchReadyCallback?.invoke(category, sentences)
             }
         }
         purge()
@@ -155,6 +178,46 @@ class TypingDnaVault(
         } else {
             categoryBuffers.values.forEach { it.clear() }
             categoryBuffers.clear()
+        }
+        persistStaging()
+    }
+
+    private fun persistStaging() {
+        val vf = vaultFile ?: return
+        runCatching {
+            val root = JSONObject()
+            categoryBuffers.forEach { (category, deque) ->
+                val arr = JSONArray()
+                deque.forEach { arr.put(it) }
+                root.put(category, arr)
+            }
+            vf.writeText(root.toString())
+        }
+    }
+
+    private fun rehydrateFromStaging() {
+        val vf = vaultFile ?: return
+        if (!vf.exists()) return
+        runCatching {
+            vf.migrateIfLegacy()
+            val raw = vf.readText() ?: return
+            if (raw.isBlank()) return
+            val root = JSONObject(raw)
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val category = keys.next()
+                val arr = root.optJSONArray(category) ?: continue
+                val deque = ArrayDeque<String>()
+                for (i in 0 until arr.length()) {
+                    val sentence = arr.optString(i, "").trim()
+                    if (sentence.length >= 4) {
+                        deque.addLast(sentence)
+                    }
+                }
+                if (deque.isNotEmpty()) {
+                    categoryBuffers[category] = deque
+                }
+            }
         }
     }
 }

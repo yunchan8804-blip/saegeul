@@ -25,7 +25,6 @@ class KoreanSemanticSentencePredictorTest {
         semanticPredictor = KoreanSemanticSentencePredictor()
         prefetcher = AiSentenceCompletionPrefetcher(clientProvider = null)
         contextualPredictor = AiContextualPredictor(
-            lexicon = PersonalizedLexiconModel(maxCapacity = 1000),
             morphology = ChoseongMorphologyEngine(),
             semanticPredictor = semanticPredictor,
             prefetcher = prefetcher
@@ -199,6 +198,7 @@ class KoreanSemanticSentencePredictorTest {
         assertEquals("네, 10시에 참석 가능합니다.", cached[0])
     }
 
+    @org.junit.Ignore("semantic 고정 템플릿 문장은 문장 줄에서 제거됨(사용자 데이터·input_continuation 기반으로 전환). 새 동작은 AiContextualPredictorInputContinuationTest가 커버")
     @Test
     fun testAiContextualPredictorIntegrationWithSemanticEngine() {
         val context = "오늘 날씨가 너무 좋은데 주말에 같이 식사할까요?"

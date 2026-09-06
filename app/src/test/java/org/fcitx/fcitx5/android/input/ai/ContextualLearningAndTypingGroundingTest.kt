@@ -16,7 +16,6 @@ import org.junit.Test
  */
 class ContextualLearningAndTypingGroundingTest {
 
-    private lateinit var lexicon: PersonalizedLexiconModel
     private lateinit var morphology: ChoseongMorphologyEngine
     private lateinit var semanticPredictor: KoreanSemanticSentencePredictor
     private lateinit var store: PersonalizedSentenceStore
@@ -24,12 +23,10 @@ class ContextualLearningAndTypingGroundingTest {
 
     @Before
     fun setUp() {
-        lexicon = PersonalizedLexiconModel()
         morphology = ChoseongMorphologyEngine()
         semanticPredictor = KoreanSemanticSentencePredictor()
         store = PersonalizedSentenceStore(storageFile = null, morphology = morphology)
         predictor = AiContextualPredictor(
-            lexicon = lexicon,
             morphology = morphology,
             semanticPredictor = semanticPredictor,
             prefetcher = null,

@@ -19,14 +19,12 @@ import org.junit.Test
 class AiToneAdaptivePredictorTest {
 
     private lateinit var adaptivePredictor: AiToneAdaptivePredictor
-    private lateinit var lexicon: PersonalizedLexiconModel
     private lateinit var morphology: ChoseongMorphologyEngine
 
     @Before
     fun setUp() {
-        lexicon = PersonalizedLexiconModel(maxCapacity = 1000)
         morphology = ChoseongMorphologyEngine()
-        val basePredictor = AiContextualPredictor(lexicon, morphology)
+        val basePredictor = AiContextualPredictor(morphology)
         adaptivePredictor = AiToneAdaptivePredictor(basePredictor, morphology)
     }
 

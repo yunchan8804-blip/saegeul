@@ -12,7 +12,6 @@ import org.fcitx.fcitx5.android.input.ai.DynamicBigram
 import org.fcitx.fcitx5.android.input.ai.KoreanCollocationModel
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.PersonaDna
-import org.fcitx.fcitx5.android.input.ai.PersonalizedLexiconModel
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore
 import org.fcitx.fcitx5.android.input.ai.TypingDnaCompiler
 import org.fcitx.fcitx5.android.input.ai.TypingDnaProfiler
@@ -88,14 +87,13 @@ class TypingDnaDeviceE2ETest {
     @Test
     fun testDeviceTypingDna0msFastPathAnd2000LookupsBenchmark() {
         val collocation = KoreanCollocationModel()
-        val lexicon = PersonalizedLexiconModel()
         val store = PersonalizedSentenceStore()
         val vault = TypingDnaVault()
         val repoFile = File(appContext.filesDir, "typing_dna_benchmark_test.json")
         repoFile.delete()
 
         val repository = TypingDnaRepository(repoFile)
-        val compiler = TypingDnaCompiler(collocation, lexicon, store, vault, repository)
+        val compiler = TypingDnaCompiler(collocation, store, vault, repository)
 
         val learnedPersona = PersonaDna(
             category = "messenger",

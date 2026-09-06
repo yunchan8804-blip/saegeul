@@ -14,6 +14,21 @@
             domain="file"
             path="README.md" />
         <exclude
+            domain="file"
+            path="typing_dna.json" />
+        <exclude
+            domain="file"
+            path="typing_dna_pending.json" />
+        <exclude
+            domain="file"
+            path="personalized_sentences.json" />
+        <exclude
+            domain="file"
+            path="personal_ngram.json" />
+        <exclude
+            domain="file"
+            path="personal_corrections.json" />
+        <exclude
             domain="database"
             path="clbdb" />
         <exclude
@@ -39,6 +54,21 @@
         <exclude
             domain="file"
             path="README.md" />
+        <exclude
+            domain="file"
+            path="typing_dna.json" />
+        <exclude
+            domain="file"
+            path="typing_dna_pending.json" />
+        <exclude
+            domain="file"
+            path="personalized_sentences.json" />
+        <exclude
+            domain="file"
+            path="personal_ngram.json" />
+        <exclude
+            domain="file"
+            path="personal_corrections.json" />
         <exclude
             domain="database"
             path="clbdb" />
