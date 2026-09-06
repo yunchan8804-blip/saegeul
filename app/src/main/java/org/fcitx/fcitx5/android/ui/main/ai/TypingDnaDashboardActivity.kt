@@ -19,6 +19,7 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.ads.TypingDnaInterstitialController
 import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
 import java.io.File
@@ -43,6 +44,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
     private lateinit var tvDashBigrams: TextView
     private lateinit var tvDashEndings: TextView
     private lateinit var tvDashPhrases: TextView
+    private lateinit var interstitial: TypingDnaInterstitialController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +53,8 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         applySystemBarInsets()
 
         repository = TypingDnaRepository(File(filesDir, "typing_dna.json"))
+        interstitial = TypingDnaInterstitialController(this)
+        interstitial.prepare()
 
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener { finish() }
@@ -85,6 +89,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
                 else -> "대기 중인 새 문장이 없습니다 (분석 문장: ${stats.totalSentences}개)"
             }
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            interstitial.showAfterAction()
         }
 
         btnClearDna.setOnClickListener {

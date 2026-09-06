@@ -19,6 +19,7 @@ PRIVACY & DATA / 개인정보·데이터 안내
 - 온라인 음성: 첫 마이크 사용과 첫 회의 파일 업로드 전에 별도 고지와 동의를 받습니다. 마이크 음성 또는 사용자가 고른 음성 파일을 설정한 온라인 음성 공급자에 보냅니다. 앱은 녹음 파일이나 선택한 파일 사본을 보관하지 않습니다.
 - GIF: 현재 공급자와 전송 내용을 검색 화면에 표시합니다. KLIPY, Wikimedia Commons, GIPHY를 사용하면 검색어가 해당 공급자에 전송됩니다. GIPHY를 승인해 사용하면 임의 앱 식별자와 노출·클릭·전송 이벤트도 GIPHY에 보내며, GIPHY 설정 삭제 시 이 식별자도 삭제합니다. Animated Noto Emoji 검색어는 기기에서만 비교하지만 목록과 미디어는 Google Fonts에서 받습니다.
 - OCR 모델: 사용자가 다운로드를 누를 때 고정된 한국어 모델만 GitHub에서 받고 크기와 SHA-256을 검증합니다. 이미지와 인식 결과는 보내지 않습니다.
+- 전면 광고: AI 언어 지문 대시보드에서 「지금 즉시 분석 및 동기화」를 누른 뒤에만 Google AdMob 전면 광고를 표시할 수 있습니다. 키보드 입력, 설정 진입, 권한 요청, 언어 지문 삭제는 광고를 띄우지 않습니다. 전체 오프라인 모드에서는 광고를 요청하지 않습니다.
 
 Google Play Data Safety 분류
 - 선택형 온라인 기능은 대략적 위치(IP 주소에서 추론), 앱 내 검색 기록(GIF 검색어), 기타 사용자 생성 콘텐츠(AI 원문·요청), 음성 또는 소리 녹음(받아쓰기·회의 파일)을 수집·공유하는 것으로 보수적으로 신고합니다.
@@ -51,6 +52,7 @@ User-initiated network transfers
 - Online speech: separate just-in-time disclosure and consent appear before the first microphone use and first meeting-file upload. Microphone audio or a selected audio file is sent to the configured online speech provider. The app does not retain a recording or a copy of the selected file.
 - GIF: the search screen identifies the active provider and transmitted data. KLIPY, Wikimedia Commons, and GIPHY receive search terms when used. An approved GIPHY configuration also sends a random app identifier and load, click, and send events; removing GIPHY configuration deletes that identifier. Animated Noto Emoji matches terms on-device, but downloads its catalog and media from Google Fonts.
 - OCR model: after a user taps download, the app downloads only a pinned Korean model from GitHub and verifies its size and SHA-256. Images and recognized text are never sent.
+- Interstitial ads: a Google AdMob interstitial may appear only after the user taps “Analyze and sync now” on the Typing DNA dashboard. Ads are not shown during typing, settings entry, permission prompts, or Typing DNA deletion. Completely offline mode does not request ads.
 
 Google Play Data Safety classification
 - Optional online features are conservatively declared as collecting and sharing approximate location inferred from an IP address, in-app search history for GIF queries, other user-generated content for AI source text and instructions, and voice or sound recordings for dictation and meeting transcription.

@@ -141,4 +141,22 @@ class AdServingPolicyTest {
         assertNull(decision.reason)
         assertEquals(2L, decision.configVersion)
     }
+
+    @Test
+    fun typingDnaSyncCompleteInterstitialIsAllowed() {
+        val venue = LocalAvenueCatalog.typingDnaSyncComplete
+        val config = signed(venues = listOf(venue), version = 1)
+        val decision = AdServingPolicy.evaluate(
+            request(config, venueId = venue.id, lastAcceptedVersion = null)
+        )
+        assertTrue(AdServingPolicy.canPublish(venue))
+        assertTrue(decision.allow)
+        assertNull(decision.reason)
+    }
+
+    @Test
+    fun typingDnaAdGateAllowsSyncCompleteAndBlocksOffline() {
+        assertTrue(TypingDnaAdGate.shouldShowInterstitial(offlineMode = false, nowEpochMs = now))
+        assertFalse(TypingDnaAdGate.shouldShowInterstitial(offlineMode = true, nowEpochMs = now))
+    }
 }

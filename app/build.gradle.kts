@@ -122,6 +122,12 @@ val productWebsiteUrl = providers.gradleProperty("PRODUCT_WEBSITE_URL")
 val privacyPolicyUrl = providers.gradleProperty("PRIVACY_POLICY_URL")
     .orElse(ProductIdentity.privacyPolicyUrl)
 val faqUrl = providers.gradleProperty("FAQ_URL").orElse(ProductIdentity.faqUrl)
+val admobAppId = providers.gradleProperty("ADMOB_APP_ID")
+    .orElse(providers.environmentVariable("ADMOB_APP_ID"))
+    .orElse("ca-app-pub-3940256099942544~3347511713")
+val admobInterstitialUnitId = providers.gradleProperty("ADMOB_INTERSTITIAL_UNIT_ID")
+    .orElse(providers.environmentVariable("ADMOB_INTERSTITIAL_UNIT_ID"))
+    .orElse("ca-app-pub-3940256099942544/1033173712")
 
 android {
     namespace = "org.fcitx.fcitx5.android"
@@ -131,6 +137,8 @@ android {
         applicationId = ProductIdentity.applicationId
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appAuthRedirectScheme"] = "${ProductIdentity.applicationId}.oauth"
+        manifestPlaceholders["admobAppId"] = admobAppId.get()
+        buildConfigField("String", "ADMOB_INTERSTITIAL_UNIT_ID", admobInterstitialUnitId.get().asBuildConfigString())
         buildConfigField("String", "AI_PROVIDER_NAME", "OpenAI".asBuildConfigString())
         buildConfigField(
             "String",
@@ -400,6 +408,7 @@ dependencies {
     implementation(libs.tesseract4android)
     implementation(libs.appauth)
     implementation(libs.okhttp)
+    implementation(libs.google.mobile.ads)
     implementation(libs.splitties.bitflags)
     implementation(libs.splitties.dimensions)
     implementation(libs.splitties.resources)

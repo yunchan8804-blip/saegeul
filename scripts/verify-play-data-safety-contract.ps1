@@ -100,7 +100,8 @@ $expectedProviders = @(
     "oauth-provider",
     "openai-compatible-ai",
     "openai-compatible-speech",
-    "wikimedia-commons"
+    "wikimedia-commons",
+    "google-admob"
 )
 $actualProviders = @($contract.releaseProviderSet.id | Sort-Object)
 if (($actualProviders -join "`n") -ne (($expectedProviders | Sort-Object) -join "`n")) {
@@ -108,7 +109,7 @@ if (($actualProviders -join "`n") -ne (($expectedProviders | Sort-Object) -join 
 }
 
 $expectedDataTypes = [ordered]@{
-    approximate_location = @("Location", "Approximate location", "App functionality")
+    approximate_location = @("Location", "Approximate location", "App functionality", "Advertising")
     in_app_search_history = @("App activity", "In-app search history", "App functionality")
     other_user_generated_content = @(
         "App activity",
@@ -116,12 +117,13 @@ $expectedDataTypes = [ordered]@{
         "App functionality"
     )
     voice_or_sound_recordings = @("Audio files", "Voice or sound recordings", "App functionality")
-    app_interactions = @("App activity", "App interactions", "App functionality", "Analytics")
+    app_interactions = @("App activity", "App interactions", "App functionality", "Analytics", "Advertising")
     device_or_other_ids = @(
         "Device or other IDs",
         "Device or other IDs",
         "App functionality",
-        "Analytics"
+        "Analytics",
+        "Advertising"
     )
 }
 

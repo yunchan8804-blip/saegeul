@@ -67,6 +67,16 @@
       "data": ["approximate_location"],
       "networkEnabledByDefault": false,
       "requiresExternalApproval": false
+    },
+    {
+      "id": "google-admob",
+      "data": [
+        "approximate_location",
+        "app_interactions",
+        "device_or_other_ids"
+      ],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": false
     }
   ],
   "dataTypes": [
@@ -79,7 +89,7 @@
       "shared": true,
       "processedEphemerally": false,
       "optional": true,
-      "purposes": ["App functionality"]
+      "purposes": ["App functionality", "Advertising"]
     },
     {
       "id": "in_app_search_history",
@@ -118,23 +128,23 @@
       "id": "app_interactions",
       "playCategory": "App activity",
       "playType": "App interactions",
-      "source": "GIPHY result load, click, and send events when an approved GIPHY configuration is used",
+      "source": "GIPHY result load, click, and send events when an approved GIPHY configuration is used; AdMob interstitial impressions after Typing DNA sync",
       "collected": true,
       "shared": true,
       "processedEphemerally": false,
       "optional": true,
-      "purposes": ["App functionality", "Analytics"]
+      "purposes": ["App functionality", "Analytics", "Advertising"]
     },
     {
       "id": "device_or_other_ids",
       "playCategory": "Device or other IDs",
       "playType": "Device or other IDs",
-      "source": "Random app identifier used only by an approved GIPHY configuration",
+      "source": "Random app identifier used only by an approved GIPHY configuration; Google advertising ID for optional AdMob interstitials",
       "collected": true,
       "shared": true,
       "processedEphemerally": false,
       "optional": true,
-      "purposes": ["App functionality", "Analytics"]
+      "purposes": ["App functionality", "Analytics", "Advertising"]
     }
   ],
   "notCollectedOffDevice": [
