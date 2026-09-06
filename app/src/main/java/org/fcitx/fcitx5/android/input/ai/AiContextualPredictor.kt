@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
@@ -34,7 +35,8 @@ class AiContextualPredictor(
     private val typoCorrector: KeyboardAwareTypoCorrector? = null,
     private val baseVocabulary: BaseKoreanVocabulary? = null,
     private val correctionStore: CorrectionPatternStore? = null,
-    private val sentenceContinuation: KoreanSentenceContinuation? = null
+    private val sentenceContinuation: KoreanSentenceContinuation? = null,
+    private val personalSentenceVault: PersonalSentenceVault? = null
 ) {
 
     companion object {
@@ -311,6 +313,24 @@ class AiContextualPredictor(
                         isSentenceCompletion = true,
                         source = "personalized_style",
                         badge = "✨ 내스타일"
+                    )
+                )
+            }
+        }
+
+        // 0-B. Personal Sentence RAG (on-device BM25 search over the user's own past sentences).
+        if (personalSentenceVault != null && contextBeforeCursor.isNotBlank()) {
+            val ragMatches = personalSentenceVault.retrieve(contextBeforeCursor, packageName, limit)
+            ragMatches.forEachIndexed { idx, retrieved ->
+                var score = 0.95f - idx * 0.01f
+                if (retrieved.startsWithLastWord) score += 0.02f
+                addPrediction(
+                    AiPrediction(
+                        text = retrieved.sentence,
+                        confidenceScore = score,
+                        isSentenceCompletion = true,
+                        source = "rag_personal",
+                        badge = "✨ 내기록"
                     )
                 )
             }

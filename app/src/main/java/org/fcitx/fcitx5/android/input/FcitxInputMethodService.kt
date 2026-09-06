@@ -2361,6 +2361,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val personalNgramModel: org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
         get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalNgramModel
 
+    val personalSentenceVault: org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
+        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalSentenceVault
+
     val typoCorrector: org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
         get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typoCorrector
 
@@ -2398,7 +2401,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun scheduleNgramSave() {
         pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
         val runnable = Runnable {
-            lifecycleScope.launch(Dispatchers.IO) { personalNgramModel.save() }
+            lifecycleScope.launch(Dispatchers.IO) {
+                personalNgramModel.save()
+                personalSentenceVault.save()
+            }
         }
         pendingNgramSaveRunnable = runnable
         ngramSaveHandler.postDelayed(runnable, 1500L)
@@ -2430,6 +2436,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             onSentenceCommitted = { pkg, sentence ->
                 typingDnaVault.recordSentence(pkg, sentence)
                 personalNgramModel.learn(sentence, pkg)
+                personalSentenceVault.record(sentence, pkg)
                 org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer.tokenize(sentence).forEach { token ->
                     typoCorrector.addWord(
                         token,
@@ -2467,7 +2474,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             ngram = personalNgramModel,
             typoCorrector = typoCorrector,
             baseVocabulary = baseKoreanVocabulary,
-            correctionStore = correctionPatternStore
+            correctionStore = correctionPatternStore,
+            personalSentenceVault = personalSentenceVault
         )
     }
 
@@ -3926,7 +3934,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         flushTypingDnaForCurrentEditor()
         pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
         pendingNgramSaveRunnable = null
-        lifecycleScope.launch(Dispatchers.IO) { personalNgramModel.save() }
+        lifecycleScope.launch(Dispatchers.IO) {
+            personalNgramModel.save()
+            personalSentenceVault.save()
+        }
         pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
         pendingCorrectionSaveRunnable = null
         lifecycleScope.launch(Dispatchers.IO) { correctionPatternStore.save() }

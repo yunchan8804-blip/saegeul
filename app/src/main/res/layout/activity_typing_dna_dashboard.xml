@@ -797,6 +797,16 @@
                 tools:text="학습 어절 128개 · 어절쌍 342개 · 분석 대기 문장 3개" />
 
             <TextView
+                android:id="@+id/tv_dash_rag_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:gravity="center"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp"
+                tools:text="기록된 문장 12개" />
+
+            <TextView
                 android:id="@+id/tv_dash_last_learned"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -998,6 +998,7 @@
     <string name="cta_open_gif_settings" tools:ignore="MissingTranslation">Open GIF settings</string>
     <string name="cta_open_phrase_settings" tools:ignore="MissingTranslation">Open phrase settings</string>
     <string name="typing_dna_ngram_stats_line" tools:ignore="MissingTranslation">Learned words %1$d · word pairs %2$d · pending sentences %3$d</string>
+    <string name="personal_sentence_vault_stats_line" tools:ignore="MissingTranslation">Recorded sentences %1$d</string>
     <string name="typing_dna_last_learned" tools:ignore="MissingTranslation">Last learned %1$s</string>
     <string name="typing_dna_card_ngram_suffix" tools:ignore="MissingTranslation"> · Learned words %1$d</string>
     <string name="typing_dna_card_pending_suffix" tools:ignore="MissingTranslation"> · pending %1$d</string>

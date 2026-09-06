@@ -28,6 +28,9 @@
         domain="file"
         path="personal_corrections.json" />
     <exclude
+        domain="file"
+        path="personal_rag.json" />
+    <exclude
         domain="database"
         path="clbdb" />
     <exclude

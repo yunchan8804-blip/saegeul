@@ -53,6 +53,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
     private lateinit var tvDashEndings: TextView
     private lateinit var tvDashPhrases: TextView
     private lateinit var tvDashNgramStats: TextView
+    private lateinit var tvDashRagStats: TextView
     private lateinit var tvDashLastLearned: TextView
     private lateinit var interstitial: TypingDnaInterstitialController
 
@@ -100,6 +101,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         tvDashEndings = findViewById(R.id.tv_dash_endings)
         tvDashPhrases = findViewById(R.id.tv_dash_phrases)
         tvDashNgramStats = findViewById(R.id.tv_dash_ngram_stats)
+        tvDashRagStats = findViewById(R.id.tv_dash_rag_stats)
         tvDashLastLearned = findViewById(R.id.tv_dash_last_learned)
 
         tvVaultHeroNumber = findViewById(R.id.tv_vault_hero_number)
@@ -166,6 +168,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
                     app.personalNgramModel.clear()
                     app.correctionPatternStore.clear()
                     app.predictionMetricsStore.clear()
+                    app.personalSentenceVault.clear()
                     updateUi(repository.getStats(forceReload = true), animate = true)
                     Toast.makeText(this, "언어 지문이 안전하게 초기화되었습니다.", Toast.LENGTH_SHORT).show()
                 }
@@ -239,6 +242,10 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             ngramStats.unigrams,
             ngramStats.bigrams,
             pending
+        )
+        tvDashRagStats.text = getString(
+            R.string.personal_sentence_vault_stats_line,
+            app.personalSentenceVault.stats().sentences
         )
         if (ngramStats.lastLearnedMs != 0L) {
             tvDashLastLearned.visibility = android.view.View.VISIBLE

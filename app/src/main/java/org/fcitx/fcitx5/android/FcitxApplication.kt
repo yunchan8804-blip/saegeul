@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
+import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher
 import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
@@ -56,6 +57,10 @@ class FcitxApplication : Application() {
 
     val personalNgramModel: PersonalNgramModel by lazy {
         PersonalNgramModel(storeFile = File(filesDir, "personal_ngram.json"), cipher = vaultCipher)
+    }
+
+    val personalSentenceVault: PersonalSentenceVault by lazy {
+        PersonalSentenceVault(storeFile = File(filesDir, "personal_rag.json"), cipher = vaultCipher)
     }
 
     val vaultCipher: KeystoreVaultCipher by lazy { KeystoreVaultCipher() }

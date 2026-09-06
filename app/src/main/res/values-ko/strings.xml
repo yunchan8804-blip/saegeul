@@ -996,6 +996,7 @@
     <string name="cta_open_gif_settings">GIF 설정 열기</string>
     <string name="cta_open_phrase_settings">상용구 설정 열기</string>
     <string name="typing_dna_ngram_stats_line">학습 어절 %1$d개 · 어절쌍 %2$d개 · 분석 대기 문장 %3$d개</string>
+    <string name="personal_sentence_vault_stats_line">기록된 문장 %1$d개</string>
     <string name="typing_dna_last_learned">마지막 학습 %1$s</string>
     <string name="typing_dna_card_ngram_suffix"> · 학습 어절 %1$d개</string>
     <string name="typing_dna_card_pending_suffix"> · 대기 %1$d개</string>

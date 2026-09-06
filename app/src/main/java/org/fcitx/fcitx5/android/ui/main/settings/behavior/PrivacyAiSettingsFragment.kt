@@ -248,6 +248,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                                 app.typingDnaRepository.clear()
                                 app.typingDnaVault.purge()
                                 app.personalNgramModel.clear()
+                                app.personalSentenceVault.clear()
                                 refreshSummaries()
                                 Toast.makeText(ctx, "언어 지문이 안전하게 초기화되었습니다.", Toast.LENGTH_SHORT).show()
                             }
