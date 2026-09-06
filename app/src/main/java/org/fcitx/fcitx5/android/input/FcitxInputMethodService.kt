@@ -2400,14 +2400,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun scheduleNgramSave() {
         pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        val runnable = Runnable {
-            lifecycleScope.launch(Dispatchers.IO) {
-                personalNgramModel.save()
-                personalSentenceVault.save()
-            }
-        }
+        val runnable = Runnable { launchPersonalModelSave() }
         pendingNgramSaveRunnable = runnable
         ngramSaveHandler.postDelayed(runnable, 1500L)
+    }
+
+    /** Persists the on-device personal learning stores (n-gram model + sentence RAG vault) off the main thread. */
+    private fun launchPersonalModelSave() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            personalNgramModel.save()
+            personalSentenceVault.save()
+        }
     }
 
     private fun scheduleCorrectionSave() {
@@ -3934,10 +3937,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         flushTypingDnaForCurrentEditor()
         pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
         pendingNgramSaveRunnable = null
-        lifecycleScope.launch(Dispatchers.IO) {
-            personalNgramModel.save()
-            personalSentenceVault.save()
-        }
+        launchPersonalModelSave()
         pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
         pendingCorrectionSaveRunnable = null
         lifecycleScope.launch(Dispatchers.IO) { correctionPatternStore.save() }

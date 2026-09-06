@@ -41,7 +41,10 @@ class PersonalSentenceVault(
         val text: String,
         val category: String,
         val lastSeenMs: Long,
-        val count: Int
+        val count: Int,
+        // Cached once at index time; doc.text never changes for a given id, so retrieval and
+        // eviction reuse these tokens instead of re-tokenizing the sentence on every query.
+        val tokens: List<String>
     )
 
     // docId == normalized (scrubbed, trimmed) sentence text.
@@ -83,10 +86,11 @@ class PersonalSentenceVault(
             text = scrubbed,
             category = TypingDnaVault.categorizePackage(packageName),
             lastSeenMs = now,
-            count = 1
+            count = 1,
+            tokens = tokens
         )
         docs[scrubbed] = doc
-        indexDoc(doc, tokens)
+        indexDoc(doc)
         enforceCapacity(now)
         return true
     }
@@ -141,10 +145,9 @@ class PersonalSentenceVault(
 
             var score = rawScore
             if (doc.category == category) score *= CATEGORY_BOOST
-            val elapsed = (now - doc.lastSeenMs).coerceAtLeast(0L).toDouble()
-            score *= 2.0.pow(-elapsed / halfLifeMs)
+            score *= decayFactor(doc.lastSeenMs, now)
 
-            val docTokens = PersonalNgramTokenizer.tokenize(doc.text)
+            val docTokens = doc.tokens
             val startsWith = docTokens.size >= queryTokens.size &&
                 docTokens.subList(0, queryTokens.size) == queryTokens
             if (startsWith) score *= CONTINUATION_BOOST
@@ -186,10 +189,10 @@ class PersonalSentenceVault(
         }
     }
 
-    private fun indexDoc(doc: Doc, tokens: List<String>) {
-        docLen[doc.id] = tokens.size
+    private fun indexDoc(doc: Doc) {
+        docLen[doc.id] = doc.tokens.size
         val tf = HashMap<String, Int>()
-        tokens.forEach { tf[it] = (tf[it] ?: 0) + 1 }
+        doc.tokens.forEach { tf[it] = (tf[it] ?: 0) + 1 }
         tf.forEach { (term, freq) ->
             postings.getOrPut(term) { HashMap() }[doc.id] = freq
         }
@@ -198,7 +201,7 @@ class PersonalSentenceVault(
     private fun removeDoc(docId: String) {
         val doc = docs.remove(docId) ?: return
         docLen.remove(docId)
-        PersonalNgramTokenizer.tokenize(doc.text).toSet().forEach { term ->
+        doc.tokens.toSet().forEach { term ->
             val posting = postings[term] ?: return@forEach
             posting.remove(docId)
             if (posting.isEmpty()) postings.remove(term)
@@ -208,16 +211,22 @@ class PersonalSentenceVault(
     private fun enforceCapacity(now: Long) {
         val excess = docs.size - maxSentences
         if (excess <= 0) return
+        // record() calls this right after inserting one doc, so excess is normally 1; a single
+        // min scan is enough there and avoids sorting the whole vault on every sentence commit.
+        if (excess == 1) {
+            docs.values.minByOrNull { decayedCount(it, now) }?.let { removeDoc(it.id) }
+            return
+        }
         docs.values
             .sortedBy { decayedCount(it, now) }
             .take(excess)
             .forEach { removeDoc(it.id) }
     }
 
-    private fun decayedCount(doc: Doc, now: Long): Double {
-        val elapsed = (now - doc.lastSeenMs).coerceAtLeast(0L).toDouble()
-        return doc.count * 2.0.pow(-elapsed / halfLifeMs)
-    }
+    private fun decayFactor(lastSeenMs: Long, now: Long): Double =
+        2.0.pow(-(now - lastSeenMs).coerceAtLeast(0L).toDouble() / halfLifeMs)
+
+    private fun decayedCount(doc: Doc, now: Long): Double = doc.count * decayFactor(doc.lastSeenMs, now)
 
     private fun load() {
         val vf = vaultFile ?: return
@@ -239,10 +248,11 @@ class PersonalSentenceVault(
                     text = text,
                     category = o.optString("cat", TypingDnaVault.CATEGORY_GENERAL),
                     lastSeenMs = o.optLong("ls", clock()),
-                    count = o.optInt("cnt", 1)
+                    count = o.optInt("cnt", 1),
+                    tokens = tokens
                 )
                 docs[doc.text] = doc
-                indexDoc(doc, tokens)
+                indexDoc(doc)
             }
         }.onFailure {
             docs.clear()

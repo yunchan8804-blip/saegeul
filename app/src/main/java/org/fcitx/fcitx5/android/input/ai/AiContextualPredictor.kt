@@ -321,13 +321,19 @@ class AiContextualPredictor(
         // 0-B. Personal Sentence RAG (on-device BM25 search over the user's own past sentences).
         if (personalSentenceVault != null && contextBeforeCursor.isNotBlank()) {
             val ragMatches = personalSentenceVault.retrieve(contextBeforeCursor, packageName, limit)
-            ragMatches.forEachIndexed { idx, retrieved ->
-                var score = 0.95f - idx * 0.01f
+            // retrieve() returns matches sorted by an unbounded BM25-derived magnitude. Map that
+            // magnitude into a fixed [0.90, 0.95] band relative to the top match so a strongly
+            // relevant sentence keeps its lead over a weakly relevant one (instead of collapsing the
+            // gap to a flat per-index step), while staying in a predictable range beside other sources.
+            val topRagScore = ragMatches.firstOrNull()?.score ?: 0f
+            ragMatches.forEach { retrieved ->
+                val relative = if (topRagScore > 0f) (retrieved.score / topRagScore).coerceIn(0f, 1f) else 0f
+                var score = 0.90f + 0.05f * relative
                 if (retrieved.startsWithLastWord) score += 0.02f
                 addPrediction(
                     AiPrediction(
                         text = retrieved.sentence,
-                        confidenceScore = score,
+                        confidenceScore = score.coerceAtMost(0.999f),
                         isSentenceCompletion = true,
                         source = "rag_personal",
                         badge = "✨ 내기록"
@@ -549,10 +555,11 @@ class AiContextualPredictor(
         // multi-word string long enough to be marked isSentenceCompletion=true from leaking
         // into the sentence line. Word-line candidates are unaffected.
         val words = results.filter { !it.isSentenceCompletion }.sortedByDescending { it.confidenceScore }.take(limit)
-        val sentences = results
+        val sentenceCandidates = results
             .filter { it.isSentenceCompletion && it.source !in SENTENCE_LINE_SOURCE_BLOCKLIST }
-            .sortedByDescending { it.confidenceScore }
-            .take(limit)
+        val sentences = SentenceRelevanceReranker.rerank(
+            sentenceCandidates, contextBeforeCursor, ngram, packageName, limit
+        )
         return (words + sentences).sortedByDescending { it.confidenceScore }
     }
 
