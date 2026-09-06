@@ -2282,7 +2282,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     val personalizedStore by lazy {
         val file = java.io.File(filesDir, "personalized_sentences.json")
-        org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore(storageFile = file, morphology = morphologyEngine).apply {
+        org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore(
+            storageFile = file,
+            morphology = morphologyEngine,
+            cipher = org.fcitx.fcitx5.android.FcitxApplication.getInstance().vaultCipher
+        ).apply {
             load()
         }
     }

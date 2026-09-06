@@ -14,7 +14,9 @@ import java.io.IOException
  * File layout: magic `SGV1` (4 bytes) + cipher id length (1 byte) + cipher id (ASCII) + cipher
  * blob. A file with no `SGV1` header is treated as legacy plaintext (UTF-8) written before
  * encryption was introduced, so existing on-disk data keeps loading until [migrateIfLegacy] is
- * called.
+ * called. [readText] always decrypts with the cipher recorded in the header (falling back to
+ * [cipher] or [PlainVaultCipher]), so a file written by an older, less-encrypted version of
+ * [cipher]'s store keeps loading correctly even before it is migrated.
  */
 class VaultFile(
     private val file: File,
@@ -32,19 +34,25 @@ class VaultFile(
 
     /**
      * Returns the file's decoded text, or null if it does not exist.
-     * Legacy plaintext files are returned as-is (UTF-8); encrypted files are decrypted with
-     * [cipher]. Decryption failures propagate as-is.
+     * Legacy plaintext files (no `SGV1` header) are returned as-is (UTF-8). Encrypted files are
+     * decrypted with the cipher recorded in their header — [cipher] if it matches, [PlainVaultCipher]
+     * if the file predates encryption support for its store, or a thrown
+     * [java.security.GeneralSecurityException] for an unrecognized id. Decryption failures
+     * otherwise propagate as-is.
      */
     fun readText(): String? {
         val raw = readRawOrNull() ?: return null
-        return if (hasMagic(raw)) {
-            val idLength = raw[MAGIC.size].toInt() and 0xFF
-            val blobStart = MAGIC.size + 1 + idLength
-            val blob = raw.copyOfRange(blobStart, raw.size)
-            String(cipher.decrypt(blob, aad), Charsets.UTF_8)
-        } else {
-            String(raw, Charsets.UTF_8)
+        if (!hasMagic(raw)) return String(raw, Charsets.UTF_8)
+        val idLength = raw[MAGIC.size].toInt() and 0xFF
+        val idStart = MAGIC.size + 1
+        val storedId = String(raw, idStart, idLength, Charsets.US_ASCII)
+        val blob = raw.copyOfRange(idStart + idLength, raw.size)
+        val readCipher = when (storedId) {
+            cipher.id -> cipher
+            PlainVaultCipher.id -> PlainVaultCipher
+            else -> throw java.security.GeneralSecurityException("Unknown vault cipher id: $storedId")
         }
+        return String(readCipher.decrypt(blob, aad), Charsets.UTF_8)
     }
 
     /** Always writes in the encrypted format, replacing the file atomically via a `.tmp` file. */
@@ -66,11 +74,17 @@ class VaultFile(
         writeAtomically(out)
     }
 
-    /** If the file is legacy plaintext, re-writes it in the encrypted format. Returns true if migrated. */
+    /**
+     * If the file is stored with a cipher other than [cipher] — either headerless legacy
+     * plaintext or a different (e.g. plain) cipher id in the `SGV1` header — re-writes it with
+     * [cipher]. Returns true if migrated.
+     */
     fun migrateIfLegacy(): Boolean {
-        if (!isLegacyPlaintext()) return false
         val raw = readRawOrNull() ?: return false
-        writeText(String(raw, Charsets.UTF_8))
+        val storedId = storedCipherId(raw)
+        if (storedId == cipher.id) return false
+        val text = readText() ?: return false
+        writeText(text)
         return true
     }
 
@@ -84,6 +98,14 @@ class VaultFile(
             if (raw[i] != MAGIC[i]) return false
         }
         return true
+    }
+
+    /** Returns the cipher id recorded in [raw]'s header, or null if it has no `SGV1` header. */
+    private fun storedCipherId(raw: ByteArray): String? {
+        if (!hasMagic(raw)) return null
+        val idLength = raw[MAGIC.size].toInt() and 0xFF
+        val idStart = MAGIC.size + 1
+        return String(raw, idStart, idLength, Charsets.US_ASCII)
     }
 
     private fun writeAtomically(bytes: ByteArray) {

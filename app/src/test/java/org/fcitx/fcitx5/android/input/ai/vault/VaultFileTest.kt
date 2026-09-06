@@ -105,6 +105,59 @@ class VaultFileTest {
     }
 
     @Test
+    fun testReadsPlainCipherFileWithNonPlainVaultCipher() {
+        val file = File(tempFolder.root, "cross-cipher.dat")
+        val plainVaultFile = VaultFile(file, PlainVaultCipher, aad)
+        val text = "다른 cipher로 저장된 평문 헤더 파일"
+        plainVaultFile.writeText(text)
+
+        val aesGcmVaultFile = VaultFile(file, AesGcmVaultCipher(AesGcmVaultCipher.randomKey()), aad)
+
+        assertEquals(text, aesGcmVaultFile.readText())
+    }
+
+    @Test
+    fun testMigrateIfLegacyReencryptsFromStoredPlainCipherToWriteCipher() {
+        val file = File(tempFolder.root, "migrate-cross-cipher.dat")
+        val plainVaultFile = VaultFile(file, PlainVaultCipher, aad)
+        val text = "plain에서 aesgcm으로 마이그레이션될 데이터"
+        plainVaultFile.writeText(text)
+
+        val aesGcmKey = AesGcmVaultCipher.randomKey()
+        val aesGcmVaultFile = VaultFile(file, AesGcmVaultCipher(aesGcmKey), aad)
+
+        val migrated = aesGcmVaultFile.migrateIfLegacy()
+
+        assertTrue(migrated)
+        assertEquals(text, aesGcmVaultFile.readText())
+
+        // The file is now stored under the aesgcm id: a fresh PlainVaultCipher VaultFile can no
+        // longer decode it (unrecognized cipher id from its point of view).
+        try {
+            VaultFile(file, PlainVaultCipher, aad).readText()
+            fail("Expected a GeneralSecurityException reading an aesgcm-stored file as plain")
+        } catch (expected: GeneralSecurityException) {
+            // expected
+        }
+
+        // But a fresh VaultFile sharing the same aesgcm key reads it back correctly.
+        val freshAesGcmVaultFile = VaultFile(file, AesGcmVaultCipher(aesGcmKey), aad)
+        assertEquals(text, freshAesGcmVaultFile.readText())
+    }
+
+    @Test
+    fun testMigrateIfLegacyIsNoOpWhenAlreadyStoredWithCurrentCipher() {
+        val file = File(tempFolder.root, "already-current.dat")
+        val key = AesGcmVaultCipher.randomKey()
+        val vaultFile = VaultFile(file, AesGcmVaultCipher(key), aad)
+        vaultFile.writeText("이미 현재 cipher로 저장된 데이터")
+
+        val migrated = vaultFile.migrateIfLegacy()
+
+        assertFalse(migrated)
+    }
+
+    @Test
     fun testNoLeftoverTmpFileAfterWrite() {
         val file = File(tempFolder.root, "notmp.dat")
         val vaultFile = VaultFile(file, AesGcmVaultCipher(AesGcmVaultCipher.randomKey()), aad)
