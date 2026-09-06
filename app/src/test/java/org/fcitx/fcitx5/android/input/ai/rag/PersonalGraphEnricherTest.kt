@@ -162,4 +162,51 @@ class PersonalGraphEnricherTest {
         assertEquals(1, result.edges)
         assertEquals(1, result.topics)
     }
+
+    @Test
+    fun enrichParsesResponseWrappedInMarkdownJsonFence() = runBlocking {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val store = PersonalGraphStore()
+        val enricher = PersonalGraphEnricher(vault, store)
+
+        val fenced = "```json\n$validGraphJson\n```"
+        val result = enricher.enrich(generate = { _, _ -> listOf(fenced) })
+
+        assertTrue(result.ok)
+        assertEquals("ok", result.reason)
+        assertEquals(2, result.nodes)
+        assertEquals(1, result.edges)
+        assertEquals(1, result.topics)
+    }
+
+    @Test
+    fun enrichParsesResponseWithSurroundingProse() = runBlocking {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val store = PersonalGraphStore()
+        val enricher = PersonalGraphEnricher(vault, store)
+
+        val withProse = "다음은 결과입니다: $validGraphJson 이상입니다."
+        val result = enricher.enrich(generate = { _, _ -> listOf(withProse) })
+
+        assertTrue(result.ok)
+        assertEquals("ok", result.reason)
+        assertEquals(2, result.nodes)
+        assertEquals(1, result.edges)
+        assertEquals(1, result.topics)
+    }
+
+    @Test
+    fun enrichReturnsParseFailedForPlainTextWithNoJsonObjectAtAll() = runBlocking {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val store = PersonalGraphStore()
+        val enricher = PersonalGraphEnricher(vault, store)
+
+        val result = enricher.enrich(generate = { _, _ -> listOf("죄송하지만 그래프를 만들 수 없습니다.") })
+
+        assertFalse(result.ok)
+        assertEquals("parse_failed", result.reason)
+    }
 }

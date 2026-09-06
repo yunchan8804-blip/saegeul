@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rag
 
+import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
@@ -33,6 +34,10 @@ class PersonalGraphStore(
 
     // node id -> Node
     private val nodes = HashMap<String, Node>()
+
+    // alias (canonical id or stem) -> canonical node id, so proximityBoost can match a
+    // particle-stripped context/candidate stem back to the node id the graph actually stores.
+    private val nodeAliases = HashMap<String, String>()
 
     // normalized (sorted) node-id pair -> Edge. A structured pair key (not a joined string) so a
     // node id that is itself a multi-word phrase can never collide with a different pair.
@@ -67,6 +72,7 @@ class PersonalGraphStore(
             .forEach { this.edges[edgeKey(it.a, it.b)] = it }
         this.topics = topics.take(MAX_TOPICS)
         this.graphBuiltMs = builtMs
+        rebuildAliases()
     }
 
     @Synchronized
@@ -76,6 +82,7 @@ class PersonalGraphStore(
     fun clear() {
         nodes.clear()
         edges.clear()
+        nodeAliases.clear()
         topics = emptyList()
         graphBuiltMs = 0L
         vaultFile?.delete()
@@ -90,8 +97,8 @@ class PersonalGraphStore(
     @Synchronized
     fun proximityBoost(contextStems: Set<String>, candidateStems: Set<String>): Float {
         if (nodes.isEmpty()) return 1.0f
-        val contextNodes = contextStems.filter { nodes.containsKey(it) }
-        val candidateNodes = candidateStems.filter { nodes.containsKey(it) }
+        val contextNodes = contextStems.mapNotNull { nodeAliases[it] }.distinct()
+        val candidateNodes = candidateStems.mapNotNull { nodeAliases[it] }.distinct()
         if (contextNodes.isEmpty() || candidateNodes.isEmpty()) return 1.0f
 
         var linkCount = 0
@@ -205,11 +212,30 @@ class PersonalGraphStore(
                 loadedTopics.add(Topic(id, label, members))
             }
             topics = loadedTopics
+            rebuildAliases()
         }.onFailure {
             nodes.clear()
             edges.clear()
+            nodeAliases.clear()
             topics = emptyList()
             graphBuiltMs = 0L
+        }
+    }
+
+    /**
+     * Rebuilds [nodeAliases] from the current [nodes]: each node id maps to itself, and its
+     * particle-stripped [PersonalNgramTokenizer.stem] additionally maps to it whenever that stem
+     * is non-empty, different from the id, and not already claimed by another node's own id
+     * (canonical ids always take priority over stem aliases).
+     */
+    private fun rebuildAliases() {
+        nodeAliases.clear()
+        nodes.keys.forEach { id -> nodeAliases[id] = id }
+        nodes.keys.forEach { id ->
+            val stem = PersonalNgramTokenizer.stem(id)
+            if (!stem.isNullOrEmpty() && stem != id) {
+                nodeAliases.putIfAbsent(stem, id)
+            }
         }
     }
 

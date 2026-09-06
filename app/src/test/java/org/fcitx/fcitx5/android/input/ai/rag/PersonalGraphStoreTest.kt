@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rag
 
+import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
 import org.fcitx.fcitx5.android.input.ai.vault.AesGcmVaultCipher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -209,5 +210,92 @@ class PersonalGraphStoreTest {
         val boost = store.proximityBoost(setOf("a1", "a2"), setOf("b1", "b2"))
 
         assertEquals(1.30f, boost, 0.0001f)
+    }
+
+    @Test
+    fun stemOfHoeuiStripsTheEuiParticleDownToHoe() {
+        // Confirms the premise the alias index is built to work around: stem() over-strips a
+        // non-particle syllable off "회의" because "의" is also a valid standalone particle.
+        assertEquals("회", PersonalNgramTokenizer.stem("회의"))
+    }
+
+    @Test
+    fun proximityBoostMatchesViaStemAliasWhenContextIsParticleStripped() {
+        val store = PersonalGraphStore()
+        store.replaceGraph(
+            nodes = listOf(
+                PersonalGraphStore.Node("회의", emptyList(), 1.0f),
+                PersonalGraphStore.Node("참석", emptyList(), 1.0f)
+            ),
+            edges = listOf(PersonalGraphStore.Edge("회의", "참석", 1.0f)),
+            topics = emptyList(),
+            builtMs = 1L
+        )
+
+        // "회" is PersonalNgramTokenizer.stem("회의"), not a real node id - only reachable via alias.
+        val boost = store.proximityBoost(setOf("회"), setOf("참석"))
+
+        assertTrue(boost > 1.0f)
+    }
+
+    @Test
+    fun proximityBoostStillMatchesOnUnstemmedCanonicalNodeId() {
+        val store = PersonalGraphStore()
+        store.replaceGraph(
+            nodes = listOf(
+                PersonalGraphStore.Node("회의", emptyList(), 1.0f),
+                PersonalGraphStore.Node("참석", emptyList(), 1.0f)
+            ),
+            edges = listOf(PersonalGraphStore.Edge("회의", "참석", 1.0f)),
+            topics = emptyList(),
+            builtMs = 1L
+        )
+
+        val boost = store.proximityBoost(setOf("회의"), setOf("참석"))
+
+        assertTrue(boost > 1.0f)
+    }
+
+    @Test
+    fun stemAliasMatchingSurvivesSaveLoadRoundTrip() {
+        val file = tempFolder.newFile("personal_graph_alias_roundtrip.json")
+        val cipher = AesGcmVaultCipher(AesGcmVaultCipher.randomKey())
+
+        val first = PersonalGraphStore(storeFile = file, cipher = cipher)
+        first.replaceGraph(
+            nodes = listOf(
+                PersonalGraphStore.Node("회의", emptyList(), 1.0f),
+                PersonalGraphStore.Node("참석", emptyList(), 1.0f)
+            ),
+            edges = listOf(PersonalGraphStore.Edge("회의", "참석", 1.0f)),
+            topics = emptyList(),
+            builtMs = 1L
+        )
+        first.save()
+
+        val second = PersonalGraphStore(storeFile = file, cipher = cipher)
+        val boost = second.proximityBoost(setOf("회"), setOf("참석"))
+
+        assertTrue(boost > 1.0f)
+    }
+
+    @Test
+    fun proximityBoostReturnsBaselineAfterClearEvenForPreviouslyAliasedStem() {
+        val store = PersonalGraphStore()
+        store.replaceGraph(
+            nodes = listOf(
+                PersonalGraphStore.Node("회의", emptyList(), 1.0f),
+                PersonalGraphStore.Node("참석", emptyList(), 1.0f)
+            ),
+            edges = listOf(PersonalGraphStore.Edge("회의", "참석", 1.0f)),
+            topics = emptyList(),
+            builtMs = 1L
+        )
+
+        store.clear()
+
+        val boost = store.proximityBoost(setOf("회"), setOf("참석"))
+
+        assertEquals(1.0f, boost)
     }
 }

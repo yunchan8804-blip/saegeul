@@ -100,7 +100,8 @@ class PersonalGraphEnricher(
     )
 
     private fun parseChunk(raw: String): ParsedChunk? = runCatching {
-        val root = JSONObject(raw)
+        val jsonText = extractJsonObject(raw) ?: return null
+        val root = JSONObject(jsonText)
 
         val nodes = mutableListOf<PersonalGraphStore.Node>()
         val nodesArr = root.optJSONArray("nodes")
@@ -151,6 +152,26 @@ class PersonalGraphEnricher(
 
         ParsedChunk(nodes, edges, topics)
     }.getOrNull()
+
+    /**
+     * Extracts the JSON object substring from a companion response that may be wrapped in a
+     * ```json code fence and/or surrounded by explanatory prose. Returns null when no `{...}`
+     * object can be located at all.
+     */
+    private fun extractJsonObject(raw: String): String? {
+        var text = raw.trim()
+        if (text.startsWith("```")) {
+            val firstNewline = text.indexOf('\n')
+            text = if (firstNewline >= 0) text.substring(firstNewline + 1) else ""
+            val fenceEnd = text.lastIndexOf("```")
+            if (fenceEnd >= 0) text = text.substring(0, fenceEnd)
+            text = text.trim()
+        }
+        val start = text.indexOf('{')
+        val end = text.lastIndexOf('}')
+        if (start < 0 || end < start) return null
+        return text.substring(start, end + 1)
+    }
 
     private fun mergeNodes(target: LinkedHashMap<String, PersonalGraphStore.Node>, nodes: List<PersonalGraphStore.Node>) {
         nodes.forEach { n ->
