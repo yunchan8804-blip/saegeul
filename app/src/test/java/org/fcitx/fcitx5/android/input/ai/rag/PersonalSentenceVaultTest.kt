@@ -183,4 +183,38 @@ class PersonalSentenceVaultTest {
 
         assertTrue("retrieve took ${elapsedMs}ms, expected <= 40ms", elapsedMs <= 40.0)
     }
+
+    @Test
+    fun exportForEnrichmentReturnsEmptyListForEmptyVault() {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+
+        assertTrue(vault.exportForEnrichment(10).isEmpty())
+    }
+
+    @Test
+    fun exportForEnrichmentRanksByDecayedCountDescending() {
+        var now = 0L
+        val vault = PersonalSentenceVault(clock = { now })
+        now = 0; vault.record("문장 하나 입니다", "com.android.chrome")
+        now = 2000; vault.record("문장 셋 입니다", "com.android.chrome")
+        now = 2000; vault.record("문장 둘 입니다", "com.android.chrome")
+        now = 2000; vault.record("문장 둘 입니다", "com.android.chrome") // bump its count to 2
+
+        val exported = vault.exportForEnrichment(10)
+
+        assertEquals(3, exported.size)
+        assertEquals("문장 둘 입니다", exported.first())
+    }
+
+    @Test
+    fun exportForEnrichmentRespectsLimit() {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        vault.record("문장 하나 입니다", "com.android.chrome")
+        vault.record("문장 둘 입니다", "com.android.chrome")
+        vault.record("문장 셋 입니다", "com.android.chrome")
+
+        val exported = vault.exportForEnrichment(2)
+
+        assertEquals(2, exported.size)
+    }
 }

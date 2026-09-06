@@ -161,6 +161,21 @@ class PersonalSentenceVault(
     @Synchronized
     fun stats(): VaultStats = VaultStats(sentences = docs.size, uniqueTerms = postings.size)
 
+    /**
+     * Exports up to [limit] stored sentences (already PII-scrubbed) for the companion
+     * enrichment pipeline, ranked by [decayedCount] descending so the sentences that are still
+     * most "alive" (recent and/or repeated) are sent first. Read-only; does not affect retrieval.
+     */
+    @Synchronized
+    fun exportForEnrichment(limit: Int): List<String> {
+        if (docs.isEmpty()) return emptyList()
+        val now = clock()
+        return docs.values
+            .sortedByDescending { decayedCount(it, now) }
+            .take(limit)
+            .map { it.text }
+    }
+
     @Synchronized
     fun clear() {
         docs.clear()
