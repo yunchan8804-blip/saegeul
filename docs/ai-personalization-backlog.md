@@ -8,7 +8,7 @@
 
 | # | 항목 | 발견 근거 | 위치 | 규모 |
 |---|---|---|---|---|
-| B1 | **대시보드 개인정보 문구 모순**: "데이터는 기기 외부로 단 1바이트도 전송되지 않습니다 · 클라우드 전송 0B" 바로 아래에 「지금 강화」(컴패니언 송출) 버튼이 있음. 온디바이스 학습(0바이트)과 opt-in 강화 송출을 문구에서 분리해 정직하게 고쳐야 함. | 기기 검증(Fold6) 스크린샷 | `TypingDnaDashboardActivity` / 대시보드 레이아웃·문자열 | 소 |
+| B1 | ~~**대시보드 개인정보 문구 모순**~~ — **해소(Phase 3-d)**: 레이아웃 900행 문구와 `TypingDnaChartView` 게이지 "클라우드 전송 0B"를 온디바이스 학습 한정으로 분리하고 「지금 강화」·자동 강화는 사용자가 켤 때만 본인 컴퓨터로 보냄을 명시. | 기기 검증(Fold6) 스크린샷 | `activity_typing_dna_dashboard.xml`, `TypingDnaChartView.kt` | 완료 |
 | B2 | **augmenter가 PII 미치환 raw 문맥을 송출**: `PersonalizedSentenceAugmenter.augmentContext`가 `getRecentContext()`(미치환)를 컴패니언에 보냄. 오프라인 게이트는 닫았으나(fc8f6032) 송출 전 `KoreanPiiScrubber.scrub` 적용 필요. | 탐색 워커 보고 | `FcitxInputMethodService` augmenter 경로, `UserTypingContextCollector` | 소 |
 | B3 | **프리페처가 사용자 내용을 logcat에 기록**: `AiSentenceCompletionPrefetcher`가 `result.suggestions`와 문맥을 `Log.i/d`로 찍음. 릴리스에서 개인정보 노출 소지. 디버그 빌드 한정 또는 제거. | 코드 읽기 | `AiSentenceCompletionPrefetcher.kt` | 소 |
 
