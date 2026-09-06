@@ -62,6 +62,20 @@ class PersonalGraphEnricherTest {
     }
 
     @Test
+    fun enrichStoresVaultSentenceCountAsSourceSentenceCount() = runBlocking {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        vault.record("내일 판교에서 봐요", "com.android.chrome")
+        val store = PersonalGraphStore()
+        val enricher = PersonalGraphEnricher(vault, store)
+
+        val result = enricher.enrich(generate = { _, _ -> listOf(validGraphJson) })
+
+        assertTrue(result.ok)
+        assertEquals(vault.stats().sentences, store.stats().sourceSentenceCount)
+    }
+
+    @Test
     fun enrichPassesInstructionAndChunkToGenerate() = runBlocking {
         val vault = PersonalSentenceVault(clock = { 1000L })
         vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")

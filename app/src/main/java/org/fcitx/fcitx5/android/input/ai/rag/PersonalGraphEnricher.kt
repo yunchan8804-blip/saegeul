@@ -64,7 +64,8 @@ class PersonalGraphEnricher(
             mergedNodes.values.toList(),
             mergedEdges.values.toList(),
             mergedTopics.values.toList(),
-            clock()
+            clock(),
+            sourceSentenceCount = vault.stats().sentences
         )
         graphStore.save()
 

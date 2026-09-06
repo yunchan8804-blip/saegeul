@@ -402,7 +402,7 @@ class TypingDnaChartView @JvmOverloads constructor(
         subTextPaint.color = emeraldGreen
         canvas.drawText("Zero-Knowledge · 온디바이스 ${privacyPercent}%", textX, y + dp(28f), subTextPaint)
         subTextPaint.color = getThemedSubTextColor()
-        canvas.drawText("클라우드 전송 ${cloudBytes}B · PII 스크러빙 적용", textX, y + dp(48f), subTextPaint)
+        canvas.drawText("온디바이스 학습 클라우드 전송 ${cloudBytes}B · PII 스크러빙 적용", textX, y + dp(48f), subTextPaint)
         canvas.drawText("원본 문장은 학습 직후 기기에서 영구 파기됩니다.", textX, y + dp(66f), subTextPaint)
     }
 

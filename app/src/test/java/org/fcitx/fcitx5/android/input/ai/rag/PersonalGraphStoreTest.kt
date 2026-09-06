@@ -213,6 +213,63 @@ class PersonalGraphStoreTest {
     }
 
     @Test
+    fun replaceGraphStoresSourceSentenceCountAndDefaultsToZeroWhenOmitted() {
+        val storeWithCount = PersonalGraphStore()
+        storeWithCount.replaceGraph(
+            nodes = listOf(PersonalGraphStore.Node("회의", emptyList(), 1.0f)),
+            edges = emptyList(),
+            topics = emptyList(),
+            builtMs = 1L,
+            sourceSentenceCount = 42
+        )
+        assertEquals(42, storeWithCount.stats().sourceSentenceCount)
+
+        val storeWithoutCount = PersonalGraphStore()
+        storeWithoutCount.replaceGraph(
+            nodes = listOf(PersonalGraphStore.Node("회의", emptyList(), 1.0f)),
+            edges = emptyList(),
+            topics = emptyList(),
+            builtMs = 1L
+        )
+        assertEquals(0, storeWithoutCount.stats().sourceSentenceCount)
+    }
+
+    @Test
+    fun sourceSentenceCountSurvivesSaveLoadRoundTrip() {
+        val file = tempFolder.newFile("personal_graph_source_count_roundtrip.json")
+        val cipher = AesGcmVaultCipher(AesGcmVaultCipher.randomKey())
+
+        val first = PersonalGraphStore(storeFile = file, cipher = cipher)
+        first.replaceGraph(
+            nodes = listOf(PersonalGraphStore.Node("회의", emptyList(), 1.0f)),
+            edges = emptyList(),
+            topics = emptyList(),
+            builtMs = 1L,
+            sourceSentenceCount = 42
+        )
+        first.save()
+
+        val second = PersonalGraphStore(storeFile = file, cipher = cipher)
+        assertEquals(42, second.stats().sourceSentenceCount)
+    }
+
+    @Test
+    fun clearResetsSourceSentenceCountToZero() {
+        val store = PersonalGraphStore()
+        store.replaceGraph(
+            nodes = listOf(PersonalGraphStore.Node("회의", emptyList(), 1.0f)),
+            edges = emptyList(),
+            topics = emptyList(),
+            builtMs = 1L,
+            sourceSentenceCount = 42
+        )
+
+        store.clear()
+
+        assertEquals(0, store.stats().sourceSentenceCount)
+    }
+
+    @Test
     fun stemOfHoeuiStripsTheEuiParticleDownToHoe() {
         // Confirms the premise the alias index is built to work around: stem() over-strips a
         // non-particle syllable off "회의" because "의" is also a valid standalone particle.

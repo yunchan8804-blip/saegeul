@@ -106,7 +106,7 @@
       "id": "other_user_generated_content",
       "playCategory": "App activity",
       "playType": "Other user-generated content",
-      "source": "AI source text and custom instructions explicitly submitted by the user; PII-scrubbed accumulated sentences the user explicitly submits from the dashboard for personal knowledge-graph enrichment by the configured AI provider (which may be the user's own companion)",
+      "source": "AI source text and custom instructions explicitly submitted by the user; PII-scrubbed accumulated sentences sent for personal knowledge-graph enrichment by the configured AI provider (which may be the user's own companion) either when the user explicitly submits them from the dashboard or, only if the user has enabled the opt-in auto-enrichment setting (off by default), automatically during keyboard use once enough new sentences have accumulated",
       "collected": true,
       "shared": true,
       "processedEphemerally": false,

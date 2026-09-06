@@ -2386,6 +2386,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @Volatile
     private var predictionEpoch = 0L
 
+    @Volatile
+    private var graphEnrichInFlight = false
+
     private data class ContextualPredictionMemoKey(
         val stroke: String,
         val context: String,
@@ -2433,6 +2436,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         org.fcitx.fcitx5.android.input.ai.TypingDnaCommitSink(userTypingContextCollector)
     }
 
+    private val personalGraphEnricher by lazy {
+        org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnricher(personalSentenceVault, personalGraphStore)
+    }
+
     val userTypingContextCollector by lazy {
         org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector(
             onTriggerAugmentation = { pkg, ctx ->
@@ -2459,8 +2466,41 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
                 predictionEpoch++
                 scheduleNgramSave()
+                maybeAutoEnrichGraph()
             }
         )
+    }
+
+    private fun maybeAutoEnrichGraph() {
+        val graph = personalGraphStore.stats()
+        val shouldRun = org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichAutoPolicy.shouldRun(
+            enabled = prefs.advanced.graphEnrichAuto.getValue(),
+            networkAllowed = allowsNetworkInputFeatures(),
+            inFlight = graphEnrichInFlight,
+            vaultSentences = personalSentenceVault.stats().sentences,
+            sourceSentenceCount = graph.sourceSentenceCount,
+            builtMs = graph.builtMs,
+            nowMs = System.currentTimeMillis()
+        )
+        if (!shouldRun) return
+        val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load() ?: return
+        graphEnrichInFlight = true
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile)
+                personalGraphEnricher.enrich(generate = { _, input ->
+                    client.generate(
+                        action = org.fcitx.fcitx5.android.input.ai.AiAction.GraphEnrich,
+                        input = input,
+                        tierOverride = org.fcitx.fcitx5.android.input.ai.AiModelTier.Fast
+                    ).suggestions
+                })
+            } catch (e: Throwable) {
+                android.util.Log.w("SaegeulAI", "auto graph enrichment failed: ${e.javaClass.simpleName}")
+            } finally {
+                graphEnrichInFlight = false
+            }
+        }
     }
 
     val contextualPredictor: org.fcitx.fcitx5.android.input.ai.AiContextualPredictor by lazy {

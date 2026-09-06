@@ -48,6 +48,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             false,
             R.string.offline_mode_summary
         )
+        val graphEnrichAuto = switch(
+            R.string.graph_enrich_auto,
+            "graph_enrich_auto",
+            false,
+            R.string.graph_enrich_auto_summary
+        )
         val autoSnippetExpansion = switch(
             R.string.auto_snippet_expansion,
             "auto_snippet_expansion",

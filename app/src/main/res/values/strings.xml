@@ -241,6 +241,8 @@
     <string name="auto_snippet_expansion_summary" tools:ignore="MissingTranslation">Expand built-in aliases such as :address1 and enabled quick-phrase keywords beginning with : when Space or Enter is pressed</string>
     <string name="offline_mode" tools:ignore="MissingTranslation">Completely offline mode</string>
     <string name="offline_mode_summary" tools:ignore="MissingTranslation">Block AI, GIF search, transcription, and every remote input provider</string>
+    <string name="graph_enrich_auto" tools:ignore="MissingTranslation">Auto-enrich knowledge graph</string>
+    <string name="graph_enrich_auto_summary" tools:ignore="MissingTranslation">When on, once 30 or more new sentences have accumulated and 24 hours have passed since the last enrichment, PII-scrubbed sentences are sent to your configured AI provider (your own computer) during keyboard use to refresh your personal knowledge graph. Never runs in offline mode or for blocked apps.</string>
     <string name="mobile_hangul_layout" tools:ignore="MissingTranslation">Korean keyboard surface</string>
     <string name="mobile_hangul_physical" tools:ignore="MissingTranslation">Physical layout</string>
     <string name="mobile_hangul_chunjiin" tools:ignore="MissingTranslation">Chunjiin</string>

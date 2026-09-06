@@ -30,7 +30,13 @@ class PersonalGraphStore(
 
     data class Topic(val id: String, val label: String, val members: List<String>)
 
-    data class GraphStats(val nodes: Int, val edges: Int, val topics: Int, val builtMs: Long)
+    data class GraphStats(
+        val nodes: Int,
+        val edges: Int,
+        val topics: Int,
+        val builtMs: Long,
+        val sourceSentenceCount: Int = 0
+    )
 
     // node id -> Node
     private val nodes = HashMap<String, Node>()
@@ -47,6 +53,10 @@ class PersonalGraphStore(
 
     private var graphBuiltMs: Long = 0L
 
+    // Vault sentence count at the time the graph was last built, so the enrichment loop can tell
+    // how many new sentences have accumulated since then.
+    private var sourceSentenceCount: Int = 0
+
     private val vaultFile: VaultFile? = storeFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
 
     init {
@@ -59,7 +69,13 @@ class PersonalGraphStore(
      * cut, and topics are capped to [MAX_TOPICS]. Updates memory only; call [save] to persist.
      */
     @Synchronized
-    fun replaceGraph(nodes: List<Node>, edges: List<Edge>, topics: List<Topic>, builtMs: Long) {
+    fun replaceGraph(
+        nodes: List<Node>,
+        edges: List<Edge>,
+        topics: List<Topic>,
+        builtMs: Long,
+        sourceSentenceCount: Int = 0
+    ) {
         this.nodes.clear()
         this.edges.clear()
         nodes.sortedByDescending { it.weight }
@@ -72,11 +88,12 @@ class PersonalGraphStore(
             .forEach { this.edges[edgeKey(it.a, it.b)] = it }
         this.topics = topics.take(MAX_TOPICS)
         this.graphBuiltMs = builtMs
+        this.sourceSentenceCount = sourceSentenceCount
         rebuildAliases()
     }
 
     @Synchronized
-    fun stats(): GraphStats = GraphStats(nodes.size, edges.size, topics.size, graphBuiltMs)
+    fun stats(): GraphStats = GraphStats(nodes.size, edges.size, topics.size, graphBuiltMs, sourceSentenceCount)
 
     @Synchronized
     fun clear() {
@@ -85,6 +102,7 @@ class PersonalGraphStore(
         nodeAliases.clear()
         topics = emptyList()
         graphBuiltMs = 0L
+        sourceSentenceCount = 0
         vaultFile?.delete()
     }
 
@@ -123,6 +141,7 @@ class PersonalGraphStore(
             val root = JSONObject()
             root.put("v", 1)
             root.put("built", graphBuiltMs)
+            root.put("src", sourceSentenceCount)
             val nodesArr = JSONArray()
             nodes.values.forEach { n ->
                 val o = JSONObject()
@@ -172,6 +191,7 @@ class PersonalGraphStore(
             if (raw.isBlank()) return
             val root = JSONObject(raw)
             graphBuiltMs = root.optLong("built", 0L)
+            sourceSentenceCount = root.optInt("src", 0)
 
             val nodesArr = root.optJSONArray("nodes") ?: JSONArray()
             for (i in 0 until nodesArr.length()) {
@@ -219,6 +239,7 @@ class PersonalGraphStore(
             nodeAliases.clear()
             topics = emptyList()
             graphBuiltMs = 0L
+            sourceSentenceCount = 0
         }
     }
 
