@@ -32,6 +32,9 @@
             domain="file"
             path="personal_rag.json" />
         <exclude
+            domain="file"
+            path="personal_graph.json" />
+        <exclude
             domain="database"
             path="clbdb" />
         <exclude
@@ -75,6 +78,9 @@
         <exclude
             domain="file"
             path="personal_rag.json" />
+        <exclude
+            domain="file"
+            path="personal_graph.json" />
         <exclude
             domain="database"
             path="clbdb" />

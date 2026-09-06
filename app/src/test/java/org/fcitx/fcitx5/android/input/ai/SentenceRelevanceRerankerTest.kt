@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -182,5 +183,50 @@ class SentenceRelevanceRerankerTest {
         )
 
         assertTrue(result.size <= 3)
+    }
+
+    @Test
+    fun graphStoreProximityBoostsCandidateConnectedToContextInGraph() {
+        val graphStore = PersonalGraphStore(storeFile = null)
+        graphStore.replaceGraph(
+            nodes = listOf(
+                PersonalGraphStore.Node(id = "발표", tags = emptyList(), weight = 1.0f),
+                PersonalGraphStore.Node(id = "보고", tags = emptyList(), weight = 1.0f)
+            ),
+            edges = listOf(
+                PersonalGraphStore.Edge(a = "발표", b = "보고", weight = 1.0f)
+            ),
+            topics = emptyList(),
+            builtMs = 0L
+        )
+
+        val context = "발표"
+        val candidate = AiPrediction(
+            text = "보고 드리겠습니다",
+            confidenceScore = 0.5f,
+            isSentenceCompletion = true,
+            source = "rag_personal"
+        )
+
+        val withoutGraph = SentenceRelevanceReranker.rerank(
+            sentences = listOf(candidate),
+            contextBeforeCursor = context,
+            ngram = null,
+            packageName = packageName,
+            limit = 5,
+            graphStore = null
+        )
+        val withGraph = SentenceRelevanceReranker.rerank(
+            sentences = listOf(candidate),
+            contextBeforeCursor = context,
+            ngram = null,
+            packageName = packageName,
+            limit = 5,
+            graphStore = graphStore
+        )
+
+        assertEquals(1, withoutGraph.size)
+        assertEquals(1, withGraph.size)
+        assertTrue(withGraph.first().confidenceScore > withoutGraph.first().confidenceScore)
     }
 }

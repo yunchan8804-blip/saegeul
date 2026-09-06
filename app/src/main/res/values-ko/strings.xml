@@ -1020,4 +1020,17 @@
     <string name="vault_category_messenger">메신저</string>
     <string name="vault_category_work">업무</string>
     <string name="vault_category_general">일반</string>
+    <string name="enrich_now_button">지금 강화</string>
+    <string name="dashboard_graph_stats_line">지식 그래프: 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
+    <string name="enrich_offline_blocked">오프라인 모드에서는 강화할 수 없습니다</string>
+    <string name="enrich_no_provider">먼저 개인정보·AI 설정에서 내 컴퓨터(AI 공급자)를 연결하세요</string>
+    <string name="enrich_confirm_title">개인 지식 그래프 강화</string>
+    <string name="enrich_confirm_message">기기에 쌓인 (개인정보 치환된) 문장을 설정한 AI 공급자(본인 컴퓨터 컴패니언)로 보내 개인 지식 그래프를 만듭니다. 요청은 store=false로 보관되지 않습니다. 계속할까요?</string>
+    <string name="enrich_confirm_positive">강화</string>
+    <string name="enrich_running">강화 중…</string>
+    <string name="enrich_failed">강화에 실패했습니다</string>
+    <string name="enrich_done">강화 완료: 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
+    <string name="enrich_no_data">아직 학습된 문장이 없습니다</string>
+    <string name="enrich_parse_failed">강화 결과를 해석하지 못했습니다</string>
+    <string name="enrich_partial">일부만 강화됨: 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
 </resources>

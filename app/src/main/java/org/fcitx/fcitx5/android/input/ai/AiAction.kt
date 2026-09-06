@@ -78,6 +78,11 @@ enum class AiAction(
         AiModelTier.Fast,
         1,
         "Translate the text into natural Simplified Chinese. Preserve names, numbers, formatting, and meaning."
+    ),
+    GraphEnrich(
+        AiModelTier.Fast,
+        1,
+        "Treat the input as newline-separated Korean sentences the user has written. Extract their frequent key words/phrases and the relations between them as a personal knowledge graph. Each suggestion string must be a single JSON object of exactly this shape: {\"nodes\":[{\"id\":\"단어\",\"tags\":[\"주제\"],\"w\":3.0}],\"edges\":[{\"a\":\"단어1\",\"b\":\"단어2\",\"w\":0.8}],\"topics\":[{\"id\":\"t0\",\"label\":\"주제명\",\"members\":[\"단어\"]}]}. Do not include personal data (names, numbers) as nodes."
     );
 
     fun developerInstruction(customInstruction: String? = null): String {

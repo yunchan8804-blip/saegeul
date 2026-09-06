@@ -1022,4 +1022,17 @@
     <string name="vault_category_messenger" tools:ignore="MissingTranslation">Messenger</string>
     <string name="vault_category_work" tools:ignore="MissingTranslation">Work</string>
     <string name="vault_category_general" tools:ignore="MissingTranslation">General</string>
+    <string name="enrich_now_button" tools:ignore="MissingTranslation">Enrich now</string>
+    <string name="dashboard_graph_stats_line" tools:ignore="MissingTranslation">Knowledge graph: %1$d nodes · %2$d relations · %3$d topics</string>
+    <string name="enrich_offline_blocked" tools:ignore="MissingTranslation">Enrichment is unavailable in offline mode</string>
+    <string name="enrich_no_provider" tools:ignore="MissingTranslation">Connect your computer (AI provider) in Privacy &amp; AI settings first</string>
+    <string name="enrich_confirm_title" tools:ignore="MissingTranslation">Enrich personal knowledge graph</string>
+    <string name="enrich_confirm_message" tools:ignore="MissingTranslation">This sends sentences accumulated on this device (with personal data scrubbed) to your configured AI provider (your computer companion) to build a personal knowledge graph. The request is sent with store=false and is not retained. Continue?</string>
+    <string name="enrich_confirm_positive" tools:ignore="MissingTranslation">Enrich</string>
+    <string name="enrich_running" tools:ignore="MissingTranslation">Enriching…</string>
+    <string name="enrich_failed" tools:ignore="MissingTranslation">Enrichment failed</string>
+    <string name="enrich_done" tools:ignore="MissingTranslation">Enrichment complete: %1$d nodes · %2$d relations · %3$d topics</string>
+    <string name="enrich_no_data" tools:ignore="MissingTranslation">No learned sentences yet</string>
+    <string name="enrich_parse_failed" tools:ignore="MissingTranslation">Could not parse the enrichment result</string>
+    <string name="enrich_partial" tools:ignore="MissingTranslation">Partially enriched: %1$d nodes · %2$d relations · %3$d topics</string>
 </resources>

@@ -21,7 +21,8 @@ import java.util.LinkedHashMap
 class AiSentenceCompletionPrefetcher(
     private val clientProvider: (() -> OpenAiResponsesClient?)? = null,
     private val maxCacheCapacity: Int = 30,
-    var onPrefetchCompleted: ((context: String, suggestions: List<String>) -> Unit)? = null
+    var onPrefetchCompleted: ((context: String, suggestions: List<String>) -> Unit)? = null,
+    private val networkAllowed: () -> Boolean = { true }
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -65,6 +66,7 @@ class AiSentenceCompletionPrefetcher(
      * Uses Fast tier (AGY CLI / Gemini Flash) for ultra low-latency prefetching and notifies the IME UI upon completion.
      */
     fun schedulePrefetch(context: String, debounceMs: Long = 300L) {
+        if (!networkAllowed()) return
         val clean = context.trim()
         if (clean.length < 2) return
 

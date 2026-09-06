@@ -2368,6 +2368,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val personalSentenceVault: org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
         get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalSentenceVault
 
+    val personalGraphStore: org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
+        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalGraphStore
+
     val typoCorrector: org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
         get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typoCorrector
 
@@ -2433,10 +2436,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val userTypingContextCollector by lazy {
         org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector(
             onTriggerAugmentation = { pkg, ctx ->
-                lifecycleScope.launch(Dispatchers.IO) {
-                    val augmented = personalizedAugmenter.augmentContext(pkg, ctx)
-                    if (augmented) {
-                        personalizedStore.save()
+                if (allowsNetworkInputFeatures()) {
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val augmented = personalizedAugmenter.augmentContext(pkg, ctx)
+                        if (augmented) {
+                            personalizedStore.save()
+                        }
                     }
                 }
             },
@@ -2475,14 +2480,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                             inputView?.refreshContextualCandidates()
                         }
                     }
-                }
+                },
+                networkAllowed = { allowsNetworkInputFeatures() }
             ),
             personalizedStore = personalizedStore,
             ngram = personalNgramModel,
             typoCorrector = typoCorrector,
             baseVocabulary = baseKoreanVocabulary,
             correctionStore = correctionPatternStore,
-            personalSentenceVault = personalSentenceVault
+            personalSentenceVault = personalSentenceVault,
+            personalGraphStore = personalGraphStore
         )
     }
 

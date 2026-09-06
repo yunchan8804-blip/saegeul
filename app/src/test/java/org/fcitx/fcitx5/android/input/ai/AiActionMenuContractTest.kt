@@ -39,7 +39,10 @@ class AiActionMenuContractTest {
             AiActionMenuPolicy.sourceButtons()
         )
         assertEquals(14, AiActionMenuPolicy.sourceButtons().size)
-        assertEquals(AiAction.entries.toSet(), AiActionMenuPolicy.sourceButtons().toSet())
+        assertEquals(
+            AiAction.entries.toSet() - AiAction.GraphEnrich,
+            AiActionMenuPolicy.sourceButtons().toSet()
+        )
     }
 
     @Test

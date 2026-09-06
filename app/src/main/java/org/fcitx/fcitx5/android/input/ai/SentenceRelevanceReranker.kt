@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
+
 /**
  * Re-ranks and filters sentence-line (isSentenceCompletion=true) candidates using purely
  * on-device signals: how much of the candidate is actually new text beyond the typed context,
@@ -33,7 +35,8 @@ object SentenceRelevanceReranker {
         contextBeforeCursor: String,
         ngram: PersonalNgramModel?,
         packageName: String,
-        limit: Int
+        limit: Int,
+        graphStore: PersonalGraphStore? = null
     ): List<AiPrediction> {
         if (sentences.isEmpty()) return emptyList()
 
@@ -47,6 +50,13 @@ object SentenceRelevanceReranker {
         // The final context word is usually echoed verbatim by continuation candidates, so it is not
         // evidence of topical overlap; drop it from the overlap set.
         val topicalCtxStems = recentCtxStems.toSet() - listOfNotNull(recentCtxStems.lastOrNull())
+
+        // The graph signal (unlike topical overlap) is not about the echoed candidate word, so it
+        // uses the full context stem set including the last token. Loop-invariant like bridgeStems,
+        // so resolve once here rather than per candidate.
+        val graphCtxStems = PersonalNgramTokenizer.tokenize(contextBeforeCursor)
+            .map { PersonalNgramTokenizer.stem(it) ?: it }
+            .toSet()
 
         // predictNext depends only on the (loop-invariant) context, so resolve the personal
         // next-word set once here rather than re-querying the n-gram model per candidate.
@@ -81,7 +91,9 @@ object SentenceRelevanceReranker {
             val newEojeolCount = remainder.split(' ').count { it.isNotBlank() }
             val lengthFactor = if (newEojeolCount > LENGTH_LONG_EOJEOLS_THRESHOLD) LENGTH_LONG_FACTOR else 1.0f
 
-            val newScore = (pred.confidenceScore * overlapFactor * bridgeFactor * lengthFactor)
+            val graphFactor = graphStore?.proximityBoost(graphCtxStems, sTokenStems) ?: 1.0f
+
+            val newScore = (pred.confidenceScore * overlapFactor * bridgeFactor * lengthFactor * graphFactor)
                 .coerceIn(0f, MAX_CONFIDENCE)
             scored.add(pred to newScore)
         }

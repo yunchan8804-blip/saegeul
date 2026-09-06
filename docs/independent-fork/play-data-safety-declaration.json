@@ -106,7 +106,7 @@
       "id": "other_user_generated_content",
       "playCategory": "App activity",
       "playType": "Other user-generated content",
-      "source": "AI source text and custom instructions explicitly submitted by the user",
+      "source": "AI source text and custom instructions explicitly submitted by the user; PII-scrubbed accumulated sentences the user explicitly submits from the dashboard for personal knowledge-graph enrichment by the configured AI provider (which may be the user's own companion)",
       "collected": true,
       "shared": true,
       "processedEphemerally": false,

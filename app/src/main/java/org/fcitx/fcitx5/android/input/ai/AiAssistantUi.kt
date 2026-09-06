@@ -1050,6 +1050,9 @@ class AiAssistantUi(
         AiAction.TranslateKorean -> R.string.ai_action_translate_korean
         AiAction.TranslateJapanese -> R.string.ai_action_translate_japanese
         AiAction.TranslateChinese -> R.string.ai_action_translate_chinese
+        // Programmatic-only action (dashboard graph enrichment); never shown in the writing menu,
+        // but the exhaustive when needs a branch. A valid label keeps it safe if ever rendered.
+        AiAction.GraphEnrich -> R.string.enrich_now_button
     }
 
     private fun matchWrap() = LinearLayout.LayoutParams(

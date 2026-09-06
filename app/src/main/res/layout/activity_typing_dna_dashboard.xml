@@ -807,6 +807,16 @@
                 tools:text="기록된 문장 12개" />
 
             <TextView
+                android:id="@+id/tv_dash_graph_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:gravity="center"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp"
+                tools:text="지식 그래프: 노드 24 · 관계 18 · 주제 5" />
+
+            <TextView
                 android:id="@+id/tv_dash_last_learned"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -909,6 +919,20 @@
                 android:textStyle="bold"
                 app:cornerRadius="12dp"
                 app:icon="@drawable/ic_baseline_auto_awesome_24" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_enrich_graph"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginBottom="12dp"
+                android:contentDescription="@string/enrich_now_button"
+                android:minHeight="48dp"
+                android:text="@string/enrich_now_button"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_baseline_emoji_objects_24" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_clear_dna"

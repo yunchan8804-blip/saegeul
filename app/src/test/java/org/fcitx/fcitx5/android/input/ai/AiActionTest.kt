@@ -13,7 +13,7 @@ import org.junit.Test
 class AiActionTest {
     @Test
     fun `all actions have bounded output and injection boundary`() {
-        assertEquals(14, AiAction.entries.size)
+        assertEquals(15, AiAction.entries.size)
         AiAction.entries.forEach { action ->
             assertTrue(action.maxSuggestions in 1..3)
             val instruction = action.developerInstruction(
@@ -49,15 +49,16 @@ class AiActionTest {
 
     @Test
     fun `source review shows every action while direct prompt is intentionally singular`() {
+        val menuActions = AiAction.entries.toSet() - AiAction.GraphEnrich
         assertEquals(14, AiActionMenuPolicy.sourceButtons().size)
         assertEquals(listOf(AiAction.Custom), AiActionMenuPolicy.directPromptButtons())
-        assertEquals(AiAction.entries.toSet(), AiActionMenuPolicy.allEntryPoints())
+        assertEquals(menuActions, AiActionMenuPolicy.allEntryPoints())
         assertEquals(
             AiActionMenuPolicy.sourceButtons().size,
             AiActionMenuPolicy.sourceButtons().distinct().size
         )
         assertEquals(setOf(AiAction.Custom), AiActionMenuPolicy.enabledActions(hasSource = false))
-        assertEquals(AiAction.entries.toSet(), AiActionMenuPolicy.enabledActions(hasSource = true))
+        assertEquals(menuActions, AiActionMenuPolicy.enabledActions(hasSource = true))
     }
 
     @Test

@@ -63,6 +63,10 @@ class FcitxApplication : Application() {
         PersonalSentenceVault(storeFile = File(filesDir, "personal_rag.json"), cipher = vaultCipher)
     }
 
+    val personalGraphStore: org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore by lazy {
+        org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore(storeFile = File(filesDir, "personal_graph.json"), cipher = vaultCipher)
+    }
+
     val vaultCipher: KeystoreVaultCipher by lazy { KeystoreVaultCipher() }
 
     val predictionMetricsStore: PredictionMetricsStore by lazy {

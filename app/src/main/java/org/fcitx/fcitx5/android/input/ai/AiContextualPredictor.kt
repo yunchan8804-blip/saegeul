@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
@@ -36,7 +37,8 @@ class AiContextualPredictor(
     private val baseVocabulary: BaseKoreanVocabulary? = null,
     private val correctionStore: CorrectionPatternStore? = null,
     private val sentenceContinuation: KoreanSentenceContinuation? = null,
-    private val personalSentenceVault: PersonalSentenceVault? = null
+    private val personalSentenceVault: PersonalSentenceVault? = null,
+    private val personalGraphStore: PersonalGraphStore? = null
 ) {
 
     companion object {
@@ -558,7 +560,7 @@ class AiContextualPredictor(
         val sentenceCandidates = results
             .filter { it.isSentenceCompletion && it.source !in SENTENCE_LINE_SOURCE_BLOCKLIST }
         val sentences = SentenceRelevanceReranker.rerank(
-            sentenceCandidates, contextBeforeCursor, ngram, packageName, limit
+            sentenceCandidates, contextBeforeCursor, ngram, packageName, limit, personalGraphStore
         )
         return (words + sentences).sortedByDescending { it.confidenceScore }
     }
