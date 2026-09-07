@@ -55,3 +55,18 @@
 - `PersonalGraphStore.proximityBoost`의 stem 불일치("회의"→"회") 해소: 노드 별칭 인덱스.
 - `PersonalGraphEnricher.parseChunk` 견고화: 코드펜스·앞뒤 설명문 허용.
 - 강화 루프 자동화(opt-in, 기본 꺼짐): 새 문장 임계치·최소 간격·게이트 통과 시 IME에서 기회 트리거. 이때 B1 문구도 함께 정리.
+
+## 콜드스타트 프리징 RCA 확정(2026-09-07, atrace 실측)
+
+첫 키보드 열림 시 ~1초 프리징(Skipped 50~110 frames). **세 각도(코드 RCA 2건 + A35 atrace 148MB 실측)로 원인 확정. 이전 두 가설은 모두 반증됨.**
+
+- **반증된 가설 1 (원조 72-에이전트 워크플로)**: "TEE 금고 복호화가 메인 스레드에서 실행돼 멈춤." → 실측: 관측된 복호화 3건(personal_ngram/personal_corrections=warmUp IO, typing_dna_pending=onCreate 메인)은 각 ~11ms로 빠르고 프리징과 무관. contextualPredictor의 3-vault(personalized/rag/graph)는 `predictionScope`(Default) 오프메인. **금고는 원인 아님.**
+- **반증된 가설 2 (rca-inputview)**: "`KeyboardWindow.kt:154 fcitx.runImmediately{inputMethodEntryCached}`(=runBlocking)가 focus 콜드 init으로 바쁜 fcitx 워커를 기다림." → atrace: 문제 구간 메인 스레드가 **86% 온-CPU(Running), off-CPU(S)는 45ms뿐.** 대기가 아니라 CPU 연산 중. **워커 블록 아님.**
+- **확정 원인 (atrace)**: `IMS.showSoftInput` 1924ms 구간이 **첫 실행 프로세스 기동 + 첫 뷰 인플레이션의 CPU 작업**으로 채워짐. TOP 슬라이스: `bindApplication` 1815ms, dex 로딩(`OpenDexFilesFromOat` 652ms, Extract/Verify dex 수백 ms), **클래스 검증**(`VerifyClass kotlin-reflect` 126ms, class-load 마커 2514건 82ms, fcitx UI 64ms, androidx 등), `serviceCreate(fcitx)` 271ms, 첫 프레임 `Choreographer#doFrame`/`traversal` 488ms + `measure` 172ms.
+- **디버그 빌드 기여분**: dex 로딩·`VerifyClass`는 JIT/디버그 특성. 릴리스(AOT)는 설치 시 사전 검증·컴파일해 대부분 사라짐. 단 DEBUGGABLE 패키지는 `cmd package compile -m speed`가 `verify`로 캡돼 온디바이스 AOT 근사 측정 불가 → 정량화하려면 실제 릴리스 빌드 측정 필요.
+- **결론**: AI/개인화(Phase 2/다듬기) 코드는 프리징과 **무관함이 증명됨**. 금고 스레딩·엔진 논블로킹 수정 둘 다 불필요(각각 구현 전 폐기). vault 스레딩 시도 A+B는 효과 없음+onDestroy 회귀로 원복 완료.
+
+### 백로그 — 콜드스타트 최적화(선택, P2~P3, AI 무관)
+- **B16 (P2) — 릴리스 빌드 콜드스타트 실측**: 사용자가 겪는 실제(release/AOT) 프리징 정량화. 디버그 대비 기여분(클래스 검증·dex) 확인 후 아래 최적화 필요 여부 판단. | 실측 |
+- **B17 (P2) — 시작 경로 kotlin-reflect 제거**: `VerifyClass kotlin-reflect` 126ms. 콜드 시작 경로에서 kotlin-reflect를 끌어오는 코드/라이브러리를 찾아 비-reflection으로 대체. 릴리스에서도 클래스 로딩 이득. | 시작 경로, `FcitxApplication`/`FcitxInputMethodService` init 그래프 |
+- **B18 (P3) — 키보드 레이아웃 지연 인플레이션**: `KeyboardWindow.keyboards by lazy`가 Text/Hangul/Number + 모든 MobileHangul 레이아웃을 한 번에 생성. 활성 레이아웃만 지연 생성. | `KeyboardWindow.kt:72-84` |
