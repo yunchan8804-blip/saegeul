@@ -888,13 +888,29 @@ def requested_suggestion_count(request: dict, instructions: str) -> int:
     raise ValueError("invalid suggestion count contract")
 
 
+def _outermost_json_object(text: str) -> str:
+    """Returns the substring from the first '{' to the last '}', or the input unchanged.
+
+    Some CLIs wrap the JSON payload in prose or append stray characters (observed: a trailing
+    backslash from the agy text renderer), which breaks a strict json.loads of the whole output.
+    """
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        return text[start : end + 1]
+    return text
+
+
 def normalize_suggestions(output: str, expected_suggestions: int | None = None) -> str:
     cleaned = output.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     try:
         document = json.loads(cleaned)
-        suggestions = document.get("suggestions")
-    except json.JSONDecodeError as error:
-        raise RuntimeError("computer AI returned invalid JSON") from error
+    except json.JSONDecodeError:
+        try:
+            document = json.loads(_outermost_json_object(cleaned))
+        except json.JSONDecodeError as error:
+            raise RuntimeError("computer AI returned invalid JSON") from error
+    suggestions = document.get("suggestions") if isinstance(document, dict) else None
     if not isinstance(suggestions, list) or not 1 <= len(suggestions) <= 3:
         raise RuntimeError("computer AI returned invalid suggestions")
     normalized = []

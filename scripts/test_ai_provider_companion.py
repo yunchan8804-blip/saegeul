@@ -220,6 +220,23 @@ class CliBoundaryTest(unittest.TestCase):
                 expected_suggestions=2,
             ),
         )
+        # A trailing stray character (observed from the agy text renderer) after valid JSON must
+        # still parse via outermost-object extraction, not fail as invalid JSON.
+        self.assertEqual(
+            '{"suggestions":["{\\"nodes\\":[]}"]}',
+            companion.normalize_suggestions(
+                '{"suggestions": ["{\\"nodes\\":[]}"]}\\',
+                expected_suggestions=1,
+            ),
+        )
+        # Leading prose before the JSON object is tolerated too.
+        self.assertEqual(
+            '{"suggestions":["가"]}',
+            companion.normalize_suggestions(
+                '다음은 결과입니다: {"suggestions": ["가"]} 이상입니다.',
+                expected_suggestions=1,
+            ),
+        )
         with self.assertRaises(RuntimeError):
             companion.normalize_suggestions("not json")
         with self.assertRaises(RuntimeError):
