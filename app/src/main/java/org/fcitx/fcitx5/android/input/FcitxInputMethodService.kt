@@ -2280,6 +2280,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     val morphologyEngine by lazy { org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine() }
 
+    private val aiBearerTokenProvider by lazy { org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider(this) }
+
     val personalizedStore by lazy {
         val file = java.io.File(filesDir, "personalized_sentences.json")
         org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore(
@@ -2302,11 +2304,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 runCatching {
                     val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
                     if (profile != null) {
-                        val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile)
+                        val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile, authorizationProvider = aiBearerTokenProvider)
                         kotlinx.coroutines.runBlocking {
                             client.generate(org.fcitx.fcitx5.android.input.ai.AiAction.Custom, prompt).suggestions.firstOrNull()
                         }
                     } else null
+                }.onFailure {
+                    android.util.Log.w("SaegeulAI", "augmenter ai call failed: ${it.javaClass.simpleName}")
                 }.getOrNull()
             },
             fallbackSynthesizer = { ctx ->
@@ -2331,7 +2335,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 runCatching {
                     val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
                     if (profile != null) {
-                        val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile)
+                        val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile, authorizationProvider = aiBearerTokenProvider)
                         kotlinx.coroutines.runBlocking {
                             client.generate(
                                 action = org.fcitx.fcitx5.android.input.ai.AiAction.Custom,
@@ -2341,6 +2345,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                             ).suggestions.firstOrNull()
                         }
                     } else null
+                }.onFailure {
+                    android.util.Log.w("SaegeulAI", "dna profiler ai call failed: ${it.javaClass.simpleName}")
                 }.getOrNull()
             }
         )
@@ -2487,7 +2493,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         graphEnrichInFlight = true
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile)
+                val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile, authorizationProvider = aiBearerTokenProvider)
                 personalGraphEnricher.enrich(generate = { _, input ->
                     client.generate(
                         action = org.fcitx.fcitx5.android.input.ai.AiAction.GraphEnrich,
@@ -2511,7 +2517,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 clientProvider = {
                     runCatching {
                         val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
-                        if (profile != null) org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile) else null
+                        if (profile != null) org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile, authorizationProvider = aiBearerTokenProvider) else null
                     }.getOrNull()
                 },
                 onPrefetchCompleted = { _, _ ->

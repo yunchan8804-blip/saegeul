@@ -180,6 +180,11 @@ class AiOAuthSessionStore(context: Context) {
                 plaintext.fill(0)
                 encrypted.payload.fill(0)
             }
+        }.onFailure {
+            // A stored session that cannot be read is indistinguishable from "not signed in" to the
+            // UI; record why (type only, never the payload) so a decrypt/fingerprint/format failure
+            // can be diagnosed instead of silently looking like a dropped connection.
+            android.util.Log.w("SaegeulAI", "oauth session load failed: ${it.javaClass.simpleName}")
         }.getOrNull()
     }
 

@@ -287,4 +287,55 @@ class OpenAiResponsesClientTest {
         assertTrue(failure is AiApiKeyRejectedException)
         assertEquals("AI provider rejected the API key", failure?.message)
     }
+
+    @Test
+    fun `default authorization provider rejects oauth profile before calling transport`() = runBlocking {
+        var requests = 0
+        val profile = oauthPkceProfile()
+        val transport = AiHttpTransport { _, _, _ ->
+            requests++
+            """{"status":"completed","output_text":"{\"suggestions\":[\"안 불러야 함\"]}"}"""
+        }
+
+        val failure = runCatching {
+            OpenAiResponsesClient(profile, transport).generate(AiAction.Proofread, "테스트")
+        }.exceptionOrNull()
+
+        assertTrue(failure is AiReauthenticationRequiredException)
+        assertEquals(0, requests)
+    }
+
+    @Test
+    fun `injected authorization provider is used for oauth profile requests`() = runBlocking {
+        var requests = 0
+        var capturedAuthorization = ""
+        val profile = oauthPkceProfile()
+        val transport = AiHttpTransport { _, authorization, _ ->
+            requests++
+            capturedAuthorization = authorization
+            """{"status":"completed","output_text":"{\"suggestions\":[\"안녕하세요\"]}"}"""
+        }
+        val fakeTokenProvider = object : AiBearerTokenProvider {
+            override suspend fun authorizationHeader(profile: AiProviderProfile): String =
+                "Bearer test-token"
+        }
+
+        val result = OpenAiResponsesClient(profile, transport, fakeTokenProvider)
+            .generate(AiAction.Proofread, "테스트")
+
+        assertEquals(1, requests)
+        assertEquals("Bearer test-token", capturedAuthorization)
+        assertEquals(listOf("안녕하세요"), result.suggestions)
+    }
+
+    private fun oauthPkceProfile() = AiProviderProfile(
+        kind = AiProviderKind.OpenAICompatible,
+        displayName = "Home AI",
+        baseUrl = "https://ai.example.test/v1",
+        authMode = AiAuthMode.OAuthPkce,
+        oauthAuthorizationEndpoint = "https://auth.example.test/authorize",
+        oauthTokenEndpoint = "https://auth.example.test/token",
+        oauthClientId = "android-public",
+        oauthScopes = "openid ai.invoke"
+    )
 }

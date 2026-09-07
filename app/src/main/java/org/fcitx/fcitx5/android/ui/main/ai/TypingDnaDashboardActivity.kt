@@ -215,7 +215,10 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.enrich_running), Toast.LENGTH_SHORT).show()
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-            val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(profile)
+            val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(
+                profile,
+                authorizationProvider = org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider(this@TypingDnaDashboardActivity)
+            )
             val enricher = org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnricher(
                 app.personalSentenceVault, app.personalGraphStore
             )
@@ -238,7 +241,10 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
                             getString(R.string.sync_done_prefix, graphEnrichMessage(r))
                         }
                     },
-                    onFailure = { getString(R.string.sync_done_prefix, getString(R.string.enrich_failed)) }
+                    onFailure = { e ->
+                        android.util.Log.w("SaegeulAI", "dashboard enrichment failed: ${e.javaClass.simpleName}")
+                        getString(R.string.sync_done_prefix, getString(R.string.enrich_failed))
+                    }
                 )
                 Toast.makeText(this@TypingDnaDashboardActivity, msg, Toast.LENGTH_LONG).show()
                 updateUi(repository.getStats(forceReload = true), animate = false)
