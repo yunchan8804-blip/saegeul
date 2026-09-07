@@ -911,6 +911,12 @@ def normalize_suggestions(output: str, expected_suggestions: int | None = None) 
         except json.JSONDecodeError as error:
             raise RuntimeError("computer AI returned invalid JSON") from error
     suggestions = document.get("suggestions") if isinstance(document, dict) else None
+    if not isinstance(suggestions, list) and isinstance(document, dict):
+        # Some models return the single result object directly (e.g. a knowledge graph
+        # {"nodes":...,"edges":...,"topics":...}) instead of wrapping it in a "suggestions" array.
+        # Treat the whole object as one suggestion; the count check below still rejects it for any
+        # action that expected more than one suggestion.
+        suggestions = [json.dumps(document, ensure_ascii=False, separators=(",", ":"))]
     if not isinstance(suggestions, list) or not 1 <= len(suggestions) <= 3:
         raise RuntimeError("computer AI returned invalid suggestions")
     normalized = []

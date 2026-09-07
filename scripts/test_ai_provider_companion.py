@@ -229,6 +229,14 @@ class CliBoundaryTest(unittest.TestCase):
                 expected_suggestions=1,
             ),
         )
+        # A model that returns the single result object directly (no "suggestions" wrapper) is
+        # wrapped into one suggestion so a graph-enrichment reply is not rejected.
+        graph = '{"nodes":[{"id":"회의","tags":["업무"],"w":2.0}],"edges":[],"topics":[]}'
+        wrapped = companion.normalize_suggestions(graph, expected_suggestions=1)
+        self.assertEqual([graph], json.loads(wrapped)["suggestions"])
+        # But a bare object still fails when the action expected more than one suggestion.
+        with self.assertRaises(RuntimeError):
+            companion.normalize_suggestions(graph, expected_suggestions=3)
         # Leading prose before the JSON object is tolerated too.
         self.assertEqual(
             '{"suggestions":["가"]}',
