@@ -30,6 +30,11 @@
 | B9 | **문맥별 retrieve 메모이제이션**: `predict()`가 stroke마다 재실행돼 같은 단어 타이핑 중 동일 BM25 조회(PII 스크럽 정규식 포함)가 반복. `(context, pkg)` 최근 1건 캐시. | /simplify 효율 리뷰 | `AiContextualPredictor` / `PersonalSentenceVault` | 소 |
 | B10 | **fcitx→saegul 네임스페이스 전면 치환(권하지 않음)**: `org.fcitx.fcitx5.android`가 738파일·2666회, JNI 심볼 `Java_org_fcitx_..._Fcitx_*`(native-lib.cpp)와 lockstep, 서브모듈은 실제 fcitx5 엔진, applicationId는 이미 `net.chanpaca.saegeul`. 실익은 내부 브랜딩뿐이고 업스트림 머지가 끊김. 하려면 AI 작업 랜딩 후 독립 브랜치에서 스크립트 리네임+JNI 동시 수정. 대안: 새 Saegeul 고유 코드만 `net.chanpaca.saegeul.*`로 격리. | 사용자 질문 | 전역 | 대, 결정 필요 |
 
+### B4 설계 제약(2026-09-07, 실패한 시도에서 확정): 노이즈 필터는 학습이 아니라 "출력 계층"에 둔다
+
+자모 융합 필터를 공유 `PersonalNgramTokenizer.isDroppable`(즉 `tokenize`)에 넣는 순진한 시도(B4a)는 회귀 7건을 깼다. `tokenize`는 n-gram 학습·RAG·리랭커뿐 아니라 **`CorrectionPatternStore.recordCorrection`**(오타를 tokenize해 `size==1` 확인)도 쓰기 때문이다. 자모 융합 문자열은 **학습엔 필요한 데이터**다: (1) 오타 교정은 융합 오타("사묘ㅏ함니다"→"감사합니다")를 typed 측으로 기록해야 하고, (2) `AiContextualPredictorTypoTest`의 "반복 오타→아는 단어→교정 억제" 로직은 융합 문자열을 n-gram에 학습할 수 있어야 한다. 두 동작 모두 회귀 방어선(테스트)으로 고정돼 있어 통과시키려 고치면 안 된다.
+→ **올바른 설계**: 필터를 학습(`tokenize`/`learn`/`recordCorrection`)에 두지 말고, **제안 출력 계층**(n-gram `predictNext`/`complete` 결과, "자주 쓰는 어절" 표시)에 둬서 학습은 온전히 두고 노이즈만 화면에서 뺀다. 규칙 자체(완성 음절+고립 호환자모 U+3131–U+3163 혼합 → 노이즈)는 유효하니 출력 필터로 재사용. | `PersonalNgramModel.predictNext/complete`, 자주 쓰는 어절 표시 경로 | 중 |
+
 ## 강화 끝단(실기기 A35 확인, 2026-09-07)
 
 - **연결 버그(B11)는 해소**: 배선 수정(12d54dcb) 후 동기화가 실제 네트워크까지 도달, oauth-session.bin이 매 실행 갱신(토큰 refresh 정상, 세션 유지). "왜 또 끊김"의 코드 원인 제거.
