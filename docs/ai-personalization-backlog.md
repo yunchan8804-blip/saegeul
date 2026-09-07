@@ -30,6 +30,13 @@
 | B9 | **문맥별 retrieve 메모이제이션**: `predict()`가 stroke마다 재실행돼 같은 단어 타이핑 중 동일 BM25 조회(PII 스크럽 정규식 포함)가 반복. `(context, pkg)` 최근 1건 캐시. | /simplify 효율 리뷰 | `AiContextualPredictor` / `PersonalSentenceVault` | 소 |
 | B10 | **fcitx→saegul 네임스페이스 전면 치환(권하지 않음)**: `org.fcitx.fcitx5.android`가 738파일·2666회, JNI 심볼 `Java_org_fcitx_..._Fcitx_*`(native-lib.cpp)와 lockstep, 서브모듈은 실제 fcitx5 엔진, applicationId는 이미 `net.chanpaca.saegeul`. 실익은 내부 브랜딩뿐이고 업스트림 머지가 끊김. 하려면 AI 작업 랜딩 후 독립 브랜치에서 스크립트 리네임+JNI 동시 수정. 대안: 새 Saegeul 고유 코드만 `net.chanpaca.saegeul.*`로 격리. | 사용자 질문 | 전역 | 대, 결정 필요 |
 
+## 강화 끝단(실기기 A35 확인, 2026-09-07)
+
+- **연결 버그(B11)는 해소**: 배선 수정(12d54dcb) 후 동기화가 실제 네트워크까지 도달, oauth-session.bin이 매 실행 갱신(토큰 refresh 정상, 세션 유지). "왜 또 끊김"의 코드 원인 제거.
+- **B12 (P2) — 낡은 공급자 프로필의 티어 매핑**: 기기 provider.bin(9/5자)이 Fast→codex로 캐시. 현재 매니페스트는 fast=agy인데 앱이 프로필을 재조회하지 않아 옛 매핑을 씀 → 강화가 codex로 라우팅. 해결: 사용자가 개인정보·AI 설정에서 컴퓨터를 **재연결**하면 fast=agy로 갱신. 근본 개선: 매니페스트 변경 시(또는 model 오류 응답 시) 프로필 자동 재조회. | `AiProviderDiscovery`, `AiProviderProfile`, `AiProviderCredentialStore` | 중, P2 |
+- **B13 (환경) — codex CLI 사용량 한도**: `codex exec`가 "You've hit your usage limit"로 rc=1(≈7s). 컴패니언 quality 티어·낡은 프로필의 fast가 codex면 실패. 코드 문제 아님(계정 quota). 컴패니언이 CLI 실패 시 다른 백엔드로 폴백할지 검토(선택). | `scripts/ai-provider-companion.py` generate | 소, 선택 |
+- **검증됨(로컬 재현)**: 컴패니언에서 agy(gemini-3.8-flash-high, high effort)로 GraphEnrich 프롬프트 실행 시 46s에 유효한 `{"suggestions":["{nodes,edges,topics}"]}` 반환. 컴패니언 정규화는 여분 문자를 견디도록 수정됨(2b3a6e8f). 즉 프로필만 fast=agy면 그래프가 실제 생성됨.
+
 ## 사용자 결정 반영(2026-09-07, 진행 중)
 
 - 「지금 강화」 별도 버튼 폐지. 「지금 즉시 분석 및 동기화」 한 파이프라인으로: AI 공급자(LLM) 연결됨 → 분석·동기화·강화 모두 실행, 미연결·오프라인 → 분석·동기화만 실행하고 "LLM 서비스가 연결되어 있지 않아 분석과 동기화만 실행했습니다"라고 다이얼로그로 알림.
