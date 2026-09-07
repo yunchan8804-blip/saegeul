@@ -10,6 +10,8 @@ import android.security.keystore.KeyProperties
 import android.util.AtomicFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.openid.appauth.AuthState
 import net.openid.appauth.AuthorizationService
@@ -65,9 +67,15 @@ class AiHttpStatusException(
     message: String
 ) : Exception(message)
 
+/** A token refresh call failed for a reason that does not indicate an invalid session; retry later. */
+class AiTransientAuthException(message: String) : AiProviderException("transient-auth: $message")
+
 /**
  * Produces exactly one authentication mechanism per request. AppAuth refreshes an expiring token
- * before returning it; a refresh failure is terminal until the user explicitly signs in again.
+ * before returning it. Only a refresh failure confirmed to be a rejected refresh token or client
+ * (see [AiOAuthRefreshPolicy]) is terminal until the user explicitly signs in again; every other
+ * refresh failure is transient and leaves the persisted session intact. Concurrent callers share a
+ * single in-flight refresh via [refreshMutex].
  */
 class AndroidAiBearerTokenProvider(context: Context) : AiBearerTokenProvider {
     private val appContext = context.applicationContext
@@ -76,40 +84,71 @@ class AndroidAiBearerTokenProvider(context: Context) : AiBearerTokenProvider {
     override suspend fun authorizationHeader(profile: AiProviderProfile): String {
         val validated = profile.validate()
         if (validated.authMode == AiAuthMode.ApiKey) return "Bearer ${validated.apiKey}"
-        val state = store.load(validated) ?: throw AiReauthenticationRequiredException()
-        val service = AuthorizationService(appContext)
-        return try {
-            suspendCancellableCoroutine { continuation ->
-                continuation.invokeOnCancellation { service.dispose() }
-                state.performActionWithFreshTokens(
-                    service,
-                    NoClientAuthentication.INSTANCE
-                ) { accessToken, _, exception ->
-                    if (!continuation.isActive) return@performActionWithFreshTokens
-                    if (exception != null || accessToken.isNullOrBlank()) {
-                        store.clear()
-                        continuation.resumeWithException(AiReauthenticationRequiredException())
-                    } else {
-                        runCatching { store.save(validated, state) }
-                            .onSuccess { continuation.resume("Bearer $accessToken") }
-                            .onFailure {
+        return refreshMutex.withLock {
+            val state = store.load(validated) ?: throw AiReauthenticationRequiredException()
+            val service = AuthorizationService(appContext)
+            try {
+                suspendCancellableCoroutine { continuation ->
+                    continuation.invokeOnCancellation { service.dispose() }
+                    state.performActionWithFreshTokens(
+                        service,
+                        NoClientAuthentication.INSTANCE
+                    ) { accessToken, _, exception ->
+                        if (!continuation.isActive) return@performActionWithFreshTokens
+                        if (exception != null || accessToken.isNullOrBlank()) {
+                            val decision = AiOAuthRefreshPolicy.classify(exception?.type, exception?.code)
+                            android.util.Log.w(
+                                "SaegeulAI",
+                                "oauth refresh failed: " +
+                                    "${AiOAuthRefreshPolicy.describe(exception?.type, exception?.code)} " +
+                                    "decision=$decision"
+                            )
+                            if (decision == AiOAuthRefreshDecision.CLEAR_SESSION) {
                                 store.clear()
                                 continuation.resumeWithException(AiReauthenticationRequiredException())
+                            } else {
+                                continuation.resumeWithException(
+                                    AiTransientAuthException("oauth token refresh failed transiently")
+                                )
                             }
+                        } else {
+                            runCatching { store.save(validated, state) }
+                                .onFailure {
+                                    android.util.Log.w(
+                                        "SaegeulAI",
+                                        "oauth session save failed: ${it.javaClass.simpleName}"
+                                    )
+                                }
+                            continuation.resume("Bearer $accessToken")
+                        }
                     }
                 }
+            } finally {
+                service.dispose()
             }
-        } finally {
-            service.dispose()
         }
     }
 
     override fun onUnauthorized(profile: AiProviderProfile): Exception {
         if (profile.authMode == AiAuthMode.OAuthPkce) {
-            store.clear()
-            return AiReauthenticationRequiredException()
+            val validated = profile.validate()
+            val state = store.load(validated) ?: return AiReauthenticationRequiredException()
+            state.needsTokenRefresh = true
+            runCatching { store.save(validated, state) }
+                .onFailure {
+                    android.util.Log.w(
+                        "SaegeulAI",
+                        "oauth session save failed: ${it.javaClass.simpleName}"
+                    )
+                }
+            android.util.Log.w("SaegeulAI", "resource 401: scheduling token refresh")
+            return AiTransientAuthException("resource server rejected access token")
         }
         return super.onUnauthorized(profile)
+    }
+
+    private companion object {
+        private val refreshMutex = Mutex()
     }
 }
 
