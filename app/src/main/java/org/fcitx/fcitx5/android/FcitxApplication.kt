@@ -47,6 +47,10 @@ class FcitxApplication : Application() {
 
     val coroutineScope = MainScope() + CoroutineName("FcitxApplication")
 
+    val applicationScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
+
     val typingDnaRepository: TypingDnaRepository by lazy {
         TypingDnaRepository(File(filesDir, "typing_dna.json"), cipher = vaultCipher)
     }

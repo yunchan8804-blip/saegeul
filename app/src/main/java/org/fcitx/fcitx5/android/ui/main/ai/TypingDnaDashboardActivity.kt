@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.ui.main.ai
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.view.View
@@ -13,11 +16,12 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.core.widget.NestedScrollView
-import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
@@ -25,7 +29,6 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.progressindicator.LinearProgressIndicator
-import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ads.TypingDnaInterstitialController
 import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
@@ -34,6 +37,7 @@ import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncLevel
 import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatus
 import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatusStore
 import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
+import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentRunner
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -184,7 +188,13 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
                     .setPositiveButton(android.R.string.ok, null)
                     .show()
             } else {
-                runGraphEnrichment(profile)
+                ensureNotificationPermission()
+                GraphEnrichmentRunner.start(this, profile, notify = true)
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.enrich_bg_title)
+                    .setMessage(R.string.enrich_bg_message)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
             }
         }
 
@@ -210,65 +220,14 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         loadAndDisplay()
     }
 
-    private fun runGraphEnrichment(profile: org.fcitx.fcitx5.android.input.ai.AiProviderProfile) {
-        btnSyncNow.isEnabled = false
-        Toast.makeText(this, getString(R.string.enrich_running), Toast.LENGTH_SHORT).show()
-        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-            val client = org.fcitx.fcitx5.android.input.ai.OpenAiResponsesClient(
-                profile,
-                authorizationProvider = org.fcitx.fcitx5.android.input.ai.AndroidAiBearerTokenProvider(this@TypingDnaDashboardActivity)
-            )
-            val enricher = org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnricher(
-                app.personalSentenceVault, app.personalGraphStore
-            )
-            val result = runCatching {
-                enricher.enrich(generate = { _, input ->
-                    client.generate(
-                        action = org.fcitx.fcitx5.android.input.ai.AiAction.GraphEnrich,
-                        input = input,
-                        tierOverride = org.fcitx.fcitx5.android.input.ai.AiModelTier.Fast
-                    ).suggestions
-                })
-            }
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                btnSyncNow.isEnabled = true
-                val msg = result.fold(
-                    onSuccess = { r ->
-                        if (r.ok && r.reason != "partial") {
-                            getString(R.string.sync_enriched_done, r.nodes, r.edges, r.topics)
-                        } else {
-                            getString(R.string.sync_done_prefix, graphEnrichMessage(r))
-                        }
-                    },
-                    onFailure = { e ->
-                        android.util.Log.w("SaegeulAI", "dashboard enrichment failed: ${e.javaClass.simpleName}")
-                        getString(R.string.sync_done_prefix, getString(R.string.enrich_failed))
-                    }
-                )
-                Toast.makeText(this@TypingDnaDashboardActivity, msg, Toast.LENGTH_LONG).show()
-                updateUi(repository.getStats(forceReload = true), animate = false)
-            }
-        }
-    }
-
-    private fun graphEnrichMessage(
-        result: org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnricher.EnrichResult
-    ): String = when {
-        !result.ok && result.reason == "no_data" -> getString(R.string.enrich_no_data)
-        !result.ok && result.reason == "parse_failed" -> getString(R.string.enrich_parse_failed)
-        !result.ok -> getString(R.string.enrich_failed)
-        result.reason == "partial" -> getString(
-            R.string.enrich_partial,
-            result.nodes,
-            result.edges,
-            result.topics
-        )
-        else -> getString(
-            R.string.enrich_done,
-            result.nodes,
-            result.edges,
-            result.topics
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) return
+        ActivityCompat.requestPermissions(
+            this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_POST_NOTIFICATIONS
         )
     }
 
@@ -454,5 +413,9 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         params.weight = ratio.coerceIn(0f, 1f)
         fillView.layoutParams = params
         percentText.text = "${(ratio * 100).roundToInt()}%"
+    }
+
+    companion object {
+        private const val REQUEST_POST_NOTIFICATIONS = 1001
     }
 }

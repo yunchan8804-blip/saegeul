@@ -1035,6 +1035,14 @@
     <string name="enrich_no_data">아직 학습된 문장이 없습니다</string>
     <string name="enrich_parse_failed">강화 결과를 해석하지 못했습니다</string>
     <string name="enrich_partial">일부만 강화됨: 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
+    <string name="enrich_bg_title">분석 및 동기화 완료</string>
+    <string name="enrich_bg_message">AI 강화는 백그라운드에서 진행됩니다. 수십 초 걸릴 수 있어요. 이 화면을 나가셔도 되고, 완료되면 알림으로 알려드립니다.</string>
+    <string name="enrich_notify_channel">언어 금고 강화</string>
+    <string name="enrich_notify_running">언어 금고를 강화하는 중…</string>
+    <string name="enrich_notify_done">언어 금고 강화 완료 · 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
+    <string name="enrich_notify_partial">언어 금고 일부 강화 완료 · 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
+    <string name="enrich_notify_no_data">아직 학습된 문장이 부족해 강화할 내용이 없어요</string>
+    <string name="enrich_notify_failed">언어 금고 강화에 실패했어요. 잠시 후 다시 시도해 주세요</string>
     <string name="sync_done_title">분석 및 동기화 완료</string>
     <string name="sync_llm_missing_message">LLM 서비스가 연결되어 있지 않아 분석과 동기화만 실행했습니다. 개인정보·AI 설정에서 내 컴퓨터를 연결하면 AI 강화까지 함께 실행됩니다.</string>
     <string name="sync_offline_message">오프라인 모드라 AI 강화는 실행하지 않았습니다.</string>

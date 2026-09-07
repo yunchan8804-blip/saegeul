@@ -1037,6 +1037,14 @@
     <string name="enrich_no_data" tools:ignore="MissingTranslation">No learned sentences yet</string>
     <string name="enrich_parse_failed" tools:ignore="MissingTranslation">Could not parse the enrichment result</string>
     <string name="enrich_partial" tools:ignore="MissingTranslation">Partially enriched: %1$d nodes · %2$d relations · %3$d topics</string>
+    <string name="enrich_bg_title" tools:ignore="MissingTranslation">Analysis &amp; sync complete</string>
+    <string name="enrich_bg_message" tools:ignore="MissingTranslation">AI enrichment will continue in the background. It can take up to a minute. You can leave this screen — you\'ll get a notification when it\'s done.</string>
+    <string name="enrich_notify_channel" tools:ignore="MissingTranslation">Language vault enrichment</string>
+    <string name="enrich_notify_running" tools:ignore="MissingTranslation">Enriching your language vault…</string>
+    <string name="enrich_notify_done" tools:ignore="MissingTranslation">Language vault enrichment complete · %1$d nodes · %2$d relations · %3$d topics</string>
+    <string name="enrich_notify_partial" tools:ignore="MissingTranslation">Language vault partially enriched · %1$d nodes · %2$d relations · %3$d topics</string>
+    <string name="enrich_notify_no_data" tools:ignore="MissingTranslation">Not enough learned sentences yet to enrich</string>
+    <string name="enrich_notify_failed" tools:ignore="MissingTranslation">Language vault enrichment failed. Please try again later</string>
     <string name="sync_done_title" tools:ignore="MissingTranslation">Analysis and sync complete</string>
     <string name="sync_llm_missing_message" tools:ignore="MissingTranslation">No AI provider is connected, so only analysis and sync ran. Connect your computer in Privacy &amp; AI settings to also run AI enrichment.</string>
     <string name="sync_offline_message" tools:ignore="MissingTranslation">Offline mode is on, so AI enrichment did not run.</string>
