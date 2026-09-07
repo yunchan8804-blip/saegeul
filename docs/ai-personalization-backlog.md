@@ -43,6 +43,12 @@
 - 대시보드 타이틀 바 우측 상단 pill에 마지막 분석·동기화 시각 표시. 내용에 마지막 실행 수준(분석·동기화까지 / AI 강화까지) 표시. 구현: `input/ai/TypingDnaSyncStatus.kt`.
 - 설정의 「지식 그래프 자동 강화」(백그라운드 opt-in)는 그대로 유지.
 
+## 강화 끝단 실동작 확인(2026-09-07, 폴드6)
+
+- **끝에서 끝까지 성공**: 재연결된 폴드6에서 「지금 즉시 분석 및 동기화」 → 컴패니언 로그 `[REQ] model='agy'` → `[OK] normalized_len=986`. agy(gemini-3.8-flash-high)가 그래프를 만들고 컴패니언이 앱으로 반환. 커밋 0fbffe92(그래프 객체 직접 반환 수용)로 마지막 벽 제거.
+- **B14 (P2) — 컴패니언 단일 슬롯 429 경쟁**: `BoundedSemaphore(1)`이라 강화(≈12~46s 슬롯 점유)와 프리페처(키 입력마다 발사)가 겹치면 `already processing`(429)로 한쪽 실패. 강화 중 프리페치 실패, 또는 프리페치 중 강화 시작 시 강화 실패. 완화: 앱이 강화 시 429면 짧게 재시도, 또는 컴패니언이 큐잉, 또는 강화 중 프리페처 억제. | `scripts/ai-provider-companion.py`, `AiSentenceCompletionPrefetcher`, `GraphEnrichmentRunner` | 중, P2 |
+- **B15 (P3) — 동기화 후 AdMob 광고가 강화 안내 다이얼로그를 가림**: 순서 조정(광고를 다이얼로그 뒤로/생략). | `TypingDnaDashboardActivity`, `TypingDnaInterstitialController` | 소, P3 |
+
 ## Phase 3에서 처리 중(백로그 아님)
 
 - `agy` CLI를 Flash 3.8 high effort(`gemini-3.8-flash-high`, `--effort high`)로 호출하도록 컴패니언 설정.
