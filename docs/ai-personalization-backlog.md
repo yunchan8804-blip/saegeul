@@ -11,6 +11,7 @@
 | B1 | ~~**대시보드 개인정보 문구 모순**~~ — **해소(Phase 3-d)**: 레이아웃 900행 문구와 `TypingDnaChartView` 게이지 "클라우드 전송 0B"를 온디바이스 학습 한정으로 분리하고 「지금 강화」·자동 강화는 사용자가 켤 때만 본인 컴퓨터로 보냄을 명시. | 기기 검증(Fold6) 스크린샷 | `activity_typing_dna_dashboard.xml`, `TypingDnaChartView.kt` | 완료 |
 | B2 | **augmenter가 PII 미치환 raw 문맥을 송출**: `PersonalizedSentenceAugmenter.augmentContext`가 `getRecentContext()`(미치환)를 컴패니언에 보냄. 오프라인 게이트는 닫았으나(fc8f6032) 송출 전 `KoreanPiiScrubber.scrub` 적용 필요. | 탐색 워커 보고 | `FcitxInputMethodService` augmenter 경로, `UserTypingContextCollector` | 소 |
 | B3 | **프리페처가 사용자 내용을 logcat에 기록**: `AiSentenceCompletionPrefetcher`가 `result.suggestions`와 문맥을 `Log.i/d`로 찍음. 릴리스에서 개인정보 노출 소지. 디버그 빌드 한정 또는 제거. | 코드 읽기 | `AiSentenceCompletionPrefetcher.kt` | 소 |
+| B11 | **AI 공급자(컴패니언) 연결이 반복적으로 끊김** — 사용자 보고 "왜 또". 증거(2026-09-07): 컴패니언은 9/6부터 무재시작·정상, Tailscale serve 정상, grant 파일은 재로그인 시각(08:59)에 새로 써짐 → 서버가 아니라 앱이 세션을 지운 것으로 추정. 앱은 인증 실패를 logcat에 남기지 않음. 직전에 `adb install -r`로 앱이 강제 종료됨(08:54). 가설: `AiAuthorization.kt`가 토큰 갱신 실패(일시적 네트워크·타임아웃·동시 갱신 경쟁 포함)에 `store.clear()`로 세션을 영구 삭제; access TTL 1h라 갱신이 잦고 프리페처·augmenter·프로파일러가 동시 갱신 가능. **원인 분석 워크플로 진행 중, 확정 후 수정.** | 기기 logcat·파일 mtime·컴패니언 상태 | `AiAuthorization.kt`, `AiSentenceCompletionPrefetcher.kt`, `scripts/ai-provider-companion.py` | 중, P1 |
 
 ## P2 — 품질·UX
 
@@ -28,6 +29,12 @@
 | B8 | **half-life 감쇠 수식 중복**: `PersonalSentenceVault`, `PersonalNgramModel`, `CorrectionPatternStore`가 같은 `count·2^(-Δt/halfLife)`를 각자 구현. 공용 헬퍼로 추출. | /simplify 재사용 리뷰 | `input/ai/` 3개 저장소 | 소 |
 | B9 | **문맥별 retrieve 메모이제이션**: `predict()`가 stroke마다 재실행돼 같은 단어 타이핑 중 동일 BM25 조회(PII 스크럽 정규식 포함)가 반복. `(context, pkg)` 최근 1건 캐시. | /simplify 효율 리뷰 | `AiContextualPredictor` / `PersonalSentenceVault` | 소 |
 | B10 | **fcitx→saegul 네임스페이스 전면 치환(권하지 않음)**: `org.fcitx.fcitx5.android`가 738파일·2666회, JNI 심볼 `Java_org_fcitx_..._Fcitx_*`(native-lib.cpp)와 lockstep, 서브모듈은 실제 fcitx5 엔진, applicationId는 이미 `net.chanpaca.saegeul`. 실익은 내부 브랜딩뿐이고 업스트림 머지가 끊김. 하려면 AI 작업 랜딩 후 독립 브랜치에서 스크립트 리네임+JNI 동시 수정. 대안: 새 Saegeul 고유 코드만 `net.chanpaca.saegeul.*`로 격리. | 사용자 질문 | 전역 | 대, 결정 필요 |
+
+## 사용자 결정 반영(2026-09-07, 진행 중)
+
+- 「지금 강화」 별도 버튼 폐지. 「지금 즉시 분석 및 동기화」 한 파이프라인으로: AI 공급자(LLM) 연결됨 → 분석·동기화·강화 모두 실행, 미연결·오프라인 → 분석·동기화만 실행하고 "LLM 서비스가 연결되어 있지 않아 분석과 동기화만 실행했습니다"라고 다이얼로그로 알림.
+- 대시보드 타이틀 바 우측 상단 pill에 마지막 분석·동기화 시각 표시. 내용에 마지막 실행 수준(분석·동기화까지 / AI 강화까지) 표시. 구현: `input/ai/TypingDnaSyncStatus.kt`.
+- 설정의 「지식 그래프 자동 강화」(백그라운드 opt-in)는 그대로 유지.
 
 ## Phase 3에서 처리 중(백로그 아님)
 

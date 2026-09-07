@@ -22,7 +22,24 @@
             android:contentDescription="@string/vault_title"
             app:title="@string/vault_title"
             app:navigationIcon="@drawable/ic_baseline_arrow_back_24"
-            app:navigationContentDescription="뒤로" />
+            app:navigationContentDescription="뒤로">
+
+            <TextView
+                android:id="@+id/tv_sync_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_sync_pill"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="마지막 분석 09:30"
+                tools:visibility="visible" />
+
+        </com.google.android.material.appbar.MaterialToolbar>
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -817,6 +834,16 @@
                 tools:text="지식 그래프: 노드 24 · 관계 18 · 주제 5" />
 
             <TextView
+                android:id="@+id/tv_dash_sync_level"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:gravity="center"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp"
+                tools:text="마지막 실행: AI 강화까지 완료 · 09:30" />
+
+            <TextView
                 android:id="@+id/tv_dash_last_learned"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -897,7 +924,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="전화번호, 주민번호, 계좌, 카드번호 등 개인정보(PII)는 학습 전 즉시 스크러빙 마스킹되며, 학습 후 원본 텍스트는 Zero-Knowledge 원칙에 따라 영구 파기됩니다. 온디바이스 학습 데이터는 기기 밖으로 나가지 않습니다. 「지금 강화」와 자동 강화는 내가 켤 때만, 치환된 문장을 내가 설정한 AI 공급자(내 컴퓨터)로 보냅니다."
+                        android:text="전화번호, 주민번호, 계좌, 카드번호 등 개인정보(PII)는 학습 전 즉시 스크러빙 마스킹되며, 학습 후 원본 텍스트는 Zero-Knowledge 원칙에 따라 영구 파기됩니다. 온디바이스 학습 데이터는 기기 밖으로 나가지 않습니다. 「지금 즉시 분석 및 동기화」는 내가 AI 공급자(내 컴퓨터)를 연결해 둔 경우에만, 그리고 자동 강화는 설정에서 켠 경우에만 치환된 문장을 그 공급자로 보냅니다."
                         android:textColor="?android:attr/textColorSecondary"
                         android:textSize="12sp"
                         android:lineSpacingExtra="2dp" />
@@ -919,20 +946,6 @@
                 android:textStyle="bold"
                 app:cornerRadius="12dp"
                 app:icon="@drawable/ic_baseline_auto_awesome_24" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_enrich_graph"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginBottom="12dp"
-                android:contentDescription="@string/enrich_now_button"
-                android:minHeight="48dp"
-                android:text="@string/enrich_now_button"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                app:cornerRadius="12dp"
-                app:icon="@drawable/ic_baseline_emoji_objects_24" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_clear_dna"

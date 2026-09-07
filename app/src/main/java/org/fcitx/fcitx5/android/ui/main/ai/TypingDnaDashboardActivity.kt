@@ -30,6 +30,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ads.TypingDnaInterstitialController
 import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
+import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncLevel
+import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatus
+import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatusStore
 import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
 import java.io.File
 import kotlin.math.roundToInt
@@ -57,8 +60,11 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
     private lateinit var tvDashNgramStats: TextView
     private lateinit var tvDashRagStats: TextView
     private lateinit var tvDashGraphStats: TextView
+    private lateinit var tvDashSyncLevel: TextView
     private lateinit var tvDashLastLearned: TextView
-    private lateinit var btnEnrichGraph: MaterialButton
+    private lateinit var tvSyncPill: TextView
+    private lateinit var btnSyncNow: MaterialButton
+    private lateinit var syncStatusStore: TypingDnaSyncStatusStore
     private lateinit var interstitial: TypingDnaInterstitialController
 
     private lateinit var tvVaultHeroNumber: TextView
@@ -89,9 +95,11 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         repository = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typingDnaRepository
         interstitial = TypingDnaInterstitialController(this)
         interstitial.prepare()
+        syncStatusStore = TypingDnaSyncStatusStore(this)
 
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener { finish() }
+        tvSyncPill = findViewById(R.id.tv_sync_pill)
 
         chartView = findViewById(R.id.chart_view)
         tvLevelBadge = findViewById(R.id.tv_level_badge)
@@ -107,6 +115,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         tvDashNgramStats = findViewById(R.id.tv_dash_ngram_stats)
         tvDashRagStats = findViewById(R.id.tv_dash_rag_stats)
         tvDashGraphStats = findViewById(R.id.tv_dash_graph_stats)
+        tvDashSyncLevel = findViewById(R.id.tv_dash_sync_level)
         tvDashLastLearned = findViewById(R.id.tv_dash_last_learned)
 
         tvVaultHeroNumber = findViewById(R.id.tv_vault_hero_number)
@@ -128,9 +137,8 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         tvVaultCatWorkPct = findViewById(R.id.tv_vault_cat_work_pct)
         tvVaultCatGeneralPct = findViewById(R.id.tv_vault_cat_general_pct)
 
-        val btnSyncNow = findViewById<MaterialButton>(R.id.btn_sync_now)
+        btnSyncNow = findViewById(R.id.btn_sync_now)
         val btnClearDna = findViewById<MaterialButton>(R.id.btn_clear_dna)
-        btnEnrichGraph = findViewById(R.id.btn_enrich_graph)
 
         btnSyncNow.setOnClickListener {
             val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
@@ -148,6 +156,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             }
             repository.invalidateCache()
             val stats = repository.getStats(forceReload = true)
+            syncStatusStore.recordSync(System.currentTimeMillis())
             updateUi(stats, animate = true)
             val message = when {
                 stats.totalSentences > before ->
@@ -161,6 +170,22 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             }
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
             interstitial.showAfterAction()
+
+            val prefs = org.fcitx.fcitx5.android.data.prefs.AppPrefs.getInstance()
+            val offlineMode = prefs.advanced.offlineMode.getValue()
+            val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
+            if (offlineMode || profile == null) {
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.sync_done_title)
+                    .setMessage(
+                        if (offlineMode) getString(R.string.sync_offline_message)
+                        else getString(R.string.sync_llm_missing_message)
+                    )
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            } else {
+                runGraphEnrichment(profile)
+            }
         }
 
         btnClearDna.setOnClickListener {
@@ -182,30 +207,11 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
                 .show()
         }
 
-        btnEnrichGraph.setOnClickListener {
-            val prefs = org.fcitx.fcitx5.android.data.prefs.AppPrefs.getInstance()
-            if (prefs.advanced.offlineMode.getValue()) {
-                Toast.makeText(this, getString(R.string.enrich_offline_blocked), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
-            if (profile == null) {
-                Toast.makeText(this, getString(R.string.enrich_no_provider), Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            AlertDialog.Builder(this)
-                .setTitle(R.string.enrich_confirm_title)
-                .setMessage(R.string.enrich_confirm_message)
-                .setPositiveButton(R.string.enrich_confirm_positive) { _, _ -> runGraphEnrichment(profile) }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
-        }
-
         loadAndDisplay()
     }
 
     private fun runGraphEnrichment(profile: org.fcitx.fcitx5.android.input.ai.AiProviderProfile) {
-        btnEnrichGraph.isEnabled = false
+        btnSyncNow.isEnabled = false
         Toast.makeText(this, getString(R.string.enrich_running), Toast.LENGTH_SHORT).show()
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
@@ -223,10 +229,16 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
                 })
             }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                btnEnrichGraph.isEnabled = true
+                btnSyncNow.isEnabled = true
                 val msg = result.fold(
-                    onSuccess = { r -> graphEnrichMessage(r) },
-                    onFailure = { getString(R.string.enrich_failed) }
+                    onSuccess = { r ->
+                        if (r.ok && r.reason != "partial") {
+                            getString(R.string.sync_enriched_done, r.nodes, r.edges, r.topics)
+                        } else {
+                            getString(R.string.sync_done_prefix, graphEnrichMessage(r))
+                        }
+                    },
+                    onFailure = { getString(R.string.sync_done_prefix, getString(R.string.enrich_failed)) }
                 )
                 Toast.makeText(this@TypingDnaDashboardActivity, msg, Toast.LENGTH_LONG).show()
                 updateUi(repository.getStats(forceReload = true), animate = false)
@@ -329,6 +341,27 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             graphStats.edges,
             graphStats.topics
         )
+
+        val lastSyncMs = syncStatusStore.lastSyncMs()
+        val nowMs = System.currentTimeMillis()
+        if (lastSyncMs > 0L) {
+            tvSyncPill.visibility = View.VISIBLE
+            tvSyncPill.text = getString(
+                R.string.sync_pill_last,
+                TypingDnaSyncStatus.formatTime(lastSyncMs, nowMs)
+            )
+        } else {
+            tvSyncPill.visibility = View.GONE
+        }
+        tvDashSyncLevel.text = when (TypingDnaSyncStatus.level(lastSyncMs, graphStats.builtMs)) {
+            TypingDnaSyncLevel.NEVER -> getString(R.string.sync_level_never)
+            TypingDnaSyncLevel.SYNC_ONLY -> getString(R.string.sync_level_sync_only)
+            TypingDnaSyncLevel.ENRICHED -> getString(
+                R.string.sync_level_enriched,
+                TypingDnaSyncStatus.formatTime(graphStats.builtMs, nowMs)
+            )
+        }
+
         if (ngramStats.lastLearnedMs != 0L) {
             tvDashLastLearned.visibility = android.view.View.VISIBLE
             tvDashLastLearned.text = getString(
