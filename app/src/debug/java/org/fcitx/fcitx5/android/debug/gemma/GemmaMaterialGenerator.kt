@@ -45,8 +45,12 @@ class GemmaMaterialGenerator(private val context: Context) {
     var isRunning: Boolean = false
         private set
 
-    suspend fun generate(modelFile: File, useGpu: Boolean): GenerationResult =
+    suspend fun generate(modelFile: File, useGpu: Boolean, prompt: String = FIXED_PROMPT): GenerationResult =
         withContext(Dispatchers.IO + NonCancellable) {
+            require(prompt.isNotBlank()) { "Gemma prompt는 비어 있을 수 없습니다." }
+            require(prompt.toByteArray(Charsets.UTF_8).size <= MAX_PROMPT_UTF8_BYTES) {
+                "Gemma prompt는 UTF-8 기준 8192바이트 이하여야 합니다."
+            }
             val internalModel = GemmaModelFiles.modelFile(context).canonicalFile
             require(modelFile.canonicalFile == internalModel) {
                 "검증된 내부 Gemma 모델 경로만 사용할 수 있습니다."
@@ -108,7 +112,7 @@ class GemmaMaterialGenerator(private val context: Context) {
                 }
                 val generationStartedAt = SystemClock.elapsedRealtime()
                 val response = StringBuilder()
-                conversation.sendMessageAsync(FIXED_PROMPT).collect { message ->
+                conversation.sendMessageAsync(prompt).collect { message ->
                     if (run.cancelled.get()) {
                         requestNativeCancellation(run)
                         return@collect
@@ -200,6 +204,7 @@ class GemmaMaterialGenerator(private val context: Context) {
     private companion object {
         const val NO_ACTIVE_RUN = -1L
         const val MAX_NUM_TOKENS = 2048
+        const val MAX_PROMPT_UTF8_BYTES = 8192
         val FIXED_PROMPT = """
             이것은 비개인적인 한국어 문장 재료 생성 실험입니다. 개인 정보, 사용자 입력, 대화 기록을 사용하지 마세요.
             한국어 일상·업무 상황의 자연스러운 완성 문장 8개를 JSON 문자열 배열 하나로만 반환하세요.
