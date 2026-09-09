@@ -44,6 +44,20 @@ class GemmaMaterialDeviceTest {
         }
         assertFalse("Gemma generator must be stopped after generation", generator.isRunning)
         assertTrue("Gemma generation returned empty text", result.text.isNotBlank())
+        val generationReport = JSONObject()
+            .put("initMs", result.initializationMs)
+            .put("generateMs", result.generationMs)
+            .put("backend", backend)
+            .put("source", "gemma-4-E2B-it")
+            .put("sourceSha256", sourceSha)
+            .put("generatedText", result.text)
+            .put("evidenceScope", "generation output before material validation")
+            .toString()
+        Log.i(TAG, generationReport)
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            0,
+            Bundle().apply { putString("gemmaGenerationJson", generationReport) }
+        )
 
         val queries = listOf("회의 자료를 ", "오늘 저녁 ", "약속을 ")
         val temporaryFile = File(context.cacheDir, "synthetic-test-${UUID.randomUUID()}.json")

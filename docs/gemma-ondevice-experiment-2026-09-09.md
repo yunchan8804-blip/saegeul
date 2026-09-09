@@ -33,7 +33,7 @@ A와 B는 병렬, C는 A 계약에 의존한다. 모델 생성이 실패하면 �
 
 ## 완료 증거
 
-구현과 전체 단위 테스트, debug 앱·테스트 APK 빌드는 통과했다. 기기 설치, 실제 모델 생성 및 ADB E2E는 연결 기기가 0대여서 미완료다.
+구현과 전체 단위 테스트, debug 앱·테스트 APK 빌드는 통과했다. 이후 무선 ADB로 Fold6(`SM-F956N`)에서 SDK 0.13.1 CPU 모델 실행과 한국어 생성까지 확인했다. 생성 응답의 세 prefix 충족 조건은 실패했다. 후보 UI E2E는 별도 결과로 구분한다.
 
 - JDK 17, `:app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest -PbuildABI=arm64-v8a`: `BUILD SUCCESSFUL in 45s`, exit 0.
 - 새 XML 집계: 1,122건 수집, 1,115건 통과, 실패 0, 오류 0, 기존 스킵 7. 암호화 저장 실패 시 데이터 보존과 문맥 조회 테스트를 포함한다.
@@ -44,15 +44,45 @@ A와 B는 병렬, C는 A 계약에 의존한다. 모델 생성이 실패하면 �
 ## 현재 구현 근거와 미검증 경계
 
 - 구현 경계는 `GemmaModelFiles`, `GemmaMaterialGenerator`, `GeneratedSentenceBank`, `ImmediateContextualPredictions`, `FcitxInputMethodService`의 `ondevice_generated` source 연결이다. 모델 생성·검증·저장·재로드·로컬 prefix 조회 API가 소스에 존재하지만, 이 문서에서는 실행 성공을 주장하지 않는다.
-- 단위 테스트와 APK 빌드는 통과했다. 모델 로딩·CPU generation, 실제 후보 표시·터치 및 latency는 실기기에서 별도로 통과해야 한다. SDK 0.13.1과 이 모델의 실제 실행 호환성도 아직 확인하지 못했다.
+- 단위 테스트와 APK 빌드는 통과했고, 무선 Fold6에서 SDK 0.13.1 CPU 모델 초기화·생성도 실행됐다. 단일 생성 응답의 세 prefix 충족 assertion은 실패했다. 독립적인 실제 앱 UI에서는 8개 저장을 확인했고, 새 instrumentation에서 재로드한 재료의 두 문맥은 표시·터치까지 통과했지만 세 문맥 전체 게이트는 실패했다.
 - 모델 파일은 확보돼 있으나 문서에는 특정 사용자 경로를 저장하지 않는다. 로컬 파일은 `MODEL_PATH` 환경변수 또는 사용자가 지정한 SAF `modelPath`로 표현한다. 기준 파일명은 `gemma-4-E2B-it.litertlm`이다.
 - 확보된 모델 기준 SHA-256은 `181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c`, 크기는 `2,588,147,712`바이트다. 이 값은 기기 설치·실행 증거가 아니다.
 
 - [x] SDK를 포함한 디버그 APK 빌드
-- [ ] 실제 기기의 모델 로딩과 한국어 생성
+- [x] 실제 기기의 모델 로딩과 한국어 생성
 - [ ] 생성 실패·취소 뒤 기존 재료 보존
 - [ ] 생성 재료 저장·재로드와 입력 문맥별 조회
 - [ ] 추론 없이 추천 표시 1초 이내 및 실제 선택 결과
+
+## 무선 Fold6 CPU 실행 결과
+
+- 실행 대상은 무선 ADB의 Fold6 `SM-F956N`이며, 개인 Tailscale IP와 port는 문서에 기록하지 않는다. 모델은 SHA-256 `181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c`, `2,588,147,712`바이트로 기기 전송을 확인했다. 전송 시간은 271.150초였다.
+- `wireless-gemma-cpu-r1.log`: 생성 전 JSON이 기록되지 않았고, 검증 assertion에서 `회의 자료를 ` 3개·`오늘 저녁 ` 3개·`약속을 ` 0개로 실패했다.
+- `wireless-gemma-cpu-r2.log`: `initMs=445`, `generateMs=10089`, 생성 JSON은 기록됐지만 같은 prefix 집계(`3, 3, 0`) assertion에서 실패했다. 모델이 요청한 `약속을 ` 대신 `약속 장소는 `, `약속 시간을 `로 시작했다. 해당 prefix의 부재가 원인이며 파서 오류로 확인된 것은 아니다.
+- `wireless-gemma-cpu-r3.log`: `initMs=546`, `generateMs=13105`, 생성 JSON은 기록됐고 `회의 자료를 ` 3개·`오늘 저녁 ` 0개·`약속을 ` 3개로 실패했다. `오늘 저녁 `을 `오늘 저녁에 `로 바꿨고, `약속을 장소로 정해야겠어요!`처럼 원문 문장 자체의 어색함도 확인됐다.
+- r2/r3는 진단 JSON을 assertion 이전에 남겼지만 strict 테스트 결과는 실패다. prompt 강화 시도도 성공으로 바꾸지 못했으며, 이를 저장·재로드 성공이나 제품 품질 통과로 해석하지 않는다.
+- 모델 로딩·생성은 확인했지만 세 prefix 전체 충족과 한국어 품질은 미달이다. 일부 문맥의 성공으로 전체 E2E 완료 체크를 바꾸지 않는다.
+- 첫 메모리 관측은 실행 후 idle 상태이며 peak 메모리를 측정한 결과가 아니다. 초기화/생성 시간은 기록했지만 메모리 상한과 한국어 품질 완료를 주장하지 않는다.
+
+근거 artifact: `.artifacts/gemma-experiment-20260909/wireless-gemma-cpu-r1.log`, `wireless-gemma-cpu-r2.log`, `wireless-gemma-cpu-r3.log`, `wireless-prefix-build.log`.
+
+### 실제 UI 저장과 추론 종료 후 추천
+
+Gemma 실험 화면에서 `고정 재료 생성`을 한 번 눌렀다. 초기화 306ms, 생성 7,970ms, 이번 저장 8개·총 8개가 표시됐다. 화면 원본은 `wireless-gemma-generated-ui.png`에 보존한다. 위 세 CPU 테스트의 실패를 대체하지 않는 독립적인 앱 동작 관측이다.
+
+이후 새 instrumentation에서 은행을 재로드하고 완전 오프라인 모드로 `candidateSource=ondevice_generated`, `tapMode=touch`를 실행했다. 이 테스트는 모델을 호출하지 않는다.
+
+| 입력 문맥 | 실제 후보 표시 | 터치 삽입 | 결과 |
+|---|---:|---|---|
+| `회의 자료를 ` | 419ms | 정확히 일치 | 통과 |
+| `오늘 저녁 ` | 후보 없음 | 미실행 | 실패 |
+| `약속을 ` | 336ms | 정확히 일치 | 통과 |
+
+전체 instrumentation 결과는 Tests 1 / Failures 1이다. 후보 수집 대기 상한 3초와 통과 기준 1초를 구분하며, 419ms·336ms는 화면 표시까지의 시간이다. 두 실제 후보 crop과 JSON은 `wireless-gemma-ui-r1-crops/`, `wireless-gemma-ui-r1.log`에 보존한다. 오프라인 설정은 이전 값 `false`로 복원됐다.
+
+이번 실험은 **미리 생성해 저장한 재료를 1초 안에 제시하는 경로의 일부 실기기 증거**다. 임의 문맥에서 항상 추천되거나, Gemma가 매번 자연스러운 한국어를 생성한다는 증거는 아니다. 지정 prefix·조사 보존과 문장 자연스러움을 충족하지 못했으므로 정식 기능으로 승격하지 않는다. 다음 완료 조건은 생성 재료의 품질 검증과 세 문맥 전체 E2E 통과이며, 후보 조건을 느슨하게 바꿔 통과시키지 않는다.
+
+최종 검증 APK SHA-256: 앱 `5B51B4C9019022408BC5A8F0A799BDA21D7BC868E330224C45B20F1813CAB953`, 테스트 `CF897701039F65DBB5900623BD432EA6DC715C38CEC979C02C3A81D51705AFCB`. 앱 파일명은 `net.chanpaca.saegeul-saegeul-v0.1.0-rc.23-25-g097ac1e8-arm64-v8a-debug.apk`다. 모델 전송용 임시 복사본은 기기 내부 모델 해시 검증 후 제거했고, 실제 모델과 생성 재료는 앱에 보존했다.
 
 ## 실기기 재개 절차
 
