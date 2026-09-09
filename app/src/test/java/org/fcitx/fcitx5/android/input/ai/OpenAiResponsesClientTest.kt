@@ -92,6 +92,213 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun `continue typing preserves trailing whitespace while other actions trim it`() = runBlocking {
+        val bodies = mutableListOf<String>()
+        val transport = AiHttpTransport { _, _, body ->
+            bodies.add(body)
+            if (bodies.size == 1) {
+                """{"status":"completed","output_text":"{\"suggestions\":[\"WORD\\t다음\",\"WORD\\t내용\",\"CONTINUATION\\t입니다\"]}"}"""
+            } else {
+                """{"status":"completed","output_text":"{\"suggestions\":[\"정리했습니다\"]}"}"""
+            }
+        }
+        val client = OpenAiResponsesClient(
+            AiProviderProfile(
+                baseUrl = "https://provider.test/v1",
+                apiKey = "test-key",
+                fastModel = "fast-test"
+            ),
+            transport
+        )
+
+        client.generate(AiAction.ContinueTyping, "  오후 2시 회의 ")
+        client.generate(AiAction.Proofread, "  회의 안내 ")
+
+        assertEquals(
+            "오후 2시 회의 ",
+            Json.parseToJsonElement(bodies[0]).jsonObject.getValue("input").jsonPrimitive.content
+        )
+        assertEquals(
+            "회의 안내",
+            Json.parseToJsonElement(bodies[1]).jsonObject.getValue("input").jsonPrimitive.content
+        )
+    }
+
+    @Test
+    fun `continuation abstention capability uses v2 schema and accepts explicit empty suggestions`() = runBlocking {
+        var capturedBody = ""
+        val client = OpenAiResponsesClient(
+            AiProviderProfile(
+                baseUrl = "https://provider.test/v1",
+                apiKey = "test-key",
+                fastModel = "fast-test",
+                capabilities = setOf("responses", "continuation_abstention")
+            ),
+            AiHttpTransport { _, _, body ->
+                capturedBody = body
+                """{"status":"completed","output_text":"{\"suggestions\":[]}"}"""
+            }
+        )
+
+        val result = client.generate(AiAction.ContinueTyping, "내가 뭘")
+
+        val request = Json.parseToJsonElement(capturedBody).jsonObject
+        val format = request.getValue("text").jsonObject.getValue("format").jsonObject
+        val suggestionsSchema = format.getValue("schema").jsonObject
+            .getValue("properties").jsonObject
+            .getValue("suggestions").jsonObject
+        assertEquals("saegeul_continuation_v2", format.getValue("name").jsonPrimitive.content)
+        assertEquals("0", suggestionsSchema.getValue("minItems").jsonPrimitive.content)
+        assertEquals("3", suggestionsSchema.getValue("maxItems").jsonPrimitive.content)
+        assertTrue(request.getValue("instructions").jsonPrimitive.content.contains("Return between 0 and 3"))
+        assertEquals(emptyList<String>(), result.suggestions)
+    }
+
+    @Test
+    fun `continue typing without abstention capability keeps legacy schema and prompt`() = runBlocking {
+        var capturedBody = ""
+        val client = OpenAiResponsesClient(
+            AiProviderProfile(
+                baseUrl = "https://provider.test/v1",
+                apiKey = "test-key",
+                fastModel = "fast-test"
+            ),
+            AiHttpTransport { _, _, body ->
+                capturedBody = body
+                """{"status":"completed","output_text":"{\"suggestions\":[\"WORD\\t다음\",\"WORD\\t내용\",\"CONTINUATION\\t입니다\"]}"}"""
+            }
+        )
+
+        client.generate(AiAction.ContinueTyping, "내가 뭘")
+
+        val request = Json.parseToJsonElement(capturedBody).jsonObject
+        val format = request.getValue("text").jsonObject.getValue("format").jsonObject
+        val suggestionsSchema = format.getValue("schema").jsonObject
+            .getValue("properties").jsonObject
+            .getValue("suggestions").jsonObject
+        assertEquals("fcitx_ai_suggestions", format.getValue("name").jsonPrimitive.content)
+        assertEquals("3", suggestionsSchema.getValue("minItems").jsonPrimitive.content)
+        assertEquals("3", suggestionsSchema.getValue("maxItems").jsonPrimitive.content)
+        assertTrue(
+            request.getValue("instructions").jsonPrimitive.content.contains(
+                "exactly two next-word suggestions followed by exactly one short continuation suffix"
+            )
+        )
+    }
+
+    @Test
+    fun `chat continuation abstention keeps json object response format`() = runBlocking {
+        var capturedBody = ""
+        val client = OpenAiResponsesClient(
+            AiProviderProfile(
+                baseUrl = "https://provider.test/v1/chat/completions",
+                apiKey = "test-key",
+                fastModel = "fast-test",
+                capabilities = setOf("chat_completions", "continuation_abstention")
+            ),
+            AiHttpTransport { _, _, body ->
+                capturedBody = body
+                """{"choices":[{"message":{"content":"{\"suggestions\":[]}"}}]}"""
+            }
+        )
+
+        val result = client.generate(AiAction.ContinueTyping, "내가 뭘")
+
+        val request = Json.parseToJsonElement(capturedBody).jsonObject
+        assertEquals("json_object", request.getValue("response_format").jsonObject.getValue("type").jsonPrimitive.content)
+        assertTrue(
+            request.getValue("messages").toString().contains("Return between 0 and 3 suggestion(s)")
+        )
+        assertEquals(emptyList<String>(), result.suggestions)
+    }
+
+    @Test
+    fun `continuation abstention rejects malformed empty and duplicate contracts`() {
+        val invalidPayloads = listOf(
+            """{"status":"completed","output_text":"{\"items\":[]}"}""",
+            """{"status":"completed","output_text":"{\"suggestions\":[\"\"]}"}""",
+            """{"status":"completed","output_text":"{\"suggestions\":[\"   \"]}"}""",
+            """{"status":"completed","output_text":"{\"suggestions\":[1]}"}""",
+            """{"status":"completed","output_text":"{\"suggestions\":null}"}""",
+            """{"status":"completed","output_text":"{\"suggestions\":[\"WORD\\t다음\",\"WORD\\t다음\"]}"}""",
+            """{"status":"completed","output_text":"{\"suggestions\":[\"a\",\"b\",\"c\",\"d\"]}"}""",
+            """{"status":"completed","output_text":"설명 {\"suggestions\":[]}"}""",
+            """{"status":"completed","output_text":"```json\n{\"suggestions\":[]}\n```"}"""
+        )
+
+        invalidPayloads.forEach { payload ->
+            val failure = runCatching {
+                OpenAiResponsesClient.parseResponse(payload, 3, "requested", 4, continuationAbstention = true)
+            }.exceptionOrNull()
+            assertTrue(failure is AiSuggestionContractException)
+        }
+    }
+
+    @Test
+    fun `continuation abstention preserves every allowed typed suggestion count`() {
+        val cases = listOf(
+            listOf("WORD\t어떻게"),
+            listOf("CONTINUATION\t잘못했는지 모르겠어"),
+            listOf("WORD\t어떻게", "WORD\t하면"),
+            listOf("WORD\t어떻게", "WORD\t하면", "CONTINUATION\t잘못했는지 모르겠어")
+        )
+
+        cases.forEach { expected ->
+            val serialized = expected.joinToString(",") { suggestion ->
+                "\"${suggestion.replace("\t", "\\t")}\""
+            }
+            val outputText = "{\"suggestions\":[$serialized]}"
+            val payload = """{"status":"completed","output_text":"${outputText.replace("\\", "\\\\").replace("\"", "\\\"")}"}"""
+
+            val result = OpenAiResponsesClient.parseResponse(
+                payload,
+                3,
+                "requested",
+                4,
+                continuationAbstention = true
+            )
+
+            assertEquals(expected, result.suggestions)
+            assertEquals(expected.size, result.suggestions.size)
+            assertEquals(expected.sumOf(String::length), result.outputCharacters)
+        }
+    }
+
+    @Test
+    fun `abstention capability does not alter other action schema prompt or empty rejection`() = runBlocking {
+        var capturedBody = ""
+        val client = OpenAiResponsesClient(
+            AiProviderProfile(
+                baseUrl = "https://provider.test/v1",
+                apiKey = "test-key",
+                fastModel = "fast-test",
+                capabilities = setOf("responses", "continuation_abstention")
+            ),
+            AiHttpTransport { _, _, body ->
+                capturedBody = body
+                """{"status":"completed","output_text":"{\"suggestions\":[]}"}"""
+            }
+        )
+
+        val failure = runCatching { client.generate(AiAction.Proofread, "테스트") }.exceptionOrNull()
+
+        val format = Json.parseToJsonElement(capturedBody).jsonObject
+            .getValue("text").jsonObject
+            .getValue("format").jsonObject
+        val suggestionsSchema = format.getValue("schema").jsonObject
+            .getValue("properties").jsonObject
+            .getValue("suggestions").jsonObject
+        assertEquals("fcitx_ai_suggestions", format.getValue("name").jsonPrimitive.content)
+        assertEquals("1", suggestionsSchema.getValue("minItems").jsonPrimitive.content)
+        assertEquals("1", suggestionsSchema.getValue("maxItems").jsonPrimitive.content)
+        assertTrue(
+            Json.parseToJsonElement(capturedBody).jsonObject.getValue("instructions").jsonPrimitive.content
+                .contains("Return exactly 1 suggestion(s)")
+        )
+        assertTrue(failure is AiSuggestionContractException)
+    }
+
+    @Test
     fun `nested response output is parsed and capped`() {
         val payload = """
             {
@@ -210,6 +417,58 @@ class OpenAiResponsesClientTest {
             "AI response reached its output limit. Try a shorter request.",
             failure.message
         )
+        assertEquals(AiProviderFailureKind.NotCompleted, failure.failureKind)
+        assertEquals(null, failure.httpStatus)
+    }
+
+    @Test
+    fun `non 401 HTTP failures preserve kind and status`() = runBlocking {
+        listOf(429, 503).forEach { status ->
+            val client = OpenAiResponsesClient(
+                AiProviderProfile(
+                    baseUrl = "https://provider.test/v1",
+                    apiKey = "test-key",
+                    fastModel = "fast-test"
+                ),
+                AiHttpTransport { _, _, _ ->
+                    throw AiHttpStatusException(status, "provider error $status")
+                }
+            )
+
+            val failure = runCatching {
+                client.generate(AiAction.Proofread, "테스트")
+            }.exceptionOrNull()
+
+            assertTrue(failure is AiProviderException)
+            failure as AiProviderException
+            assertEquals(AiProviderFailureKind.Http, failure.failureKind)
+            assertEquals(status, failure.httpStatus)
+        }
+    }
+
+    @Test
+    fun `malformed JSON and empty output preserve failure kinds`() {
+        val invalidJson = runCatching {
+            OpenAiResponsesClient.parseResponse("not-json", 1, "requested", 4)
+        }.exceptionOrNull()
+        val emptyOutput = runCatching {
+            OpenAiResponsesClient.parseResponse(
+                """{"status":"completed","output":[]}""",
+                1,
+                "requested",
+                4
+            )
+        }.exceptionOrNull()
+
+        assertTrue(invalidJson is AiProviderException)
+        invalidJson as AiProviderException
+        assertEquals(AiProviderFailureKind.InvalidJson, invalidJson.failureKind)
+        assertEquals(null, invalidJson.httpStatus)
+
+        assertTrue(emptyOutput is AiProviderException)
+        emptyOutput as AiProviderException
+        assertEquals(AiProviderFailureKind.EmptyOutput, emptyOutput.failureKind)
+        assertEquals(null, emptyOutput.httpStatus)
     }
 
     @Test

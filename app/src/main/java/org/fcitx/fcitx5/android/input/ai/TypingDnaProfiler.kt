@@ -131,7 +131,12 @@ $textSample
             if (!response.isNullOrBlank()) {
                 val parsed = parseLlmResponse(category, response)
                 if (parsed != null) {
-                    return parsed
+                    val observed = profileOnDevice(category, sentences)
+                    return parsed.copy(
+                        habitualEndings = parsed.habitualEndings.ifEmpty { observed.habitualEndings },
+                        frequentBigrams = observed.frequentBigrams,
+                        cannedPhrases = observed.cannedPhrases
+                    )
                 }
             }
         }
@@ -152,31 +157,23 @@ $textSample
         val bigramCounts = mutableMapOf<Pair<String, String>, Int>()
         val phraseCounts = mutableMapOf<String, Int>()
 
-        val commonEndings = listOf(
-            "습니다", "ㅂ니다", "해요", "드립니다", "부탁드립니다", "하세요", "이네요",
-            "했어", "했지", "해봐", "먹자", "보자", "ㅋㅋ", "ㅎㅎ", "네용", "했어용", "구요", "거든"
-        )
-
         for (s in sentences) {
             val trimmed = s.trim()
             if (trimmed.isBlank()) continue
 
             phraseCounts[trimmed] = (phraseCounts[trimmed] ?: 0) + 1
 
-            // Tone inference
-            if (trimmed.endsWith("습니다") || trimmed.endsWith("ㅂ니다") || trimmed.endsWith("요") ||
-                trimmed.endsWith("드립니다") || trimmed.endsWith("부탁드립니다") || trimmed.endsWith("시오")
-            ) {
-                honorificScore += 2
-            } else if (trimmed.endsWith("야") || trimmed.endsWith("어") || trimmed.endsWith("지") ||
-                trimmed.endsWith("자") || trimmed.endsWith("해") || trimmed.endsWith("ㅋㅋ") || trimmed.endsWith("ㅎㅎ")
-            ) {
-                informalScore += 2
-            }
-
-            // Habitual endings detection
-            for (ending in commonEndings) {
-                if (trimmed.endsWith(ending)) {
+            KoreanSentenceEndingExtractor.sentenceFragments(trimmed).forEach { fragment ->
+                val ending = KoreanSentenceEndingExtractor.endingOf(fragment)
+                if (ending in HONORIFIC_ENDINGS || fragment.endsWith("요") || fragment.endsWith("시오")) {
+                    honorificScore += 2
+                } else if (ending in INFORMAL_ENDINGS ||
+                    fragment.endsWith("야") || fragment.endsWith("어") || fragment.endsWith("지") ||
+                    fragment.endsWith("자") || fragment.endsWith("해")
+                ) {
+                    informalScore += 2
+                }
+                if (ending != null) {
                     endingCounts[ending] = (endingCounts[ending] ?: 0) + 1
                 }
             }
@@ -221,4 +218,13 @@ $textSample
             cannedPhrases = canned
         )
     }
+
 }
+
+private val HONORIFIC_ENDINGS = setOf(
+    "부탁드립니다", "드리겠습니다", "겠습니다", "할까요", "인가요", "거든요",
+    "드립니다", "했습니다", "합니다", "입니다", "됩니다", "하세요", "이네요",
+    "네요", "세요", "어요", "아요", "해요", "구요", "네용", "했어용", "습니다", "죠"
+)
+
+private val INFORMAL_ENDINGS = setOf("했어", "했지", "해봐", "먹자", "보자", "할까", "거든", "ㅋㅋ", "ㅎㅎ")

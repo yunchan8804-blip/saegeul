@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_connection_provider_missing">AI 추가 추천: API 키 또는 OAuth 연결 필요 · 설정</string>
+    <string name="ai_connection_reauth_required">AI 추가 추천: OAuth 재로그인 필요 · 설정</string>
+</resources>

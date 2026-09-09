@@ -72,13 +72,15 @@ class PredictionMetricsStoreTest {
 
         store.recordAccepted("personal_ngram", 1) // personal only
         store.recordAccepted("typo_personal", 1) // personal + typo
+        store.recordAccepted("personalized_style", 1) // personal only
+        store.recordAccepted("rag_personal", 1) // personal only
         store.recordAccepted("typo_keyboard", 1) // typo only
         store.recordAccepted("cloud_llm", 1) // neither
 
         val summary = store.summary()
-        assertEquals(4, summary.totalAccepted)
+        assertEquals(6, summary.totalAccepted)
         val today = summary.recent.last()
-        assertEquals(2, today.acceptedPersonal)
+        assertEquals(4, today.acceptedPersonal)
         assertEquals(2, today.typoCorrected)
     }
 

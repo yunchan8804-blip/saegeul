@@ -90,6 +90,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
         fun resolveBadgeIcon(badgeText: String): String {
             val clean = badgeText.trim()
             return when {
+                clean == "기본문장" -> "📖"
                 clean.contains("일정") || clean.contains("시간") -> "📅"
                 clean.contains("업무") || clean.contains("보고") || clean.contains("비즈니스") || clean.contains("개발") -> "💼"
                 clean.contains("양해") || clean.contains("안심") || clean.contains("지연") -> "⏳"

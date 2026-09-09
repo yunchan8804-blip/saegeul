@@ -123,3 +123,11 @@ lint/tmp/
 *.obj
 **/obj/
 /scripts/__pycache__/
+
+# Local experiment evidence and generated automation files
+/.artifacts/
+/@AutomationLog.txt
+/current_screen.png
+/main_screen.png
+/one-second-build-r2.exit
+**/__pycache__/

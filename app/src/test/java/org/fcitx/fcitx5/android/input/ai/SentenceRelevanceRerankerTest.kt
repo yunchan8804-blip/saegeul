@@ -229,4 +229,63 @@ class SentenceRelevanceRerankerTest {
         assertEquals(1, withGraph.size)
         assertTrue(withGraph.first().confidenceScore > withoutGraph.first().confidenceScore)
     }
+
+    @Test
+    fun typedAppendUsesItsFullSuffixWhenItSharesTheContextPrefix() {
+        val context = "나는"
+        val append = ContextualAppend(context, "나중에 연락할게")
+        val candidate = AiPrediction(
+            text = append.suffix,
+            confidenceScore = 0.8f,
+            isSentenceCompletion = true,
+            source = "llm_cached",
+            append = append
+        )
+        val ngram = PersonalNgramModel(clock = { 1_000_000_000L })
+        repeat(20) { ngram.learn("나는 나중에 연락할게", packageName) }
+
+        val result = SentenceRelevanceReranker.rerank(
+            sentences = listOf(candidate),
+            contextBeforeCursor = context,
+            ngram = ngram,
+            packageName = packageName,
+            limit = 5
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(append, result.single().append)
+        assertEquals(" 나중에 연락할게 ", result.single().append!!.insertionFor(context))
+        assertEquals(0.999f, result.single().confidenceScore, 0.001f)
+    }
+
+    @Test
+    fun attachmentAppendDoesNotUseNextWordBridgeScoring() {
+        val context = "회의"
+        val append = ContextualAppend(
+            context,
+            "에 참석해 주세요.",
+            ContextualAppend.JoinMode.ATTACH
+        )
+        val candidate = AiPrediction(
+            text = append.suffix,
+            confidenceScore = 0.8f,
+            isSentenceCompletion = true,
+            source = "llm_cached",
+            append = append
+        )
+        val ngram = PersonalNgramModel(clock = { 1_000_000_000L })
+        repeat(20) { ngram.learn("회의 자료", packageName) }
+
+        val result = SentenceRelevanceReranker.rerank(
+            sentences = listOf(candidate),
+            contextBeforeCursor = context,
+            ngram = ngram,
+            packageName = packageName,
+            limit = 5
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(append, result.single().append)
+        assertEquals(0.8f, result.single().confidenceScore, 0.001f)
+    }
 }

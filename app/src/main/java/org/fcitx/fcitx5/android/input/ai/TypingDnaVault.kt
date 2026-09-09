@@ -15,8 +15,8 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * On-Device Secure Staging Vault for User Typing DNA Accumulation.
  * Buffers PII-scrubbed sentences per application persona category.
- * When the accumulation threshold is reached, triggers background LLM/on-device
- * profiling, and safely purges raw staging buffers immediately upon knowledge compilation.
+ * When the accumulation threshold is reached, triggers background on-device profiling.
+ * Pending sentences are removed only after their processor returns normally.
  */
 class TypingDnaVault(
     private val thresholdPerCategory: Int = 15,
@@ -140,14 +140,30 @@ class TypingDnaVault(
     }
 
     /**
-     * Drains all staged sentences without dispatching [onBatchReady].
-     * Used by instant dashboard sync so compilation happens exactly once.
+     * Processes current pending sentences under the vault lock.
+     * A category is removed only after [processor] returns normally. New records wait for the
+     * current processor and remain pending for a subsequent call.
      */
     @Synchronized
-    fun drain(): Map<String, List<String>> {
-        val snapshot = snapshot()
-        purge()
-        return snapshot
+    fun processPending(
+        category: String? = null,
+        processor: (String, List<String>) -> Unit
+    ): Int {
+        val categories = when (category) {
+            null -> categoryBuffers.keys.toList().sorted()
+            else -> listOf(category)
+        }
+        var processedCount = 0
+        for (currentCategory in categories) {
+            val sentences = categoryBuffers[currentCategory]?.toList().orEmpty()
+            if (sentences.isEmpty()) continue
+
+            processor(currentCategory, sentences)
+            categoryBuffers.remove(currentCategory)
+            persistStaging()
+            processedCount += sentences.size
+        }
+        return processedCount
     }
 
     /**
@@ -199,8 +215,7 @@ class TypingDnaVault(
         val vf = vaultFile ?: return
         if (!vf.exists()) return
         runCatching {
-            vf.migrateIfLegacy()
-            val raw = vf.readText() ?: return
+            val raw = vf.readTextAndMigrate() ?: return
             if (raw.isBlank()) return
             val root = JSONObject(raw)
             val keys = root.keys()

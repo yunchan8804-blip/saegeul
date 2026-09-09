@@ -33,6 +33,7 @@ class CorrectionPatternStore(
     private val pairs = LinkedHashMap<String, PairRecord>()
     private val confusions = HashMap<Pair<Char, Char>, Float>()
     private val vaultFile: VaultFile? = storeFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
+    private val persistenceLock = Any()
 
     init {
         vaultFile?.let { vf ->
@@ -97,48 +98,53 @@ class CorrectionPatternStore(
     @Synchronized
     fun stats(): Pair<Int, Int> = pairs.size to confusions.size
 
-    @Synchronized
     fun save() {
         val vf = vaultFile ?: return
-        val obj = JSONObject()
-        val pairsArray = JSONArray()
-        pairs.values.forEach { p ->
-            pairsArray.put(
-                JSONObject().apply {
-                    put("typed", p.typed)
-                    put("corrected", p.corrected)
-                    put("count", p.count.toDouble())
-                    put("lastSeenMs", p.lastSeenMs)
+        synchronized(persistenceLock) {
+            val snapshot = synchronized(this) {
+                val obj = JSONObject()
+                val pairsArray = JSONArray()
+                pairs.values.forEach { p ->
+                    pairsArray.put(
+                        JSONObject().apply {
+                            put("typed", p.typed)
+                            put("corrected", p.corrected)
+                            put("count", p.count.toDouble())
+                            put("lastSeenMs", p.lastSeenMs)
+                        }
+                    )
                 }
-            )
-        }
-        obj.put("pairs", pairsArray)
-        val confusionArray = JSONArray()
-        confusions.forEach { (key, count) ->
-            confusionArray.put(
-                JSONObject().apply {
-                    put("from", key.first.toString())
-                    put("to", key.second.toString())
-                    put("count", count.toDouble())
+                obj.put("pairs", pairsArray)
+                val confusionArray = JSONArray()
+                confusions.forEach { (key, count) ->
+                    confusionArray.put(
+                        JSONObject().apply {
+                            put("from", key.first.toString())
+                            put("to", key.second.toString())
+                            put("count", count.toDouble())
+                        }
+                    )
                 }
-            )
+                obj.put("confusions", confusionArray)
+                obj
+            }
+            vf.writeText(snapshot.toString(2))
         }
-        obj.put("confusions", confusionArray)
-
-        vf.writeText(obj.toString(2))
     }
 
-    @Synchronized
     fun clear() {
-        pairs.clear()
-        confusions.clear()
-        vaultFile?.delete() ?: storeFile?.delete()
+        synchronized(persistenceLock) {
+            synchronized(this) {
+                pairs.clear()
+                confusions.clear()
+            }
+            vaultFile?.delete() ?: storeFile?.delete()
+        }
     }
 
     private fun loadFromDisk(vaultFile: VaultFile) {
         try {
-            vaultFile.migrateIfLegacy()
-            val content = vaultFile.readText() ?: return
+            val content = vaultFile.readTextAndMigrate() ?: return
             if (content.isBlank()) return
             val obj = JSONObject(content)
             val pairsArray = obj.optJSONArray("pairs")

@@ -19,18 +19,16 @@ class TypingDnaInstantSync(
     private val profiler: TypingDnaProfiler = TypingDnaProfiler(),
     private val compiler: TypingDnaCompiler
 ) {
-    fun syncNow(): TypingDnaStats {
-        val pending = vault.drain().filterValues { it.isNotEmpty() }
-        pending.forEach { (category, sentences) ->
-            val persona = profiler.profileOnDevice(category, sentences)
+    fun syncNow(category: String? = null): TypingDnaStats {
+        vault.processPending(category) { pendingCategory, sentences ->
+            val persona = profiler.profileOnDevice(pendingCategory, sentences)
             compiler.compilePersona(
                 persona,
                 persist = true,
                 analyzedSentenceCount = sentences.size
             )
         }
-        repository.invalidateCache()
-        return repository.getStats(forceReload = true)
+        return repository.getStats()
     }
 
     companion object {
@@ -48,7 +46,6 @@ class TypingDnaInstantSync(
             val compiler = TypingDnaCompiler(
                 collocationModel = KoreanCollocationModel(),
                 sentenceStore = sentenceStore,
-                vault = vault,
                 repository = repository
             )
             val stats = TypingDnaInstantSync(

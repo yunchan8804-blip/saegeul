@@ -1,0 +1,251 @@
+{
+  "source_path": "D:\\workspace\\Saegul\\.artifacts\\contextual-quality-e2e\\kanana-prefix-prefill-results.json",
+  "source_sha256": "0228b75bb9e8612bffbaba13d89791becb69f931ddefb708de0cc4559a9545ca",
+  "adapter_source_path": "D:\\workspace\\Saegul\\scripts\\korean_continuation_surface.py",
+  "adapter_source_sha256": "eed0ce65dfe200ccb335b450974ac76efb01ee72ecd32ca55591b8a0508b789e",
+  "model_repository": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+  "model_revision": "7df4bc35ccd610e451809d7106e1c3cf82bfd44c",
+  "mode": "captured_model_output_replay_not_live_inference",
+  "records": [
+    {
+      "raw_prefix": "내가 뭘",
+      "raw_suffix_clean_decoded": " 하고 있었지?",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "하고 있었지?",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t하고 있었지?"
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t하고 있었지?\"]}"
+      },
+      "expected_editor_text": "내가 뭘 하고 있었지? ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "내일 판교에서",
+      "raw_suffix_clean_decoded": " 만나요.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "만나요.",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t만나요."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t만나요.\"]}"
+      },
+      "expected_editor_text": "내일 판교에서 만나요. ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "오후 2시 회의",
+      "raw_suffix_clean_decoded": "가 시작되었습니다. 모두 자리에 앉으세요.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "ATTACH",
+        "payload": "가 시작되었습니다. 모두 자리에 앉으세요.",
+        "boundary_space_removed": 0,
+        "suggestions": [
+          "CONTINUATION_ATTACH\t가 시작되었습니다. 모두 자리에 앉으세요."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION_ATTACH\\t가 시작되었습니다. 모두 자리에 앉으세요.\"]}"
+      },
+      "expected_editor_text": "오후 2시 회의가 시작되었습니다. 모두 자리에 앉으세요. ",
+      "normalized_boundary_only": false
+    },
+    {
+      "raw_prefix": "내가 뭘 ",
+      "raw_suffix_clean_decoded": " 하려고 했지?",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "하려고 했지?",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t하려고 했지?"
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t하려고 했지?\"]}"
+      },
+      "expected_editor_text": "내가 뭘 하려고 했지? ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "오늘은 집에서",
+      "raw_suffix_clean_decoded": " 쉬면서 좋아하는 드라마를 볼 거야.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "쉬면서 좋아하는 드라마를 볼 거야.",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t쉬면서 좋아하는 드라마를 볼 거야."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t쉬면서 좋아하는 드라마를 볼 거야.\"]}"
+      },
+      "expected_editor_text": "오늘은 집에서 쉬면서 좋아하는 드라마를 볼 거야. ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "비가 많이 와서",
+      "raw_suffix_clean_decoded": " 우산을 챙겨야겠어.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "우산을 챙겨야겠어.",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t우산을 챙겨야겠어."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t우산을 챙겨야겠어.\"]}"
+      },
+      "expected_editor_text": "비가 많이 와서 우산을 챙겨야겠어. ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "자료를 확인하고",
+      "raw_suffix_clean_decoded": " 나니 더 명확해졌어.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "나니 더 명확해졌어.",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t나니 더 명확해졌어."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t나니 더 명확해졌어.\"]}"
+      },
+      "expected_editor_text": "자료를 확인하고 나니 더 명확해졌어. ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "혹시 시간 괜찮으시면",
+      "raw_suffix_clean_decoded": " 언제든지 연락 주세요.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "언제든지 연락 주세요.",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t언제든지 연락 주세요."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t언제든지 연락 주세요.\"]}"
+      },
+      "expected_editor_text": "혹시 시간 괜찮으시면 언제든지 연락 주세요. ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "그건 내가 한 게",
+      "raw_suffix_clean_decoded": " 맞아.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "맞아.",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t맞아."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t맞아.\"]}"
+      },
+      "expected_editor_text": "그건 내가 한 게 맞아. ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "배송이 아직",
+      "raw_suffix_clean_decoded": " 안 됐어요. 잠시만 기다려 주세요.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "안 됐어요. 잠시만 기다려 주세요.",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t안 됐어요. 잠시만 기다려 주세요."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t안 됐어요. 잠시만 기다려 주세요.\"]}"
+      },
+      "expected_editor_text": "배송이 아직 안 됐어요. 잠시만 기다려 주세요. ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "이거 어떻게",
+      "raw_suffix_clean_decoded": " 써야 할지 모르겠어.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "NEXT_WORD",
+        "payload": "써야 할지 모르겠어.",
+        "boundary_space_removed": 1,
+        "suggestions": [
+          "CONTINUATION\t써야 할지 모르겠어."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION\\t써야 할지 모르겠어.\"]}"
+      },
+      "expected_editor_text": "이거 어떻게 써야 할지 모르겠어. ",
+      "normalized_boundary_only": true
+    },
+    {
+      "raw_prefix": "늦어서 미안",
+      "raw_suffix_clean_decoded": "해, 다음엔 더 일찍 갈게.",
+      "adapter_diagnostic": {
+        "status": "accepted",
+        "join_mode": "ATTACH",
+        "payload": "해, 다음엔 더 일찍 갈게.",
+        "boundary_space_removed": 0,
+        "suggestions": [
+          "CONTINUATION_ATTACH\t해, 다음엔 더 일찍 갈게."
+        ]
+      },
+      "response_envelope": {
+        "status": "completed",
+        "model": "kakaocorp/kanana-1.5-2.1b-instruct-2505",
+        "output_text": "{\"suggestions\":[\"CONTINUATION_ATTACH\\t해, 다음엔 더 일찍 갈게.\"]}"
+      },
+      "expected_editor_text": "늦어서 미안해, 다음엔 더 일찍 갈게. ",
+      "normalized_boundary_only": false
+    }
+  ]
+}

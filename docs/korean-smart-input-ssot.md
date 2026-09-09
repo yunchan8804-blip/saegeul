@@ -1357,15 +1357,30 @@ OpenAI·Anthropic API key나 CLI의 `auth.json`, OAuth access token을 복사하
 `%LOCALAPPDATA%/Saegeul/ai-companion-oauth.bin`에 Windows DPAPI current-user 범위로 암호화해
 보존하므로 PC 재시작 뒤에도 다시 로그인하지 않고 refresh할 수 있다.
 
+앱 화면의 언어 금고 통계와 설정 요약은 IO dispatcher에서 읽은 불변 snapshot을 UI에 전달한다.
+홈 카드 bind와 페이지 render에서 암호화 파일 강제 재로드·복호화·통계 계산을 실행하지 않는다.
+초기 통계 로딩 중에도 화면과 상세 진입 버튼은 사용 가능해야 하며, 로딩과 실패를 구분해 표시한다.
+화면 수명 종료 뒤 결과를 적용하지 않고, 중복 갱신은 합쳐 최신 결과만 반영한다.
+수동 분석은 중복 실행과 초기화 경합을 차단하고 IO에서 처리하며, 실패를 완료로 표시하지 않는다.
+응답성 검증은 첫 화면 표시, 데이터 준비, 메인 큐 지연을 별도로 측정한다.
+개인 n-gram·문장 검색·추천 지표·오타 교정 저장소는 저장 전용 잠금으로 save/clear 순서를 보존하고,
+메모리 잠금에서는 독립 snapshot만 복사한다. 직렬화·암호화·파일 쓰기로 입력 중 메모리 조회를 막지 않는다.
+문장 staging의 즉시 저장·재시작 복원 계약은 유지하며, 별도 기기 계측 없이 비동기 저장으로 바꾸지 않는다.
+
 요청 실행 경계는 다음으로 고정한다.
 
-- Codex: `codex exec --ephemeral --sandbox read-only --skip-git-repo-check --ignore-user-config
-  --ignore-rules -c approval_policy=never -c web_search=disabled --color never -C <empty-sandbox> -`
-- Claude Code: `claude -p --safe-mode --tools '' --permission-mode dontAsk --no-session-persistence
+- Codex: `codex exec --yolo --ephemeral --skip-git-repo-check --ignore-user-config
+  --ignore-rules -c web_search=disabled --color never -C <empty-sandbox> -`
+- Claude Code: `claude -p --dangerously-skip-permissions --no-session-persistence
   --output-format json`
+- AGY: `agy -p <prompt> --dangerously-skip-permissions --disable-slash-commands
+  --output-format text --model <configured-model> --effort <configured-effort>`
+- 사용자 명시 지시에 따라 세 CLI의 도구 권한 확인을 자동 승인한다. 작업 디렉터리는 그대로 유지하지만
+  읽기 전용 샌드박스를 보장하지 않는다. 이 설정은 상위 Codex 하네스의 별도 승인 정책을 변경하지 않는다.
 - 자식 process에서는 API key·token override 환경 변수를 제거해 CLI에 저장된 구독 OAuth 로그인을 강제한다.
 - 한 번에 한 요청만 실행하고 prompt·결과·Bearer token을 log에 남기지 않으며, strict suggestion JSON 외
-  출력은 거부한다. Fast·Quality는 Codex, Balanced는 Claude로 route한다.
+  출력은 거부한다. tier별 backend는 가용 CLI로 생성한 manifest의 `models` 매핑을 따른다.
+  AGY·Claude·Codex가 모두 가용하면 Fast는 AGY, Balanced는 Claude, Quality는 Codex로 route한다.
 
 gateway는 loopback `127.0.0.1:9211`, tailnet 공개면은 Tailscale Serve HTTPS `:9210`, 발견은
 `_saegeul-ai._tcp.local.`을 사용한다. WPF tray `tools/SaegeulAiCompanionTray`가 상태·backend·시작·중지·재시작·

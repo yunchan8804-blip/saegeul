@@ -877,6 +877,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
 
+    var candidateConnectionHintVisible: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                updateBarHeight()
+            }
+        }
+
     private fun setRowHeight(row: View, heightDp: Int) {
         val heightPx = context.dp(heightDp)
         val params = row.layoutParams as? LinearLayout.LayoutParams ?: return
@@ -894,7 +902,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             expanded = toolbarNeedsSecondRow
         )
         val toolRowHeightDp = toolbarHeightSession.heightDp
-        val candidateRowHeightDp = if (isCandidateTwoRow) CANDIDATE_TWO_ROW_HEIGHT_DP else HEIGHT
+        val candidateRowHeightDp = when {
+            candidateConnectionHintVisible -> 77
+            isCandidateTwoRow -> CANDIDATE_TWO_ROW_HEIGHT_DP
+            else -> HEIGHT
+        }
         setRowHeight(idleUi.root, toolRowHeightDp)
         setRowHeight(candidateUi.root, candidateRowHeightDp)
         // Normal mode stacks both rows, so the bar height is their sum. When the suggestion row

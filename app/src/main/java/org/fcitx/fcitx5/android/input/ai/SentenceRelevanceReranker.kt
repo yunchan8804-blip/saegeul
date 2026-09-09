@@ -58,18 +58,19 @@ object SentenceRelevanceReranker {
             .map { PersonalNgramTokenizer.stem(it) ?: it }
             .toSet()
 
-        // predictNext depends only on the (loop-invariant) context, so resolve the personal
-        // next-word set once here rather than re-querying the n-gram model per candidate.
-        val bridgeCands = ngram?.predictNext(contextBeforeCursor, packageName, NGRAM_BRIDGE_CANDIDATE_LIMIT).orEmpty()
+        // The contextual lookup depends only on the loop-invariant context, so resolve the
+        // personally observed next-word set once rather than re-querying per candidate.
+        val bridgeCands = ngram?.predictContextualNext(contextBeforeCursor, packageName, NGRAM_BRIDGE_CANDIDATE_LIMIT).orEmpty()
         val bridgeStems = bridgeCands.map { PersonalNgramTokenizer.stem(it.word) ?: it.word }.toSet()
         val bridgeMaxProb = bridgeCands.maxOfOrNull { it.probability } ?: 0f
 
         val scored = mutableListOf<Pair<AiPrediction, Float>>()
         for (pred in sentences) {
-            if (pred.text.trim() == contextBeforeCursor.trim()) continue
+            if (pred.append == null && pred.text.trim() == contextBeforeCursor.trim()) continue
 
-            val prefixLen = contextBeforeCursor.commonPrefixWith(pred.text).length
-            val rawRemainder = pred.text.substring(prefixLen)
+            val rawRemainder = pred.append?.suffix ?: pred.text.substring(
+                contextBeforeCursor.commonPrefixWith(pred.text).length
+            )
             val remainder = rawRemainder.trim()
             if (remainder.isEmpty()) continue
 
@@ -79,9 +80,13 @@ object SentenceRelevanceReranker {
             val shared = (topicalCtxStems intersect sTokenStems).size
             val overlapFactor = 1.0f + minOf(shared, TOPICAL_OVERLAP_MAX_SHARED) * TOPICAL_OVERLAP_BOOST_PER_TOKEN
 
-            val wordBoundary = contextBeforeCursor.endsWith(" ") ||
-                contextBeforeCursor.endsWith("\n") ||
-                rawRemainder.startsWith(" ")
+            val wordBoundary = when (pred.append?.joinMode) {
+                ContextualAppend.JoinMode.ATTACH -> false
+                ContextualAppend.JoinMode.NEXT_WORD -> true
+                null -> contextBeforeCursor.endsWith(" ") ||
+                    contextBeforeCursor.endsWith("\n") ||
+                    rawRemainder.startsWith(" ")
+            }
             val bridgeFactor = if (wordBoundary) {
                 bridgeFactorFor(remainder, bridgeStems, bridgeMaxProb)
             } else {

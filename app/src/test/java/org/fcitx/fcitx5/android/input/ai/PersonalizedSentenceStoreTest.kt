@@ -12,7 +12,12 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 /**
  * TDD RED Tests for PersonalizedSentenceStore:
@@ -129,5 +134,78 @@ class PersonalizedSentenceStoreTest {
         assertEquals("배포 완료 후 모니터링 중입니다.", found[0].sentence)
         assertEquals(2.0f, found[0].score, 0.01f)
         assertEquals(3, found[0].useCount)
+    }
+
+    @Test
+    fun saveSnapshotDoesNotBlockRecordsWhileCipherEncryptionWaits() {
+        val cipher = BlockingVaultCipher()
+        val concurrentFile = tempFolder.newFile("concurrent_personalized_sentences.json")
+        val concurrentStore = PersonalizedSentenceStore(
+            storageFile = concurrentFile,
+            morphology = morphology,
+            maxCapacity = 10,
+            cipher = cipher
+        )
+        concurrentStore.upsert(PersonalizedSentenceRecord(sentence = "첫 저장 문장", keywords = listOf("첫")))
+
+        val saveFailure = AtomicReference<Throwable?>()
+        val saveThread = thread(start = true) {
+            runCatching { concurrentStore.save() }.exceptionOrNull()?.let(saveFailure::set)
+        }
+        assertTrue(cipher.encryptionStarted.await(5, TimeUnit.SECONDS))
+
+        val getFinished = CountDownLatch(1)
+        val upsertFinished = CountDownLatch(1)
+        val getFailure = AtomicReference<Throwable?>()
+        val upsertFailure = AtomicReference<Throwable?>()
+        val getThread = thread(start = true) {
+            runCatching { concurrentStore.get("첫 저장 문장") }.exceptionOrNull()?.let(getFailure::set)
+            getFinished.countDown()
+        }
+        val upsertThread = thread(start = true) {
+            runCatching {
+                concurrentStore.upsert(PersonalizedSentenceRecord(sentence = "후속 변경 문장", keywords = listOf("후속")))
+            }.exceptionOrNull()?.let(upsertFailure::set)
+            upsertFinished.countDown()
+        }
+
+        try {
+            assertTrue(getFinished.await(1, TimeUnit.SECONDS))
+            assertTrue(upsertFinished.await(1, TimeUnit.SECONDS))
+            assertTrue(saveThread.isAlive)
+        } finally {
+            cipher.allowEncryption.countDown()
+            saveThread.join(5_000)
+            getThread.join(5_000)
+            upsertThread.join(5_000)
+        }
+        assertTrue(saveFailure.get() == null)
+        assertTrue(getFailure.get() == null)
+        assertTrue(upsertFailure.get() == null)
+
+        val firstReload = PersonalizedSentenceStore(storageFile = concurrentFile, morphology = morphology, maxCapacity = 10, cipher = cipher)
+        firstReload.load()
+        assertNotNull(firstReload.get("첫 저장 문장"))
+        assertFalse(firstReload.contains("후속 변경 문장"))
+
+        concurrentStore.save()
+        val secondReload = PersonalizedSentenceStore(storageFile = concurrentFile, morphology = morphology, maxCapacity = 10, cipher = cipher)
+        secondReload.load()
+        assertNotNull(secondReload.get("첫 저장 문장"))
+        assertNotNull(secondReload.get("후속 변경 문장"))
+    }
+
+    private class BlockingVaultCipher : VaultCipher {
+        override val id: String = "blocking"
+        val encryptionStarted = CountDownLatch(1)
+        val allowEncryption = CountDownLatch(1)
+
+        override fun encrypt(plain: ByteArray, aad: ByteArray): ByteArray {
+            encryptionStarted.countDown()
+            check(allowEncryption.await(5, TimeUnit.SECONDS))
+            return plain
+        }
+
+        override fun decrypt(blob: ByteArray, aad: ByteArray): ByteArray = blob
     }
 }

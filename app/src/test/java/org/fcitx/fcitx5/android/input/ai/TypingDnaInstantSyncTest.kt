@@ -11,6 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Reproduces the user-visible "sync shows 0 sentences" failure:
@@ -108,6 +109,54 @@ class TypingDnaInstantSyncTest {
         )
         sink.onEditorTextCommitted("com.kakao.talk", "확인했습니다", inspectionAllowed = true)
         assertEquals(1, vault.totalBufferedCount())
+    }
+
+    @Test
+    fun deferredThresholdCallbackAfterInstantSyncDoesNotAnalyzeTheBatchTwice() {
+        val scheduledCategories = mutableListOf<String>()
+        val vault = TypingDnaVault(
+            thresholdPerCategory = 1,
+            onBatchReady = { category, _ -> scheduledCategories.add(category) }
+        )
+        val repository = TypingDnaRepository(tempFolder.newFile("typing_dna_callback.json"))
+        val compiler = TypingDnaCompiler(
+            collocationModel = KoreanCollocationModel(),
+            sentenceStore = PersonalizedSentenceStore(),
+            repository = repository
+        )
+        val sync = TypingDnaInstantSync(vault, repository, compiler = compiler)
+
+        vault.recordSentence("com.kakao.talk", "친구야 오늘 저녁에 만나자")
+        assertEquals(listOf(TypingDnaVault.CATEGORY_MESSENGER), scheduledCategories)
+
+        assertEquals(1, sync.syncNow().totalSentences)
+        scheduledCategories.forEach { category -> sync.syncNow(category) }
+
+        assertEquals(1, repository.getStats().totalSentences)
+        assertEquals(0, vault.totalBufferedCount())
+    }
+
+    @Test
+    fun syncNowUsesOnlyOnDeviceProfiling() {
+        val vault = TypingDnaVault(thresholdPerCategory = 15)
+        val repository = TypingDnaRepository(tempFolder.newFile("typing_dna_on_device.json"))
+        val compiler = TypingDnaCompiler(
+            collocationModel = KoreanCollocationModel(),
+            sentenceStore = PersonalizedSentenceStore(),
+            repository = repository
+        )
+        val llmCalls = AtomicInteger()
+        val profiler = TypingDnaProfiler(llmCaller = {
+            llmCalls.incrementAndGet()
+            throw AssertionError("Instant sync must not call an LLM profiler")
+        })
+        val sync = TypingDnaInstantSync(vault, repository, profiler, compiler)
+
+        vault.recordSentence("com.kakao.talk", "친구야 오늘 저녁에 만나자")
+
+        assertEquals(1, sync.syncNow().totalSentences)
+        assertEquals(0, vault.totalBufferedCount())
+        assertEquals(0, llmCalls.get())
     }
 
     @Test

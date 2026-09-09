@@ -13,7 +13,7 @@ import org.junit.Test
 class AiActionTest {
     @Test
     fun `all actions have bounded output and injection boundary`() {
-        assertEquals(15, AiAction.entries.size)
+        assertEquals(16, AiAction.entries.size)
         AiAction.entries.forEach { action ->
             assertTrue(action.maxSuggestions in 1..3)
             val instruction = action.developerInstruction(
@@ -48,8 +48,37 @@ class AiActionTest {
     }
 
     @Test
+    fun `continue typing keeps its typed three suggestion contract internal`() {
+        val instruction = AiAction.ContinueTyping.developerInstruction()
+
+        assertEquals(AiModelTier.Fast, AiAction.ContinueTyping.tier)
+        assertEquals(3, AiAction.ContinueTyping.maxSuggestions)
+        assertTrue(instruction.contains("exactly two next-word suggestions followed by exactly one short continuation suffix"))
+        assertTrue(instruction.contains("WORD\t<one whitespace-free eojeol>"))
+        assertTrue(instruction.contains("CONTINUATION\t<text after a whitespace boundary>"))
+        assertTrue(instruction.contains("CONTINUATION_ATTACH\t<text continuing directly from the final eojeol without an intervening space>"))
+        assertTrue(instruction.contains("input does not end in whitespace"))
+        assertTrue(instruction.contains("finish the user's unfinished clause or sentence"))
+        assertTrue(instruction.contains("never return only a particle, conjunction, or unfinished fragment"))
+        assertTrue(instruction.contains("Return exactly 3 suggestion(s)"))
+        assertFalse(AiAction.ContinueTyping in AiActionMenuPolicy.allEntryPoints())
+    }
+
+    @Test
+    fun `continuation abstention permits a bounded typed empty result`() {
+        val instruction = AiAction.ContinueTyping.developerInstruction(continuationAbstention = true)
+
+        assertTrue(instruction.contains("zero to two next-word suggestions followed by zero or one continuation suffix"))
+        assertTrue(instruction.contains("words before a suffix"))
+        assertTrue(instruction.contains("not invent specific facts absent from the input"))
+        assertTrue(instruction.contains("{\"suggestions\":[]}"))
+        assertTrue(instruction.contains("Return between 0 and 3 suggestion(s)"))
+        assertFalse(instruction.contains("Return exactly 3 suggestion(s)"))
+    }
+
+    @Test
     fun `source review shows every action while direct prompt is intentionally singular`() {
-        val menuActions = AiAction.entries.toSet() - AiAction.GraphEnrich
+        val menuActions = AiActionMenuPolicy.sourceButtons().toSet()
         assertEquals(14, AiActionMenuPolicy.sourceButtons().size)
         assertEquals(listOf(AiAction.Custom), AiActionMenuPolicy.directPromptButtons())
         assertEquals(menuActions, AiActionMenuPolicy.allEntryPoints())

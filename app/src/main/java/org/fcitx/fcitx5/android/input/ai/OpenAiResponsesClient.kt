@@ -45,7 +45,7 @@ class OpenAiResponsesClient(
         tierOverride: AiModelTier? = null
     ): AiGenerationResult =
         withContext(Dispatchers.IO) {
-            val cleanInput = input.trim()
+            val cleanInput = if (action == AiAction.ContinueTyping) input.trimStart() else input.trim()
             require(cleanInput.isNotEmpty() || action == AiAction.Custom) { "AI input is empty" }
             require(cleanInput.length <= MAX_INPUT_CHARACTERS) { "AI input is too long" }
             val requestInput = cleanInput.ifEmpty {
@@ -53,6 +53,8 @@ class OpenAiResponsesClient(
             }
             val validated = profile.validate()
             val model = validated.model(tierOverride ?: action.tier)
+            val continuationAbstention = action == AiAction.ContinueTyping &&
+                "continuation_abstention" in validated.capabilities
             val isChatCompletions = validated.kind == AiProviderKind.Gemini ||
                 validated.baseUrl.endsWith("/chat/completions") ||
                 validated.baseUrl.contains("googleapis.com") ||
@@ -79,7 +81,11 @@ class OpenAiResponsesClient(
                         })
                         add(buildJsonObject {
                             put("role", "user")
-                            put("content", action.developerInstruction(customInstruction) + "\n\nInput text:\n" + requestInput)
+                            put(
+                                "content",
+                                action.developerInstruction(customInstruction, continuationAbstention) +
+                                    "\n\nInput text:\n" + requestInput
+                            )
                         })
                     })
                     put("max_tokens", MAX_OUTPUT_TOKENS)
@@ -91,7 +97,7 @@ class OpenAiResponsesClient(
             } else {
                 buildJsonObject {
                     put("model", model)
-                    put("instructions", action.developerInstruction(customInstruction))
+                    put("instructions", action.developerInstruction(customInstruction, continuationAbstention))
                     put("input", requestInput)
                     put("store", false)
                     put("max_output_tokens", MAX_OUTPUT_TOKENS)
@@ -100,7 +106,14 @@ class OpenAiResponsesClient(
                         put("verbosity", "low")
                         put("format", buildJsonObject {
                             put("type", "json_schema")
-                            put("name", "fcitx_ai_suggestions")
+                            put(
+                                "name",
+                                if (continuationAbstention) {
+                                    "saegeul_continuation_v2"
+                                } else {
+                                    "fcitx_ai_suggestions"
+                                }
+                            )
                             put("strict", true)
                             put("schema", buildJsonObject {
                                 put("type", "object")
@@ -108,7 +121,10 @@ class OpenAiResponsesClient(
                                 put("properties", buildJsonObject {
                                     put("suggestions", buildJsonObject {
                                         put("type", "array")
-                                        put("minItems", action.maxSuggestions)
+                                        put(
+                                            "minItems",
+                                            if (continuationAbstention) 0 else action.maxSuggestions
+                                        )
                                         put("maxItems", action.maxSuggestions)
                                         put("items", buildJsonObject { put("type", "string") })
                                     })
@@ -126,9 +142,19 @@ class OpenAiResponsesClient(
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
                     throw authorizationProvider.onUnauthorized(validated)
                 }
-                throw AiProviderException(exception.message ?: "AI provider request failed")
+                throw AiProviderException(
+                    exception.message ?: "AI provider request failed",
+                    failureKind = AiProviderFailureKind.Http,
+                    httpStatus = exception.status
+                )
             }
-            parseResponse(response, action.maxSuggestions, model, cleanInput.length)
+            parseResponse(
+                response,
+                action.maxSuggestions,
+                model,
+                cleanInput.length,
+                continuationAbstention
+            )
         }
 
     companion object {
@@ -139,10 +165,16 @@ class OpenAiResponsesClient(
             payload: String,
             maxSuggestions: Int,
             requestedModel: String,
-            inputCharacters: Int
+            inputCharacters: Int,
+            continuationAbstention: Boolean = false
         ): AiGenerationResult {
             val root = runCatching { JSON.parseToJsonElement(payload).jsonObject }
-                .getOrElse { throw AiProviderException("AI provider returned invalid JSON") }
+                .getOrElse {
+                    throw AiProviderException(
+                        "AI provider returned invalid JSON",
+                        failureKind = AiProviderFailureKind.InvalidJson
+                    )
+                }
             val status = root.string("status")
             if (status == "incomplete") {
                 val details = root["incomplete_details"] as? JsonObject
@@ -155,7 +187,10 @@ class OpenAiResponsesClient(
                 )
             }
             if (status.isNotEmpty() && status != "completed") {
-                throw AiProviderException("AI response did not complete")
+                throw AiProviderException(
+                    "AI response did not complete",
+                    failureKind = AiProviderFailureKind.NotCompleted
+                )
             }
             if (containsRefusal(root["output"] as? JsonArray)) {
                 throw AiResponseRefusedException()
@@ -170,29 +205,52 @@ class OpenAiResponsesClient(
             val outputText = choiceContent?.takeIf(String::isNotBlank)
                 ?: root.string("output_text").takeIf(String::isNotBlank)
                 ?: extractOutputText(root["output"] as? JsonArray)
-                ?: throw AiProviderException("AI response contained no text")
+                ?: throw AiProviderException(
+                    "AI response contained no text",
+                    failureKind = AiProviderFailureKind.EmptyOutput
+                )
 
-            val normalizedSuggestions = parseSuggestions(outputText)
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-                .distinct()
-
-            if (choiceContent != null) {
-                if (normalizedSuggestions.isEmpty()) {
-                    throw AiSuggestionContractException()
-                }
+            val normalizedSuggestions = if (continuationAbstention) {
+                parseContinuationAbstentionSuggestions(outputText, maxSuggestions)
             } else {
-                if (normalizedSuggestions.size < maxSuggestions) {
-                    throw AiSuggestionContractException()
-                }
+                parseSuggestions(outputText)
+                    .map(String::trim)
+                    .filter(String::isNotEmpty)
+                    .distinct()
+                    .also { suggestions ->
+                        if (choiceContent != null) {
+                            if (suggestions.isEmpty()) throw AiSuggestionContractException()
+                        } else if (suggestions.size < maxSuggestions) {
+                            throw AiSuggestionContractException()
+                        }
+                    }
+                    .take(maxSuggestions)
             }
-            val suggestions = normalizedSuggestions.take(maxSuggestions)
+
             return AiGenerationResult(
-                suggestions = suggestions,
+                suggestions = normalizedSuggestions,
                 model = root.string("model").ifBlank { requestedModel },
                 inputCharacters = inputCharacters,
-                outputCharacters = suggestions.sumOf(String::length)
+                outputCharacters = normalizedSuggestions.sumOf(String::length)
             )
+        }
+
+        private fun parseContinuationAbstentionSuggestions(
+            outputText: String,
+            maxSuggestions: Int
+        ): List<String> {
+            val element = runCatching { JSON.parseToJsonElement(outputText.trim()) }
+                .getOrElse { throw AiSuggestionContractException() }
+            val suggestions = (element as? JsonObject)?.get("suggestions") as? JsonArray
+                ?: throw AiSuggestionContractException()
+            if (suggestions.size > maxSuggestions) throw AiSuggestionContractException()
+            val normalized = suggestions.map { value ->
+                (value as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.contentOrNull?.trim()
+                    ?.takeIf(String::isNotEmpty)
+                    ?: throw AiSuggestionContractException()
+            }
+            if (normalized.distinct().size != normalized.size) throw AiSuggestionContractException()
+            return normalized
         }
 
         private fun extractOutputText(output: JsonArray?): String? {
@@ -321,7 +379,19 @@ class UrlConnectionAiTransport : AiHttpTransport {
     }
 }
 
-open class AiProviderException(message: String) : Exception(message)
+enum class AiProviderFailureKind {
+    Unknown,
+    Http,
+    InvalidJson,
+    NotCompleted,
+    EmptyOutput
+}
+
+open class AiProviderException(
+    message: String,
+    val failureKind: AiProviderFailureKind = AiProviderFailureKind.Unknown,
+    val httpStatus: Int? = null
+) : Exception(message)
 
 class AiResponseTooLargeException : AiProviderException(
     "AI provider response was too large. Try a shorter request."
@@ -347,7 +417,8 @@ class AiIncompleteResponseException(
             "AI response was stopped by a safety filter. Try changing the request."
         AiIncompleteReason.Unknown ->
             "AI response did not complete. Try again."
-    }
+    },
+    failureKind = AiProviderFailureKind.NotCompleted
 )
 
 class AiSuggestionContractException : Exception("AI suggestion contract was not satisfied")

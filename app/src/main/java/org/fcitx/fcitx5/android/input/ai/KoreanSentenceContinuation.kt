@@ -83,22 +83,20 @@ class KoreanSentenceContinuation(
             endingsFor(tone).forEach { ending -> ordered.add("$base$ending") }
         }
 
-        // 3. n-gram / collocation chaining: reflects learned personal data.
-        collectChain(lastWord, base, tone, packageName, MAX_CHAIN_DEPTH).forEach { ordered.add(it) }
+        // 3. Observed n-gram chaining: reflects learned personal data.
+        collectChain(base, tone, packageName, MAX_CHAIN_DEPTH).forEach { ordered.add(it) }
 
         return ordered.filter { it.startsWith(base) }.take(limit)
     }
 
     private fun collectChain(
-        prevWord: String,
         chainBase: String,
         tone: ContinuationTone,
         packageName: String,
         depthRemaining: Int
     ): List<String> {
         val nextWords = LinkedHashSet<String>()
-        ngram?.predictNext(chainBase, packageName, 5)?.forEach { nextWords.add(it.word) }
-        collocation?.predictNextWords(prevWord, tone == ContinuationTone.Informal, 5)?.forEach { nextWords.add(it) }
+        ngram?.predictContextualNext(chainBase, packageName, 5)?.forEach { nextWords.add(it.word) }
 
         val results = mutableListOf<String>()
         for (next in nextWords) {
@@ -106,7 +104,7 @@ class KoreanSentenceContinuation(
             val extended = "$chainBase $next"
             when {
                 isTerminal(next) -> results.add(extended)
-                depthRemaining > 1 -> results.addAll(collectChain(next, extended, tone, packageName, depthRemaining - 1))
+                depthRemaining > 1 -> results.addAll(collectChain(extended, tone, packageName, depthRemaining - 1))
                 next in HADA_NOUNS -> endingsFor(tone).forEach { ending -> results.add("$extended$ending") }
                 // depth exhausted and the chain can't be closed with a 하다-ending: discard.
             }

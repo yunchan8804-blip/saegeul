@@ -5,10 +5,15 @@
 package org.fcitx.fcitx5.android.input.ai.rag
 
 import kotlinx.coroutines.runBlocking
+import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.security.GeneralSecurityException
 
 /**
  * Unit tests for [PersonalGraphEnricher]: no-data short-circuit, successful single-chunk
@@ -16,6 +21,9 @@ import org.junit.Test
  * across chunks.
  */
 class PersonalGraphEnricherTest {
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
 
     private val validGraphJson =
         """{"nodes":[{"id":"회의","tags":["업무"],"w":3.0},{"id":"참석","tags":["업무"],"w":2.0}],"edges":[{"a":"회의","b":"참석","w":0.8}],"topics":[{"id":"t0","label":"업무","members":["회의","참석"]}]}"""
@@ -105,7 +113,8 @@ class PersonalGraphEnricherTest {
             topics = emptyList(),
             builtMs = 42L
         )
-        val enricher = PersonalGraphEnricher(vault, store)
+        val outcomes = mutableListOf<GraphEnrichmentChunkOutcome>()
+        val enricher = PersonalGraphEnricher(vault, store, onChunkOutcome = { outcomes.add(it) })
 
         val result = enricher.enrich(generate = { _, _ -> listOf("이것은 JSON이 아닙니다") })
 
@@ -114,6 +123,7 @@ class PersonalGraphEnricherTest {
         assertEquals(0, result.nodes)
         assertEquals(0, result.edges)
         assertEquals(0, result.topics)
+        assertEquals(listOf(GraphEnrichmentChunkOutcome.NO_JSON_OBJECT), outcomes)
 
         // Existing graph is left alone - not replaced, not cleared.
         val stats = store.stats()
@@ -182,7 +192,8 @@ class PersonalGraphEnricherTest {
         val vault = PersonalSentenceVault(clock = { 1000L })
         vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
         val store = PersonalGraphStore()
-        val enricher = PersonalGraphEnricher(vault, store)
+        val outcomes = mutableListOf<GraphEnrichmentChunkOutcome>()
+        val enricher = PersonalGraphEnricher(vault, store, onChunkOutcome = { outcomes.add(it) })
 
         val fenced = "```json\n$validGraphJson\n```"
         val result = enricher.enrich(generate = { _, _ -> listOf(fenced) })
@@ -192,6 +203,7 @@ class PersonalGraphEnricherTest {
         assertEquals(2, result.nodes)
         assertEquals(1, result.edges)
         assertEquals(1, result.topics)
+        assertEquals(listOf(GraphEnrichmentChunkOutcome.VALID), outcomes)
     }
 
     @Test
@@ -222,5 +234,95 @@ class PersonalGraphEnricherTest {
 
         assertFalse(result.ok)
         assertEquals("parse_failed", result.reason)
+    }
+
+    @Test
+    fun enrichClassifiesInvalidChunkOutputsOnceAndPreservesExistingGraph() = runBlocking {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        repeat(6) { vault.record("그래프 청크 ${it + 1}", "com.android.chrome") }
+        val store = PersonalGraphStore()
+        store.replaceGraph(
+            nodes = listOf(PersonalGraphStore.Node("기존", emptyList(), 1.0f)),
+            edges = emptyList(),
+            topics = emptyList(),
+            builtMs = 42L
+        )
+        val outcomes = mutableListOf<GraphEnrichmentChunkOutcome>()
+        val enricher = PersonalGraphEnricher(vault, store, onChunkOutcome = { outcomes.add(it) })
+        val responses = listOf(
+            listOf("그래프를 만들 수 없습니다."),
+            listOf("""{"nodes":[}"""),
+            listOf("""{"nodes":[],"edges":[]}"""),
+            listOf("""{"nodes":{},"edges":[],"topics":[]}"""),
+            emptyList(),
+            listOf("   ")
+        )
+        var responseIndex = 0
+
+        val result = enricher.enrich(
+            generate = { _, _ -> responses[responseIndex++] },
+            maxCharsPerChunk = 1
+        )
+
+        assertFalse(result.ok)
+        assertEquals("parse_failed", result.reason)
+        assertEquals(
+            listOf(
+                GraphEnrichmentChunkOutcome.NO_JSON_OBJECT,
+                GraphEnrichmentChunkOutcome.INVALID_JSON,
+                GraphEnrichmentChunkOutcome.INVALID_SHAPE,
+                GraphEnrichmentChunkOutcome.INVALID_SHAPE,
+                GraphEnrichmentChunkOutcome.EMPTY_OUTPUT,
+                GraphEnrichmentChunkOutcome.EMPTY_OUTPUT
+            ),
+            outcomes
+        )
+        assertEquals(1, store.stats().nodes)
+        assertEquals(42L, store.stats().builtMs)
+    }
+
+    @Test
+    fun enrichAcceptsSchemaValidEmptyArrays() = runBlocking {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val store = PersonalGraphStore()
+        val outcomes = mutableListOf<GraphEnrichmentChunkOutcome>()
+        val enricher = PersonalGraphEnricher(vault, store, onChunkOutcome = { outcomes.add(it) })
+
+        val result = enricher.enrich(generate = { _, _ -> listOf("""{"nodes":[],"edges":[],"topics":[]}""") })
+
+        assertTrue(result.ok)
+        assertEquals("ok", result.reason)
+        assertEquals(0, result.nodes)
+        assertEquals(0, result.edges)
+        assertEquals(0, result.topics)
+        assertEquals(listOf(GraphEnrichmentChunkOutcome.VALID), outcomes)
+    }
+
+    @Test
+    fun enrichDoesNotReturnSuccessWhenGraphSaveFails() = runBlocking {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val store = PersonalGraphStore(
+            storeFile = tempFolder.newFile("personal_graph_enricher_save_failure.json"),
+            cipher = FailingVaultCipher()
+        )
+        val enricher = PersonalGraphEnricher(vault, store)
+
+        try {
+            enricher.enrich(generate = { _, _ -> listOf(validGraphJson) })
+            fail("enrichment must not report success when graph persistence fails")
+        } catch (_: GeneralSecurityException) {
+        }
+    }
+
+    private class FailingVaultCipher : VaultCipher {
+        override val id: String = "failing"
+
+        override fun encrypt(plain: ByteArray, aad: ByteArray): ByteArray {
+            throw GeneralSecurityException("write failure")
+        }
+
+        override fun decrypt(blob: ByteArray, aad: ByteArray): ByteArray = blob
     }
 }

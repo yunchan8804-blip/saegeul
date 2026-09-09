@@ -15,12 +15,15 @@ import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
+import androidx.preference.PreferenceManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.graphics.drawable.DrawerArrowDrawable
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnPreDraw
 import androidx.core.view.forEach
 import androidx.core.view.updateLayoutParams
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.fragment.NavHostFragment
@@ -29,7 +32,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.databinding.ActivityMainBinding
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.SentencePackDialog
 import org.fcitx.fcitx5.android.ui.setup.SetupActivity
+import org.fcitx.fcitx5.android.ui.setup.SetupPage
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
@@ -44,11 +49,17 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     private lateinit var navController: NavController
+    private lateinit var rootView: ViewGroup
+    private var sentencePackPromptScheduled = false
+    private var sentencePackPromptAwaitingFirstFrame = false
+    private var notificationPermissionPromptVisible = false
+    private var notificationPermissionRequestPending = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val binding = ActivityMainBinding.inflate(layoutInflater)
+        rootView = binding.root
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
             val statusBars = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars())
             val navBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
@@ -96,10 +107,47 @@ class MainActivity : AppCompatActivity() {
         checkNotificationPermission()
     }
 
+    private fun scheduleSentencePackPrompt() {
+        if (
+            sentencePackPromptScheduled || sentencePackPromptAwaitingFirstFrame ||
+            notificationPermissionPromptVisible || SetupPage.hasUndonePage()
+        ) return
+        val preferences = PreferenceManager.getDefaultSharedPreferences(this)
+        if (preferences.getString(SENTENCE_PACK_PROMPT_SCHEMA_KEY, null) == SENTENCE_PACK_PROMPT_SCHEMA) return
+        sentencePackPromptAwaitingFirstFrame = true
+        rootView.doOnPreDraw {
+            rootView.postOnAnimation {
+                sentencePackPromptAwaitingFirstFrame = false
+                if (
+                    isFinishing || isDestroyed || notificationPermissionPromptVisible ||
+                    !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                ) return@postOnAnimation
+                if (preferences.getString(SENTENCE_PACK_PROMPT_SCHEMA_KEY, null) == SENTENCE_PACK_PROMPT_SCHEMA) {
+                    return@postOnAnimation
+                }
+                sentencePackPromptScheduled = true
+                preferences.edit()
+                    .putString(SENTENCE_PACK_PROMPT_SCHEMA_KEY, SENTENCE_PACK_PROMPT_SCHEMA)
+                    .apply()
+                SentencePackDialog.show(
+                    context = this,
+                    lifecycleOwner = this,
+                    repository = org.fcitx.fcitx5.android.FcitxApplication.getInstance().sentencePacks,
+                    isOfflineMode = { AppPrefs.getInstance().advanced.offlineMode.getValue() }
+                )
+            }
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         processIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        scheduleSentencePackPrompt()
     }
 
     private fun processIntent(intent: Intent?) {
@@ -180,6 +228,7 @@ class MainActivity : AppCompatActivity() {
             if (!needNotifications) return
             // always show a dialog to explain why we need notification permission,
             // regardless of `shouldShowRequestPermissionRationale(...)`
+            notificationPermissionPromptVisible = true
             AlertDialog.Builder(this)
                 .setIconAttribute(android.R.attr.alertDialogIcon)
                 .setTitle(R.string.notification_permission_title)
@@ -189,9 +238,19 @@ class MainActivity : AppCompatActivity() {
                     needNotifications = false
                 }
                 .setPositiveButton(R.string.grant_permission) { _, _ ->
+                    notificationPermissionRequestPending = true
                     requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
                 }
-                .show()
+                .create()
+                .apply {
+                    setOnDismissListener {
+                        if (!notificationPermissionRequestPending) {
+                            notificationPermissionPromptVisible = false
+                            scheduleSentencePackPrompt()
+                        }
+                    }
+                    show()
+                }
         }
     }
 
@@ -204,6 +263,9 @@ class MainActivity : AppCompatActivity() {
         if (requestCode != 0) return
         // do not ask again if user denied the request
         needNotifications = grantResults.getOrNull(0) == PackageManager.PERMISSION_GRANTED
+        notificationPermissionRequestPending = false
+        notificationPermissionPromptVisible = false
+        scheduleSentencePackPrompt()
     }
 
     override fun onStop() {
@@ -219,6 +281,8 @@ class MainActivity : AppCompatActivity() {
             "${BuildConfig.APPLICATION_ID}.EXTRA_PRIVACY_AI_ACTION"
         const val PRIVACY_AI_ACTION_WRITING_SETUP = "writing_setup"
         const val PRIVACY_AI_ACTION_VOICE_SETUP = "voice_setup"
+        private const val SENTENCE_PACK_PROMPT_SCHEMA_KEY = "sentence_pack_prompt_schema"
+        private const val SENTENCE_PACK_PROMPT_SCHEMA = "1"
     }
 
 }

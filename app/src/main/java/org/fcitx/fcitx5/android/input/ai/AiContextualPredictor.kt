@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
+import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
@@ -17,13 +18,14 @@ data class AiPrediction(
     val isSentenceCompletion: Boolean = false,
     val source: String = "local_ai",
     val badge: String = "✨ AI완성",
-    val replaceLength: Int = 0
+    val replaceLength: Int = 0,
+    val append: ContextualAppend? = null
 )
 
 /**
  * Realtime AI Stroke-Level Next Word & Sentence Prediction Engine for Saegeul Keyboard.
- * Combines Jaso decomposition, Choseong matching, Personalized N-gram Markov context,
- * and built-in Korean conversational templates for sub-5ms instant suggestions.
+ * Combines Jaso decomposition, Choseong matching, personalized N-gram context,
+ * and cached continuation results.
  */
 class AiContextualPredictor(
     private val morphology: ChoseongMorphologyEngine,
@@ -36,25 +38,18 @@ class AiContextualPredictor(
     private val typoCorrector: KeyboardAwareTypoCorrector? = null,
     private val baseVocabulary: BaseKoreanVocabulary? = null,
     private val correctionStore: CorrectionPatternStore? = null,
-    private val sentenceContinuation: KoreanSentenceContinuation? = null,
     private val personalSentenceVault: PersonalSentenceVault? = null,
-    private val personalGraphStore: PersonalGraphStore? = null
+    private val personalGraphStore: PersonalGraphStore? = null,
+    private val sentencePackLookup: ((String, Int) -> List<SentencePackMatch>)? = null,
+    private val schedulePrefetchOnPredict: Boolean = true
 ) {
 
     companion object {
         // The only sources allowed to produce a full-sentence (isSentenceCompletion=true)
-        // candidate: input_continuation (learned/typed-prefix continuation), personalized_style
-        // (the user's own SOURCE_USER_PHRASE sentences), and llm_cached (LLM-generated
-        // continuation of the user's own context, or corrections of what the user typed).
+        // candidate: personalized_style (the user's own SOURCE_USER_PHRASE sentences),
+        // rag_personal, llm_cached continuation results, and verified sentence-pack continuations.
         // Only hardcoded-content sources are blocked from the sentence line at the end of predict().
         private val SENTENCE_LINE_SOURCE_BLOCKLIST = setOf("collocation_next_word", "base_lexicon")
-    }
-
-    // Falls back to this predictor's own ngram/collocationModel when no explicit instance is
-    // wired in, so callers that don't pass sentenceContinuation still get input-preserving
-    // completions. Created once and cached, never per predict() call.
-    private val effectiveSentenceContinuation: KoreanSentenceContinuation by lazy {
-        sentenceContinuation ?: KoreanSentenceContinuation(ngram = ngram, collocation = collocationModel)
     }
 
     private val baseKoreanLexicon = listOf(
@@ -99,12 +94,14 @@ class AiContextualPredictor(
         currentStroke: String,
         contextBeforeCursor: String,
         packageName: String,
-        limit: Int = 5
+        limit: Int = 5,
+        inputSessionEpoch: Long = 0L
     ): List<AiPrediction> {
         val results = mutableListOf<AiPrediction>()
         val seen = mutableSetOf<String>()
 
         fun addPrediction(pred: AiPrediction): Boolean {
+            if (!KoreanSuggestionSurface.isDisplayable(pred.text)) return false
             val key = if (pred.isSentenceCompletion) "s:${pred.text}" else "w:${pred.text}"
             if (seen.add(key)) {
                 results.add(pred)
@@ -281,6 +278,14 @@ class AiContextualPredictor(
         } else {
             cleanContext
         }
+        val rawFullContext = ContextualPredictionInput.rawFullContext(
+            currentStroke,
+            contextBeforeCursor
+        )
+        val prefetchScope = AiSentenceCompletionPrefetcher.Scope(
+            packageName,
+            inputSessionEpoch
+        )
 
         // Context normalization for typos in the current sentence
         val correctedLastWord = if (lastWordInContext.isNotBlank()) {
@@ -305,7 +310,10 @@ class AiContextualPredictor(
                 queryChoseong = cleanStroke,
                 context = normalizedFullContext,
                 limit = limit
-            ).filter { it.source == PersonalizedSentenceRecord.SOURCE_USER_PHRASE }
+            ).filter {
+                it.source == PersonalizedSentenceRecord.SOURCE_USER_PHRASE &&
+                    PersonalSentenceCompletionGate.isContinuation(normalizedFullContext, it.sentence)
+            }
             personalMatches.forEach { record ->
                 val score = (0.96f + (record.score * 0.01f)).coerceAtMost(0.999f)
                 addPrediction(
@@ -321,8 +329,9 @@ class AiContextualPredictor(
         }
 
         // 0-B. Personal Sentence RAG (on-device BM25 search over the user's own past sentences).
-        if (personalSentenceVault != null && contextBeforeCursor.isNotBlank()) {
-            val ragMatches = personalSentenceVault.retrieve(contextBeforeCursor, packageName, limit)
+        if (personalSentenceVault != null && normalizedFullContext.isNotBlank()) {
+            val ragMatches = personalSentenceVault.retrieve(normalizedFullContext, packageName, limit)
+                .filter { PersonalSentenceCompletionGate.isContinuation(normalizedFullContext, it.sentence) }
             // retrieve() returns matches sorted by an unbounded BM25-derived magnitude. Map that
             // magnitude into a fixed [0.90, 0.95] band relative to the top match so a strongly
             // relevant sentence keeps its lead over a weakly relevant one (instead of collapsing the
@@ -344,92 +353,23 @@ class AiContextualPredictor(
             }
         }
 
-        // 1. LLM Cached Semantic Predictions (Highest intelligence & zero latency)
-        if (normalizedFullContext.isNotBlank() && prefetcher != null) {
-            val cached = prefetcher.getCachedPredictions(normalizedFullContext)
-                ?: if (normalizedFullContext != fullContext) prefetcher.getCachedPredictions(fullContext) else null
-            cached?.forEach { llmProposal ->
-                val proposal = llmProposal.trim()
-                if (proposal.isBlank()) return@forEach
-
-                val matches = if (cleanStroke.isBlank()) {
-                    true
-                } else {
-                    proposal.contains(cleanStroke) ||
-                    proposal.startsWith(cleanStroke) ||
-                    morphology.matchesChoseong(proposal, cleanStroke)
-                }
-                if (matches) {
-                    val isSentence = proposal.contains(" ") && proposal.length > 8
-                    val isTypoCorrection = (sentenceCorrectedText != null && proposal == sentenceCorrectedText) ||
-                        (cleanContext.isNotBlank() && typoEngine.hasExplicitTypo(lastWordInContext) &&
-                            typoEngine.correct(lastWordInContext).contains(proposal))
-                    val badge = when {
-                        isTypoCorrection -> "✏️ AI수정"
-                        !isSentence -> "✨ AI단어"
-                        else -> "✨ AI완성"
-                    }
-                    val score = when {
-                        isTypoCorrection -> 0.998f
-                        cleanStroke.isBlank() -> if (!isSentence) 0.985f else 0.980f
-                        else -> if (!isSentence) 0.920f else 0.860f
-                    }
-                    addPrediction(
-                        AiPrediction(
-                            text = proposal,
-                            confidenceScore = score,
-                            isSentenceCompletion = isSentence,
-                            source = "llm_cached",
-                            badge = badge
-                        )
-                    )
-                }
-            }
-            // Trigger background prefetch for subsequent sentence progression
-            prefetcher.schedulePrefetch(normalizedFullContext)
-        }
-
-        // 1-B. Input-Preserving Sentence Continuation (keeps typed word(s) as a literal prefix,
-        // e.g. "회의 참석" -> "회의 참석하겠습니다", instead of an unrelated fixed template).
-        run {
-            val committedWords = cleanContext.split(Regex("\\s+")).filter { it.isNotBlank() }
-            val contextTail = (if (cleanStroke.isNotBlank()) committedWords + cleanStroke else committedWords)
-                .takeLast(3)
-            if (contextTail.isNotEmpty()) {
-                val continuationTone = if (normalizedFullContext.isNotBlank()) {
-                    if (semanticPredictor.inferTone(normalizedFullContext) == KoreanTone.Informal) {
-                        ContinuationTone.Informal
-                    } else {
-                        ContinuationTone.Honorific
-                    }
-                } else if (TypingDnaVault.categorizePackage(packageName) == TypingDnaVault.CATEGORY_MESSENGER) {
-                    ContinuationTone.Informal
-                } else {
-                    ContinuationTone.Honorific
-                }
-                val continuedSentences = effectiveSentenceContinuation.continuations(
-                    contextTail,
-                    continuationTone,
-                    packageName,
-                    3
-                )
-                continuedSentences.forEachIndexed { idx, text ->
-                    addPrediction(
-                        AiPrediction(
-                            text = text,
-                            confidenceScore = 0.985f - idx * 0.005f,
-                            isSentenceCompletion = true,
-                            source = "input_continuation",
-                            badge = "✨ AI완성"
-                        )
-                    )
-                }
-            }
+        ImmediateContextualPredictions.collect(
+            input = ImmediateContextualPredictions.Input(
+                rawContext = rawFullContext,
+                packageName = packageName,
+                inputSessionEpoch = inputSessionEpoch,
+                limit = limit
+            ),
+            sentencePackLookup = sentencePackLookup,
+            prefetcher = prefetcher
+        ).forEach(::addPrediction)
+        if (schedulePrefetchOnPredict && rawFullContext.isNotBlank() && prefetcher != null) {
+            prefetcher.schedulePrefetch(rawFullContext, scope = prefetchScope)
         }
 
         // 2. semantic_sentence is intentionally NOT consumed here: KoreanSemanticSentencePredictor's
         // intent-classified proposals are fixed content templates unrelated to what the user typed,
-        // so they never reach the sentence line. semanticPredictor.inferTone() above (and below) is
+        // so they never reach the sentence line. semanticPredictor.inferTone() below is
         // still used for tone inference, which is not a content template.
 
         val isInformal = semanticPredictor.inferTone(normalizedFullContext) == KoreanTone.Informal
@@ -483,7 +423,7 @@ class AiContextualPredictor(
 
         // 3. Personal N-gram Context Predictions
         val ngramCandidates = if (cleanStroke.isBlank()) {
-            ngram.predictNext(contextBeforeCursor, packageName, 4)
+            ngram.predictContextualNext(contextBeforeCursor, packageName, 4)
         } else {
             ngram.complete(cleanStroke, contextBeforeCursor, packageName, 4)
         }
@@ -507,7 +447,7 @@ class AiContextualPredictor(
         // 3-B. Base Korean Vocabulary Completion (bundled TSV, right after personal n-gram)
         if (cleanStroke.isNotBlank() && baseVocabulary != null) {
             val personalWords = ngramCandidates.map { it.word }.toSet()
-            val baseCtxProb = ngram.predictNext(contextBeforeCursor, packageName, 20)
+            val baseCtxProb = ngram.predictContextualNext(contextBeforeCursor, packageName, 20)
                 .associate { it.word to it.probability }
             val vocabCandidates = baseVocabulary.completions(cleanStroke, 8)
                 .filter { (word, _) -> word !in personalWords }
@@ -551,16 +491,17 @@ class AiContextualPredictor(
             }
         }
 
-        // Sentence-line whitelist: only sources backed by the user's own data or model output
-        // may appear as a full-sentence candidate. This blocks hardcoded content templates
-        // (collocation_next_word, baseKoreanLexicon, etc.) that occasionally produce a
-        // multi-word string long enough to be marked isSentenceCompletion=true from leaking
-        // into the sentence line. Word-line candidates are unaffected.
+        // Sentence-line whitelist: only sources backed by the user's own data, model output,
+        // or a verified on-device sentence-pack continuation may appear as a full-sentence
+        // candidate. This blocks hardcoded content templates (collocation_next_word,
+        // baseKoreanLexicon, etc.) that occasionally produce a multi-word string long enough
+        // to be marked isSentenceCompletion=true from leaking into the sentence line.
+        // Word-line candidates are unaffected.
         val words = results.filter { !it.isSentenceCompletion }.sortedByDescending { it.confidenceScore }.take(limit)
         val sentenceCandidates = results
             .filter { it.isSentenceCompletion && it.source !in SENTENCE_LINE_SOURCE_BLOCKLIST }
         val sentences = SentenceRelevanceReranker.rerank(
-            sentenceCandidates, contextBeforeCursor, ngram, packageName, limit, personalGraphStore
+            sentenceCandidates, rawFullContext, ngram, packageName, limit, personalGraphStore
         )
         return (words + sentences).sortedByDescending { it.confidenceScore }
     }

@@ -40,7 +40,6 @@ class TypingDnaProfilerAndCompilerTest {
         compiler = TypingDnaCompiler(
             collocationModel = collocationModel,
             sentenceStore = sentenceStore,
-            vault = vault,
             repository = repository
         )
         profiler = TypingDnaProfiler()
@@ -95,7 +94,7 @@ class TypingDnaProfilerAndCompilerTest {
     }
 
     @Test
-    fun testCompilerInjectsDynamicBigramsAndPurgesVault() {
+    fun testCompilerPersistsDynamicBigramsAndPendingProcessorConsumesVault() {
         // 1. Buffer text in vault
         vault.recordSentence("com.kakao.talk", "오늘 야근하고 치맥 먹자.")
         assertEquals(1, vault.totalBufferedCount())
@@ -114,8 +113,8 @@ class TypingDnaProfilerAndCompilerTest {
         // 2. Compile persona
         compiler.compilePersona(persona)
 
-        // 3. Verify zero-knowledge purge
-        assertEquals("Vault must be purged after compile", 0, vault.totalBufferedCount())
+        // 3. Compiler never owns the pending staging buffer.
+        assertEquals("Vault is consumed only by its processor", 1, vault.totalBufferedCount())
 
         // 4. Verify 0ms collocation model gives learned bigram priority!
         val nextWords = collocationModel.predictNextWords("오늘", isInformal = true, limit = 5)
@@ -135,6 +134,16 @@ class TypingDnaProfilerAndCompilerTest {
         assertEquals(15, summary.totalSentences)
         assertEquals(2, summary.bigramsCount)
         assertEquals(1, summary.phrasesCount)
+
+        val consumed = vault.processPending { category, sentences ->
+            compiler.compilePersona(
+                profiler.profileOnDevice(category, sentences),
+                analyzedSentenceCount = sentences.size
+            )
+        }
+        assertEquals(1, consumed)
+        assertEquals(0, vault.totalBufferedCount())
+        assertEquals(16, repository.load().totalAnalyzedSentences)
     }
 
     @Test
@@ -176,6 +185,56 @@ class TypingDnaProfilerAndCompilerTest {
         )
         val nextWords = collocationModel.predictNextWords("오늘", isInformal = true, limit = 3)
         assertEquals("칼퇴하고", nextWords.first())
+    }
+
+    @Test
+    fun compileFullProfileRehydratesRuntimeWithoutPurgingUnanalyzedStaging() {
+        val persona = PersonaDna(
+            category = TypingDnaVault.CATEGORY_MESSENGER,
+            dominantTone = "Informal",
+            habitualEndings = listOf("~해"),
+            frequentBigrams = listOf(DynamicBigram("오늘", "만나자", 0.9f)),
+            cannedPhrases = listOf("오늘 만나자")
+        )
+        repository.updatePersona(persona, analyzedSentenceCount = 7)
+        vault.recordSentence("com.kakao.talk", "친구야 오늘 저녁에 만나자")
+        vault.recordSentence("com.slack", "배포 일정 확인 부탁드립니다")
+        val stagedBefore = vault.snapshot()
+        val profileBefore = repository.load()
+
+        compiler.compileFullProfile(profileBefore)
+
+        assertEquals(stagedBefore, vault.snapshot())
+        assertEquals(profileBefore, repository.load())
+        assertEquals(7, repository.load().totalAnalyzedSentences)
+        assertTrue(
+            collocationModel.predictNextWords("오늘", isInformal = true, limit = 3).contains("만나자")
+        )
+    }
+
+    @Test
+    fun compilePersonaWithoutPersistenceRehydratesRuntimeWithoutPurgingUnanalyzedStaging() {
+        val persona = PersonaDna(
+            category = TypingDnaVault.CATEGORY_MESSENGER,
+            dominantTone = "Informal",
+            habitualEndings = listOf("~해"),
+            frequentBigrams = listOf(DynamicBigram("오늘", "연락할게", 0.9f)),
+            cannedPhrases = listOf("오늘 연락할게")
+        )
+        repository.updatePersona(persona, analyzedSentenceCount = 11)
+        vault.recordSentence("com.kakao.talk", "친구야 오늘 저녁에 만나자")
+        vault.recordSentence("com.slack", "배포 일정 확인 부탁드립니다")
+        val stagedBefore = vault.snapshot()
+        val profileBefore = repository.load()
+
+        compiler.compilePersona(persona, persist = false)
+
+        assertEquals(stagedBefore, vault.snapshot())
+        assertEquals(profileBefore, repository.load())
+        assertEquals(11, repository.load().totalAnalyzedSentences)
+        assertTrue(
+            collocationModel.predictNextWords("오늘", isInformal = true, limit = 3).contains("연락할게")
+        )
     }
 
     @Test

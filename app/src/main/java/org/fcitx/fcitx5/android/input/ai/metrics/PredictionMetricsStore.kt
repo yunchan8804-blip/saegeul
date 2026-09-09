@@ -80,6 +80,7 @@ class PredictionMetricsStore(
     private val days = TreeMap<String, MutableDay>()
     private var archived = Archived()
     private val vaultFile: VaultFile? = storeFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
+    private val persistenceLock = Any()
 
     init {
         load()
@@ -165,50 +166,51 @@ class PredictionMetricsStore(
         }
     }
 
-    @Synchronized
     fun save() {
         val vf = vaultFile ?: return
-        val daysJson = JSONObject()
-        days.forEach { (day, stat) ->
-            daysJson.put(
-                day,
-                JSONObject().apply {
-                    put("shown", stat.shown)
-                    put("accepted", stat.accepted)
-                    put("acceptedPersonal", stat.acceptedPersonal)
-                    put("keystrokesSaved", stat.keystrokesSaved)
-                    put("typoCorrected", stat.typoCorrected)
-                    put("learnedSentences", stat.learnedSentences)
-                    put("learnedWords", stat.learnedWords)
+        synchronized(persistenceLock) {
+            val snapshot = synchronized(this) {
+                val daysJson = JSONObject()
+                days.forEach { (day, stat) ->
+                    daysJson.put(
+                        day,
+                        JSONObject().apply {
+                            put("shown", stat.shown)
+                            put("accepted", stat.accepted)
+                            put("acceptedPersonal", stat.acceptedPersonal)
+                            put("keystrokesSaved", stat.keystrokesSaved)
+                            put("typoCorrected", stat.typoCorrected)
+                            put("learnedSentences", stat.learnedSentences)
+                            put("learnedWords", stat.learnedWords)
+                        }
+                    )
                 }
-            )
+                val archivedJson = JSONObject().apply {
+                    put("shown", archived.shown)
+                    put("accepted", archived.accepted)
+                    put("acceptedPersonal", archived.acceptedPersonal)
+                    put("keystrokesSaved", archived.keystrokesSaved)
+                    put("typoCorrected", archived.typoCorrected)
+                    put("learnedSentences", archived.learnedSentences)
+                    put("learnedWords", archived.learnedWords)
+                    put("dayCount", archived.dayCount)
+                    archived.firstDay?.let { put("firstDay", it) }
+                }
+                JSONObject().apply {
+                    put("version", FORMAT_VERSION)
+                    put("days", daysJson)
+                    put("archived", archivedJson)
+                }
+            }
+            vf.writeText(snapshot.toString())
         }
-        val archivedJson = JSONObject().apply {
-            put("shown", archived.shown)
-            put("accepted", archived.accepted)
-            put("acceptedPersonal", archived.acceptedPersonal)
-            put("keystrokesSaved", archived.keystrokesSaved)
-            put("typoCorrected", archived.typoCorrected)
-            put("learnedSentences", archived.learnedSentences)
-            put("learnedWords", archived.learnedWords)
-            put("dayCount", archived.dayCount)
-            archived.firstDay?.let { put("firstDay", it) }
-        }
-        val root = JSONObject().apply {
-            put("version", FORMAT_VERSION)
-            put("days", daysJson)
-            put("archived", archivedJson)
-        }
-
-        vf.writeText(root.toString())
     }
 
     private fun load() {
         val vf = vaultFile ?: return
         if (!vf.exists()) return
         try {
-            vf.migrateIfLegacy()
-            val content = vf.readText() ?: return
+            val content = vf.readTextAndMigrate() ?: return
             if (content.isBlank()) return
             val root = JSONObject(content)
             val daysJson = root.optJSONObject("days") ?: JSONObject()
@@ -251,11 +253,14 @@ class PredictionMetricsStore(
         }
     }
 
-    @Synchronized
     fun clear() {
-        days.clear()
-        archived = Archived()
-        vaultFile?.delete()
+        synchronized(persistenceLock) {
+            synchronized(this) {
+                days.clear()
+                archived = Archived()
+            }
+            vaultFile?.delete()
+        }
     }
 
     private fun getOrCreateToday(): MutableDay {
@@ -293,7 +298,13 @@ class PredictionMetricsStore(
         Instant.ofEpochMilli(clock()).atZone(zone).toLocalDate()
 
     companion object {
-        val PERSONAL_SOURCES = setOf("personal_ngram", "typo_personal", "personalized_style_user")
+        val PERSONAL_SOURCES = setOf(
+            "personal_ngram",
+            "typo_personal",
+            "personalized_style_user",
+            "personalized_style",
+            "rag_personal"
+        )
         val TYPO_SOURCES = setOf(
             "typo_personal",
             "typo_keyboard",

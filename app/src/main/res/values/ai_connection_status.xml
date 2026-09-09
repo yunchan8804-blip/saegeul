@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_connection_provider_missing">Extra AI suggestions: API key or OAuth connection required · Settings</string>
+    <string name="ai_connection_reauth_required">Extra AI suggestions: OAuth sign-in required · Settings</string>
+</resources>

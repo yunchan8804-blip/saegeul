@@ -57,6 +57,7 @@ class PersonalSentenceVault(
     private val docLen = HashMap<String, Int>()
 
     private val vaultFile: VaultFile? = storeFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
+    private val persistenceLock = Any()
 
     init {
         load()
@@ -176,31 +177,38 @@ class PersonalSentenceVault(
             .map { it.text }
     }
 
-    @Synchronized
     fun clear() {
-        docs.clear()
-        postings.clear()
-        docLen.clear()
-        vaultFile?.delete()
+        synchronized(persistenceLock) {
+            synchronized(this) {
+                docs.clear()
+                postings.clear()
+                docLen.clear()
+            }
+            vaultFile?.delete()
+        }
     }
 
-    @Synchronized
     fun save() {
         val vf = vaultFile ?: return
-        runCatching {
-            val root = JSONObject()
-            root.put("v", 1)
-            val arr = JSONArray()
-            docs.values.forEach { doc ->
-                val o = JSONObject()
-                o.put("t", doc.text)
-                o.put("cnt", doc.count)
-                o.put("cat", doc.category)
-                o.put("ls", doc.lastSeenMs)
-                arr.put(o)
+        synchronized(persistenceLock) {
+            runCatching {
+                val snapshot = synchronized(this) {
+                    val root = JSONObject()
+                    root.put("v", 1)
+                    val arr = JSONArray()
+                    docs.values.forEach { doc ->
+                        val o = JSONObject()
+                        o.put("t", doc.text)
+                        o.put("cnt", doc.count)
+                        o.put("cat", doc.category)
+                        o.put("ls", doc.lastSeenMs)
+                        arr.put(o)
+                    }
+                    root.put("docs", arr)
+                    root
+                }
+                vf.writeText(snapshot.toString())
             }
-            root.put("docs", arr)
-            vf.writeText(root.toString())
         }
     }
 
@@ -247,8 +255,7 @@ class PersonalSentenceVault(
         val vf = vaultFile ?: return
         if (!vf.exists()) return
         runCatching {
-            vf.migrateIfLegacy()
-            val raw = vf.readText() ?: return
+            val raw = vf.readTextAndMigrate() ?: return
             if (raw.isBlank()) return
             val root = JSONObject(raw)
             val arr = root.optJSONArray("docs") ?: JSONArray()

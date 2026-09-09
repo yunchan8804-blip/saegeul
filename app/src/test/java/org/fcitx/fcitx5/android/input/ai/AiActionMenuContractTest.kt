@@ -9,7 +9,7 @@ import org.junit.Test
 
 class AiActionMenuContractTest {
     @Test
-    fun `source review exposes the full Korean writing catalog in its intended groups and order`() {
+    fun `source review exposes the user facing Korean writing catalog in its intended groups and order`() {
         assertEquals(
             listOf(AiAction.Proofread, AiAction.Compose, AiAction.Reply, AiAction.Custom),
             AiActionMenuPolicy.primary
@@ -40,7 +40,7 @@ class AiActionMenuContractTest {
         )
         assertEquals(14, AiActionMenuPolicy.sourceButtons().size)
         assertEquals(
-            AiAction.entries.toSet() - AiAction.GraphEnrich,
+            AiAction.entries.toSet() - setOf(AiAction.GraphEnrich, AiAction.ContinueTyping),
             AiActionMenuPolicy.sourceButtons().toSet()
         )
     }

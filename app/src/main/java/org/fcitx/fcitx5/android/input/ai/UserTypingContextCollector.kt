@@ -102,9 +102,9 @@ class UserTypingContextCollector(
     fun flushPending(packageName: String): Boolean {
         val buffer = pendingBufferMap[packageName] ?: return false
         val pending = buffer.toString().trim()
-        if (pending.length < MIN_FLUSH_CHARS) return false
-        buffer.clear()
+        pendingBufferMap.remove(packageName)
         pendingEndingBoundaryMap.remove(packageName)
+        if (pending.length < MIN_FLUSH_CHARS) return false
         emitSentence(packageName, pending)
         return true
     }
@@ -139,6 +139,41 @@ class UserTypingContextCollector(
     @Synchronized
     fun getSentences(packageName: String): List<String> {
         return historyMap[packageName]?.toList() ?: emptyList()
+    }
+
+    /** Drops only text that has not crossed a sentence boundary in the current editor session. */
+    @Synchronized
+    fun discardPending(packageName: String? = null) {
+        if (packageName != null) {
+            pendingBufferMap.remove(packageName)
+            pendingEndingBoundaryMap.remove(packageName)
+        } else {
+            pendingBufferMap.clear()
+            pendingEndingBoundaryMap.clear()
+        }
+    }
+
+    /**
+     * Removes a suffix only when it exactly matches text still waiting in the current editor.
+     * Uncertain replacement joins discard pending text rather than carrying it into a new candidate.
+     */
+    @Synchronized
+    fun removePendingSuffix(packageName: String, removedText: String?) {
+        val buffer = pendingBufferMap[packageName] ?: return
+        if (removedText.isNullOrEmpty()) {
+            discardPending(packageName)
+            return
+        }
+        val pending = buffer.toString()
+        if (!pending.endsWith(removedText)) {
+            discardPending(packageName)
+            return
+        }
+        buffer.setLength(pending.length - removedText.length)
+        pendingEndingBoundaryMap.remove(packageName)
+        if (buffer.isEmpty()) {
+            pendingBufferMap.remove(packageName)
+        }
     }
 
     @Synchronized

@@ -22,6 +22,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.core.widget.NestedScrollView
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
@@ -31,14 +32,17 @@ import com.google.android.material.chip.ChipGroup
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ads.TypingDnaInterstitialController
-import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
-import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
-import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncLevel
-import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatus
-import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatusStore
-import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
+import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
+import org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException
+import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentFailure
+import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPhase
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentRunner
-import java.io.File
+import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatusStore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /**
@@ -48,7 +52,7 @@ import kotlin.math.roundToInt
  */
 class TypingDnaDashboardActivity : AppCompatActivity() {
 
-    private lateinit var repository: TypingDnaRepository
+    private lateinit var snapshotReader: DashboardSnapshotReader
     private lateinit var chartView: TypingDnaChartView
 
     private lateinit var tvLevelBadge: TextView
@@ -65,22 +69,47 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
     private lateinit var tvDashRagStats: TextView
     private lateinit var tvDashGraphStats: TextView
     private lateinit var tvDashSyncLevel: TextView
+    private lateinit var tvDashEnrichmentAvailability: TextView
+    private lateinit var btnEnrichmentSetup: MaterialButton
+    private lateinit var progressEnrichment: LinearProgressIndicator
     private lateinit var tvDashLastLearned: TextView
     private lateinit var tvSyncPill: TextView
     private lateinit var btnSyncNow: MaterialButton
-    private lateinit var syncStatusStore: TypingDnaSyncStatusStore
+    private lateinit var btnClearDna: MaterialButton
+    private lateinit var enrichmentStatusStore: GraphEnrichmentStatusStore
     private lateinit var interstitial: TypingDnaInterstitialController
+    private lateinit var dashboardContent: View
+    private lateinit var dashboardLoading: View
+    private lateinit var dashboardLoadingMessage: TextView
+    private lateinit var dashboardSyncBusy: View
+    private lateinit var dashboardSyncError: TextView
 
-    private lateinit var tvVaultHeroNumber: TextView
+    private var refreshJob: Job? = null
+    private var enrichmentRefreshJob: Job? = null
+    private var syncJob: Job? = null
+    private var clearJob: Job? = null
+    private var hasRenderedSnapshot = false
+    private var dashboardBusy = false
+    private var enrichmentRunning = false
+    private var snapshotGeneration = 0L
+    private var enrichmentRefreshPending = false
+
+    private val enrichmentStatusListener: () -> Unit = {
+        runOnUiThread { requestEnrichmentRefresh() }
+    }
+
     private lateinit var tvVaultHeroSubtitle: TextView
     private lateinit var tvVaultSecuritySubtitle: TextView
     private lateinit var vaultIntegrityGrid: LinearLayout
     private lateinit var tvVaultIntegrityEmpty: TextView
     private lateinit var tvVaultAcceptRate: TextView
+    private lateinit var tvVaultAcceptRateDescription: TextView
     private lateinit var tvVaultPersonalHits: TextView
     private lateinit var tvVaultKeystrokesSaved: TextView
     private lateinit var tvVaultTyposFixed: TextView
     private lateinit var vaultTimelineView: VaultTimelineView
+    private lateinit var tvVaultTimelineSummary: TextView
+    private lateinit var tvVaultTimelineEmpty: TextView
     private lateinit var cardVaultWords: MaterialCardView
     private lateinit var chipGroupVaultWords: ChipGroup
     private lateinit var vaultCatMessengerFill: View
@@ -96,14 +125,19 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         setContentView(R.layout.activity_typing_dna_dashboard)
         applySystemBarInsets()
 
-        repository = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typingDnaRepository
+        snapshotReader = DashboardSnapshotReader(applicationContext)
         interstitial = TypingDnaInterstitialController(this)
         interstitial.prepare()
-        syncStatusStore = TypingDnaSyncStatusStore(this)
+        enrichmentStatusStore = GraphEnrichmentStatusStore(this)
 
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener { finish() }
         tvSyncPill = findViewById(R.id.tv_sync_pill)
+        dashboardContent = findViewById(R.id.dashboard_content)
+        dashboardLoading = findViewById(R.id.dashboard_loading)
+        dashboardLoadingMessage = findViewById(R.id.dashboard_loading_message)
+        dashboardSyncBusy = findViewById(R.id.dashboard_sync_busy)
+        dashboardSyncError = findViewById(R.id.dashboard_sync_error)
 
         chartView = findViewById(R.id.chart_view)
         tvLevelBadge = findViewById(R.id.tv_level_badge)
@@ -120,18 +154,23 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         tvDashRagStats = findViewById(R.id.tv_dash_rag_stats)
         tvDashGraphStats = findViewById(R.id.tv_dash_graph_stats)
         tvDashSyncLevel = findViewById(R.id.tv_dash_sync_level)
+        tvDashEnrichmentAvailability = findViewById(R.id.tv_dash_enrichment_availability)
+        btnEnrichmentSetup = findViewById(R.id.btn_enrichment_setup)
+        progressEnrichment = findViewById(R.id.progress_enrichment)
         tvDashLastLearned = findViewById(R.id.tv_dash_last_learned)
 
-        tvVaultHeroNumber = findViewById(R.id.tv_vault_hero_number)
         tvVaultHeroSubtitle = findViewById(R.id.tv_vault_hero_subtitle)
         tvVaultSecuritySubtitle = findViewById(R.id.tv_vault_security_subtitle)
         vaultIntegrityGrid = findViewById(R.id.vault_integrity_grid)
         tvVaultIntegrityEmpty = findViewById(R.id.tv_vault_integrity_empty)
         tvVaultAcceptRate = findViewById(R.id.tv_vault_accept_rate)
+        tvVaultAcceptRateDescription = findViewById(R.id.tv_vault_accept_rate_description)
         tvVaultPersonalHits = findViewById(R.id.tv_vault_personal_hits)
         tvVaultKeystrokesSaved = findViewById(R.id.tv_vault_keystrokes_saved)
         tvVaultTyposFixed = findViewById(R.id.tv_vault_typos_fixed)
         vaultTimelineView = findViewById(R.id.vault_timeline_view)
+        tvVaultTimelineSummary = findViewById(R.id.tv_vault_timeline_summary)
+        tvVaultTimelineEmpty = findViewById(R.id.tv_vault_timeline_empty)
         cardVaultWords = findViewById(R.id.card_vault_words)
         chipGroupVaultWords = findViewById(R.id.chip_group_vault_words)
         vaultCatMessengerFill = findViewById(R.id.vault_cat_messenger_fill)
@@ -142,82 +181,38 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         tvVaultCatGeneralPct = findViewById(R.id.tv_vault_cat_general_pct)
 
         btnSyncNow = findViewById(R.id.btn_sync_now)
-        val btnClearDna = findViewById<MaterialButton>(R.id.btn_clear_dna)
-
-        btnSyncNow.setOnClickListener {
-            val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-            val ime = org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance
-            val before = repository.getStats(forceReload = true).totalSentences
-            if (ime != null) {
-                runCatching { ime.triggerInstantTypingDnaSync() }
-            } else {
-                org.fcitx.fcitx5.android.input.ai.TypingDnaInstantSync.persistOnly(
-                    app.typingDnaVault,
-                    app.typingDnaRepository,
-                    sentenceStoreFile = File(filesDir, "personalized_sentences.json"),
-                    cipher = app.vaultCipher
-                )
-            }
-            repository.invalidateCache()
-            val stats = repository.getStats(forceReload = true)
-            syncStatusStore.recordSync(System.currentTimeMillis())
-            updateUi(stats, animate = true)
-            val message = when {
-                stats.totalSentences > before ->
-                    "최신 언어 지문 분석 완료 (분석 문장: ${stats.totalSentences}개)"
-                stats.totalSentences > 0 ->
-                    "대기 중인 새 문장이 없습니다 (분석 문장: ${stats.totalSentences}개)"
-                ime == null ->
-                    "저장된 언어 지문을 불러왔습니다 (분석 문장: ${stats.totalSentences}개)"
-                else ->
-                    "대기 중인 새 문장이 없습니다 (분석 문장: ${stats.totalSentences}개)"
-            }
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-            interstitial.showAfterAction()
-
-            val prefs = org.fcitx.fcitx5.android.data.prefs.AppPrefs.getInstance()
-            val offlineMode = prefs.advanced.offlineMode.getValue()
-            val profile = org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore(this).load()
-            if (offlineMode || profile == null) {
-                AlertDialog.Builder(this)
-                    .setTitle(R.string.sync_done_title)
-                    .setMessage(
-                        if (offlineMode) getString(R.string.sync_offline_message)
-                        else getString(R.string.sync_llm_missing_message)
-                    )
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show()
-            } else {
-                ensureNotificationPermission()
-                GraphEnrichmentRunner.start(this, profile, notify = true)
-                AlertDialog.Builder(this)
-                    .setTitle(R.string.enrich_bg_title)
-                    .setMessage(R.string.enrich_bg_message)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show()
-            }
+        btnClearDna = findViewById(R.id.btn_clear_dna)
+        btnEnrichmentSetup.setOnClickListener {
+            AiSettingsNavigator.openWritingSetup(this)
         }
+        findViewById<MaterialButton>(R.id.btn_dashboard_loading_retry).setOnClickListener {
+            requestDashboardRefresh(animate = true)
+        }
+
+        btnSyncNow.setOnClickListener { startSync() }
 
         btnClearDna.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("언어 지문 전체 초기화")
                 .setMessage("기기 내에 학습된 모든 말투, 종결 어미, 나만의 표현을 영구 삭제하시겠습니까?")
                 .setPositiveButton(R.string.delete) { _, _ ->
-                    val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-                    app.typingDnaRepository.clear()
-                    app.typingDnaVault.purge()
-                    app.personalNgramModel.clear()
-                    app.correctionPatternStore.clear()
-                    app.predictionMetricsStore.clear()
-                    app.personalSentenceVault.clear()
-                    updateUi(repository.getStats(forceReload = true), animate = true)
-                    Toast.makeText(this, "언어 지문이 안전하게 초기화되었습니다.", Toast.LENGTH_SHORT).show()
+                    startClear()
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         }
 
-        loadAndDisplay()
+        requestDashboardRefresh(animate = true)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        enrichmentStatusStore.addListener(enrichmentStatusListener)
+    }
+
+    override fun onStop() {
+        enrichmentStatusStore.removeListener(enrichmentStatusListener)
+        super.onStop()
     }
 
     private fun ensureNotificationPermission() {
@@ -249,26 +244,179 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        loadAndDisplay()
+        requestDashboardRefresh(animate = false)
     }
 
-    private fun loadAndDisplay() {
-        val stats = repository.getStats(forceReload = true)
-        updateUi(stats, animate = true)
-    }
-
-    private fun updateUi(stats: TypingDnaStats, animate: Boolean) {
-        tvLevelBadge.text = "Lv.${stats.level}"
-        tvLevelBadge.contentDescription = "학습 레벨 ${stats.level}"
-        tvLevelTitle.text = stats.levelTitle
-
-        tvLevelDesc.text = when (stats.level) {
-            1 -> "키보드로 타이핑한 문장을 바탕으로 내 고유의 말투와 단어 연결 습관을 기기 내에서 학습 중입니다."
-            2 -> "자주 쓰는 종결 어미와 단어 쌍이 정착되고 있습니다. 문맥에 맞는 다음 단어 제안이 강화됩니다."
-            3 -> "메신저와 업무 환경의 말투 차이를 인식하기 시작했습니다. 문체별 자연스러운 맞춤 문장이 제안됩니다."
-            4 -> "나만의 고유한 어휘와 문장 스타일이 정밀하게 동기화되었습니다."
-            else -> "완성형 언어 지문입니다. 키보드가 나의 다음 생각과 문장을 가장 자연스럽게 완성해 줍니다."
+    private fun requestDashboardRefresh(animate: Boolean) {
+        if (refreshJob?.isActive == true || syncJob?.isActive == true || clearJob?.isActive == true) return
+        val generation = ++snapshotGeneration
+        if (!hasRenderedSnapshot) showInitialLoading()
+        refreshJob = lifecycleScope.launch {
+            try {
+                val snapshot = withContext(Dispatchers.IO) { snapshotReader.read() }
+                if (generation != snapshotGeneration) return@launch
+                hasRenderedSnapshot = true
+                renderDashboard(snapshot, animate)
+                showDashboardContent()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                android.util.Log.w("SaegeulAI", "dashboard load failed: ${error.javaClass.simpleName}")
+                if (!hasRenderedSnapshot) showInitialLoadFailure()
+                else Toast.makeText(this@TypingDnaDashboardActivity, R.string.dashboard_loading_failed, Toast.LENGTH_SHORT).show()
+            } finally {
+                refreshJob = null
+            }
         }
+    }
+
+    private fun requestEnrichmentRefresh() {
+        if (refreshJob?.isActive == true || syncJob?.isActive == true || clearJob?.isActive == true) return
+        if (enrichmentRefreshJob?.isActive == true) {
+            enrichmentRefreshPending = true
+            return
+        }
+        val generation = snapshotGeneration
+        enrichmentRefreshJob = lifecycleScope.launch {
+            try {
+                val enrichment = withContext(Dispatchers.IO) { snapshotReader.readEnrichment() }
+                if (generation != snapshotGeneration) return@launch
+                renderEnrichment(enrichment)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                android.util.Log.w("SaegeulAI", "dashboard enrichment refresh failed: ${error.javaClass.simpleName}")
+            } finally {
+                enrichmentRefreshJob = null
+                if (enrichmentRefreshPending) {
+                    enrichmentRefreshPending = false
+                    requestEnrichmentRefresh()
+                }
+            }
+        }
+    }
+
+    private fun startSync() {
+        if (syncJob?.isActive == true || clearJob?.isActive == true) return
+        val ime = org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance
+        snapshotGeneration++
+        dashboardSyncError.visibility = View.GONE
+        setDashboardBusy(true)
+        syncJob = lifecycleScope.launch {
+            var completedSnapshot: DashboardSnapshot? = null
+            try {
+                val before = withContext(Dispatchers.IO) { snapshotReader.readAnalyzedSentenceCount() }
+                if (ime != null) {
+                    ime.triggerInstantTypingDnaSyncAsync()
+                } else {
+                    withContext(Dispatchers.IO) { snapshotReader.persistWithoutIme() }
+                }
+                val snapshot = withContext(Dispatchers.IO) { snapshotReader.readAfterManualSync() }
+                completedSnapshot = snapshot
+                hasRenderedSnapshot = true
+                renderDashboard(snapshot, animate = true)
+                Toast.makeText(
+                    this@TypingDnaDashboardActivity,
+                    when {
+                        snapshot.typingStats.totalSentences > before ->
+                            "최신 언어 지문 분석 완료 (분석 문장: ${snapshot.typingStats.totalSentences}개)"
+                        snapshot.typingStats.totalSentences > 0 ->
+                            "대기 중인 새 문장이 없습니다 (분석 문장: ${snapshot.typingStats.totalSentences}개)"
+                        ime == null ->
+                            "저장된 언어 지문을 불러왔습니다 (분석 문장: ${snapshot.typingStats.totalSentences}개)"
+                        else -> "대기 중인 새 문장이 없습니다 (분석 문장: ${snapshot.typingStats.totalSentences}개)"
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
+                interstitial.showAfterAction()
+                continueWithEnrichment(snapshot.enrichment)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: TypingDnaPersistenceException) {
+                android.util.Log.w("SaegeulAI", "dashboard sync failed: ${error.javaClass.simpleName}")
+                showSyncFailure()
+            } catch (error: Throwable) {
+                android.util.Log.w("SaegeulAI", "dashboard sync failed: ${error.javaClass.simpleName}")
+                showSyncFailure()
+            } finally {
+                syncJob = null
+                if (!isFinishing && !isDestroyed) {
+                    setDashboardBusy(false)
+                    completedSnapshot?.let { renderEnrichment(it.enrichment) }
+                    requestEnrichmentRefresh()
+                }
+            }
+        }
+    }
+
+    private fun startClear() {
+        if (syncJob?.isActive == true || clearJob?.isActive == true) return
+        snapshotGeneration++
+        setDashboardBusy(true)
+        clearJob = lifecycleScope.launch {
+            var snapshot: DashboardSnapshot? = null
+            try {
+                val clearedSnapshot = withContext(Dispatchers.IO) { snapshotReader.clearAll() }
+                snapshot = clearedSnapshot
+                hasRenderedSnapshot = true
+                renderDashboard(clearedSnapshot, animate = true)
+                Toast.makeText(this@TypingDnaDashboardActivity, "언어 지문이 안전하게 초기화되었습니다.", Toast.LENGTH_SHORT).show()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                android.util.Log.w("SaegeulAI", "dashboard clear failed: ${error.javaClass.simpleName}")
+                Toast.makeText(this@TypingDnaDashboardActivity, R.string.typing_dna_persistence_failed, Toast.LENGTH_SHORT).show()
+            } finally {
+                clearJob = null
+                if (!isFinishing && !isDestroyed) {
+                    setDashboardBusy(false)
+                    snapshot?.let { renderEnrichment(it.enrichment) } ?: requestEnrichmentRefresh()
+                }
+            }
+        }
+    }
+
+    private fun continueWithEnrichment(enrichment: DashboardEnrichmentSnapshot) {
+        val profile = enrichment.profile
+        when {
+            enrichment.offlineMode || profile == null -> AlertDialog.Builder(this)
+                .setTitle(R.string.sync_done_title)
+                .setMessage(
+                    if (enrichment.offlineMode) getString(R.string.sync_offline_message)
+                    else getString(R.string.sync_llm_missing_message)
+                )
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            enrichment.oauthNeedsLogin -> AlertDialog.Builder(this)
+                .setTitle(R.string.sync_done_title)
+                .setMessage(R.string.ai_oauth_reauth_required)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.enrichment_setup_action) { _, _ ->
+                    AiSettingsNavigator.openWritingSetup(this)
+                }
+                .show()
+            else -> {
+                ensureNotificationPermission()
+                if (GraphEnrichmentRunner.start(this, profile, notify = true)) {
+                    requestEnrichmentRefresh()
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.enrich_bg_title)
+                        .setMessage(R.string.enrich_bg_message)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                } else {
+                    requestEnrichmentRefresh()
+                }
+            }
+        }
+    }
+
+    private fun renderDashboard(snapshot: DashboardSnapshot, animate: Boolean) {
+        val stats = snapshot.typingStats
+        tvLevelBadge.text = getString(R.string.vault_level_number, stats.level)
+        tvLevelBadge.contentDescription = getString(R.string.vault_level_content_description, stats.level)
+        tvLevelTitle.text = getString(R.string.vault_level_title, stats.level)
+        tvLevelDesc.setText(R.string.vault_level_description)
 
         progressLevel.progress = stats.levelProgressPercent
 
@@ -278,61 +426,47 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         tvDashPhrases.text = "${stats.phrasesCount}"
 
         tvLevelProgressText.text = if (stats.level >= 5) {
-            "최고 레벨 달성 · 지속적으로 나만의 표현을 학습하고 업데이트합니다"
+            getString(R.string.vault_level_progress_max)
         } else {
             val remain = (stats.nextLevelTargetSentences - stats.totalSentences).coerceAtLeast(1)
-            "다음 레벨(Lv.${stats.level + 1})까지 문장 ${remain}개 남음 · 진행률 ${stats.levelProgressPercent}%"
+            getString(
+                R.string.vault_level_progress_next,
+                stats.level + 1,
+                remain,
+                stats.levelProgressPercent
+            )
         }
 
         chartView.setStats(stats, animate = animate)
 
-        val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-        val ngramStats = app.personalNgramModel.stats()
-        val pending = app.typingDnaVault.totalBufferedCount()
         tvDashNgramStats.text = getString(
             R.string.typing_dna_ngram_stats_line,
-            ngramStats.unigrams,
-            ngramStats.bigrams,
-            pending
+            snapshot.ngramUnigrams,
+            snapshot.ngramBigrams,
+            snapshot.pendingSentences
         )
         tvDashRagStats.text = getString(
             R.string.personal_sentence_vault_stats_line,
-            app.personalSentenceVault.stats().sentences
+            snapshot.vaultSentences
         )
-        val graphStats = app.personalGraphStore.stats()
-        tvDashGraphStats.text = getString(
-            R.string.dashboard_graph_stats_line,
-            graphStats.nodes,
-            graphStats.edges,
-            graphStats.topics
-        )
-
-        val lastSyncMs = syncStatusStore.lastSyncMs()
         val nowMs = System.currentTimeMillis()
-        if (lastSyncMs > 0L) {
+        if (snapshot.lastSyncMs > 0L) {
             tvSyncPill.visibility = View.VISIBLE
             tvSyncPill.text = getString(
                 R.string.sync_pill_last,
-                TypingDnaSyncStatus.formatTime(lastSyncMs, nowMs)
+                org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatus.formatTime(snapshot.lastSyncMs, nowMs)
             )
         } else {
             tvSyncPill.visibility = View.GONE
         }
-        tvDashSyncLevel.text = when (TypingDnaSyncStatus.level(lastSyncMs, graphStats.builtMs)) {
-            TypingDnaSyncLevel.NEVER -> getString(R.string.sync_level_never)
-            TypingDnaSyncLevel.SYNC_ONLY -> getString(R.string.sync_level_sync_only)
-            TypingDnaSyncLevel.ENRICHED -> getString(
-                R.string.sync_level_enriched,
-                TypingDnaSyncStatus.formatTime(graphStats.builtMs, nowMs)
-            )
-        }
+        renderEnrichment(snapshot.enrichment)
 
-        if (ngramStats.lastLearnedMs != 0L) {
+        if (snapshot.ngramLastLearnedMs != 0L) {
             tvDashLastLearned.visibility = android.view.View.VISIBLE
             tvDashLastLearned.text = getString(
                 R.string.typing_dna_last_learned,
                 DateUtils.getRelativeTimeSpanString(
-                    ngramStats.lastLearnedMs,
+                    snapshot.ngramLastLearnedMs,
                     System.currentTimeMillis(),
                     DateUtils.MINUTE_IN_MILLIS
                 )
@@ -341,51 +475,68 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             tvDashLastLearned.visibility = android.view.View.GONE
         }
 
-        val metricsSummary = app.predictionMetricsStore.summary()
+        val metricsSummary = snapshot.metrics
 
-        tvVaultHeroNumber.text = "${ngramStats.unigrams}"
         tvVaultHeroSubtitle.text = getString(
             R.string.vault_hero_subtitle,
-            metricsSummary.activeDays,
-            ngramStats.bigrams,
-            ngramStats.learnedSentences
+            snapshot.ngramUnigrams,
+            stats.totalSentences
         )
 
-        val cipher = app.vaultCipher
         tvVaultSecuritySubtitle.text = when {
-            cipher.isStrongBoxBacked -> getString(R.string.vault_security_strongbox)
-            cipher.isHardwareBacked -> getString(R.string.vault_security_tee)
+            snapshot.security.isStrongBoxBacked -> getString(R.string.vault_security_strongbox)
+            snapshot.security.isHardwareBacked -> getString(R.string.vault_security_tee)
             else -> getString(R.string.vault_security_software)
         }
 
-        val hasIntegrityData = metricsSummary.totalAccepted > 0 ||
-            metricsSummary.keystrokesSaved > 0 ||
-            metricsSummary.typoCorrected > 0
-        if (hasIntegrityData) {
-            vaultIntegrityGrid.visibility = View.VISIBLE
-            tvVaultIntegrityEmpty.visibility = View.GONE
-            tvVaultAcceptRate.text = "${(metricsSummary.acceptRate * 100).roundToInt()}%"
-            tvVaultPersonalHits.text = "${(metricsSummary.personalShare * 100).roundToInt()}%"
-            tvVaultKeystrokesSaved.text = "${metricsSummary.keystrokesSaved}"
-            tvVaultTyposFixed.text = "${metricsSummary.typoCorrected}"
+        vaultIntegrityGrid.visibility = View.VISIBLE
+        tvVaultAcceptRate.text = if (metricsSummary.totalShown > 0) {
+            "${(metricsSummary.acceptRate * 100).roundToInt()}%"
         } else {
-            vaultIntegrityGrid.visibility = View.GONE
-            tvVaultIntegrityEmpty.visibility = View.VISIBLE
+            getString(R.string.vault_metric_not_recorded)
+        }
+        tvVaultAcceptRateDescription.text = if (metricsSummary.totalShown > 0) {
+            getString(
+                R.string.vault_metric_accept_rate_counts,
+                metricsSummary.totalShown,
+                metricsSummary.totalAccepted
+            )
+        } else {
+            getString(R.string.vault_metric_accept_rate_description)
+        }
+        tvVaultPersonalHits.text = if (metricsSummary.totalAccepted > 0) {
+            "${(metricsSummary.personalShare * 100).roundToInt()}%"
+        } else {
+            getString(R.string.vault_metric_not_recorded)
+        }
+        tvVaultKeystrokesSaved.setText(R.string.vault_metric_measurement_pending)
+        tvVaultTyposFixed.text = "${metricsSummary.typoCorrected}"
+        tvVaultIntegrityEmpty.visibility = if (metricsSummary.totalShown == 0) {
+            View.VISIBLE
+        } else {
+            View.GONE
         }
 
         vaultTimelineView.setSummary(metricsSummary)
-
-        val frequentWords = mutableListOf<Pair<String, Float>>()
-        app.personalNgramModel.forEachUnigram { word, count ->
-            if (word.length >= 2 && word != "<s>") frequentWords.add(word to count)
+        val timelineSentenceTotal = metricsSummary.recent.sumOf { it.learnedSentences }
+        val timelineDailyMaximum = metricsSummary.recent.maxOfOrNull { it.learnedSentences } ?: 0
+        tvVaultTimelineSummary.text = getString(
+            R.string.vault_timeline_summary,
+            timelineSentenceTotal,
+            timelineDailyMaximum
+        )
+        tvVaultTimelineEmpty.visibility = if (metricsSummary.recent.none { it.learnedSentences > 0 }) {
+            View.VISIBLE
+        } else {
+            View.GONE
         }
-        val topWords = frequentWords.sortedByDescending { it.second }.take(12)
+
         chipGroupVaultWords.removeAllViews()
-        if (topWords.isEmpty()) {
+        if (snapshot.frequentWords.isEmpty()) {
             cardVaultWords.visibility = View.GONE
         } else {
             cardVaultWords.visibility = View.VISIBLE
-            topWords.forEach { (word, _) ->
+            snapshot.frequentWords.forEach { word ->
                 val chip = Chip(this)
                 chip.text = word
                 chip.isClickable = false
@@ -395,17 +546,129 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             }
         }
 
-        val categoryCounts = app.personalNgramModel.categoryCounts()
-        val messengerCount = categoryCounts[TypingDnaVault.CATEGORY_MESSENGER] ?: 0f
-        val workCount = categoryCounts[TypingDnaVault.CATEGORY_WORK] ?: 0f
-        val generalCount = categoryCounts[TypingDnaVault.CATEGORY_GENERAL] ?: 0f
-        val categoryTotal = messengerCount + workCount + generalCount
-        val messengerRatio = if (categoryTotal > 0f) messengerCount / categoryTotal else 0f
-        val workRatio = if (categoryTotal > 0f) workCount / categoryTotal else 0f
-        val generalRatio = if (categoryTotal > 0f) generalCount / categoryTotal else 0f
-        setCategoryBar(vaultCatMessengerFill, tvVaultCatMessengerPct, messengerRatio)
-        setCategoryBar(vaultCatWorkFill, tvVaultCatWorkPct, workRatio)
-        setCategoryBar(vaultCatGeneralFill, tvVaultCatGeneralPct, generalRatio)
+        setCategoryBar(vaultCatMessengerFill, tvVaultCatMessengerPct, snapshot.messengerRatio)
+        setCategoryBar(vaultCatWorkFill, tvVaultCatWorkPct, snapshot.workRatio)
+        setCategoryBar(vaultCatGeneralFill, tvVaultCatGeneralPct, snapshot.generalRatio)
+    }
+
+    private fun renderEnrichment(enrichment: DashboardEnrichmentSnapshot) {
+        val phase = enrichment.phase
+        val nowMs = System.currentTimeMillis()
+
+        tvDashSyncLevel.text = when (phase) {
+            GraphEnrichmentPhase.NEVER -> if (enrichment.graphBuiltMs > 0L) {
+                getString(R.string.enrichment_status_legacy)
+            } else {
+                getString(R.string.enrichment_status_never)
+            }
+            GraphEnrichmentPhase.RUNNING -> getString(R.string.enrichment_status_running)
+            GraphEnrichmentPhase.SUCCEEDED -> getString(R.string.enrichment_status_succeeded)
+            GraphEnrichmentPhase.PARTIAL -> getString(R.string.enrichment_status_partial)
+            GraphEnrichmentPhase.NO_DATA -> getString(R.string.enrichment_status_no_data)
+            GraphEnrichmentPhase.FAILED -> getString(
+                when (enrichment.failure) {
+                    GraphEnrichmentFailure.INVALID_RESPONSE -> R.string.graph_enrichment_failure_invalid_response
+                    GraphEnrichmentFailure.REAUTH_REQUIRED -> R.string.graph_enrichment_failure_reauth_required
+                    GraphEnrichmentFailure.PROVIDER_BUSY -> R.string.graph_enrichment_failure_provider_busy
+                    GraphEnrichmentFailure.TIMEOUT -> R.string.graph_enrichment_failure_timeout
+                    GraphEnrichmentFailure.NETWORK -> R.string.graph_enrichment_failure_network
+                    GraphEnrichmentFailure.PROVIDER_ERROR -> R.string.graph_enrichment_failure_provider_error
+                    GraphEnrichmentFailure.STORAGE -> R.string.graph_enrichment_failure_storage
+                    GraphEnrichmentFailure.NONE,
+                    GraphEnrichmentFailure.UNKNOWN -> R.string.enrichment_status_failed
+                }
+            )
+            GraphEnrichmentPhase.INTERRUPTED -> getString(R.string.enrichment_status_interrupted)
+        }
+        tvDashGraphStats.text = when {
+            enrichment.lastAppliedMs > 0L -> getString(
+                R.string.enrichment_graph_stats_last_applied,
+                org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatus.formatTime(enrichment.lastAppliedMs, nowMs),
+                enrichment.graphNodes,
+                enrichment.graphEdges,
+                enrichment.graphTopics
+            )
+            phase == GraphEnrichmentPhase.NEVER && enrichment.graphBuiltMs > 0L -> getString(
+                R.string.enrichment_graph_stats_legacy,
+                org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatus.formatTime(enrichment.graphBuiltMs, nowMs),
+                enrichment.graphNodes,
+                enrichment.graphEdges,
+                enrichment.graphTopics
+            )
+            else -> getString(
+                R.string.dashboard_graph_stats_line,
+                enrichment.graphNodes,
+                enrichment.graphEdges,
+                enrichment.graphTopics
+            )
+        }
+
+        val isRunning = phase == GraphEnrichmentPhase.RUNNING
+        enrichmentRunning = isRunning
+        progressEnrichment.visibility = if (isRunning) View.VISIBLE else View.GONE
+        progressEnrichment.isIndeterminate = true
+        updateActionAvailability()
+
+        when {
+            enrichment.offlineMode -> {
+                tvDashEnrichmentAvailability.visibility = View.VISIBLE
+                tvDashEnrichmentAvailability.setText(R.string.enrichment_unavailable_offline)
+                btnEnrichmentSetup.visibility = View.GONE
+            }
+            enrichment.profile == null -> {
+                tvDashEnrichmentAvailability.visibility = View.VISIBLE
+                tvDashEnrichmentAvailability.setText(R.string.enrichment_unavailable_provider)
+                btnEnrichmentSetup.visibility = View.VISIBLE
+            }
+            enrichment.oauthNeedsLogin || enrichment.failure == GraphEnrichmentFailure.REAUTH_REQUIRED -> {
+                tvDashEnrichmentAvailability.visibility = View.VISIBLE
+                tvDashEnrichmentAvailability.setText(R.string.enrichment_unavailable_oauth)
+                btnEnrichmentSetup.visibility = View.VISIBLE
+            }
+            else -> {
+                tvDashEnrichmentAvailability.visibility = View.GONE
+                btnEnrichmentSetup.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun setDashboardBusy(busy: Boolean) {
+        dashboardBusy = busy
+        dashboardSyncBusy.visibility = if (busy) View.VISIBLE else View.GONE
+        updateActionAvailability()
+    }
+
+    private fun updateActionAvailability() {
+        btnSyncNow.isEnabled = !dashboardBusy && !enrichmentRunning
+        btnClearDna.isEnabled = !dashboardBusy
+    }
+
+    private fun showSyncFailure() {
+        if (isFinishing || isDestroyed) return
+        dashboardSyncError.visibility = View.VISIBLE
+        Toast.makeText(this, R.string.typing_dna_persistence_failed, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showInitialLoading() {
+        dashboardContent.visibility = View.GONE
+        dashboardLoading.visibility = View.VISIBLE
+        dashboardLoadingMessage.setText(R.string.dashboard_loading_message)
+        findViewById<View>(R.id.dashboard_loading_error).visibility = View.GONE
+        findViewById<View>(R.id.btn_dashboard_loading_retry).visibility = View.GONE
+        findViewById<View>(R.id.dashboard_loading_progress).visibility = View.VISIBLE
+    }
+
+    private fun showInitialLoadFailure() {
+        dashboardContent.visibility = View.GONE
+        dashboardLoading.visibility = View.VISIBLE
+        findViewById<View>(R.id.dashboard_loading_progress).visibility = View.GONE
+        findViewById<View>(R.id.dashboard_loading_error).visibility = View.VISIBLE
+        findViewById<View>(R.id.btn_dashboard_loading_retry).visibility = View.VISIBLE
+    }
+
+    private fun showDashboardContent() {
+        dashboardLoading.visibility = View.GONE
+        dashboardContent.visibility = View.VISIBLE
     }
 
     private fun setCategoryBar(fillView: View, percentText: TextView, ratio: Float) {

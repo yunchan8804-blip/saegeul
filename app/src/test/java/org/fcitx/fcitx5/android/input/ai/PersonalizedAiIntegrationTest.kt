@@ -60,10 +60,10 @@ class PersonalizedAiIntegrationTest {
             )
         )
 
-        // When user types choseong "ㅍㄱ" with meeting context
+        // The current sentence is a literal prefix of the stored user phrase.
         val predictions = predictor.predict(
-            currentStroke = "ㅍㄱ",
-            contextBeforeCursor = "내일 약속 장소 ",
+            currentStroke = "카카오",
+            contextBeforeCursor = "판교 ",
             packageName = "com.kakao.talk",
             limit = 5
         )
@@ -73,21 +73,32 @@ class PersonalizedAiIntegrationTest {
         assertNotNull(myStyleMatch)
         assertEquals("판교 카카오 아지트 1층 로비에서 뵙겠습니다.", myStyleMatch?.text)
         assertTrue(myStyleMatch?.isSentenceCompletion == true)
+
+        val unrelatedPredictions = predictor.predict(
+            currentStroke = "ㅍㄱ",
+            contextBeforeCursor = "내일 약속 장소 ",
+            packageName = "com.kakao.talk",
+            limit = 5
+        )
+        assertFalse(unrelatedPredictions.any {
+            it.source == "personalized_style" && it.text == "판교 카카오 아지트 1층 로비에서 뵙겠습니다."
+        })
     }
 
     @Test
     fun testSeparateWordAndSentenceCandidates() {
         // Add a word transition to the personal n-gram model
-        ngram.learn("내일 판교에서", "com.kakao.talk")
+        ngram.learn("내일 판교에서 오시면 됩니다.", "com.kakao.talk")
 
         // Add a sentence to personalized store
         store.upsert(
             PersonalizedSentenceRecord(
-                sentence = "판교 테크원타워로 오시면 됩니다.",
+                sentence = "내일 판교에서 오시면 됩니다.",
                 intent = ContextualIntent.Scheduling,
                 tone = KoreanTone.Honorific,
                 keywords = listOf("판교", "테크원"),
-                score = 2.0f
+                score = 2.0f,
+                source = PersonalizedSentenceRecord.SOURCE_USER_PHRASE
             )
         )
 
@@ -101,14 +112,14 @@ class PersonalizedAiIntegrationTest {
         val wordCandidates = allPredictions.filter { !it.isSentenceCompletion }
         val sentenceCandidates = allPredictions.filter { it.isSentenceCompletion }
 
-        // Sentence candidate list should have full sentences
-        assertTrue(sentenceCandidates.isNotEmpty())
-        assertTrue(sentenceCandidates.any { it.text.contains("오시면 됩니다") || it.text.contains("뵙겠습니다") })
-
-        // Words vs sentences should be partitioned cleanly
-        sentenceCandidates.forEach {
-            assertTrue(it.isSentenceCompletion)
-        }
+        assertTrue(wordCandidates.any {
+            it.source == "personal_ngram" && it.text == "판교에서" && !it.isSentenceCompletion
+        })
+        assertTrue(sentenceCandidates.any {
+            it.source == "personalized_style" &&
+                it.text == "내일 판교에서 오시면 됩니다." &&
+                it.isSentenceCompletion
+        })
     }
 
     @Test

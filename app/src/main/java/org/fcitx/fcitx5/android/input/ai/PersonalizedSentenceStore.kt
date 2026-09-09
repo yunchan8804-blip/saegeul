@@ -26,6 +26,7 @@ class PersonalizedSentenceStore(
 
     private val records = LinkedHashMap<String, PersonalizedSentenceRecord>()
     private val vaultFile: VaultFile? = storageFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
+    private val saveLock = Any()
 
     @Synchronized
     fun size(): Int = records.size
@@ -118,27 +119,31 @@ class PersonalizedSentenceStore(
         .map { it.first }
     }
 
-    @Synchronized
     fun save() {
         val vf = vaultFile ?: return
-        val array = JSONArray()
-        records.values.forEach { r ->
-            val obj = JSONObject().apply {
-                put("id", r.id)
-                put("sentence", r.sentence)
-                put("choseong", r.choseong)
-                put("intent", r.intent.name)
-                put("tone", r.tone.name)
-                put("keywords", JSONArray(r.keywords))
-                put("source", r.source)
-                put("score", r.score.toDouble())
-                put("useCount", r.useCount)
-                put("lastUsedTimestamp", r.lastUsedTimestamp)
-                r.packageName?.let { put("packageName", it) }
+        synchronized(saveLock) {
+            val snapshot = synchronized(this) {
+                records.values.map { it.copy(keywords = it.keywords.toList()) }
             }
-            array.put(obj)
+            val array = JSONArray()
+            snapshot.forEach { r ->
+                val obj = JSONObject().apply {
+                    put("id", r.id)
+                    put("sentence", r.sentence)
+                    put("choseong", r.choseong)
+                    put("intent", r.intent.name)
+                    put("tone", r.tone.name)
+                    put("keywords", JSONArray(r.keywords))
+                    put("source", r.source)
+                    put("score", r.score.toDouble())
+                    put("useCount", r.useCount)
+                    put("lastUsedTimestamp", r.lastUsedTimestamp)
+                    r.packageName?.let { put("packageName", it) }
+                }
+                array.put(obj)
+            }
+            vf.writeText(array.toString(2))
         }
-        vf.writeText(array.toString(2))
     }
 
     @Synchronized
@@ -146,8 +151,7 @@ class PersonalizedSentenceStore(
         val vf = vaultFile ?: return
         if (!vf.exists()) return
         try {
-            vf.migrateIfLegacy()
-            val content = vf.readText() ?: return
+            val content = vf.readTextAndMigrate() ?: return
             if (content.isBlank()) return
             val array = JSONArray(content)
             records.clear()

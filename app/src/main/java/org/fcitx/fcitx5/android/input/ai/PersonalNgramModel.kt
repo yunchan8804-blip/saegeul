@@ -70,6 +70,7 @@ class PersonalNgramModel(
     private val morphology = ChoseongMorphologyEngine()
     private val tables = HashMap<String, Table>()
     private val vaultFile: VaultFile? = storeFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
+    private val persistenceLock = Any()
 
     /**
      * complete()의 매 호출마다 decomposeHangul()을 재계산하지 않도록 유니그램 단어의
@@ -172,12 +173,40 @@ class PersonalNgramModel(
         val category = TypingDnaVault.categorizePackage(packageName)
         val combined = combinedScores(prev2, prev1, category, now)
         return combined.entries
+            .asSequence()
+            .filter { KoreanSuggestionSurface.isDisplayable(it.key) }
             .sortedWith(
                 compareByDescending<Map.Entry<String, Scored>> { it.value.probability }
                     .thenByDescending { it.value.evidence }
             )
             .take(limit)
             .map { NgramCandidate(it.key, it.value.probability, it.value.evidence, it.value.level) }
+            .toList()
+    }
+
+    /**
+     * 현재 문맥에서 실제로 관찰된 전이만 반환한다. 유니그램은 어휘 빈도일 뿐 다음 단어의
+     * 문맥 근거가 아니므로 제외한다. 빈 문맥에서는 문장 시작 마커의 bigram을 전이로 취급한다.
+     */
+    @Synchronized
+    fun predictContextualNext(contextBeforeCursor: String, packageName: String, limit: Int): List<NgramCandidate> {
+        val now = clock()
+        val ctxTokens = PersonalNgramTokenizer.tokenize(contextBeforeCursor)
+        val prev1 = ctxTokens.lastOrNull() ?: START
+        val prev2 = if (ctxTokens.size >= 2) ctxTokens[ctxTokens.size - 2] else null
+        val category = TypingDnaVault.categorizePackage(packageName)
+        val combined = combinedScores(prev2, prev1, category, now)
+        return combined.entries
+            .asSequence()
+            .filter { it.value.level >= 2 && it.value.evidence > 0f && it.value.probability > 0f }
+            .filter { KoreanSuggestionSurface.isDisplayable(it.key) }
+            .sortedWith(
+                compareByDescending<Map.Entry<String, Scored>> { it.value.probability }
+                    .thenByDescending { it.value.evidence }
+            )
+            .take(limit)
+            .map { NgramCandidate(it.key, it.value.probability, it.value.evidence, it.value.level) }
+            .toList()
     }
 
     @Synchronized
@@ -235,11 +264,14 @@ class PersonalNgramModel(
         }
 
         return scored
+            .asSequence()
+            .filter { KoreanSuggestionSurface.isDisplayable(it.word) }
             .sortedWith(
                 compareByDescending<NgramCandidate> { it.probability }
                     .thenByDescending { it.evidence }
             )
             .take(limit)
+            .toList()
     }
 
     /** 개인 어휘("*" 테이블)에서 [word]의 시간 감쇠된 유니그램 카운트. 없으면 0. */
@@ -298,31 +330,38 @@ class PersonalNgramModel(
         return NgramStats(t.uni.size, bigramCount, trigramCount, t.learnedSentences, t.lastLearnedMs)
     }
 
-    @Synchronized
     fun clear() {
-        tables.clear()
-        completionIndex.clear()
-        wordsByFirstChar.clear()
-        wordsByJamoFirst.clear()
-        wordsByChoseongFirst.clear()
-        vaultFile?.delete() ?: storeFile?.delete()
+        synchronized(persistenceLock) {
+            synchronized(this) {
+                tables.clear()
+                completionIndex.clear()
+                wordsByFirstChar.clear()
+                wordsByJamoFirst.clear()
+                wordsByChoseongFirst.clear()
+            }
+            vaultFile?.delete() ?: storeFile?.delete()
+        }
     }
 
-    @Synchronized
     fun save() {
         val vf = vaultFile ?: return
-        val root = JSONObject()
-        root.put("v", 1)
-        val starTable = tables["*"]
-        root.put("learned", starTable?.learnedSentences ?: 0)
-        root.put("last", starTable?.lastLearnedMs ?: 0L)
-        val tablesJson = JSONObject()
-        for ((name, t) in tables) {
-            tablesJson.put(name, serializeTable(t))
-        }
-        root.put("tables", tablesJson)
-        runCatching {
-            vf.writeText(root.toString())
+        synchronized(persistenceLock) {
+            val snapshot = synchronized(this) {
+                val root = JSONObject()
+                root.put("v", 1)
+                val starTable = tables["*"]
+                root.put("learned", starTable?.learnedSentences ?: 0)
+                root.put("last", starTable?.lastLearnedMs ?: 0L)
+                val tablesJson = JSONObject()
+                for ((name, t) in tables) {
+                    tablesJson.put(name, serializeTable(t))
+                }
+                root.put("tables", tablesJson)
+                root
+            }
+            runCatching {
+                vf.writeText(snapshot.toString())
+            }
         }
     }
 
@@ -451,7 +490,16 @@ class PersonalNgramModel(
             val c = categoryScores[w]
             val s = starScores[w]
             val prob = (c?.probability ?: 0f) + 0.5f * (s?.probability ?: 0f)
-            val (evidence, level) = if (c != null) c.evidence to c.level else (s?.evidence ?: 0f) to (s?.level ?: 0)
+            val provenance = when {
+                c == null -> s
+                s == null -> c
+                s.level > c.level -> s
+                s.level < c.level -> c
+                s.evidence > c.evidence -> s
+                else -> c
+            }
+            val evidence = provenance?.evidence ?: 0f
+            val level = provenance?.level ?: 0
             merged[w] = Scored(prob, evidence, level)
         }
         return merged
@@ -544,8 +592,7 @@ class PersonalNgramModel(
         val vf = vaultFile ?: return
         if (!vf.exists()) return
         runCatching {
-            vf.migrateIfLegacy()
-            val raw = vf.readText() ?: return@runCatching
+            val raw = vf.readTextAndMigrate() ?: return@runCatching
             if (raw.isBlank()) return@runCatching
             val root = JSONObject(raw)
             val tablesJson = root.optJSONObject("tables") ?: return@runCatching

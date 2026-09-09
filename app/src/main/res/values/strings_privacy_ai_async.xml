@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="privacy_ai_summary_loading">Loading Privacy &amp; AI settings…</string>
+    <string name="privacy_ai_summary_load_failed">Couldn\'t load Privacy &amp; AI settings. Please try again.</string>
+    <string name="privacy_ai_typing_dna_sync_summary">Update your writing style and vocabulary habits using recent typing data.</string>
+    <string name="privacy_ai_typing_dna_sync_busy">Analyzing and syncing your language profile…</string>
+    <string name="privacy_ai_typing_dna_sync_failed">Couldn\'t analyze and sync your language profile. Please try again.</string>
+</resources>

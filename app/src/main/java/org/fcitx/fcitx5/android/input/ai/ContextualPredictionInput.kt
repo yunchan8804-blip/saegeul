@@ -17,6 +17,14 @@ internal object ContextualPredictionInput {
 
     private val WHITESPACE = charArrayOf(' ', '\n', '\t', '\r')
 
+    fun rawFullContext(currentStroke: String, contextBeforeCursor: String): String = when {
+        currentStroke.isBlank() -> contextBeforeCursor
+        contextBeforeCursor.endsWith(currentStroke) -> contextBeforeCursor
+        contextBeforeCursor.isBlank() -> currentStroke
+        contextBeforeCursor.last().isWhitespace() -> contextBeforeCursor + currentStroke
+        else -> "$contextBeforeCursor $currentStroke"
+    }
+
     fun resolve(textBeforeCursor: String, composingText: String): Resolved {
         val endsWithWhitespace = textBeforeCursor.isNotEmpty() && textBeforeCursor.last() in WHITESPACE
 

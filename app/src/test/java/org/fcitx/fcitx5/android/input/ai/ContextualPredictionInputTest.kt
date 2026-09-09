@@ -40,4 +40,33 @@ class ContextualPredictionInputTest {
         assertEquals("", resolved.stroke)
         assertEquals("오늘 회의 ", resolved.context)
     }
+
+    @Test
+    fun rawFullContextUsesCurrentStroke() {
+        assertEquals(
+            "오늘 회의 참석",
+            ContextualPredictionInput.rawFullContext("참석", "오늘 회의 ")
+        )
+    }
+
+    @Test
+    fun rawFullContextPreservesWhitespaceBeforeStroke() {
+        assertEquals(
+            "오늘 회의 참석",
+            ContextualPredictionInput.rawFullContext("참석", "오늘 회의")
+        )
+    }
+
+    @Test
+    fun rawFullContextDoesNotDuplicateIncludedStroke() {
+        assertEquals(
+            "오늘 회의 참석",
+            ContextualPredictionInput.rawFullContext("참석", "오늘 회의 참석")
+        )
+    }
+
+    @Test
+    fun rawFullContextUsesStrokeForBlankContext() {
+        assertEquals("참석", ContextualPredictionInput.rawFullContext("참석", ""))
+    }
 }

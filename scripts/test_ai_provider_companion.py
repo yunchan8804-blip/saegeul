@@ -286,6 +286,155 @@ class CliBoundaryTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             companion.requested_suggestion_count({}, "Return some suggestions")
 
+    def test_continuation_abstention_contract_requires_marker_and_exact_schema(self):
+        request = {
+            "text": {
+                "format": {
+                    "name": companion.CONTINUATION_ABSTENTION_FORMAT,
+                    "schema": {
+                        "properties": {
+                            "suggestions": {"minItems": 0, "maxItems": 3}
+                        }
+                    },
+                }
+            }
+        }
+        self.assertEqual(
+            (3, True),
+            companion.requested_suggestion_contract(request, "Return exactly 3 suggestion(s)."),
+        )
+
+        for minimum, maximum in ((1, 3), (0, 2), (0, "3")):
+            invalid = json.loads(json.dumps(request))
+            invalid["text"]["format"]["schema"]["properties"]["suggestions"] = {
+                "minItems": minimum,
+                "maxItems": maximum,
+            }
+            with self.subTest(minimum=minimum, maximum=maximum), self.assertRaises(ValueError):
+                companion.requested_suggestion_contract(invalid, "Return exactly 3 suggestion(s).")
+
+        legacy = json.loads(json.dumps(request))
+        legacy["text"]["format"].pop("name")
+        with self.assertRaises(ValueError):
+            companion.requested_suggestion_contract(legacy, "Return exactly 3 suggestion(s).")
+
+        exact_legacy = {
+            "text": {
+                "format": {
+                    "schema": {
+                        "properties": {
+                            "suggestions": {"minItems": 2, "maxItems": 2}
+                        }
+                    }
+                }
+            }
+        }
+        self.assertEqual(
+            (2, False),
+            companion.requested_suggestion_contract(exact_legacy, "irrelevant"),
+        )
+
+    def test_continuation_abstention_normalization_allows_only_valid_zero_to_three_array(self):
+        for output, expected in (
+            ('{"suggestions": []}', '{"suggestions":[]}'),
+            ('{"suggestions": ["하나"]}', '{"suggestions":["하나"]}'),
+            ('{"suggestions": ["하나", "둘"]}', '{"suggestions":["하나","둘"]}'),
+            ('{"suggestions": ["하나", "둘", "셋"]}', '{"suggestions":["하나","둘","셋"]}'),
+        ):
+            with self.subTest(output=output):
+                self.assertEqual(
+                    expected,
+                    companion.normalize_suggestions(
+                        output,
+                        expected_suggestions=3,
+                        allow_partial_suggestions=True,
+                    ),
+                )
+        for output in (
+            '설명 {"suggestions": []} 끝',
+            '```json\n{"suggestions": []}\n```',
+            '{"suggestions": []',
+            '{"suggestions": "not an array"}',
+            '{"suggestions": [""]}',
+            '{"suggestions": [null]}',
+            '{"suggestions": [1]}',
+            '{"suggestions": [" "]}',
+            '{"suggestions": ["같음", "같음"]}',
+            '{"suggestions": ["하나", "둘", "셋", "넷"]}',
+            '{"nodes": [], "edges": []}',
+        ):
+            with self.subTest(output=output), self.assertRaises(RuntimeError):
+                companion.normalize_suggestions(
+                    output,
+                    expected_suggestions=3,
+                    allow_partial_suggestions=True,
+                )
+
+    def test_continuation_abstention_prompt_removes_exact_count_force(self):
+        prompt = companion.cli_prompt(
+            "Return exactly 3 suggestion(s). Do not use Markdown.",
+            "내가 뭘",
+            allow_partial_suggestions=True,
+        )
+        self.assertNotIn("Return exactly 3 suggestion(s).", prompt)
+        self.assertIn("Return zero to three suggestion(s).", prompt)
+        self.assertIn("An empty suggestions array is valid", prompt)
+
+    def test_gateway_continuation_abstention_routes_contract_and_rejects_malformed_formats(self):
+        runner = mock.Mock()
+        runner.available = {"fast"}
+        runner.generate.return_value = '{"suggestions":[]}'
+        gateway = mock.Mock()
+        gateway.oauth.accepts.return_value = True
+        gateway.runner = runner
+        handler = object.__new__(companion.CliGatewayRequestHandler)
+        handler.server = type("GatewayServer", (), {"gateway": gateway})()
+        handler.headers = {"Authorization": "Bearer test"}
+        responses = []
+        handler.send_json = lambda status, payload: responses.append((status, payload))
+
+        request = {
+            "model": "fast",
+            "instructions": "Return exactly 3 suggestion(s).",
+            "input": "내가 뭘",
+            "store": False,
+            "text": {
+                "format": {
+                    "name": companion.CONTINUATION_ABSTENTION_FORMAT,
+                    "schema": {
+                        "properties": {
+                            "suggestions": {"minItems": 0, "maxItems": 3}
+                        }
+                    },
+                }
+            },
+        }
+        handler.run_responses(json.dumps(request).encode("utf-8"))
+        self.assertEqual(200, responses[-1][0])
+        runner.generate.assert_called_once_with(
+            "fast", request["instructions"], request["input"], 3, True
+        )
+
+        for invalid_format in (None, [], "invalid"):
+            runner.reset_mock()
+            malformed = json.loads(json.dumps(request))
+            malformed["text"]["format"] = invalid_format
+            handler.run_responses(json.dumps(malformed).encode("utf-8"))
+            self.assertEqual(400, responses[-1][0])
+            runner.generate.assert_not_called()
+
+        legacy = json.loads(json.dumps(request))
+        legacy["text"]["format"].pop("name")
+        legacy["text"]["format"]["schema"]["properties"]["suggestions"] = {
+            "minItems": 1,
+            "maxItems": 1,
+        }
+        handler.run_responses(json.dumps(legacy).encode("utf-8"))
+        self.assertEqual(200, responses[-1][0])
+        runner.generate.assert_called_once_with(
+            "fast", legacy["instructions"], legacy["input"], 1, False
+        )
+
     def test_manifest_routes_tiers_without_exposing_cli_credentials(self):
         runner = mock.Mock()
         runner.model_mapping.return_value = {
@@ -304,6 +453,7 @@ class CliBoundaryTest(unittest.TestCase):
 
         self.assertEqual("codex", manifest["models"]["fast"])
         self.assertEqual("claude", manifest["models"]["balanced"])
+        self.assertEqual(["responses", "continuation_abstention"], manifest["capabilities"])
         self.assertNotIn("access_token", encoded)
         self.assertNotIn("api_key", encoded)
         self.assertNotIn("client_secret", encoded)
@@ -366,6 +516,34 @@ class CliBoundaryTest(unittest.TestCase):
                 )
                 self.assertEqual('{"suggestions":["오늘 점심 뭐 먹을래?"]}', result)
 
+    def test_agy_generate_allows_an_empty_continuation_abstention_response(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.codex = None
+            runner.claude = None
+            runner.agy = "agy.exe"
+            runner.available = {companion.CliBackendRunner.MODEL_AGY}
+            runner._slot = companion.threading.BoundedSemaphore(1)
+            prompts = []
+
+            def run_agy(prompt):
+                prompts.append(prompt)
+                return '{"suggestions": []}'
+
+            with mock.patch.object(runner, "_run_agy", side_effect=run_agy):
+                result = runner.generate(
+                    companion.CliBackendRunner.MODEL_AGY,
+                    "Return exactly 3 suggestion(s).",
+                    "내가 뭘",
+                    3,
+                    allow_partial_suggestions=True,
+                )
+
+            self.assertEqual('{"suggestions":[]}', result)
+            self.assertNotIn("Return exactly 3 suggestion(s).", prompts[0])
+            self.assertIn("Return zero to three suggestion(s).", prompts[0])
+
     def test_run_agy_uses_default_model_and_effort(self):
         with tempfile.TemporaryDirectory() as sandbox:
             runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
@@ -379,10 +557,67 @@ class CliBoundaryTest(unittest.TestCase):
                 result = runner._run_agy("prompt text")
                 self.assertEqual("hello", result)
                 command = mocked.call_args.args[0]
+                self.assertEqual(1, command.count("--dangerously-skip-permissions"))
                 self.assertIn("--model", command)
                 self.assertIn("--effort", command)
                 self.assertEqual("gemini-3.8-flash-high", command[command.index("--model") + 1])
                 self.assertEqual("high", command[command.index("--effort") + 1])
+                self.assertEqual("prompt text", command[command.index("-p") + 1])
+                self.assertEqual(Path(sandbox), mocked.call_args.kwargs["cwd"])
+                self.assertEqual(companion.CLI_TIMEOUT_SECONDS, mocked.call_args.kwargs["timeout"])
+
+    def test_run_codex_uses_yolo_without_read_only_conflicts(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.codex = "codex.cmd"
+
+            completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="hello", stderr="")
+            with mock.patch.object(companion, "run_quiet", return_value=completed) as mocked:
+                result = runner._run_codex("prompt text")
+
+            self.assertEqual("hello", result)
+            command = mocked.call_args.args[0]
+            self.assertEqual(1, command.count("--yolo"))
+            self.assertNotIn("--sandbox", command)
+            self.assertNotIn("read-only", command)
+            self.assertNotIn('approval_policy="never"', command)
+            self.assertIn("--ephemeral", command)
+            self.assertIn("--skip-git-repo-check", command)
+            self.assertIn("--ignore-user-config", command)
+            self.assertIn("--ignore-rules", command)
+            self.assertIn('web_search="disabled"', command)
+            self.assertEqual("never", command[command.index("--color") + 1])
+            self.assertEqual(str(Path(sandbox)), command[command.index("-C") + 1])
+            self.assertEqual("-", command[-1])
+            self.assertEqual("prompt text", mocked.call_args.kwargs["input_text"])
+            self.assertEqual(companion.CLI_TIMEOUT_SECONDS, mocked.call_args.kwargs["timeout"])
+
+    def test_run_claude_uses_skip_permissions_without_safe_mode_conflicts(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.claude = "claude.exe"
+
+            completed = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout='{"is_error": false, "subtype": "success", "result": "hello"}', stderr=""
+            )
+            with mock.patch.object(companion, "run_quiet", return_value=completed) as mocked:
+                result = runner._run_claude("prompt text")
+
+            self.assertEqual("hello", result)
+            command = mocked.call_args.args[0]
+            self.assertEqual(1, command.count("--dangerously-skip-permissions"))
+            self.assertNotIn("--safe-mode", command)
+            self.assertNotIn("--tools", command)
+            self.assertNotIn("--permission-mode", command)
+            self.assertNotIn("dontAsk", command)
+            self.assertIn("-p", command)
+            self.assertIn("--no-session-persistence", command)
+            self.assertEqual("json", command[command.index("--output-format") + 1])
+            self.assertEqual(Path(sandbox), mocked.call_args.kwargs["cwd"])
+            self.assertEqual("prompt text", mocked.call_args.kwargs["input_text"])
+            self.assertEqual(companion.CLI_TIMEOUT_SECONDS, mocked.call_args.kwargs["timeout"])
 
     def test_run_agy_uses_configured_model_and_effort(self):
         with tempfile.TemporaryDirectory() as sandbox:

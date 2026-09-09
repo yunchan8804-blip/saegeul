@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import kotlinx.coroutines.CancellationException
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
+import org.fcitx.fcitx5.android.input.ai.vault.VaultFileVersion
 import java.io.File
 
 /**
@@ -14,63 +16,95 @@ import java.io.File
  * Manages incremental accumulation, knowledge evolution, and atomic persistence.
  */
 class TypingDnaRepository(
-    private val storageFile: File,
+    storageFile: File,
     private val cipher: VaultCipher = PlainVaultCipher
 ) {
 
     private var cachedProfile: TypingDnaProfile? = null
-    private var lastLoadedTimestamp: Long = 0L
+    private var cachedVersion: VaultFileVersion? = null
+    private var cachedSummary: DerivedCache<TypingDnaSummary>? = null
+    private var cachedStats: DerivedCache<TypingDnaStats>? = null
     private val vaultFile = VaultFile(storageFile, cipher, VaultFile.aadFor(storageFile.name))
 
     @Synchronized
-    fun load(forceReload: Boolean = false): TypingDnaProfile {
-        val currentMod = if (storageFile.exists()) storageFile.lastModified() else 0L
-        if (!forceReload && cachedProfile != null && currentMod <= lastLoadedTimestamp) {
-            return cachedProfile!!
-        }
-
-        if (!storageFile.exists()) {
-            val fresh = TypingDnaProfile()
-            cachedProfile = fresh
-            lastLoadedTimestamp = 0L
-            return fresh
-        }
-
-        val jsonStr = runCatching {
-            vaultFile.migrateIfLegacy()
-            vaultFile.readText()
-        }.getOrNull() ?: ""
-        val profile = TypingDnaProfile.fromJson(jsonStr)
-        cachedProfile = profile
-        lastLoadedTimestamp = currentMod
-        return profile
+    fun load(forceReload: Boolean = false): TypingDnaProfile = vaultFile.withLock {
+        loadLocked(forceReload)
     }
 
     @Synchronized
     fun save(profile: TypingDnaProfile) {
-        cachedProfile = profile
-        runCatching {
-            vaultFile.writeText(profile.toJson())
-            lastLoadedTimestamp = storageFile.lastModified()
+        vaultFile.withLock {
+            saveLocked(profile)
         }
     }
 
     @Synchronized
     fun invalidateCache() {
-        cachedProfile = null
-        lastLoadedTimestamp = 0L
+        clearCaches()
     }
 
     @Synchronized
     fun updatePersona(newPersona: PersonaDna, analyzedSentenceCount: Int = 15) {
-        val current = load()
+        vaultFile.withLock {
+            updatePersonaLocked(newPersona, analyzedSentenceCount)
+        }
+    }
+
+    @Synchronized
+    fun clear() {
+        vaultFile.withLock {
+            runCatching {
+                vaultFile.delete()
+            }
+            clearCaches()
+        }
+    }
+
+    private fun loadLocked(forceReload: Boolean): TypingDnaProfile {
+        val version = vaultFile.version()
+        val cached = cachedProfile
+        if (!forceReload && cached != null && cachedVersion == version) {
+            return cached
+        }
+
+        invalidateDerivedCaches()
+        val text = try {
+            vaultFile.readTextAndMigrate()
+        } catch (_: Exception) {
+            clearCaches()
+            return TypingDnaProfile.fromJson("")
+        }
+        val profile = TypingDnaProfile.fromJson(text ?: "")
+        cachedProfile = profile
+        cachedVersion = vaultFile.version()
+        return profile
+    }
+
+    private fun saveLocked(profile: TypingDnaProfile) {
+        try {
+            vaultFile.writeText(profile.toJson())
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            throw TypingDnaPersistenceException(exception)
+        }
+        cachedProfile = profile
+        cachedVersion = vaultFile.version()
+        invalidateDerivedCaches()
+    }
+
+    private fun updatePersonaLocked(newPersona: PersonaDna, analyzedSentenceCount: Int) {
+        val current = loadLocked(forceReload = false)
         val currentPersonas = current.personas.toMutableMap()
         val existing = currentPersonas[newPersona.category]
 
+        val mergedEndings = (newPersona.habitualEndings + existing?.habitualEndings.orEmpty())
+            .distinct()
+            .take(15)
+
         val merged = if (existing == null) {
-            newPersona
+            newPersona.copy(habitualEndings = mergedEndings)
         } else {
-            val mergedEndings = (existing.habitualEndings + newPersona.habitualEndings).distinct().take(15)
             val bigramMap = mutableMapOf<Pair<String, String>, Float>()
             existing.frequentBigrams.forEach { bigramMap[Pair(it.prev, it.next)] = it.weight }
             newPersona.frequentBigrams.forEach {
@@ -98,21 +132,16 @@ class TypingDnaRepository(
             totalAnalyzedSentences = current.totalAnalyzedSentences + analyzedSentenceCount.coerceAtLeast(0),
             personas = currentPersonas
         )
-        save(updatedProfile)
-    }
-
-    @Synchronized
-    fun clear() {
-        cachedProfile = TypingDnaProfile()
-        lastLoadedTimestamp = 0L
-        runCatching {
-            vaultFile.delete()
-        }
+        saveLocked(updatedProfile)
     }
 
     @Synchronized
     fun getSummary(forceReload: Boolean = false): TypingDnaSummary {
         val profile = load(forceReload = forceReload)
+        val version = cachedVersion
+        cachedSummary?.takeIf { it.profile === profile && it.version == version }?.let {
+            return it.value
+        }
         var endingsCount = 0
         var bigramsCount = 0
         var phrasesCount = 0
@@ -125,18 +154,26 @@ class TypingDnaRepository(
             dominantTones.add("${p.category}:${p.dominantTone}")
         }
 
-        return TypingDnaSummary(
+        val summary = TypingDnaSummary(
             totalSentences = profile.totalAnalyzedSentences,
             endingsCount = endingsCount,
             bigramsCount = bigramsCount,
             phrasesCount = phrasesCount,
             personasSummary = dominantTones.joinToString(", ")
         )
+        if (cachedProfile === profile && version != null) {
+            cachedSummary = DerivedCache(profile, version, summary)
+        }
+        return summary
     }
 
     @Synchronized
     fun getStats(forceReload: Boolean = false): TypingDnaStats {
         val profile = load(forceReload = forceReload)
+        val version = cachedVersion
+        cachedStats?.takeIf { it.profile === profile && it.version == version }?.let {
+            return it.value
+        }
         var endingsCount = 0
         var bigramsCount = 0
         var phrasesCount = 0
@@ -198,7 +235,7 @@ class TypingDnaRepository(
         val emptyTone = honorificCount == 0 && informalCount == 0
         val emptyCat = messengerCount == 0 && workCount == 0 && generalCount == 0
 
-        return TypingDnaStats(
+        val stats = TypingDnaStats(
             level = level,
             levelTitle = levelTitle,
             levelProgressPercent = progress,
@@ -218,7 +255,28 @@ class TypingDnaRepository(
             cloudBytesExported = 0,
             hasLearnedData = hasLearnedData
         )
+        if (cachedProfile === profile && version != null) {
+            cachedStats = DerivedCache(profile, version, stats)
+        }
+        return stats
     }
+
+    private fun invalidateDerivedCaches() {
+        cachedSummary = null
+        cachedStats = null
+    }
+
+    private fun clearCaches() {
+        cachedProfile = null
+        cachedVersion = null
+        invalidateDerivedCaches()
+    }
+
+    private data class DerivedCache<T>(
+        val profile: TypingDnaProfile,
+        val version: VaultFileVersion,
+        val value: T
+    )
 
     private data class Tuple4<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 }

@@ -6,6 +6,14 @@ package org.fcitx.fcitx5.android.input.ai.rag
 
 import org.json.JSONObject
 
+enum class GraphEnrichmentChunkOutcome {
+    VALID,
+    EMPTY_OUTPUT,
+    NO_JSON_OBJECT,
+    INVALID_JSON,
+    INVALID_SHAPE
+}
+
 /**
  * Orchestrates the companion enrichment pipeline: batches the user's own committed sentences from
  * [vault], sends them to the companion LLM CLI (via the injected [enrich] `generate` callback) to
@@ -16,7 +24,8 @@ import org.json.JSONObject
 class PersonalGraphEnricher(
     private val vault: PersonalSentenceVault,
     private val graphStore: PersonalGraphStore,
-    private val clock: () -> Long = System::currentTimeMillis
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val onChunkOutcome: (GraphEnrichmentChunkOutcome) -> Unit = {}
 ) {
 
     data class EnrichResult(val ok: Boolean, val reason: String, val nodes: Int, val edges: Int, val topics: Int)
@@ -46,16 +55,17 @@ class PersonalGraphEnricher(
 
         for (chunk in chunks) {
             val outs = generate(ENRICHMENT_INSTRUCTION, chunk)
-            val raw = outs.firstOrNull()
-            val parsed = raw?.let { parseChunk(it) }
-            if (parsed == null) {
+            val parsed = parseChunk(outs.firstOrNull())
+            onChunkOutcome(parsed.outcome)
+            val graph = parsed.graph
+            if (graph == null) {
                 failCount++
                 continue
             }
             successCount++
-            mergeNodes(mergedNodes, parsed.nodes)
-            mergeEdges(mergedEdges, parsed.edges)
-            mergeTopics(mergedTopics, parsed.topics)
+            mergeNodes(mergedNodes, graph.nodes)
+            mergeEdges(mergedEdges, graph.edges)
+            mergeTopics(mergedTopics, graph.topics)
         }
 
         if (successCount == 0) return EnrichResult(false, "parse_failed", 0, 0, 0)
@@ -100,59 +110,79 @@ class PersonalGraphEnricher(
         val topics: List<PersonalGraphStore.Topic>
     )
 
-    private fun parseChunk(raw: String): ParsedChunk? = runCatching {
-        val jsonText = extractJsonObject(raw) ?: return null
-        val root = JSONObject(jsonText)
+    private data class ChunkParseResult(
+        val outcome: GraphEnrichmentChunkOutcome,
+        val graph: ParsedChunk? = null
+    )
+
+    private fun parseChunk(raw: String?): ChunkParseResult {
+        val nonBlankRaw = raw?.takeIf { it.isNotBlank() }
+            ?: return ChunkParseResult(GraphEnrichmentChunkOutcome.EMPTY_OUTPUT)
+
+        val jsonText = extractJsonObject(nonBlankRaw)
+            ?: return ChunkParseResult(
+                if (nonBlankRaw.contains('{') || nonBlankRaw.contains('}')) {
+                    GraphEnrichmentChunkOutcome.INVALID_JSON
+                } else {
+                    GraphEnrichmentChunkOutcome.NO_JSON_OBJECT
+                }
+            )
+        val root = try {
+            JSONObject(jsonText)
+        } catch (_: Exception) {
+            return ChunkParseResult(GraphEnrichmentChunkOutcome.INVALID_JSON)
+        }
+
+        val nodesArr = root.optJSONArray("nodes")
+            ?: return ChunkParseResult(GraphEnrichmentChunkOutcome.INVALID_SHAPE)
+        val edgesArr = root.optJSONArray("edges")
+            ?: return ChunkParseResult(GraphEnrichmentChunkOutcome.INVALID_SHAPE)
+        val topicsArr = root.optJSONArray("topics")
+            ?: return ChunkParseResult(GraphEnrichmentChunkOutcome.INVALID_SHAPE)
 
         val nodes = mutableListOf<PersonalGraphStore.Node>()
-        val nodesArr = root.optJSONArray("nodes")
-        if (nodesArr != null) {
-            for (i in 0 until nodesArr.length()) {
-                val o = nodesArr.optJSONObject(i) ?: continue
-                val id = o.optString("id", "")
-                if (id.isBlank()) continue
-                val tagsArr = o.optJSONArray("tags")
-                val tags = mutableListOf<String>()
-                if (tagsArr != null) {
-                    for (j in 0 until tagsArr.length()) tags.add(tagsArr.optString(j, ""))
-                }
-                val w = o.optDouble("w", 1.0).toFloat()
-                nodes.add(PersonalGraphStore.Node(id, tags, w))
+        for (i in 0 until nodesArr.length()) {
+            val o = nodesArr.optJSONObject(i) ?: continue
+            val id = o.optString("id", "")
+            if (id.isBlank()) continue
+            val tagsArr = o.optJSONArray("tags")
+            val tags = mutableListOf<String>()
+            if (tagsArr != null) {
+                for (j in 0 until tagsArr.length()) tags.add(tagsArr.optString(j, ""))
             }
+            val w = o.optDouble("w", 1.0).toFloat()
+            nodes.add(PersonalGraphStore.Node(id, tags, w))
         }
 
         val edges = mutableListOf<PersonalGraphStore.Edge>()
-        val edgesArr = root.optJSONArray("edges")
-        if (edgesArr != null) {
-            for (i in 0 until edgesArr.length()) {
-                val o = edgesArr.optJSONObject(i) ?: continue
-                val a = o.optString("a", "")
-                val b = o.optString("b", "")
-                if (a.isBlank() || b.isBlank()) continue
-                val w = o.optDouble("w", 1.0).toFloat()
-                edges.add(PersonalGraphStore.Edge(a, b, w))
-            }
+        for (i in 0 until edgesArr.length()) {
+            val o = edgesArr.optJSONObject(i) ?: continue
+            val a = o.optString("a", "")
+            val b = o.optString("b", "")
+            if (a.isBlank() || b.isBlank()) continue
+            val w = o.optDouble("w", 1.0).toFloat()
+            edges.add(PersonalGraphStore.Edge(a, b, w))
         }
 
         val topics = mutableListOf<PersonalGraphStore.Topic>()
-        val topicsArr = root.optJSONArray("topics")
-        if (topicsArr != null) {
-            for (i in 0 until topicsArr.length()) {
-                val o = topicsArr.optJSONObject(i) ?: continue
-                val id = o.optString("id", "")
-                val label = o.optString("label", "")
-                if (id.isBlank() || label.isBlank()) continue
-                val membersArr = o.optJSONArray("members")
-                val members = mutableListOf<String>()
-                if (membersArr != null) {
-                    for (j in 0 until membersArr.length()) members.add(membersArr.optString(j, ""))
-                }
-                topics.add(PersonalGraphStore.Topic(id, label, members))
+        for (i in 0 until topicsArr.length()) {
+            val o = topicsArr.optJSONObject(i) ?: continue
+            val id = o.optString("id", "")
+            val label = o.optString("label", "")
+            if (id.isBlank() || label.isBlank()) continue
+            val membersArr = o.optJSONArray("members")
+            val members = mutableListOf<String>()
+            if (membersArr != null) {
+                for (j in 0 until membersArr.length()) members.add(membersArr.optString(j, ""))
             }
+            topics.add(PersonalGraphStore.Topic(id, label, members))
         }
 
-        ParsedChunk(nodes, edges, topics)
-    }.getOrNull()
+        return ChunkParseResult(
+            GraphEnrichmentChunkOutcome.VALID,
+            ParsedChunk(nodes, edges, topics)
+        )
+    }
 
     /**
      * Extracts the JSON object substring from a companion response that may be wrapped in a

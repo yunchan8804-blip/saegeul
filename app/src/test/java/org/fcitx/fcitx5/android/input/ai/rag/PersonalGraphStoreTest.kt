@@ -6,12 +6,15 @@ package org.fcitx.fcitx5.android.input.ai.rag
 
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
 import org.fcitx.fcitx5.android.input.ai.vault.AesGcmVaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.security.GeneralSecurityException
 
 /**
  * Unit tests for [PersonalGraphStore]: capacity trimming, dangling-edge pruning, encrypted
@@ -122,6 +125,26 @@ class PersonalGraphStoreTest {
         assertEquals(0, stats.edges)
         assertEquals(0, stats.topics)
         assertFalse(file.exists())
+    }
+
+    @Test
+    fun savePropagatesCipherWriteFailure() {
+        val store = PersonalGraphStore(
+            storeFile = tempFolder.newFile("personal_graph_save_failure.json"),
+            cipher = FailingVaultCipher()
+        )
+        store.replaceGraph(
+            nodes = listOf(PersonalGraphStore.Node("회의", emptyList(), 1.0f)),
+            edges = emptyList(),
+            topics = emptyList(),
+            builtMs = 1L
+        )
+
+        try {
+            store.save()
+            fail("cipher write failure must propagate")
+        } catch (_: GeneralSecurityException) {
+        }
     }
 
     @Test
@@ -354,5 +377,15 @@ class PersonalGraphStoreTest {
         val boost = store.proximityBoost(setOf("회"), setOf("참석"))
 
         assertEquals(1.0f, boost)
+    }
+
+    private class FailingVaultCipher : VaultCipher {
+        override val id: String = "failing"
+
+        override fun encrypt(plain: ByteArray, aad: ByteArray): ByteArray {
+            throw GeneralSecurityException("write failure")
+        }
+
+        override fun decrypt(blob: ByteArray, aad: ByteArray): ByteArray = blob
     }
 }

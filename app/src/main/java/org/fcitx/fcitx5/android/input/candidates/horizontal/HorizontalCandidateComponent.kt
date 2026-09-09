@@ -6,12 +6,16 @@
 package org.fcitx.fcitx5.android.input.candidates.horizontal
 
 import android.content.res.Configuration
+import android.graphics.Rect
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.flexbox.FlexWrap
@@ -40,9 +44,14 @@ import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualAppendSnapshot
+import org.fcitx.fcitx5.android.input.ai.AiPrefetchConnectionState
+import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
+import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import kotlin.math.max
+import java.util.IdentityHashMap
 
 /**
  * Two-tiered horizontal candidate component for Saegeul Keyboard:
@@ -96,6 +105,24 @@ class HorizontalCandidateComponent :
     private var nativeCandidates: List<CandidateWord> = emptyList()
     private var currentCapFlags: CapabilityFlags = CapabilityFlags.DefaultFlags
     private var preeditEmpty: Boolean = true
+    private val contextualMetricsCandidates = IdentityHashMap<CandidateWord, PredictionMetricsSession.Candidate?>()
+    private val contextualAppendSnapshots = IdentityHashMap<CandidateWord, ContextualAppendSnapshot?>()
+    private var metricsVisibilityPosted = false
+    private val metricsGlobalLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
+        scheduleCandidateVisibilityMeasurement()
+    }
+    private val metricsAttachListener = object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(v: View) {
+            v.viewTreeObserver.addOnGlobalLayoutListener(metricsGlobalLayoutListener)
+            scheduleCandidateVisibilityMeasurement()
+        }
+
+        override fun onViewDetachedFromWindow(v: View) {
+            if (v.viewTreeObserver.isAlive) {
+                v.viewTreeObserver.removeOnGlobalLayoutListener(metricsGlobalLayoutListener)
+            }
+        }
+    }
 
     // Whether this component currently renders at least one candidate (word row + sentence row
     // combined). KawaiiBarComponent collapses its suggestion row when this is false.
@@ -211,12 +238,19 @@ class HorizontalCandidateComponent :
                     if (nativeIdx >= 0) {
                         service.selectCandidate(nativeIdx)
                     } else {
-                        service.commitContextualSentence(holder.candidate.text)
+                        if (!contextualMetricsCandidates.containsKey(holder.candidate)) {
+                            return@setOnClickListener
+                        }
+                        service.commitContextualSentence(
+                            holder.candidate.text,
+                            contextualMetricsCandidates[holder.candidate],
+                            contextualAppendSnapshots[holder.candidate]
+                        )
                     }
                     // Feedback loop: If sentence candidates were offered on bottom row, record ignore decay
                     val offeredSentences = sentenceAdapter.candidates.map { it.text }
                     if (offeredSentences.isNotEmpty()) {
-                        service.reinforcementTracker.onCandidatesIgnored(offeredSentences)
+                        service.recordContextualCandidatesIgnored(offeredSentences)
                     }
                     view.post {
                         refreshContextualCandidatesIfNeeded()
@@ -250,14 +284,21 @@ class HorizontalCandidateComponent :
                     flexShrink = 0f
                 }
                 holder.itemView.setOnClickListener {
-                    service.commitContextualSentence(holder.candidate.text)
+                    if (!contextualMetricsCandidates.containsKey(holder.candidate)) {
+                        return@setOnClickListener
+                    }
+                    service.commitContextualSentence(
+                        holder.candidate.text,
+                        contextualMetricsCandidates[holder.candidate],
+                        contextualAppendSnapshots[holder.candidate]
+                    )
                     view.post {
                         refreshContextualCandidatesIfNeeded()
                     }
                 }
                 holder.itemView.setOnLongClickListener {
                     // Rejection / penalty on candidate long click
-                    service.reinforcementTracker.onCandidateRejected(holder.candidate.text, heavyPenalty = true)
+                    service.recordContextualCandidateRejected(holder.candidate.text, heavyPenalty = true)
                     view.post {
                         refreshContextualCandidatesIfNeeded()
                     }
@@ -300,6 +341,10 @@ class HorizontalCandidateComponent :
 
     val sentenceLayoutManager: FlexboxLayoutManager by lazy {
         object : FlexboxLayoutManager(context) {
+            init {
+                flexWrap = FlexWrap.NOWRAP
+            }
+
             override fun canScrollVertically() = false
             override fun canScrollHorizontally() = true
         }
@@ -332,6 +377,11 @@ class HorizontalCandidateComponent :
             addItemDecoration(FlexboxVerticalDecoration(wordDividerDrawable))
             isHorizontalFadingEdgeEnabled = true
             setFadingEdgeLength(context.dp(16))
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    scheduleCandidateVisibilityMeasurement()
+                }
+            })
         }
     }
 
@@ -343,12 +393,30 @@ class HorizontalCandidateComponent :
             layoutManager = sentenceLayoutManager
             isHorizontalFadingEdgeEnabled = true
             setFadingEdgeLength(context.dp(16))
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    scheduleCandidateVisibilityMeasurement()
+                }
+            })
         }
     }
 
     private val hairlineDivider: View by lazy {
         View(context).apply {
             setBackgroundColor((theme.dividerColor and 0x00FFFFFF) or 0x40000000)
+        }
+    }
+
+    private val connectionHintView: TextView by lazy {
+        TextView(context).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            textSize = 13f
+            setTextColor(theme.candidateTextColor)
+            setPadding(context.dp(12), 0, context.dp(12), 0)
+            isClickable = true
+            isFocusable = true
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            setOnClickListener { AiSettingsNavigator.openWritingSetup(context) }
         }
     }
 
@@ -364,10 +432,62 @@ class HorizontalCandidateComponent :
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
             )
             addView(
+                connectionHintView,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
+            )
+            addView(
                 sentenceRecyclerView,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
             )
+        }.also { root ->
+            root.addOnAttachStateChangeListener(metricsAttachListener)
+            if (root.isAttachedToWindow) {
+                root.viewTreeObserver.addOnGlobalLayoutListener(metricsGlobalLayoutListener)
+            }
         }
+    }
+
+    private fun scheduleCandidateVisibilityMeasurement() {
+        if (metricsVisibilityPosted) return
+        metricsVisibilityPosted = true
+        view.post {
+            metricsVisibilityPosted = false
+            recordVisibleContextualCandidates()
+        }
+    }
+
+    private fun recordVisibleContextualCandidates() {
+        if (!view.isShown) return
+        recordVisibleContextualCandidates(wordRecyclerView)
+        recordVisibleContextualCandidates(sentenceRecyclerView)
+    }
+
+    private fun recordVisibleContextualCandidates(recyclerView: RecyclerView) {
+        if (!recyclerView.isShown) return
+        for (index in 0 until recyclerView.childCount) {
+            val child = recyclerView.getChildAt(index) ?: continue
+            if (!child.isShown || !child.getGlobalVisibleRect(Rect())) continue
+            val holder = recyclerView.getChildViewHolder(child) as? CandidateViewHolder ?: continue
+            service.recordContextualCandidateShown(contextualMetricsCandidates[holder.candidate])
+        }
+    }
+
+    private fun connectionHintResource(): Int? = when (service.contextualSentenceConnectionHintState()) {
+        AiPrefetchConnectionState.PROVIDER_MISSING -> R.string.ai_connection_provider_missing
+        AiPrefetchConnectionState.REAUTH_REQUIRED -> R.string.ai_connection_reauth_required
+        AiPrefetchConnectionState.UNKNOWN,
+        AiPrefetchConnectionState.READY -> null
+    }
+
+    private fun setConnectionHint(resource: Int?) {
+        val visible = resource != null
+        connectionHintView.visibility = if (visible) View.VISIBLE else View.GONE
+        connectionHintView.updateLayoutParams<LinearLayout.LayoutParams> {
+            height = if (visible) context.dp(48) else 0
+            weight = 0f
+        }
+        if (visible) connectionHintView.setText(resource)
+        bar.candidateConnectionHintVisible = visible
     }
 
     private fun renderCandidates(data: FcitxEvent.CandidateListEvent.Data? = null) {
@@ -375,19 +495,33 @@ class HorizontalCandidateComponent :
             nativeCandidates = data.candidates.toList()
             nativeCandidateCount = nativeCandidates.size
         }
-        val contextualSentences = service.getContextualSentencePredictions(limit = 2)
-        val contextualWords = service.getContextualWordPredictions(limit = 4)
+        val contextualSnapshot = service.getContextualCandidateSnapshot(wordLimit = 4, sentenceLimit = 2)
+        val contextualWords = contextualSnapshot.words.map { it.word }
+        val contextualSentences = contextualSnapshot.sentences
+            .filterNot { contextual -> nativeCandidates.any { it.text == contextual.word.text } }
+            .map { it.word }
+        contextualMetricsCandidates.clear()
+        contextualAppendSnapshots.clear()
+        (contextualSnapshot.words + contextualSnapshot.sentences).forEach { candidate ->
+            if (nativeCandidates.none { it.text == candidate.word.text }) {
+                contextualMetricsCandidates[candidate.word] = candidate.metricsCandidate
+                contextualAppendSnapshots[candidate.word] = candidate.appendSnapshot
+            }
+        }
 
         val flags = if (currentCapFlags != CapabilityFlags.DefaultFlags) currentCapFlags else service.capabilityFlags
         val isEmail = EditorPrivacyPolicy.isEmailAddressField(service.currentInputEditorInfo, flags)
         val isUrl = EditorPrivacyPolicy.isUrlField(service.currentInputEditorInfo, flags)
 
         val showTwoRows = twoRowCandidateBar && !isEmail && !isUrl
+        val connectionHint = if (contextualSentences.isEmpty()) connectionHintResource() else null
 
         if (showTwoRows) {
             val topCandidates = mergeCandidates(nativeCandidates, contextualWords, emptyList())
             val bottomCandidates = if (contextualSentences.isNotEmpty()) {
                 contextualSentences.toTypedArray()
+            } else if (connectionHint != null) {
+                emptyArray()
             } else {
                 val overflowWords = contextualWords.drop(2).ifEmpty { nativeCandidates.drop(3) }
                 overflowWords.toTypedArray()
@@ -403,11 +537,13 @@ class HorizontalCandidateComponent :
 
             sentenceAdapter.updateCandidates(bottomCandidates, bottomCandidates.size)
             sentenceAdapter.rowHeightDp = 30
-            sentenceRecyclerView.visibility = View.VISIBLE
+            sentenceRecyclerView.visibility = if (connectionHint == null) View.VISIBLE else View.GONE
             sentenceRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
-                height = context.dp(30)
+                height = if (connectionHint == null) context.dp(30) else 0
                 weight = 0f
             }
+
+            setConnectionHint(connectionHint)
 
             hairlineDivider.visibility = View.VISIBLE
             hairlineDivider.updateLayoutParams<LinearLayout.LayoutParams> {
@@ -425,14 +561,48 @@ class HorizontalCandidateComponent :
                 )
             }
             applyFillStyle(topCandidates.size)
-            setHasVisibleCandidates(topCandidates.isNotEmpty() || bottomCandidates.isNotEmpty())
+            setHasVisibleCandidates(
+                topCandidates.isNotEmpty() || bottomCandidates.isNotEmpty() || connectionHint != null
+            )
         } else {
-            val candidates = mergeCandidates(nativeCandidates, contextualWords, contextualSentences)
+            val candidates = mergeCandidates(
+                nativeCandidates,
+                contextualWords,
+                if (connectionHint == null) contextualSentences else emptyList()
+            )
             wordAdapter.updateCandidates(candidates, candidates.size)
             sentenceAdapter.updateCandidates(emptyArray(), 0)
 
             val hasCandidates = candidates.isNotEmpty()
-            if (hasCandidates) {
+            if (connectionHint != null) {
+                wordRecyclerView.visibility = View.VISIBLE
+                wordAdapter.rowHeightDp = 28
+                wordRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = context.dp(28)
+                    weight = 0f
+                }
+                hairlineDivider.visibility = View.VISIBLE
+                hairlineDivider.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = max(1, context.dp(1))
+                    weight = 0f
+                }
+                sentenceRecyclerView.visibility = View.GONE
+                sentenceRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = 0
+                    weight = 0f
+                }
+                setConnectionHint(connectionHint)
+                bar.isCandidateTwoRow = true
+                if (!(preeditEmpty && nativeCandidates.isEmpty())) {
+                    bar.barStateMachine.push(
+                        KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
+                        KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
+                    )
+                }
+                applyFillStyle(candidates.size)
+                setHasVisibleCandidates(true)
+            } else if (hasCandidates) {
+                setConnectionHint(null)
                 wordRecyclerView.visibility = View.VISIBLE
                 wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
                 wordRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
@@ -453,6 +623,7 @@ class HorizontalCandidateComponent :
                 applyFillStyle(candidates.size)
                 setHasVisibleCandidates(true)
             } else {
+                setConnectionHint(null)
                 wordRecyclerView.visibility = View.GONE
                 hairlineDivider.visibility = View.GONE
                 sentenceRecyclerView.visibility = View.GONE
@@ -465,6 +636,7 @@ class HorizontalCandidateComponent :
                 refreshExpanded(0)
             }
         }
+        scheduleCandidateVisibilityMeasurement()
     }
 
     private fun applyFillStyle(candidateCount: Int) {
@@ -541,6 +713,8 @@ class HorizontalCandidateComponent :
         currentCapFlags = capFlags
         nativeCandidateCount = 0
         nativeCandidates = emptyList()
+        contextualMetricsCandidates.clear()
+        contextualAppendSnapshots.clear()
         view.post {
             refreshContextualCandidatesIfNeeded()
         }

@@ -35,7 +35,21 @@ class ContextualLearningAndTypingGroundingTest {
     }
 
     @Test
-    fun `predict with context '내일 판교' MUST return pangyo-specific sentences, not hello greetings`() {
+    fun `learned material with context '내일 판교' returns stored pangyo sentence, not hello greetings`() {
+        store.upsert(
+            PersonalizedSentenceRecord(
+                sentence = "내일 판교에서 만나서 이야기해요.",
+                source = PersonalizedSentenceRecord.SOURCE_USER_PHRASE,
+                packageName = "com.kakao.talk"
+            )
+        )
+        store.upsert(
+            PersonalizedSentenceRecord(
+                sentence = "안녕하세요!",
+                source = PersonalizedSentenceRecord.SOURCE_USER_PHRASE,
+                packageName = "com.kakao.talk"
+            )
+        )
         val results = predictor.predict(
             currentStroke = "",
             contextBeforeCursor = "내일 판교에서 ",
@@ -44,6 +58,10 @@ class ContextualLearningAndTypingGroundingTest {
         )
 
         val sentenceResults = results.filter { it.isSentenceCompletion }
+        assertEquals(
+            listOf("내일 판교에서 만나서 이야기해요."),
+            sentenceResults.map { it.text }
+        )
         assertTrue("Should have sentence completions for '내일 판교에서'", sentenceResults.isNotEmpty())
 
         // Must be grounded in Pangyo / meeting, NEVER arbitrary '안녕하세요!'
@@ -57,7 +75,21 @@ class ContextualLearningAndTypingGroundingTest {
     }
 
     @Test
-    fun `predict with context '회의' MUST return meeting-specific sentences`() {
+    fun `learned material with context '회의' returns stored meeting sentence`() {
+        store.upsert(
+            PersonalizedSentenceRecord(
+                sentence = "오후 2시 회의 참석 가능하신가요?",
+                source = PersonalizedSentenceRecord.SOURCE_USER_PHRASE,
+                packageName = "com.slack"
+            )
+        )
+        store.upsert(
+            PersonalizedSentenceRecord(
+                sentence = "안녕하세요!",
+                source = PersonalizedSentenceRecord.SOURCE_USER_PHRASE,
+                packageName = "com.slack"
+            )
+        )
         val results = predictor.predict(
             currentStroke = "",
             contextBeforeCursor = "오후 2시 회의 ",
@@ -66,6 +98,10 @@ class ContextualLearningAndTypingGroundingTest {
         )
 
         val sentenceResults = results.filter { it.isSentenceCompletion }
+        assertEquals(
+            listOf("오후 2시 회의 참석 가능하신가요?"),
+            sentenceResults.map { it.text }
+        )
         assertTrue("Should have sentence completions for meeting context", sentenceResults.isNotEmpty())
 
         val containsMeetingTerms = sentenceResults.any {
@@ -73,6 +109,19 @@ class ContextualLearningAndTypingGroundingTest {
         }
         assertTrue("Sentences must be grounded in meeting context", containsMeetingTerms)
         assertFalse("Sentences must not contain '안녕하세요!'", sentenceResults.any { it.text == "안녕하세요!" })
+    }
+
+    @Test
+    fun `nonempty context with empty store returns no sentence completions`() {
+        val results = predictor.predict(
+            currentStroke = "",
+            contextBeforeCursor = "내일 판교에서 ",
+            packageName = "com.kakao.talk",
+            limit = 5
+        )
+
+        val sentenceResults = results.filter { it.isSentenceCompletion }
+        assertTrue("Empty learned store must not fabricate sentence completions", sentenceResults.isEmpty())
     }
 
     @Test

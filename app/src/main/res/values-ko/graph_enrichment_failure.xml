@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="graph_enrichment_failure_invalid_response">AI 응답 형식이 맞지 않아 강화하지 못했어요. 다시 시도해 주세요.</string>
+    <string name="graph_enrichment_failure_reauth_required">AI 공급자에 다시 로그인해야 해요.</string>
+    <string name="graph_enrichment_failure_provider_busy">AI 공급자가 다른 요청을 처리 중이에요. 잠시 후 다시 시도해 주세요.</string>
+    <string name="graph_enrichment_failure_timeout">AI 응답 시간이 초과됐어요. 연결을 확인하고 다시 시도해 주세요.</string>
+    <string name="graph_enrichment_failure_network">AI 공급자에 연결하지 못했어요. 네트워크와 게이트웨이를 확인해 주세요.</string>
+    <string name="graph_enrichment_failure_provider_error">AI 공급자가 요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.</string>
+    <string name="graph_enrichment_failure_storage">강화 결과를 기기에 저장하지 못했어요.</string>
+</resources>

@@ -11,6 +11,27 @@ package org.fcitx.fcitx5.android.input.ai
 class TypingDnaCommitSink(
     private val collector: UserTypingContextCollector
 ) {
+    /** New editor metadata never proves continuity with an earlier text field. */
+    fun onEditorSessionStarted() {
+        collector.discardPending()
+    }
+
+    fun onEditorContinuityLost(packageName: String?, inspectionAllowed: Boolean) {
+        if (!inspectionAllowed) return
+        val pkg = packageName?.takeIf { it.isNotBlank() } ?: return
+        collector.discardPending(pkg)
+    }
+
+    fun onEditorSuffixDeleted(
+        packageName: String?,
+        removedText: String?,
+        inspectionAllowed: Boolean
+    ) {
+        if (!inspectionAllowed) return
+        val pkg = packageName?.takeIf { it.isNotBlank() } ?: return
+        collector.removePendingSuffix(pkg, removedText)
+    }
+
     fun onEditorTextCommitted(
         packageName: String?,
         text: String,

@@ -47,7 +47,7 @@ class VaultTimelineDataTest {
 
     @Test
     fun fromSummaryReturnsOneBarPerRecentDay() {
-        val days = (1..30).map { i -> dayStat(day = "2026-08-%02d".format(i), learnedWords = i) }
+        val days = (1..30).map { i -> dayStat(day = "2026-08-%02d".format(i), learnedSentences = i) }
 
         val bars = VaultTimelineData.fromSummary(summaryWith(days))
 
@@ -58,13 +58,13 @@ class VaultTimelineDataTest {
     fun fromSummaryNormalizesHeightRatioToMaxOne() {
         val days = listOf(
             dayStat("2026-08-01", learnedWords = 2),
-            dayStat("2026-08-02", learnedWords = 10),
+            dayStat("2026-08-02", learnedSentences = 10),
             dayStat("2026-08-03", learnedSentences = 5)
         )
 
         val bars = VaultTimelineData.fromSummary(summaryWith(days))
 
-        assertEquals(0.2f, bars[0].heightRatio, 0.0001f)
+        assertEquals(0f, bars[0].heightRatio, 0.0001f)
         assertEquals(1.0f, bars[1].heightRatio, 0.0001f)
         assertEquals(0.5f, bars[2].heightRatio, 0.0001f)
     }
@@ -73,13 +73,26 @@ class VaultTimelineDataTest {
     fun fromSummaryEmptyDayHasZeroHeightRatio() {
         val days = listOf(
             dayStat("2026-08-01"),
-            dayStat("2026-08-02", learnedWords = 4)
+            dayStat("2026-08-02", learnedSentences = 4)
         )
 
         val bars = VaultTimelineData.fromSummary(summaryWith(days))
 
         assertEquals(0f, bars[0].heightRatio, 0.0001f)
         assertEquals(0, bars[0].value)
+    }
+
+    @Test
+    fun fromSummaryUsesOnlyLearnedSentencesRatherThanLearnedWords() {
+        val bars = VaultTimelineData.fromSummary(summaryWith(listOf(
+            dayStat("2026-08-01", learnedWords = 500, learnedSentences = 2),
+            dayStat("2026-08-02", learnedWords = 1, learnedSentences = 4)
+        )))
+
+        assertEquals(2, bars[0].value)
+        assertEquals(4, bars[1].value)
+        assertEquals(0.5f, bars[0].heightRatio, 0.0001f)
+        assertEquals(1.0f, bars[1].heightRatio, 0.0001f)
     }
 
     @Test

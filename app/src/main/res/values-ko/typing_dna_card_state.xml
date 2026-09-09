@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="typing_dna_card_loading_title">언어 금고를 불러오는 중…</string>
+    <string name="typing_dna_card_loading_summary">불러오면 현재 학습 현황을 표시합니다.</string>
+    <string name="typing_dna_card_load_failed_title">언어 금고를 불러오지 못했어요</string>
+    <string name="typing_dna_card_load_failed_summary">상세 그래프를 열거나 잠시 후 다시 시도해 주세요.</string>
+    <string name="typing_dna_card_value_unknown">—</string>
+    <string name="typing_dna_card_metric_sentences_unknown">문장 —</string>
+    <string name="typing_dna_card_metric_bigrams_unknown">단어쌍 —</string>
+    <string name="typing_dna_card_metric_endings_unknown">어미 —</string>
+    <string name="typing_dna_card_metric_phrases_unknown">상용구 —</string>
+</resources>

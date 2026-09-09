@@ -26,6 +26,34 @@ class KoreanPiiScrubberTest {
     }
 
     @Test
+    fun testPhoneNumberWithKoreanParticleScrubbing() {
+        val input = "연락처는 010-1234-5678이고 다시 알려드릴게요."
+        val scrubbed = KoreanPiiScrubber.scrub(input)
+
+        assertTrue(KoreanPiiScrubber.containsPii(input))
+        assertFalse(scrubbed.contains("010-1234-5678"))
+        assertEquals("연락처는 [전화번호]이고 다시 알려드릴게요.", scrubbed)
+    }
+
+    @Test
+    fun testPhoneNumberWithKoreanPrefixScrubbing() {
+        val input = "연락처010-1234-5678로 보내주세요."
+        val scrubbed = KoreanPiiScrubber.scrub(input)
+
+        assertTrue(KoreanPiiScrubber.containsPii(input))
+        assertFalse(scrubbed.contains("010-1234-5678"))
+        assertEquals("연락처[전화번호]로 보내주세요.", scrubbed)
+    }
+
+    @Test
+    fun testLongerPhoneDigitSequenceIsNotScrubbedAsSubstring() {
+        val input = "식별 번호 010123456789를 확인하세요."
+
+        assertFalse(KoreanPiiScrubber.containsPii(input))
+        assertEquals(input, KoreanPiiScrubber.scrub(input))
+    }
+
+    @Test
     fun testRrnScrubbing() {
         val input = "주민등록번호는 950101-1234567 입니다."
         val scrubbed = KoreanPiiScrubber.scrub(input)

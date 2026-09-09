@@ -22,9 +22,14 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.AppCompatEditText
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnAttach
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.AiAuthMode
 import org.fcitx.fcitx5.android.input.ai.AiOAuthLoginActivity
@@ -52,6 +57,7 @@ class AiEditorTestActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(createContent())
         switchMode(HostMode.Normal)
     }
@@ -59,6 +65,19 @@ class AiEditorTestActivity : Activity() {
     private fun createContent(): View = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(12), dp(12), dp(12), dp(8))
+        ViewCompat.setOnApplyWindowInsetsListener(this) { view, windowInsets ->
+            val safeInsets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
+            )
+            view.setPadding(
+                dp(12) + safeInsets.left,
+                dp(12) + safeInsets.top,
+                dp(12) + safeInsets.right,
+                dp(8) + safeInsets.bottom
+            )
+            windowInsets
+        }
+        doOnAttach { ViewCompat.requestApplyInsets(it) }
 
         addView(TextView(context).apply {
             text = "AI editor E2E host · debug only"
@@ -78,7 +97,10 @@ class AiEditorTestActivity : Activity() {
         }
         addView(editorState)
 
-        addView(buttonRow(
+        val controls = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        controls.addView(buttonRow(
             button("Normal editor", "Select normal complete-editor mode") {
                 switchMode(HostMode.Normal)
             },
@@ -92,7 +114,7 @@ class AiEditorTestActivity : Activity() {
                 switchMode(HostMode.StaleExtractedSelection)
             }
         ))
-        addView(buttonRow(
+        controls.addView(buttonRow(
             button("이메일 칸", "Email input field test") {
                 switchMode(HostMode.Email)
             },
@@ -103,7 +125,7 @@ class AiEditorTestActivity : Activity() {
                 switchMode(HostMode.Url)
             }
         ))
-        addView(buttonRow(
+        controls.addView(buttonRow(
             button("Reset", "Reset deterministic editor text") { resetEditorText() },
             button("Select middle", "Select the deterministic middle source") {
                 selectMiddleSource()
@@ -112,7 +134,7 @@ class AiEditorTestActivity : Activity() {
                 mutateSourceWithoutMovingSelection()
             }
         ))
-        addView(buttonRow(
+        controls.addView(buttonRow(
             button("Clear", "Clear text") {
                 editor.setText("")
                 editor.setSelection(0)
@@ -129,7 +151,7 @@ class AiEditorTestActivity : Activity() {
                 (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).restartInput(editor)
             }
         ))
-        addView(buttonRow(
+        controls.addView(buttonRow(
             button("난 그걸하고 시프니까", "Set text to 난 그걸하고 시프니까") {
                 editor.setText("난 그걸하고 시프니까")
                 editor.setSelection("난 그걸하고 시프니까".length)
@@ -142,7 +164,7 @@ class AiEditorTestActivity : Activity() {
                 loadLongMultilineSource()
             }
         ))
-        addView(buttonRow(
+        controls.addView(buttonRow(
             button("OAuth browser", "Launch the configured OAuth browser flow") {
                 // A credential-free HTTPS profile gives the debug host a deterministic way to
                 // exercise AppAuth browser discovery without touching a user's real provider.
@@ -161,7 +183,7 @@ class AiEditorTestActivity : Activity() {
                 startActivity(AiOAuthLoginActivity.createIntent(this@AiEditorTestActivity))
             }
         ))
-        addView(buttonRow(
+        controls.addView(buttonRow(
             button("Local result", "Arm one local AI result card without network or credentials") {
                 AiDebugGenerationOverride.armForNextRequest()
                 Toast.makeText(
@@ -179,7 +201,7 @@ class AiEditorTestActivity : Activity() {
                 ).show()
             }
         ))
-        addView(buttonRow(
+        controls.addView(buttonRow(
             button("Local 8s loading", "Keep the next local AI request loading for eight seconds") {
                 AiDebugGenerationOverride.armDelayedForNextRequest()
                 Toast.makeText(
@@ -189,6 +211,15 @@ class AiEditorTestActivity : Activity() {
                 ).show()
             }
         ))
+        addView(
+            ScrollView(context).apply {
+                addView(controls)
+            },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(144)
+            )
+        )
 
         editorContainer = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL

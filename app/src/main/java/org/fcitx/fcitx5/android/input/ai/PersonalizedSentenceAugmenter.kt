@@ -123,7 +123,7 @@ $context
 
         try {
             lastAugmentTime.set(now)
-            val prompt = buildPrompt(context)
+            val prompt = buildPrompt(KoreanPiiScrubber.scrub(context))
             val response = llmCaller(prompt)
 
             var candidates = if (!response.isNullOrBlank()) {

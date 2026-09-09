@@ -357,12 +357,15 @@ class AiProviderSetupActivity : AppCompatActivity(), AiProviderDiscoveryListener
             runCatching {
                 val store = AiProviderCredentialStore(this@AiProviderSetupActivity)
                 val previous = store.load()
-                if (previous?.authMode == AiAuthMode.OAuthPkce && previous != profile) {
+                if (
+                    previous?.authMode == AiAuthMode.OAuthPkce &&
+                    !AiOAuthSessionIdentity.canPreserveSession(previous, profile)
+                ) {
                     runCatching {
                         AiOAuthSessionManager(this@AiProviderSetupActivity)
                             .revokeAndClear(previous)
                     }
-                } else if (previous != profile) {
+                } else if (previous?.authMode != AiAuthMode.OAuthPkce && previous != profile) {
                     AiOAuthSessionStore(this@AiProviderSetupActivity).clear()
                 }
                 store.save(profile)

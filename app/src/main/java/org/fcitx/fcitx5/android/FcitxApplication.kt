@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
+import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackRepository
 import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher
 import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
@@ -67,6 +68,12 @@ class FcitxApplication : Application() {
         PersonalSentenceVault(storeFile = File(filesDir, "personal_rag.json"), cipher = vaultCipher)
     }
 
+    val sentencePacks: SentencePackRepository by lazy {
+        SentencePackRepository(this, applicationScope) {
+            !AppPrefs.getInstance().advanced.offlineMode.getValue()
+        }
+    }
+
     val personalGraphStore: org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore by lazy {
         org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore(storeFile = File(filesDir, "personal_graph.json"), cipher = vaultCipher)
     }
@@ -94,6 +101,7 @@ class FcitxApplication : Application() {
      * 실패해도 앱 기동에는 영향이 없어야 하므로 예외는 삼키지 않고 로그만 남긴다.
      */
     fun warmUpLanguageAssets() {
+        sentencePacks.prepare()
         coroutineScope.launch(Dispatchers.IO) {
             try {
                 baseKoreanVocabulary.load()

@@ -691,6 +691,7 @@
     <string name="ai_auth_mode_auto_discovery" tools:ignore="MissingTranslation">Find my computer automatically (recommended)</string>
     <string name="ai_auth_mode_api_key" tools:ignore="MissingTranslation">Use an OpenAI API key</string>
     <string name="ai_auth_mode_oauth" tools:ignore="MissingTranslation">OAuth 2.0 login (PKCE)</string>
+    <string name="ai_auth_mode_oauth_relogin" tools:ignore="MissingTranslation">Sign in to existing connection again</string>
     <string name="ai_auth_mode_oauth_advanced" tools:ignore="MissingTranslation">Advanced OAuth settings</string>
     <string name="ai_auth_mode_advanced" tools:ignore="MissingTranslation">Advanced connection settings</string>
     <string name="ai_auth_mode_api_key_advanced" tools:ignore="MissingTranslation">OpenAI-compatible API endpoint</string>
@@ -1007,18 +1008,35 @@
     <string name="typing_dna_card_title" tools:ignore="MissingTranslation">AI My Language Vault Status</string>
     <string name="typing_dna_card_hardware_suffix" tools:ignore="MissingTranslation"> · 🔒 Hardware encrypted</string>
     <string name="vault_title" tools:ignore="MissingTranslation">My Language Vault</string>
-    <string name="vault_hero_subtitle" tools:ignore="MissingTranslation">Learning for %1$d days · %2$d word pairs · %3$d sentences</string>
+    <string name="vault_hero_subtitle" tools:ignore="MissingTranslation">Learned words %1$d · analyzed sentences %2$d</string>
+    <string name="vault_level_title" tools:ignore="MissingTranslation">Lv.%1$d | AI coexisting user</string>
+    <string name="vault_level_description" tools:ignore="MissingTranslation">The device records word connections and speaking style from the sentences you enter. Levels increase by analyzed sentence count.</string>
+    <string name="vault_level_number" tools:ignore="MissingTranslation">LV\n%1$d</string>
+    <string name="vault_level_content_description" tools:ignore="MissingTranslation">Learning level %1$d</string>
+    <string name="vault_level_progress_max" tools:ignore="MissingTranslation">Maximum level reached · continuing to record analyzed sentences</string>
+    <string name="vault_level_progress_next" tools:ignore="MissingTranslation">%2$d analyzed sentences until Lv.%1$d · %3$d%% complete</string>
     <string name="vault_security_title" tools:ignore="MissingTranslation">Encrypted with this device\'s hardware key</string>
     <string name="vault_security_strongbox" tools:ignore="MissingTranslation">StrongBox secure chip</string>
     <string name="vault_security_tee" tools:ignore="MissingTranslation">TEE hardware key</string>
     <string name="vault_security_software" tools:ignore="MissingTranslation">Software key</string>
     <string name="vault_security_body_line1" tools:ignore="MissingTranslation">Even the people who built Saegeul cannot open it.</string>
     <string name="vault_security_body_line2" tools:ignore="MissingTranslation">It cannot be read if copied to another app or device.</string>
-    <string name="vault_metric_accept_rate" tools:ignore="MissingTranslation">Accept rate</string>
-    <string name="vault_metric_personal_hits" tools:ignore="MissingTranslation">Personal hits</string>
+    <string name="vault_metric_accept_rate" tools:ignore="MissingTranslation">Recommendation acceptance rate</string>
+    <string name="vault_metric_accept_rate_description" tools:ignore="MissingTranslation">The share of displayed contextual recommendations that you selected.</string>
+    <string name="vault_metric_accept_rate_counts" tools:ignore="MissingTranslation">You selected %2$d of %1$d displayed recommendations. It updates when a recommendation is shown or selected.</string>
+    <string name="vault_metric_personal_hits" tools:ignore="MissingTranslation">Personal record usage</string>
     <string name="vault_metric_keystrokes_saved" tools:ignore="MissingTranslation">Keystrokes saved</string>
     <string name="vault_metric_typos_fixed" tools:ignore="MissingTranslation">Typos fixed</string>
-    <string name="vault_integrity_empty" tools:ignore="MissingTranslation">Accuracy will build up here as you type.</string>
+    <string name="vault_metric_measurement_pending" tools:ignore="MissingTranslation">Measurement pending</string>
+    <string name="vault_metric_not_recorded" tools:ignore="MissingTranslation">Not recorded</string>
+    <string name="vault_integrity_empty" tools:ignore="MissingTranslation">Recording starts when a contextual recommendation is displayed. Selected recommendations count toward the acceptance rate.</string>
+    <string name="vault_timeline_title" tools:ignore="MissingTranslation">Sentences learned from typing (last 30 days)</string>
+    <string name="vault_timeline_explanation" tools:ignore="MissingTranslation">Word connections are learned as you type. This count is separate from sentences analyzed for writing style and endings.</string>
+    <string name="vault_timeline_accessibility_empty" tools:ignore="MissingTranslation">Sentences learned from typing (last 30 days). No sentences recorded.</string>
+    <string name="vault_timeline_accessibility_populated" tools:ignore="MissingTranslation">Sentences learned from typing over %1$d days. %2$s to %3$s, daily maximum %4$d sentences.</string>
+    <string name="vault_timeline_summary" tools:ignore="MissingTranslation">%1$d sentences in the last 30 days · daily maximum %2$d</string>
+    <string name="vault_timeline_summary_preview" tools:ignore="MissingTranslation">0 sentences in the last 30 days · daily maximum 0</string>
+    <string name="vault_timeline_empty" tools:ignore="MissingTranslation">No learned sentences have been recorded yet. Enter and complete a sentence to add one.</string>
     <string name="vault_frequent_words_title" tools:ignore="MissingTranslation">Frequent words</string>
     <string name="vault_category_title" tools:ignore="MissingTranslation">By app category</string>
     <string name="vault_category_messenger" tools:ignore="MissingTranslation">Messenger</string>
@@ -1026,6 +1044,28 @@
     <string name="vault_category_general" tools:ignore="MissingTranslation">General</string>
     <string name="enrich_now_button" tools:ignore="MissingTranslation">Enrich now</string>
     <string name="dashboard_graph_stats_line" tools:ignore="MissingTranslation">Knowledge graph: %1$d nodes · %2$d relations · %3$d topics</string>
+    <string name="enrichment_card_title" tools:ignore="MissingTranslation">LLM enrichment</string>
+    <string name="enrichment_card_description" tools:ignore="MissingTranslation">It organizes relationships and topics in saved expressions to affect recommendation ranking.</string>
+    <string name="enrichment_action" tools:ignore="MissingTranslation">Analyze and enrich with LLM</string>
+    <string name="enrichment_status_never" tools:ignore="MissingTranslation">LLM enrichment has not run yet</string>
+    <string name="enrichment_status_legacy" tools:ignore="MissingTranslation">Earlier enrichment results exist · no recent run record</string>
+    <string name="enrichment_status_running" tools:ignore="MissingTranslation">LLM enrichment is running…</string>
+    <string name="enrichment_status_succeeded" tools:ignore="MissingTranslation">LLM enrichment complete</string>
+    <string name="enrichment_status_partial" tools:ignore="MissingTranslation">Partially enriched · you can run it again</string>
+    <string name="enrichment_status_no_data" tools:ignore="MissingTranslation">There are no sentences to enrich yet</string>
+    <string name="enrichment_status_failed" tools:ignore="MissingTranslation">Recent enrichment failed · you can try again</string>
+    <string name="enrichment_status_interrupted" tools:ignore="MissingTranslation">Enrichment was interrupted · please try again</string>
+    <string name="enrichment_graph_stats_last_applied" tools:ignore="MissingTranslation">Last applied %1$s\nCurrent graph: %2$d nodes · %3$d relations · %4$d topics</string>
+    <string name="enrichment_graph_stats_legacy" tools:ignore="MissingTranslation">Legacy graph saved %1$s\nCurrent graph: %2$d nodes · %3$d relations · %4$d topics</string>
+    <string name="enrichment_unavailable_offline" tools:ignore="MissingTranslation">LLM enrichment is unavailable in offline mode</string>
+    <string name="enrichment_unavailable_provider" tools:ignore="MissingTranslation">Connect an AI provider with an API key or OAuth to use sentence recommendations and LLM enrichment.</string>
+    <string name="enrichment_unavailable_oauth" tools:ignore="MissingTranslation">Sign in to your AI provider again to run LLM enrichment.</string>
+    <string name="enrichment_setup_action" tools:ignore="MissingTranslation">AI connection settings</string>
+    <string name="dashboard_loading_message" tools:ignore="MissingTranslation">Loading your language vault…</string>
+    <string name="dashboard_loading_failed" tools:ignore="MissingTranslation">Couldn\'t load your language vault. Please try again.</string>
+    <string name="dashboard_loading_retry" tools:ignore="MissingTranslation">Try again</string>
+    <string name="dashboard_sync_busy_message" tools:ignore="MissingTranslation">Analyzing sentences saved on this device…</string>
+    <string name="dashboard_sync_failed" tools:ignore="MissingTranslation">Couldn\'t save the analyzed content. Please try again.</string>
     <string name="enrich_offline_blocked" tools:ignore="MissingTranslation">Enrichment is unavailable in offline mode</string>
     <string name="enrich_no_provider" tools:ignore="MissingTranslation">Connect your computer (AI provider) in Privacy &amp; AI settings first</string>
     <string name="enrich_confirm_title" tools:ignore="MissingTranslation">Enrich personal knowledge graph</string>
@@ -1054,4 +1094,5 @@
     <string name="sync_level_never" tools:ignore="MissingTranslation">Not analyzed yet</string>
     <string name="sync_level_sync_only" tools:ignore="MissingTranslation">Last run: analysis and sync only (no AI enrichment)</string>
     <string name="sync_level_enriched" tools:ignore="MissingTranslation">Last run: AI enrichment complete · %1$s</string>
+    <string name="typing_dna_persistence_failed" tools:ignore="MissingTranslation">Couldn\'t save your language profile. Please try again.</string>
 </resources>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sentence_packs_title">Sentence packs</string>
+    <string name="sentence_packs_default_summary">Using built-in sentences · get extra examples</string>
+    <string name="sentence_packs_installed_summary">Built-in %1$d sentences · extra %2$d sentences installed</string>
+    <string name="sentence_packs_downloading_summary">Downloading extra examples · %1$s</string>
+    <string name="sentence_packs_failed_summary">Extra examples could not be downloaded · try again</string>
+    <string name="sentence_packs_dialog_title">Sentence packs</string>
+    <string name="sentence_packs_download_message">Would you like to add the daily sentence pack? Built-in sentences are available without a download.\n\nAbout 0.85 MiB · use offline after installation\nOnly daily sentences are selected on this device from GitHub’s public question-and-answer file. Your typed content and personal language vault are never sent.\n\nThese are public examples, so they may differ from your writing style.</string>
+    <string name="sentence_packs_download_continues">You can close this dialog while the download continues.</string>
+    <string name="sentence_packs_offline_message">Offline mode is on, so the extra sentence pack cannot be downloaded. Built-in sentences remain available. Turn off offline mode in this screen to download it.</string>
+    <string name="sentence_packs_installed_message">Built-in sentences remain available. The daily sentence pack has %1$d extra sentences installed.</string>
+    <string name="sentence_packs_source_license">Source and MIT license</string>
+    <string name="sentence_packs_download">Download</string>
+    <string name="sentence_packs_later">Later</string>
+    <string name="sentence_packs_close">Close</string>
+    <string name="sentence_packs_cancel">Cancel download</string>
+    <string name="sentence_packs_remove">Remove extra pack</string>
+    <string name="sentence_packs_retry">Retry</string>
+    <string name="sentence_packs_latest">Latest version</string>
+    <string name="sentence_packs_progress">%1$s / %2$s</string>
+</resources>

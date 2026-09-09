@@ -7,19 +7,18 @@ package org.fcitx.fcitx5.android.input.ai
 /**
  * 0ms Local Knowledge Compiler:
  * Compiles distilled [TypingDnaProfile] knowledge into the high-speed Tier-1 runtime engines
- * ([KoreanCollocationModel], [PersonalizedSentenceStore]),
- * and irreversibly purges the raw staging buffer in [TypingDnaVault] to enforce zero-leak privacy.
+ * ([KoreanCollocationModel], [PersonalizedSentenceStore]).
  */
 class TypingDnaCompiler(
     private val collocationModel: KoreanCollocationModel,
     private val sentenceStore: PersonalizedSentenceStore,
-    private val vault: TypingDnaVault? = null,
     private val repository: TypingDnaRepository? = null
 ) {
 
     /**
      * Compiles a single [PersonaDna] batch and updates runtime models.
-     * [persist] writes into [TypingDnaRepository]. Pass false for startup/runtime rehydrate.
+     * [persist] writes into [TypingDnaRepository]. Pass false for startup/runtime rehydrate,
+     * which updates runtime models only.
      * [analyzedSentenceCount] is the actual number of newly analyzed sentences to add.
      */
     @Synchronized
@@ -58,9 +57,6 @@ class TypingDnaCompiler(
         if (persist) {
             repository?.updatePersona(persona, analyzedSentenceCount)
         }
-
-        // Zero-Knowledge: Purge raw staging buffer
-        vault?.purge(persona.category)
     }
 
     /**

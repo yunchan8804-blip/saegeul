@@ -230,13 +230,7 @@ class AiOAuthSessionStore(context: Context) {
     fun clear() = atomicFile.delete()
 
     private fun profileFingerprint(profile: AiProviderProfile): String {
-        val material = listOf(
-            profile.baseUrl,
-            profile.oauthAuthorizationEndpoint,
-            profile.oauthTokenEndpoint,
-            profile.oauthClientId,
-            AiProviderProfile.oauthRedirectUri
-        ).joinToString("\u0000").toByteArray(Charsets.UTF_8)
+        val material = AiOAuthSessionIdentity.identityMaterial(profile)
         return try {
             MessageDigest.getInstance("SHA-256").digest(material)
                 .joinToString("") { "%02x".format(it) }

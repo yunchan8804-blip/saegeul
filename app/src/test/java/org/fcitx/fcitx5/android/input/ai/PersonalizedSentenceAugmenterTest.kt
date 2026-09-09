@@ -1,6 +1,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -107,6 +108,31 @@ class PersonalizedSentenceAugmenterTest {
         val found = store.query(queryChoseong = "ㅍㄱ", context = "", limit = 5)
         assertTrue(found.isNotEmpty())
         assertEquals("판교 테크원타워 지하 1층 카페에서 만나요.", found[0].sentence)
+    }
+
+    @Test
+    fun `external augmenter prompt scrubs PII from context`() {
+        var capturedPrompt: String? = null
+        val augmenter = PersonalizedSentenceAugmenter(
+            store = store,
+            llmCaller = { prompt ->
+                capturedPrompt = prompt
+                "[]"
+            },
+            debounceMs = 0L
+        )
+
+        augmenter.augmentContext(
+            packageName = "com.kakao.talk",
+            context = "연락처는 010-1234-5678이고 메일은 user@example.com입니다."
+        )
+
+        val prompt = capturedPrompt
+        assertNotNull(prompt)
+        assertTrue(prompt!!.contains("[전화번호]"))
+        assertTrue(prompt.contains("[이메일]"))
+        assertFalse(prompt.contains("010-1234-5678"))
+        assertFalse(prompt.contains("user@example.com"))
     }
 
     @Test

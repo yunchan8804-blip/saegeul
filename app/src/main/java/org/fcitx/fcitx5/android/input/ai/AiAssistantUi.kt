@@ -1053,6 +1053,7 @@ class AiAssistantUi(
         // Programmatic-only action (dashboard graph enrichment); never shown in the writing menu,
         // but the exhaustive when needs a branch. A valid label keeps it safe if ever rendered.
         AiAction.GraphEnrich -> R.string.enrich_now_button
+        AiAction.ContinueTyping -> R.string.ai_action_compose
     }
 
     private fun matchWrap() = LinearLayout.LayoutParams(

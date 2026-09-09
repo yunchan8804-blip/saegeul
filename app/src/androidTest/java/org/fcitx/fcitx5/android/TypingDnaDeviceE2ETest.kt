@@ -93,7 +93,7 @@ class TypingDnaDeviceE2ETest {
         repoFile.delete()
 
         val repository = TypingDnaRepository(repoFile)
-        val compiler = TypingDnaCompiler(collocation, store, vault, repository)
+        val compiler = TypingDnaCompiler(collocation, store, repository)
 
         val learnedPersona = PersonaDna(
             category = "messenger",

@@ -174,7 +174,7 @@ class PersonalGraphStore(
             }
             root.put("topics", topicsArr)
             vf.writeText(root.toString())
-        }
+        }.getOrThrow()
     }
 
     private fun sameTopic(a: String, b: String): Boolean =
@@ -186,8 +186,7 @@ class PersonalGraphStore(
         val vf = vaultFile ?: return
         if (!vf.exists()) return
         runCatching {
-            vf.migrateIfLegacy()
-            val raw = vf.readText() ?: return
+            val raw = vf.readTextAndMigrate() ?: return
             if (raw.isBlank()) return
             val root = JSONObject(raw)
             graphBuiltMs = root.optLong("built", 0L)

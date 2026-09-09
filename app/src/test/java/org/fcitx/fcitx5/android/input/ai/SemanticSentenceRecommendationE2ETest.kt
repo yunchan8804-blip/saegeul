@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.core.CandidateWord
+import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -14,15 +15,15 @@ import org.junit.Ignore
 import org.junit.Test
 
 /**
- * End-to-End (E2E) Integration Tests for AI-driven Contextual Sentence Recommendation.
- * Validates the entire user input lifecycle:
- * Context Ingestion -> Intent & Entity Extraction -> Slot-Filling Sentence Synthesis ->
- * Polarity/Nuance Filtering -> Candidate Mapping -> Selection & Trailing Whitespace Commit.
+ * MockEditor 기반 AI 문장 추천 단위 통합 검사.
+ * 관측 문장 저장, 문맥 검색, 후보 매핑, 편집기 삽입을 검사한다.
+ * 실제 Android 기기 E2E 검사는 아니다.
  */
 class SemanticSentenceRecommendationE2ETest {
 
     private lateinit var semanticPredictor: KoreanSemanticSentencePredictor
     private lateinit var prefetcher: AiSentenceCompletionPrefetcher
+    private lateinit var personalSentenceVault: PersonalSentenceVault
     private lateinit var contextualPredictor: AiContextualPredictor
 
     /**
@@ -47,11 +48,18 @@ class SemanticSentenceRecommendationE2ETest {
     fun setUp() {
         semanticPredictor = KoreanSemanticSentencePredictor()
         prefetcher = AiSentenceCompletionPrefetcher(clientProvider = null)
+        personalSentenceVault = PersonalSentenceVault(storeFile = null)
         contextualPredictor = AiContextualPredictor(
             morphology = ChoseongMorphologyEngine(),
             semanticPredictor = semanticPredictor,
-            prefetcher = prefetcher
+            prefetcher = prefetcher,
+            personalSentenceVault = personalSentenceVault
         )
+    }
+
+    private fun observeSentence(sentence: String, packageName: String) {
+        contextualPredictor.learnSentence(sentence, packageName)
+        assertTrue(personalSentenceVault.record(sentence, packageName))
     }
 
     private fun getContextualCandidateWords(
@@ -147,10 +155,10 @@ class SemanticSentenceRecommendationE2ETest {
 
     @Test
     fun testE2E_ToneConsistencyAcrossStyles() {
-        // Sentence-line tone consistency is now carried by input_continuation, which appends a
-        // tone-matching ending onto a personal-n-gram-trained continuable input.
+        // Sentence-line tone consistency comes from observed personal sentences retrieved for
+        // the user's current context.
         // 1. Honorific
-        contextualPredictor.learnSentence("회의 참석하겠습니다", "com.kakao.talk")
+        observeSentence("회의 참석하겠습니다", "com.kakao.talk")
         val honorificEditor = MockEditor("회의 참석")
         val honorificCandidates = getContextualCandidateWords(honorificEditor)
         assertTrue(honorificCandidates.isNotEmpty())
@@ -160,7 +168,7 @@ class SemanticSentenceRecommendationE2ETest {
         })
 
         // 2. Informal
-        contextualPredictor.learnSentence("뭐 확인했어", "com.kakao.talk")
+        observeSentence("뭐 확인했어", "com.kakao.talk")
         val informalEditor = MockEditor("뭐 확인")
         val informalCandidates = getContextualCandidateWords(informalEditor)
         assertTrue(informalCandidates.isNotEmpty())
@@ -173,9 +181,8 @@ class SemanticSentenceRecommendationE2ETest {
     @Test
     fun testE2E_StrokeVsBlankPriorities() {
         val context = "오늘 회의 내용 "
-        // "내용" is not a 하다-명사, so the sentence-line result here only comes from
-        // input_continuation's personal-n-gram chaining, which needs this trained first.
-        contextualPredictor.learnSentence("오늘 회의 내용 정리했습니다", "com.kakao.talk")
+        // The observed sentence is retrieved as a continuation of the typed context.
+        observeSentence("오늘 회의 내용 정리했습니다", "com.kakao.talk")
 
         // 1. Blank stroke: Full sentences should have top confidence
         val blankPredictions = contextualPredictor.predict(

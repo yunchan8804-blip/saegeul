@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="graph_enrichment_failure_invalid_response">The AI response format was invalid, so enrichment could not finish. Please try again.</string>
+    <string name="graph_enrichment_failure_reauth_required">Sign in to your AI provider again.</string>
+    <string name="graph_enrichment_failure_provider_busy">Your AI provider is handling another request. Please try again shortly.</string>
+    <string name="graph_enrichment_failure_timeout">The AI response timed out. Check the connection and try again.</string>
+    <string name="graph_enrichment_failure_network">Could not connect to your AI provider. Check the network and gateway.</string>
+    <string name="graph_enrichment_failure_provider_error">Your AI provider could not process the request. Please try again shortly.</string>
+    <string name="graph_enrichment_failure_storage">Could not save the enrichment result on this device.</string>
+</resources>

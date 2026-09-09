@@ -17,8 +17,9 @@ class CandidateViewHolder(val ui: CandidateItemUi) : RecyclerView.ViewHolder(ui.
 
     fun update(newIndex: Int, newCandidate: CandidateWord) {
         idx = newIndex
-        if (candidate != newCandidate) {
-            candidate = newCandidate
+        val shouldUpdateUi = candidate != newCandidate
+        candidate = newCandidate
+        if (shouldUpdateUi) {
             ui.updateCandidate(newCandidate, isFeatured = (newIndex == 0))
         }
     }

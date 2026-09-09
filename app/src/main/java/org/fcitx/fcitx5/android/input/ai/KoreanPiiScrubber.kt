@@ -16,22 +16,22 @@ object KoreanPiiScrubber {
 
     // 010-1234-5678, 01012345678, 011-123-4567, 02-1234-5678
     private val PHONE_PATTERN = Pattern.compile(
-        """\b(?:01[016789]|02|0[3-9][0-9])[-.\s]?\d{3,4}[-.\s]?\d{4}\b"""
+        """(?<![0-9])(?:01[016789]|02|0[3-9][0-9])[-.\s]?\d{3,4}[-.\s]?\d{4}(?![0-9])"""
     )
 
     // Korean Resident Registration Number: 900101-1234567, 020505-3456789
     private val RRN_PATTERN = Pattern.compile(
-        """\b\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-.\s]?[1-8]\d{6}\b"""
+        """(?<![0-9])\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-.\s]?[1-8]\d{6}(?![0-9])"""
     )
 
     // Credit Card: 16-digit card numbers with optional separators
     private val CARD_PATTERN = Pattern.compile(
-        """\b(?:\d{4}[-.\s]?){3}\d{4}\b"""
+        """(?<![0-9])(?:\d{4}[-.\s]?){3}\d{4}(?![0-9])"""
     )
 
     // Bank Account: e.g. 110-123-456789, 302-1234-5678-01
     private val ACCOUNT_PATTERN = Pattern.compile(
-        """\b(?:\d{3,6}[-.\s]){2,3}\d{2,6}\b"""
+        """(?<![0-9])(?:\d{3,6}[-.\s]){2,3}\d{2,6}(?![0-9])"""
     )
 
     // Email: e.g. user@example.com
@@ -41,7 +41,7 @@ object KoreanPiiScrubber {
 
     // OTP / Verification Code (4-8 digits after keyword or standalone token)
     private val OTP_PATTERN = Pattern.compile(
-        """(?i)(?:인증(?:번호|코드)?|비밀번호|비번|otp|code)[:\s]*([0-9]{4,8})\b"""
+        """(?i)(?:인증(?:번호|코드)?|비밀번호|비번|otp|code)[:\s]*(?<![0-9])([0-9]{4,8})(?![0-9])"""
     )
 
     /**
