@@ -3093,6 +3093,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (predictionMetricsSession.recordAccepted(candidate, committed)) {
             FcitxApplication.getInstance().applicationScope.launch {
+                if (BuildConfig.DEBUG && candidate.source == "ondevice_generated") {
+                    try {
+                        FcitxApplication.getInstance().generatedSentenceBank.recordAcceptedSuffix(candidate.text)
+                    } catch (error: Exception) {
+                        Timber.w("Generated material acceptance save failed: ${error.javaClass.simpleName}")
+                    }
+                }
                 FcitxApplication.getInstance().predictionMetricsStore.recordAccepted(candidate.source, savedKeystrokes = 0)
                 withContext(Dispatchers.Main) {
                     scheduleNgramSave()

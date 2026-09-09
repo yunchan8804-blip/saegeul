@@ -14,6 +14,8 @@ import com.google.ai.edge.litertlm.Content
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,8 +47,34 @@ class GemmaMaterialGenerator(private val context: Context) {
     var isRunning: Boolean = false
         private set
 
-    suspend fun generate(modelFile: File, useGpu: Boolean, prompt: String = FIXED_PROMPT): GenerationResult =
-        withContext(Dispatchers.IO + NonCancellable) {
+    @Volatile
+    var isInferring: Boolean = false
+        private set
+
+    suspend fun generate(
+        modelFile: File,
+        useGpu: Boolean,
+        prompt: String = FIXED_PROMPT
+    ): GenerationResult = coroutineScope {
+        val generation = async(Dispatchers.IO) {
+            generateNonCancellable(modelFile, useGpu, prompt)
+        }
+        try {
+            generation.await()
+        } catch (error: CancellationException) {
+            cancel()
+            withContext(NonCancellable) {
+                generation.join()
+            }
+            throw error
+        }
+    }
+
+    private suspend fun generateNonCancellable(
+        modelFile: File,
+        useGpu: Boolean,
+        prompt: String
+    ): GenerationResult = withContext(Dispatchers.IO + NonCancellable) {
             require(prompt.isNotBlank()) { "Gemma prompt는 비어 있을 수 없습니다." }
             require(prompt.toByteArray(Charsets.UTF_8).size <= MAX_PROMPT_UTF8_BYTES) {
                 "Gemma prompt는 UTF-8 기준 8192바이트 이하여야 합니다."
@@ -112,14 +140,19 @@ class GemmaMaterialGenerator(private val context: Context) {
                 }
                 val generationStartedAt = SystemClock.elapsedRealtime()
                 val response = StringBuilder()
-                conversation.sendMessageAsync(prompt).collect { message ->
-                    if (run.cancelled.get()) {
-                        requestNativeCancellation(run)
-                        return@collect
+                isInferring = true
+                try {
+                    conversation.sendMessageAsync(prompt).collect { message ->
+                        if (run.cancelled.get()) {
+                            requestNativeCancellation(run)
+                            return@collect
+                        }
+                        message.contents.contents
+                            .filterIsInstance<Content.Text>()
+                            .forEach { response.append(it.text) }
                     }
-                    message.contents.contents
-                        .filterIsInstance<Content.Text>()
-                        .forEach { response.append(it.text) }
+                } finally {
+                    isInferring = false
                 }
                 val generationMs = SystemClock.elapsedRealtime() - generationStartedAt
                 run.cancellationError.get()?.let { error ->
@@ -132,6 +165,7 @@ class GemmaMaterialGenerator(private val context: Context) {
                 failure = error
                 throw error
             } finally {
+                isInferring = false
                 var cleanupFailure: Throwable? = null
                 fun captureCleanupFailure(action: () -> Unit) {
                     try {

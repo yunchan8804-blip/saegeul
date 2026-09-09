@@ -34,6 +34,65 @@ class GeneratedSentenceBank(
     val sourceCount: Int
         get() = snapshot.sourceCount
 
+    fun exactPrefixCount(prefix: String): Int {
+        require(prefix in GeneratedMaterialPolicy.PREFIXES) { "Unknown generated-material prefix" }
+        return snapshot.entries.count { it.text.startsWith(prefix) }
+    }
+
+    fun addGeneratedForPrefix(response: String, prefix: String, modelId: String, modelSha256: String): IngestionReport {
+        require(prefix in GeneratedMaterialPolicy.PREFIXES) { "Unknown generated-material prefix" }
+        val source = Source(modelId.requireModelId(), modelSha256.requireSha256())
+        require(response.toByteArray(Charsets.UTF_8).size <= MAX_RESPONSE_BYTES) {
+            "Generated response exceeds 64 KiB"
+        }
+        val array = try { JSONArray(stripJsonFence(response)) } catch (error: Exception) {
+            throw GeneratedSentenceBankFormatException("Generated response must be a JSON array", error)
+        }
+        if (array.length() !in 1..8) throw GeneratedSentenceBankFormatException("Generated response must contain 1..8 sentences")
+        val accepted = mutableListOf<String>()
+        var rejected = 0
+        for (index in 0 until array.length()) {
+            val raw = array.opt(index) as? String
+            if (raw == null) { rejected++; continue }
+            val candidate = try {
+                decodeGenerated(JSONArray().put(raw).toString()).single()
+            } catch (_: GeneratedSentenceBankFormatException) {
+                rejected++
+                continue
+            }
+            if (isGeneratedCandidate(candidate, prefix)) accepted += candidate else rejected++
+        }
+        synchronized(ioLock) {
+            if (!loaded) loadLocked()
+            val existing = snapshot.entries.map { it.text }.toSet()
+            val known = existing.toMutableSet()
+            val additions = accepted.filter { known.add(it) }.map { StoredSentence(it, source) }
+            val duplicates = accepted.size - additions.size
+            if (additions.isNotEmpty()) {
+                val entries = retainEntries(snapshot.entries + additions)
+                vaultFile().writeText(encodeStored(entries))
+                snapshot = snapshotFor(entries, snapshot.revision + 1)
+                return IngestionReport(entries.count { it.text !in existing }, duplicates, rejected)
+            }
+            return IngestionReport(0, duplicates, rejected)
+        }
+    }
+
+    fun recordAcceptedSuffix(suffix: String): Int {
+        val needle = suffix.trim()
+        if (needle.isEmpty()) return 0
+        synchronized(ioLock) {
+            if (!loaded) loadLocked()
+            val matches = snapshot.entries.filter { it.text.endsWith(needle) }
+            if (matches.size != 1) return 0
+            val target = matches.single()
+            val entries = snapshot.entries.map { if (it === target) it.copy(acceptedCount = saturatingIncrement(it.acceptedCount)) else it }
+            vaultFile().writeText(encodeStored(entries))
+            snapshot = snapshotFor(entries, snapshot.revision + 1)
+            return 1
+        }
+    }
+
     fun load() {
         synchronized(ioLock) { loadLocked() }
     }
@@ -55,7 +114,7 @@ class GeneratedSentenceBank(
             }
             if (additions.isEmpty()) return 0
 
-            val entries = (previous.entries + additions).takeLast(MAX_SENTENCES)
+            val entries = retainEntries(previous.entries + additions)
             val next = snapshotFor(entries, previous.revision + 1)
             vaultFile().writeText(encodeStored(entries))
             snapshot = next
@@ -78,7 +137,7 @@ class GeneratedSentenceBank(
     private fun loadLocked() {
         val raw = vaultFile().readText()
         val stored = raw?.let(::decodeStored) ?: emptyList()
-        val capped = stored.takeLast(MAX_SENTENCES)
+        val capped = retainEntries(stored)
         val next = snapshotFor(capped, snapshot.revision + 1)
         if (capped.size != stored.size) {
             vaultFile().writeText(encodeStored(capped))
@@ -150,7 +209,14 @@ class GeneratedSentenceBank(
                 ?: throw GeneratedSentenceBankFormatException("Generated sentence bank entry $index modelSha256 is missing")
             validateStoredSentence(text, index)
             val source = Source(modelId.requireModelId(), modelSha256.requireSha256())
-            byText.putIfAbsent(text, StoredSentence(text, source))
+            val acceptedCount = if (!entry.has("acceptedCount")) 0L else {
+                val value = entry.opt("acceptedCount")
+                if ((value !is Int && value !is Long) || value.toLong() < 0L) {
+                    throw GeneratedSentenceBankFormatException("acceptedCount is invalid")
+                }
+                value.toLong()
+            }
+            byText.putIfAbsent(text, StoredSentence(text, source, acceptedCount))
         }
         return byText.values.toList()
     }
@@ -173,6 +239,7 @@ class GeneratedSentenceBank(
                         put("text", entry.text)
                         put("modelId", entry.source.modelId)
                         put("modelSha256", entry.source.modelSha256)
+                        put("acceptedCount", entry.acceptedCount)
                     })
                 }
             })
@@ -182,6 +249,25 @@ class GeneratedSentenceBank(
             "Generated sentence bank exceeds 1 MiB"
         }
         return encoded
+    }
+
+    private fun isGeneratedCandidate(text: String, prefix: String): Boolean {
+        if (!text.startsWith(prefix) || text.substring(prefix.length).trim().isEmpty()) return false
+        if (text.substring(prefix.length).trim().startsWith(prefix.trim())) return false
+        if (text.dropLast(1).any { it == '.' || it == '?' || it == '!' }) return false
+        val words = text.split(' ').filter(String::isNotBlank)
+        if (words.size !in 3..12) return false
+        if (words.size >= 3 && words.windowed(3).toSet().size != words.size - 2) return false
+        return true
+    }
+
+    private fun retainEntries(entries: List<StoredSentence>): List<StoredSentence> {
+        if (entries.size <= MAX_SENTENCES) return entries
+        return entries.withIndex()
+            .sortedWith(compareByDescending<IndexedValue<StoredSentence>> { it.value.acceptedCount }.thenByDescending { it.index })
+            .take(MAX_SENTENCES)
+            .sortedBy { it.index }
+            .map { it.value }
     }
 
     private fun stripJsonFence(response: String): String {
@@ -221,7 +307,7 @@ class GeneratedSentenceBank(
         val revision: Long
     )
 
-    private data class StoredSentence(val text: String, val source: Source)
+    private data class StoredSentence(val text: String, val source: Source, val acceptedCount: Long = 0L)
 
     private data class Source(val modelId: String, val modelSha256: String)
 
@@ -235,6 +321,10 @@ class GeneratedSentenceBank(
         val TERMINALS = setOf('.', '?', '!')
     }
 }
+
+data class IngestionReport(val added: Int, val duplicate: Int, val rejected: Int)
+
+private fun saturatingIncrement(value: Long): Long = if (value == Long.MAX_VALUE) value else value + 1L
 
 class GeneratedSentenceBankFormatException(message: String, cause: Throwable? = null) :
     IllegalArgumentException(message, cause)

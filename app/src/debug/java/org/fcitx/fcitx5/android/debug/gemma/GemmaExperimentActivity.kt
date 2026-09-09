@@ -10,24 +10,27 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
-import java.io.File
 import java.util.Locale
 
 class GemmaExperimentActivity : AppCompatActivity() {
@@ -44,9 +47,30 @@ class GemmaExperimentActivity : AppCompatActivity() {
     private lateinit var clearButton: Button
     private lateinit var deleteModelButton: Button
     private lateinit var backendGroup: RadioGroup
+    private lateinit var accumulationToggle: Switch
+    private lateinit var accumulationProgress: ProgressBar
+    private lateinit var accumulationStatus: TextView
+    private lateinit var accumulationDetails: TextView
+    private lateinit var scheduleAccumulationButton: Button
+    private lateinit var retryAccumulationButton: Button
+
+    private val accumulationStore by lazy { GemmaAccumulationStore.get(applicationContext) }
+    private var accumulationState = GemmaAccumulationState()
+    private var accumulationLoaded = false
+    private var accumulationLoadJob: Job? = null
+    private var accumulationOperation: Job? = null
+    private var accumulationLoadError: String? = null
+    private var manualBusy = false
+    private var modelReady = false
+    private var initialModelReadyCheckComplete = false
+    private var renderingAccumulationToggle = false
 
     private val importModel = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
+        if (accumulationState.enabled) {
+            status.text = "자동 축적을 끈 뒤 관리할 수 있습니다."
+            return@registerForActivityResult
+        }
         launchExclusive {
             status.text = "선택한 모델을 검증하며 가져오는 중입니다…"
             val result = GemmaModelFiles.importFrom(this, uri, ::showTransferProgress)
@@ -55,12 +79,21 @@ class GemmaExperimentActivity : AppCompatActivity() {
             } else {
                 "모델 가져오기와 SHA-256 검증이 완료되었습니다."
             }
+            refreshModelReady()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(createContent())
+        renderAccumulation()
+        observeAccumulation()
+        refreshModelReady()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshModelReady()
     }
 
     override fun onStop() {
@@ -85,6 +118,40 @@ class GemmaExperimentActivity : AppCompatActivity() {
         content.addView(TextView(this).apply {
             text = memoryGuidance()
         })
+        accumulationToggle = Switch(this).apply {
+            text = "문장 재료 자동 축적"
+            contentDescription = "문장 재료 자동 축적"
+            minimumHeight = dp(48)
+            setOnCheckedChangeListener { _, enabled ->
+                if (!renderingAccumulationToggle) setAccumulationEnabled(enabled)
+            }
+        }
+        content.addView(accumulationToggle)
+        content.addView(TextView(this).apply {
+            text = "충전 중이고 키보드를 사용하지 않을 때 문장 재료를 조금씩 쌓습니다. 입력할 때는 저장한 재료를 바로 찾습니다."
+        })
+        accumulationProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = DEFAULT_PREFIX_COUNT
+            progress = 0
+            contentDescription = "문장 재료 축적 진행"
+        }
+        content.addView(accumulationProgress)
+        accumulationStatus = TextView(this).apply {
+            contentDescription = "문장 재료 축적 상태"
+        }
+        accumulationDetails = TextView(this).apply {
+            contentDescription = "문장 재료 축적 세부 정보"
+        }
+        content.addView(accumulationStatus)
+        content.addView(accumulationDetails)
+        scheduleAccumulationButton = button("지금 보충 예약") { requestAccumulation() }.apply {
+            contentDescription = "지금 문장 재료 보충 예약"
+        }
+        retryAccumulationButton = button("다시 보충 시도") { retryAccumulation() }.apply {
+            contentDescription = "문장 재료 다시 보충 시도"
+        }
+        content.addView(scheduleAccumulationButton)
+        content.addView(retryAccumulationButton)
         backendGroup = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
             addView(RadioButton(this@GemmaExperimentActivity).apply {
@@ -111,7 +178,7 @@ class GemmaExperimentActivity : AppCompatActivity() {
         content.addView(clearButton)
         content.addView(deleteModelButton)
         status = TextView(this).apply {
-            text = "모델을 다운로드하거나 이미 받은 모델을 가져오세요."
+            text = INITIAL_MODEL_STATUS
             setPadding(0, padding, 0, 0)
         }
         output = TextView(this).apply {
@@ -124,6 +191,7 @@ class GemmaExperimentActivity : AppCompatActivity() {
 
     private fun button(text: String, onClick: () -> Unit): Button = Button(this).apply {
         this.text = text
+        minimumHeight = dp(48)
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
@@ -149,6 +217,7 @@ class GemmaExperimentActivity : AppCompatActivity() {
                     } else {
                         "모델 다운로드와 SHA-256 검증이 완료되었습니다."
                     }
+                    refreshModelReady()
                 }
             }
             .show()
@@ -191,6 +260,7 @@ class GemmaExperimentActivity : AppCompatActivity() {
                 launchExclusive {
                     GemmaModelFiles.deleteModel(this@GemmaExperimentActivity)
                     status.text = "Gemma 모델을 삭제했습니다."
+                    refreshModelReady()
                 }
             }
             .show()
@@ -217,6 +287,147 @@ class GemmaExperimentActivity : AppCompatActivity() {
         operation?.cancel()
     }
 
+    private fun observeAccumulation() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    accumulationStore.state.collect { state ->
+                        accumulationState = state
+                        if (state.error == null) accumulationLoadError = null
+                        renderAccumulation()
+                    }
+                }
+            }
+        }
+        loadAccumulationState()
+    }
+
+    private fun loadAccumulationState() {
+        if (accumulationLoadJob?.isActive == true) return
+        accumulationLoadError = null
+        accumulationLoadJob = lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) { accumulationStore.load() }
+                accumulationLoaded = true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                accumulationLoadError = error.message ?: error.javaClass.simpleName
+                renderAccumulation()
+            } finally {
+                accumulationLoadJob = null
+                renderAccumulation()
+            }
+        }
+    }
+
+    private fun refreshModelReady() {
+        lifecycleScope.launch {
+            modelReady = withContext(Dispatchers.IO) {
+                GemmaModelFiles.modelFile(applicationContext).let { file ->
+                    file.isFile && file.length() == GemmaModelFiles.MODEL_BYTES
+                }
+            }
+            if (!initialModelReadyCheckComplete) {
+                initialModelReadyCheckComplete = true
+                if (modelReady && status.text == INITIAL_MODEL_STATUS) {
+                    status.text = MODEL_READY_STATUS
+                }
+            }
+            renderAccumulation()
+        }
+    }
+
+    private fun setAccumulationEnabled(enabled: Boolean) {
+        if (!accumulationLoaded) {
+            renderAccumulation()
+            return
+        }
+        if (enabled && !modelReady) {
+            renderAccumulation()
+            return
+        }
+        runAccumulationAction {
+            GemmaAccumulationScheduler.setEnabled(applicationContext, enabled)
+        }
+    }
+
+    private fun requestAccumulation() {
+        if (!accumulationLoaded) {
+            renderAccumulation()
+            return
+        }
+        runAccumulationAction {
+            GemmaAccumulationScheduler.requestNow(applicationContext)
+        }
+    }
+
+    private fun retryAccumulation() {
+        if (!accumulationLoaded) {
+            loadAccumulationState()
+            return
+        }
+        runAccumulationAction {
+            GemmaAccumulationScheduler.retryExhausted(applicationContext)
+        }
+    }
+
+    private fun runAccumulationAction(action: suspend () -> Unit) {
+        if (accumulationOperation?.isActive == true) {
+            renderAccumulation()
+            return
+        }
+        accumulationLoadError = null
+        accumulationOperation = lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) { action() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                accumulationLoadError = error.message ?: error.javaClass.simpleName
+                renderAccumulation()
+            } finally {
+                accumulationOperation = null
+                renderAccumulation()
+            }
+        }
+        renderAccumulation()
+    }
+
+    private fun renderAccumulation() {
+        if (!::accumulationToggle.isInitialized) return
+        val state = accumulationState
+        val total = state.totalPrefixes.coerceAtLeast(1)
+        renderingAccumulationToggle = true
+        accumulationToggle.isChecked = state.enabled
+        renderingAccumulationToggle = false
+        accumulationToggle.isEnabled = accumulationLoaded && (state.enabled || (
+            modelReady && !manualBusy && accumulationOperation?.isActive != true
+        ))
+        accumulationProgress.max = total
+        accumulationProgress.progress = state.covered.coerceIn(0, total)
+        accumulationStatus.text = if (accumulationLoaded) state.status else "축적 상태를 확인하는 중…"
+        val error = state.error ?: accumulationLoadError
+        accumulationDetails.text = buildString {
+            append("저장 문장 ${state.stored}개 · 4개 이상 채운 문맥 ${state.covered}/${state.totalPrefixes}개")
+            append(" · 누적 추가 ${state.added}개 · 중복 ${state.duplicates}개 · 거부 ${state.rejected}개")
+            if (accumulationLoaded && !modelReady && !state.enabled) {
+                append("\n자동 축적을 켜려면 모델을 다운로드하거나 가져오세요.")
+            }
+            if (error != null) append("\n실패 사유: $error")
+        }
+        accumulationProgress.contentDescription = "4개 이상 채운 문맥 ${state.covered}/${state.totalPrefixes}개"
+        val canSchedule = accumulationLoaded && state.enabled && modelReady && !manualBusy && accumulationOperation?.isActive != true
+        scheduleAccumulationButton.isEnabled = canSchedule
+        retryAccumulationButton.text = if (!accumulationLoaded && error != null) "상태 다시 확인" else "다시 보충 시도"
+        retryAccumulationButton.isEnabled = if (!accumulationLoaded) {
+            error != null && accumulationLoadJob?.isActive != true
+        } else {
+            canSchedule
+        }
+        applyManualControlState()
+    }
+
     private fun showTransferProgress(receivedBytes: Long, totalBytes: Long) {
         runOnUiThread {
             status.text = "모델 처리 중: ${formatBytes(receivedBytes)} / ${formatBytes(totalBytes)}"
@@ -224,6 +435,10 @@ class GemmaExperimentActivity : AppCompatActivity() {
     }
 
     private fun launchExclusive(block: suspend () -> Unit) {
+        if (accumulationState.enabled) {
+            status.text = "자동 축적을 끈 뒤 관리할 수 있습니다."
+            return
+        }
         if (operation?.isActive == true || generator.isRunning) {
             status.text = "이미 작업이 진행 중입니다."
             return
@@ -243,16 +458,27 @@ class GemmaExperimentActivity : AppCompatActivity() {
     }
 
     private fun setBusy(busy: Boolean) {
-        downloadButton.isEnabled = !busy
-        importButton.isEnabled = !busy
-        generateButton.isEnabled = !busy
-        clearButton.isEnabled = !busy
-        deleteModelButton.isEnabled = !busy
-        backendGroup.isEnabled = !busy
-        for (index in 0 until backendGroup.childCount) {
-            backendGroup.getChildAt(index).isEnabled = !busy
-        }
+        manualBusy = busy
+        applyManualControlState()
         cancelButton.isEnabled = busy
+        renderAccumulation()
+    }
+
+    private fun applyManualControlState() {
+        if (!::downloadButton.isInitialized) return
+        val enabled = accumulationLoaded && !manualBusy && !accumulationState.enabled && accumulationOperation?.isActive != true
+        downloadButton.isEnabled = enabled
+        importButton.isEnabled = enabled
+        generateButton.isEnabled = enabled
+        clearButton.isEnabled = enabled
+        deleteModelButton.isEnabled = enabled
+        backendGroup.isEnabled = enabled
+        for (index in 0 until backendGroup.childCount) {
+            backendGroup.getChildAt(index).isEnabled = enabled
+        }
+        if (accumulationState.enabled) {
+            status.text = "자동 축적을 끈 뒤 관리할 수 있습니다."
+        }
     }
 
     private fun memoryGuidance(): String {
@@ -268,8 +494,13 @@ class GemmaExperimentActivity : AppCompatActivity() {
 
     private fun formatBytes(bytes: Long): String = String.format(Locale.US, "%.2f GiB", bytes / 1024.0 / 1024.0 / 1024.0)
 
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
     private companion object {
+        const val INITIAL_MODEL_STATUS = "모델을 다운로드하거나 이미 받은 모델을 가져오세요."
+        const val MODEL_READY_STATUS = "모델이 준비되어 있습니다. 자동 축적을 켜거나 고정 재료를 생성할 수 있습니다."
         const val CPU_ID = 1001
         const val GPU_ID = 1002
+        const val DEFAULT_PREFIX_COUNT = 20
     }
 }

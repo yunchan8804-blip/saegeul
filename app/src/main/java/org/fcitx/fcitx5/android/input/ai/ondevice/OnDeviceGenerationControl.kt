@@ -9,6 +9,12 @@ object OnDeviceGenerationControl {
     private var keyboardActive = false
     private var cancelCallback: (() -> Unit)? = null
 
+    val isKeyboardActive: Boolean
+        get() = synchronized(lock) { keyboardActive }
+
+    val isGenerating: Boolean
+        get() = synchronized(lock) { cancelCallback != null }
+
     fun begin(cancel: () -> Unit): Boolean = synchronized(lock) {
         if (keyboardActive || cancelCallback != null) return false
         cancelCallback = cancel

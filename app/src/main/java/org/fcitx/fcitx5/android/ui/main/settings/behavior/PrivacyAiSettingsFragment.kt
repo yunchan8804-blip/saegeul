@@ -36,6 +36,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore
@@ -250,6 +251,20 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                         ctx.startActivity(android.content.Intent(ctx, org.fcitx.fcitx5.android.ui.main.ai.TypingDnaDashboardActivity::class.java))
                     }
                 )
+                if (BuildConfig.DEBUG) {
+                    addPreference(
+                        title = "기기에서 문장 재료 쌓기",
+                        summary = "고정 문장 재료를 기기에서 자동으로 쌓는 debug 실험을 엽니다.",
+                        onClick = {
+                            ctx.startActivity(
+                                android.content.Intent().setClassName(
+                                    ctx,
+                                    "org.fcitx.fcitx5.android.debug.gemma.GemmaExperimentActivity"
+                                )
+                            )
+                        }
+                    )
+                }
                 typingDnaSyncPreference = Preference(ctx).apply {
                     title = "지금 언어 지문 분석 및 동기화"
                     summary = "최근 타이핑 데이터를 바탕으로 내 말투와 어휘 습관을 즉시 업데이트합니다."
