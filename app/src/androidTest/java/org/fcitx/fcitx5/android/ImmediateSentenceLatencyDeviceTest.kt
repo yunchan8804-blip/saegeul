@@ -50,21 +50,36 @@ class ImmediateSentenceLatencyDeviceTest {
         val results = mutableListOf<LatencyResult>()
         val tapMode = InstrumentationRegistry.getArguments().getString(TAP_MODE_ARGUMENT)
             .takeIf { it == TOUCH_TAP_MODE } ?: ACCESSIBILITY_TAP_MODE
+        val candidateSource = when (val requestedSource =
+            InstrumentationRegistry.getArguments().getString(CANDIDATE_SOURCE_ARGUMENT)
+        ) {
+            null -> SENTENCE_PACK_SOURCE
+            SENTENCE_PACK_SOURCE, GENERATED_SOURCE -> requestedSource
+            else -> error("candidateSource는 sentence_pack 또는 ondevice_generated만 허용합니다: $requestedSource")
+        }
         val requestedLatencyCase = InstrumentationRegistry.getArguments().getString(LATENCY_CASE_ARGUMENT)
         val latencyCase = requestedLatencyCase?.toIntOrNull()
-        require(requestedLatencyCase == null || latencyCase in LATENCY_PREFIXES.indices.map { it + 1 }) {
-            "latencyCase는 1..${LATENCY_PREFIXES.size}이어야 합니다."
+        val prefixes = if (candidateSource == GENERATED_SOURCE) GENERATED_PREFIXES else LATENCY_PREFIXES
+        require(requestedLatencyCase == null || latencyCase in prefixes.indices.map { it + 1 }) {
+            "latencyCase는 1..${prefixes.size}이어야 합니다."
         }
         try {
             AppPrefs.getInstance().advanced.offlineMode.setValue(true)
-            waitForBuiltinSentencePack()
+            if (candidateSource == SENTENCE_PACK_SOURCE) {
+                waitForBuiltinSentencePack()
+            } else {
+                val generatedBank = FcitxApplication.getInstance().generatedSentenceBank
+                generatedBank.load()
+                val generatedCount = generatedBank.sentenceCount
+                assertTrue("저장된 on-device generated 재료가 없습니다.", generatedCount > 0)
+            }
             val currentActivity = launchActivity()
             activity = currentActivity
             val automation = configureUiAutomation()
 
-            val caseIndices = latencyCase?.let { listOf(it - 1) } ?: LATENCY_PREFIXES.indices
+            val caseIndices = latencyCase?.let { listOf(it - 1) } ?: prefixes.indices
             caseIndices.forEach { index ->
-                val prefix = LATENCY_PREFIXES[index]
+                val prefix = prefixes[index]
                 val editor = selectNormalAndClear(currentActivity)
                 requestEditorFocusAndIme(currentActivity, editor)
                 val ime = waitForCurrentEditor(editorTarget(editor))
@@ -83,7 +98,8 @@ class ImmediateSentenceLatencyDeviceTest {
                     editor = editor,
                     ime = ime,
                     automation = automation,
-                    tapMode = tapMode
+                    tapMode = tapMode,
+                    candidateSource = candidateSource
                 )
                 results += result
                 reportResult(result)
@@ -93,9 +109,9 @@ class ImmediateSentenceLatencyDeviceTest {
                 buildList {
                     val visibleCandidateMs = result.visibleCandidateMs
                     result.error?.let { add("case=${result.caseNumber}: $it") }
-                    if (visibleCandidateMs == null) add("case=${result.caseNumber}: visible sentence_pack 후보 없음")
+                    if (visibleCandidateMs == null) add("case=${result.caseNumber}: visible $candidateSource 후보 없음")
                     if (visibleCandidateMs != null && visibleCandidateMs > VISIBLE_LATENCY_LIMIT_MS) {
-                        add("case=${result.caseNumber}: visible sentence_pack latency=${visibleCandidateMs}ms")
+                        add("case=${result.caseNumber}: visible $candidateSource latency=${visibleCandidateMs}ms")
                     }
                     if (result.clickInsertionMatched != true) add("case=${result.caseNumber}: exact append 실패")
                 }
@@ -125,9 +141,14 @@ class ImmediateSentenceLatencyDeviceTest {
         editor: EditText,
         ime: FcitxInputMethodService,
         automation: UiAutomation,
-        tapMode: String
+        tapMode: String,
+        candidateSource: String
     ): LatencyResult {
-        val expected = FcitxApplication.getInstance().sentencePacks.complete(prefix, CANDIDATE_LIMIT)
+        val expected = if (candidateSource == SENTENCE_PACK_SOURCE) {
+            FcitxApplication.getInstance().sentencePacks.complete(prefix, CANDIDATE_LIMIT)
+        } else {
+            FcitxApplication.getInstance().generatedSentenceBank.complete(prefix, CANDIDATE_LIMIT)
+        }
             .firstOrNull()
 
         val beforeText = onMain { editor.text.toString() }
@@ -145,7 +166,7 @@ class ImmediateSentenceLatencyDeviceTest {
             return result
         }
         if (expected == null) {
-            result.error = "production 문장팩 lookup 결과가 비어 있음"
+            result.error = "$candidateSource lookup 결과가 비어 있음"
             return result
         }
 
@@ -157,7 +178,9 @@ class ImmediateSentenceLatencyDeviceTest {
             waitForServiceSelection(ime, editor, committedText, startedAt + CASE_DEADLINE_MS)
             result.serviceSelectionReadyMs = SystemClock.elapsedRealtime() - startedAt
             result.stage = "snapshot"
-            val candidate = waitForSnapshotCandidate(ime, prefix, expected.suffix, startedAt, result)
+            val candidate = waitForSnapshotCandidate(
+                ime, prefix, expected.suffix, candidateSource, startedAt, result
+            )
             result.stage = "visible"
             val firstVisible = waitForVisibleCandidateNode(
                 automation = automation,
@@ -169,8 +192,8 @@ class ImmediateSentenceLatencyDeviceTest {
             )
             result.visibleCandidateMs = SystemClock.elapsedRealtime() - startedAt
             result.candidateSource = candidate.metricsCandidate?.source
-            if (result.candidateSource != SENTENCE_PACK_SOURCE) {
-                result.error = "snapshot 후보 source가 sentence_pack이 아님"
+            if (result.candidateSource != candidateSource) {
+                result.error = "snapshot 후보 source가 $candidateSource 아님"
                 return result
             }
             val expectedInsertion = candidate.appendSnapshot?.append?.insertionFor(prefix)
@@ -190,7 +213,7 @@ class ImmediateSentenceLatencyDeviceTest {
             captureCandidateCrop(
                 firstVisible.live.textBounds,
                 automation,
-                "case-$caseNumber-visible-sentence-pack-text.png"
+                "case-$caseNumber-visible-$candidateSource-text.png"
             ).also { capture ->
                 result.capturePath = capture.path
                 result.captureError = capture.error
@@ -213,7 +236,7 @@ class ImmediateSentenceLatencyDeviceTest {
                 currentVisible.a11y.node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             }
             if (!clicked) {
-                if (result.error == null) result.error = "sentence_pack 후보 클릭 실패"
+                if (result.error == null) result.error = "$candidateSource 후보 클릭 실패"
                 return result
             }
             val expectedText = committedText + expectedInsertion
@@ -244,6 +267,7 @@ class ImmediateSentenceLatencyDeviceTest {
         ime: FcitxInputMethodService,
         prefix: String,
         suffix: String,
+        candidateSource: String,
         startedAt: Long,
         result: LatencyResult
     ): FcitxInputMethodService.ContextualCandidate {
@@ -256,7 +280,7 @@ class ImmediateSentenceLatencyDeviceTest {
                 .groupingBy { it.metricsCandidate?.source ?: "unattributed" }
                 .eachCount()
             snapshot.sentences.firstOrNull {
-                it.metricsCandidate?.source == SENTENCE_PACK_SOURCE && it.word.text == suffix
+                it.metricsCandidate?.source == candidateSource && it.word.text == suffix
             }?.let { candidate ->
                 result.snapshotCandidateMs = SystemClock.elapsedRealtime() - startedAt
                 recordSnapshotDiagnostics(ime, prefix, result)
@@ -266,7 +290,7 @@ class ImmediateSentenceLatencyDeviceTest {
         }
         recordSnapshotDiagnostics(ime, prefix, result)
         recordTimeoutCacheDiagnostics(ime, prefix, result)
-        throw AssertionError("deadline 안에 sentence_pack snapshot 후보가 나타나지 않았습니다.")
+        throw AssertionError("deadline 안에 $candidateSource snapshot 후보가 나타나지 않았습니다.")
     }
 
     private fun recordSnapshotDiagnostics(
@@ -646,7 +670,7 @@ class ImmediateSentenceLatencyDeviceTest {
                     JSONObject()
                         .put("kind", "immediate_sentence_latency")
                         .put("case", result.caseNumber)
-                        .put("evidenceScope", "sentence_pack local 1 second; this is not an AI latency claim")
+                        .put("evidenceScope", "${result.candidateSource} local 1 second; this is not an AI latency claim")
                         .put("deadlineMs", CASE_DEADLINE_MS)
                         .put("stage", result.stage)
                         .put("tapMode", result.tapMode)
@@ -900,7 +924,9 @@ class ImmediateSentenceLatencyDeviceTest {
 
     private companion object {
         val LATENCY_PREFIXES = listOf("회의 자료를 ", "오늘 저녁 ", "회의가 끝나", "약속을 ")
+        val GENERATED_PREFIXES = listOf("회의 자료를 ", "오늘 저녁 ", "약속을 ")
         const val SENTENCE_PACK_SOURCE = "sentence_pack"
+        const val GENERATED_SOURCE = "ondevice_generated"
         const val BUILTIN_SENTENCE_COUNT = 216
         const val CANDIDATE_LIMIT = 2
         const val REPOSITORY_READY_TIMEOUT_MS = 10_000L
@@ -911,6 +937,7 @@ class ImmediateSentenceLatencyDeviceTest {
         const val MAX_ERROR_MESSAGE_CHARS = 400
         const val TAP_MODE_ARGUMENT = "tapMode"
         const val LATENCY_CASE_ARGUMENT = "latencyCase"
+        const val CANDIDATE_SOURCE_ARGUMENT = "candidateSource"
         const val RESTORE_OFFLINE_MODE_ARGUMENT = "restoreOfflineMode"
         const val ACCESSIBILITY_TAP_MODE = "accessibility"
         const val TOUCH_TAP_MODE = "touch"

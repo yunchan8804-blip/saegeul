@@ -116,6 +116,7 @@ import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
 import org.fcitx.fcitx5.android.input.ai.ContextualAppend
 import org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
@@ -2422,7 +2423,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val context: String,
         val packageName: String,
         val epoch: Long,
-        val sentencePackRevision: Long
+        val sentencePackRevision: Long,
+        val generatedSentenceRevision: Long
     )
 
     data class ContextualAppendSnapshot(
@@ -2451,6 +2453,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val predictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>,
         val generation: Long?
     )
+
+    private fun mergeGeneratedSentencePredictions(
+        predictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>,
+        generatedPredictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>
+    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
+        val seen = mutableSetOf<String>()
+        return (predictions + generatedPredictions)
+            .asSequence()
+            .sortedByDescending { it.confidenceScore }
+            .filter { prediction -> seen.add("${prediction.isSentenceCompletion}:${prediction.text}") }
+            .toList()
+    }
 
     @Volatile
     private var contextualResultCache: CachedContextualPredictions? = null
@@ -2698,12 +2712,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 activePreedit
             )
             if (resolved.stroke.isBlank() && resolved.context.isBlank()) return@launch
+            val application = FcitxApplication.getInstance()
             val currentMemoKey = ContextualPredictionMemoKey(
                 resolved.stroke,
                 resolved.context,
                 currentInputEditorInfo.packageName,
                 predictionEpoch,
-                FcitxApplication.getInstance().sentencePacks.revision
+                application.sentencePacks.revision,
+                if (BuildConfig.DEBUG) application.generatedSentenceBank.revision else 0L
             )
             if (contextualPredictKey != currentMemoKey) return@launch
 
@@ -2904,12 +2920,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             return ResolvedContextualPredictions(emptyList(), null)
         }
 
+        val application = FcitxApplication.getInstance()
         val memoKey = ContextualPredictionMemoKey(
             resolved.stroke,
             resolved.context,
             pkgName,
             predictionEpoch,
-            FcitxApplication.getInstance().sentencePacks.revision
+            application.sentencePacks.revision,
+            if (BuildConfig.DEBUG) application.generatedSentenceBank.revision else 0L
         )
         val inputSessionEpoch = currentInputSessionEpoch
         contextualResultCache?.let { cached ->
@@ -2931,8 +2949,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 inputSessionEpoch = inputSessionEpoch,
                 limit = limit
             ),
-            sentencePackLookup = FcitxApplication.getInstance().sentencePacks::complete,
-            prefetcher = prefetcher
+            sentencePackLookup = application.sentencePacks::complete,
+            prefetcher = prefetcher,
+            generatedSentenceLookup = if (BuildConfig.DEBUG) application.generatedSentenceBank::complete else null
         )
         val immediateGeneration = ++nextContextualPredictionGeneration
         contextualResultCache = CachedContextualPredictions(
@@ -2940,7 +2959,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             generation = immediateGeneration,
             predictions = immediateResults
         )
-        if (allowsAiInputFeatures()) {
+        if (allowsAiInputFeatures() && !BuildConfig.DEBUG) {
             prefetcher.schedulePrefetch(
                 rawFullContext,
                 scope = AiSentenceCompletionPrefetcher.Scope(pkgName, inputSessionEpoch)
@@ -2973,10 +2992,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         currentInputSelection.isEmpty() &&
                         currentFieldIsConversational
                     ) {
-                        val publishedResults = if (results.isEmpty() && immediateResults.isNotEmpty()) {
-                            immediateResults
-                        } else {
-                            results
+                        val generatedImmediateResults = immediateResults.filter {
+                            it.source == "ondevice_generated"
+                        }
+                        val publishedResults = when {
+                            results.isEmpty() && immediateResults.isNotEmpty() -> immediateResults
+                            generatedImmediateResults.isEmpty() -> results
+                            else -> mergeGeneratedSentencePredictions(results, generatedImmediateResults)
                         }
                         contextualResultCache = CachedContextualPredictions(
                             key = memoKey,
@@ -4062,6 +4084,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
+        OnDeviceGenerationControl.onKeyboardVisibilityChanged(true)
         engineRestartEditorRehydrationGate.onStartInputView(
             inputSessionEpoch = inputSessionEpoch,
             editorPackageName = info.packageName,
@@ -4445,6 +4468,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        OnDeviceGenerationControl.onKeyboardVisibilityChanged(false)
         cancelInternalPromptCapture(discardPreStartCallbacks = true)
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
@@ -4517,6 +4541,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onDestroy() {
+        OnDeviceGenerationControl.onKeyboardVisibilityChanged(false)
         sentencePackRevisionJob?.cancel()
         sentencePackRevisionJob = null
         predictionScope.cancel()

@@ -94,6 +94,58 @@ class ImmediateContextualPredictionsTest {
     }
 
     @Test
+    fun `generated material keeps provenance and only accepts strong context evidence`() {
+        val predictions = collect(
+            rawContext = "오늘 회의 ",
+            generatedSentenceLookup = { _, _ ->
+                listOf(
+                    SentencePackMatch(
+                        suffix = "회의록을 공유하겠습니다.",
+                        joinMode = ContextualAppend.JoinMode.NEXT_WORD,
+                        matchedTokens = 2,
+                        evidence = MatchEvidence.PREFIX
+                    ),
+                    SentencePackMatch(
+                        suffix = "약속을 정할까요?",
+                        joinMode = ContextualAppend.JoinMode.NEXT_WORD,
+                        matchedTokens = 1,
+                        evidence = MatchEvidence.LAST_WORD
+                    )
+                )
+            }
+        )
+
+        val prediction = predictions.single()
+        assertEquals("회의록을 공유하겠습니다.", prediction.text)
+        assertEquals("ondevice_generated", prediction.source)
+        assertEquals("기기 AI 재료", prediction.badge)
+        assertEquals(0.82f, prediction.confidenceScore)
+        assertEquals(
+            ContextualAppend("오늘 회의 ", "회의록을 공유하겠습니다."),
+            prediction.append
+        )
+    }
+
+    @Test
+    fun `generated material wins sentence pack duplicate by confidence`() {
+        val match = SentencePackMatch(
+            suffix = "회의록을 공유하겠습니다.",
+            joinMode = ContextualAppend.JoinMode.NEXT_WORD,
+            matchedTokens = 2,
+            evidence = MatchEvidence.PREFIX
+        )
+
+        val predictions = collect(
+            rawContext = "오늘 회의 ",
+            sentencePackLookup = { _, _ -> listOf(match) },
+            generatedSentenceLookup = { _, _ -> listOf(match) }
+        )
+
+        assertEquals(1, predictions.size)
+        assertEquals("ondevice_generated", predictions.single().source)
+    }
+
+    @Test
     fun `cached AI takes priority over matching pack text and deduplicates`() {
         val prefetcher = AiSentenceCompletionPrefetcher()
         prefetcher.putPredictions(
@@ -148,6 +200,7 @@ class ImmediateContextualPredictionsTest {
         rawContext: String,
         sentencePackLookup: ((String, Int) -> List<SentencePackMatch>)? = null,
         prefetcher: AiSentenceCompletionPrefetcher? = null,
+        generatedSentenceLookup: ((String, Int) -> List<SentencePackMatch>)? = null,
         epoch: Long = 0L,
         limit: Int = 4
     ): List<AiPrediction> = ImmediateContextualPredictions.collect(
@@ -158,7 +211,8 @@ class ImmediateContextualPredictionsTest {
             limit = limit
         ),
         sentencePackLookup = sentencePackLookup,
-        prefetcher = prefetcher
+        prefetcher = prefetcher,
+        generatedSentenceLookup = generatedSentenceLookup
     )
 
     private fun scope() = AiSentenceCompletionPrefetcher.Scope("com.example", 0L)

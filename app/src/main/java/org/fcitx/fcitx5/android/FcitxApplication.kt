@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
+import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackRepository
 import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher
@@ -68,6 +69,10 @@ class FcitxApplication : Application() {
         PersonalSentenceVault(storeFile = File(filesDir, "personal_rag.json"), cipher = vaultCipher)
     }
 
+    val generatedSentenceBank: GeneratedSentenceBank by lazy {
+        GeneratedSentenceBank(file = File(noBackupFilesDir, "gemma_materials.json"), cipher = vaultCipher)
+    }
+
     val sentencePacks: SentencePackRepository by lazy {
         SentencePackRepository(this, applicationScope) {
             !AppPrefs.getInstance().advanced.offlineMode.getValue()
@@ -102,6 +107,15 @@ class FcitxApplication : Application() {
      */
     fun warmUpLanguageAssets() {
         sentencePacks.prepare()
+        if (BuildConfig.DEBUG) {
+            applicationScope.launch {
+                try {
+                    generatedSentenceBank.load()
+                } catch (e: Exception) {
+                    Timber.w("Generated sentence material load failed: ${e.javaClass.simpleName}")
+                }
+            }
+        }
         coroutineScope.launch(Dispatchers.IO) {
             try {
                 baseKoreanVocabulary.load()

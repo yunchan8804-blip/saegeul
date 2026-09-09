@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libvndksupport.so"
+            android:required="false" />
         <!--
           This host exists only in the debug source set.  It has no intent filter and is exported
           solely so a connected emulator can launch the exact component with adb.
@@ -13,6 +19,12 @@
             android:label="AI editor E2E (debug)"
             android:theme="@style/Theme.FcitxAppTheme"
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+        <activity
+            android:name="org.fcitx.fcitx5.android.debug.gemma.GemmaExperimentActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="Gemma 재료 실험"
+            android:theme="@style/Theme.FcitxAppTheme" />
     </application>
 
 </manifest>

@@ -19,7 +19,8 @@ object ImmediateContextualPredictions {
     fun collect(
         input: Input,
         sentencePackLookup: ((String, Int) -> List<SentencePackMatch>)?,
-        prefetcher: AiSentenceCompletionPrefetcher?
+        prefetcher: AiSentenceCompletionPrefetcher?,
+        generatedSentenceLookup: ((String, Int) -> List<SentencePackMatch>)? = null
     ): List<AiPrediction> {
         if (input.rawContext.isBlank()) return emptyList()
 
@@ -34,6 +35,19 @@ object ImmediateContextualPredictions {
                 append = ContextualAppend(input.rawContext, match.suffix, match.joinMode)
             )
         }
+
+        generatedSentenceLookup?.invoke(input.rawContext, input.limit)
+            ?.filter { it.evidence == MatchEvidence.PREFIX || it.evidence == MatchEvidence.CONTEXT_SUFFIX }
+            ?.forEach { match ->
+                predictions += AiPrediction(
+                    text = match.suffix,
+                    confidenceScore = 0.82f,
+                    isSentenceCompletion = true,
+                    source = "ondevice_generated",
+                    badge = "기기 AI 재료",
+                    append = ContextualAppend(input.rawContext, match.suffix, match.joinMode)
+                )
+            }
 
         val scope = AiSentenceCompletionPrefetcher.Scope(input.packageName, input.inputSessionEpoch)
         PrefetchedContinuation.parse(
