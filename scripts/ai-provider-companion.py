@@ -1339,6 +1339,17 @@ def response_packet(instance: str, hostname: str, address: str, port: int, url: 
     return struct.pack("!HHHHHH", 0, 0x8400, 0, 4, 0, 0) + records
 
 
+def is_query_for_service(data: bytes) -> bool:
+    """True when `data` is an mDNS query whose question section names SERVICE_TYPE."""
+    if len(data) < 12:
+        return False
+    flags, question_count = struct.unpack("!HH", data[2:6])
+    if flags & 0x8000 or question_count == 0:
+        return False
+    wanted = dns_name(SERVICE_TYPE).lower()
+    return wanted in data.lower() or dns_name("_services._dns-sd._udp.local.") in data.lower()
+
+
 def advertise(name: str, address: str, port: int, url: str) -> None:
     safe_host = "".join(
         character.lower() if character.isascii() and character.isalnum() else "-"
@@ -1366,6 +1377,10 @@ def advertise(name: str, address: str, port: int, url: str) -> None:
     except OSError:
         pass
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
+    try:
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 0)
+    except OSError:
+        pass
     sock.settimeout(1)
 
     print(f"AI connection helper: {name}")
@@ -1375,16 +1390,28 @@ def advertise(name: str, address: str, port: int, url: str) -> None:
     print("Press Ctrl+C to stop.")
     try:
         last_announcement = 0.0
+        last_response = 0.0
         while True:
             now = time.monotonic()
             if now - last_announcement >= 5:
                 sock.sendto(packet, (MULTICAST_GROUP, MULTICAST_PORT))
                 last_announcement = now
+                last_response = now
             try:
-                sock.recvfrom(9000)
-                sock.sendto(packet, (MULTICAST_GROUP, MULTICAST_PORT))
+                data, sender = sock.recvfrom(9000)
             except socket.timeout:
-                pass
+                continue
+            except OSError:
+                continue
+            # Only answer real queries from other hosts that ask for this service.
+            # Answering every packet (including our own multicast echo) floods the LAN.
+            if sender[0] == address or not is_query_for_service(data):
+                continue
+            now = time.monotonic()
+            if now - last_response < 1:
+                continue
+            sock.sendto(packet, (MULTICAST_GROUP, MULTICAST_PORT))
+            last_response = now
     except KeyboardInterrupt:
         for _ in range(2):
             sock.sendto(goodbye, (MULTICAST_GROUP, MULTICAST_PORT))
