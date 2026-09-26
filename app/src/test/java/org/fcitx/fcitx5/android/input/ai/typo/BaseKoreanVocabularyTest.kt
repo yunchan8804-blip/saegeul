@@ -6,10 +6,14 @@ package org.fcitx.fcitx5.android.input.ai.typo
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.io.StringReader
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Unit tests for BaseKoreanVocabulary: TSV parsing, log-scaled prior, and
@@ -185,5 +189,55 @@ class BaseKoreanVocabularyTest {
         val elapsedMs = (System.nanoTime() - start) / 1_000_000.0 / iterations
 
         assertTrue("completions() averaged ${elapsedMs}ms per call, expected <= 20ms", elapsedMs <= 20.0)
+    }
+
+    // 로드 중(HashMap을 직접 채우던 과거 구현이라면 경합이 발생했을) 다른 스레드의 읽기가
+    // 예외 없이 끝나는지 검증한다. load()는 스냅샷을 지역 변수에서 완성한 뒤 한 번에
+    // 공개하므로, 읽기 스레드는 로드 전 빈 결과 또는 로드 후 완성된 결과만 봐야 한다.
+    @Test
+    fun concurrentReadsDuringLoadDoNotThrow() {
+        val wordCount = 2000
+        val tsv = buildString {
+            appendLine("# concurrent test vocab")
+            for (i in 0 until wordCount) {
+                appendLine("단어$i\t${wordCount - i}")
+            }
+        }
+        val vocabulary = BaseKoreanVocabulary { StringReader(tsv) }
+
+        val startLatch = CountDownLatch(1)
+        val readerDone = CountDownLatch(1)
+        val readerError = AtomicReference<Throwable?>(null)
+
+        val reader = Thread {
+            try {
+                startLatch.await()
+                repeat(5000) {
+                    vocabulary.contains("단어1")
+                    vocabulary.prior("단어1")
+                    vocabulary.completions("단어", 5)
+                    vocabulary.size()
+                }
+            } catch (t: Throwable) {
+                readerError.set(t)
+            } finally {
+                readerDone.countDown()
+            }
+        }
+        val loader = Thread {
+            startLatch.await()
+            vocabulary.load()
+        }
+
+        reader.start()
+        loader.start()
+        startLatch.countDown()
+
+        loader.join(10_000)
+        readerDone.await(10_000, TimeUnit.MILLISECONDS)
+
+        assertNull("reader thread threw: ${readerError.get()}", readerError.get())
+        assertTrue(vocabulary.isLoaded)
+        assertEquals(wordCount, vocabulary.size())
     }
 }

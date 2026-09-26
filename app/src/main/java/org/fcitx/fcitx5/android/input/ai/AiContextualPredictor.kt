@@ -41,7 +41,8 @@ class AiContextualPredictor(
     private val personalSentenceVault: PersonalSentenceVault? = null,
     private val personalGraphStore: PersonalGraphStore? = null,
     private val sentencePackLookup: ((String, Int) -> List<SentencePackMatch>)? = null,
-    private val schedulePrefetchOnPredict: Boolean = true
+    private val schedulePrefetchOnPredict: Boolean = true,
+    private val bundledNgram: () -> BundledKoreanNgram? = { null }
 ) {
 
     companion object {
@@ -153,7 +154,7 @@ class AiContextualPredictor(
                         )
                     }
                 } else {
-                    val isKnownWord = baseVocabulary?.contains(typed) == true || ngram.unigramCount(typed) >= 2f
+                    val isKnownWord = baseVocabulary?.containsWithinTop(typed, BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) == true || ngram.unigramCount(typed) >= 2f
                     if (!isKnownWord) {
                         val ctxProb = ngram.predictNext(contextBeforeCursor, packageName, 20)
                             .associate { it.word to it.probability }
@@ -399,6 +400,11 @@ class AiContextualPredictor(
         }
         if (effectiveLastWord.isNotBlank()) {
             val nextWords = collocationModel.predictNextWords(effectiveLastWord, isInformal, limit = limit * 2)
+            // 사용자에게서 학습한 bigram은 개인 데이터라 높게 두고, 코드에 박아 둔 정적 연어는
+            // 코퍼스 n-gram(3-A) 아래로 내려 그 후보가 없는 문맥만 채우게 한다.
+            val learnedNextWords = collocationModel
+                .predictLearnedNextWords(effectiveLastWord, isInformal, limit = limit * 2)
+                .toSet()
             nextWords.forEachIndexed { idx, nextWord ->
                 val matches = if (cleanStroke.isBlank()) {
                     true
@@ -406,7 +412,11 @@ class AiContextualPredictor(
                     nextWord.startsWith(cleanStroke) || morphology.matchesChoseong(nextWord, cleanStroke)
                 }
                 if (matches) {
-                    val score = (0.95f - (idx * 0.01f)).coerceAtLeast(0.85f)
+                    val score = if (nextWord in learnedNextWords) {
+                        (0.95f - (idx * 0.01f)).coerceAtLeast(0.85f)
+                    } else {
+                        (0.83f - (idx * 0.01f)).coerceAtLeast(0.75f)
+                    }
                     val isSentence = nextWord.contains(" ") && nextWord.length > 8
                     addPrediction(
                         AiPrediction(
@@ -442,6 +452,49 @@ class AiContextualPredictor(
                     badge = "⭐"
                 )
             )
+        }
+
+        // 3-A. Bundled corpus n-gram (FineWeb-2 어절 bigram/trigram): 개인 n-gram 아래, 문맥 없는 사전 위
+        val corpusNgram = bundledNgram()
+        val corpusContext = corpusNgram?.let { BundledKoreanNgram.contextWords(contextBeforeCursor) }
+        if (corpusNgram != null && corpusContext != null) {
+            val (prev2, prev1) = corpusContext
+            val corpusCandidates = corpusNgram.nextWords(prev2, prev1, 8)
+            if (cleanStroke.isBlank()) {
+                corpusCandidates.take(4).forEachIndexed { idx, candidate ->
+                    val base = if (candidate.order == 3) 0.93f else 0.90f
+                    addPrediction(
+                        AiPrediction(
+                            text = candidate.word,
+                            confidenceScore = (base - idx * 0.01f).coerceAtLeast(0.84f),
+                            isSentenceCompletion = false,
+                            source = "corpus_ngram",
+                            badge = ""
+                        )
+                    )
+                }
+            } else {
+                val strokeJamo = morphology.decomposeHangul(cleanStroke)
+                val choseongOnly = cleanStroke.all { morphology.isChoseong(it) }
+                corpusCandidates
+                    .filter { candidate ->
+                        candidate.word.startsWith(cleanStroke) ||
+                            morphology.decomposeHangul(candidate.word).startsWith(strokeJamo) ||
+                            (choseongOnly && morphology.extractChoseongSequence(candidate.word).startsWith(cleanStroke))
+                    }
+                    .take(3)
+                    .forEachIndexed { idx, candidate ->
+                        addPrediction(
+                            AiPrediction(
+                                text = candidate.word,
+                                confidenceScore = 0.957f - idx * 0.005f,
+                                isSentenceCompletion = false,
+                                source = "corpus_ngram",
+                                badge = ""
+                            )
+                        )
+                    }
+            }
         }
 
         // 3-B. Base Korean Vocabulary Completion (bundled TSV, right after personal n-gram)

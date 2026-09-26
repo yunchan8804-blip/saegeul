@@ -165,6 +165,14 @@ class KoreanCollocationModel {
         dynamicInformalBigrams.clear()
     }
 
+    /** 사용자 입력에서 학습해 주입한 bigram만 돌려준다. 코드에 박아 둔 정적 연어는 포함하지 않는다. */
+    fun predictLearnedNextWords(lastWord: String, isInformal: Boolean, limit: Int = 4): List<String> {
+        val clean = lastWord.trim()
+        if (clean.isBlank()) return emptyList()
+        val dynamicMap = if (isInformal) dynamicInformalBigrams else dynamicHonorificBigrams
+        return (dynamicMap[clean] ?: emptyList()).take(limit)
+    }
+
     /**
      * Finds next word suggestions based on the last typed word or trailing particle.
      */

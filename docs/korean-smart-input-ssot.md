@@ -412,7 +412,23 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 - 생성 스크립트는 `lang_code=ko`와 현대 한글 표제어만 허용하고 한 entry당 정의를 최대 4개로
   제한한다. 결과는 deterministic sorted binary index이며 원본 URL·원본 checksum·dump/extract date와
   wiktextract commit을 attribution asset에 고정한다.
-- 오타 교정·어절 완성의 기본 어휘 `app/src/main/assets/ko_base_vocab.tsv`는 hermitdave/FrequencyWords의 OpenSubtitles 2016 `ko_50k`에서 `scripts/build-ko-base-vocab.py`로 상위 3만 어절을 추출한 것이며 CC BY-SA 4.0으로 `assets/legal/NOTICE.txt`에 고지한다. 기기 밖으로 나가지 않는다.
+- 기본 한국어 팩은 FineWeb-2 한국어(`kor_Hang`, ODC-By 1.0)에서 만든다. 원천은 train 샤드 `000_00000.parquet`(SHA256 `0bb6e638…c7ec`)이고, 문장 단위 중복 제거 후 어절 2억 개를 쓴다. 해요체·반말로 끝나는 문장에는 3배 가중을 준다. n-gram은 문서 3개 이상에 나온 것만 남긴다. `scripts/build-ko-corpus-ngram.py`가 팩을 만들고 `scripts/pack-ko-base-assets.py`가 자산으로 변환하며, 평가는 `scripts/eval-ko-base-pack.py`로 한다. 출처는 `assets/legal/NOTICE.txt`에 고지하고, 데이터는 기기 밖으로 나가지 않는다.
+  - `ko_base_vocab.tsv`는 어절 15만 개다. 어절 완성에는 전체를 쓰고, 오타 교정의 트라이 등록과 '아는 단어' 판정에는 빈도 상위 `BaseKoreanVocabulary.TYPO_VOCAB_LIMIT`(3만)만 쓴다. 드문 어절까지 아는 단어로 치면 인접 키 오타가 교정되지 않는다.
+  - `korean/ko-ngram.bin`은 KONGRAM1 포맷이고, bigram은 앞 어절당 8개, trigram은 쌍당 5개이며 전체 20만 개다. 다음 어절이 단독 조사나 단위(`은 는 을 를 의 에 년 월`)인 항목은 제외한다. `BundledKoreanNgram`이 IO 스레드에서 읽는다.
+    - 후보 점수(`corpus_ngram`, 배지 없음): 다음 어절 모드는 trigram 0.93, bigram 0.90이다. 입력 중 모드는 자모·초성 앞부분이 일치하는 후보만 0.957이다. 두 모드 모두 개인 n-gram보다 아래이고 문맥 없는 사전 완성보다는 위다.
+  - 두 자산은 AssetManager로 직접 읽으므로 `descriptor.json`의 dataDir 복사 대상에서 뺀다(`app/build.gradle.kts`).
+  - **구어 층** (`scripts/merge-ko-casual-layer.py`): 웹 팩만으로는 채팅 문맥이 약해 구어 분포를 섞는다. 앞 어절별로 `p = (1−λ')·p_web + λ'·p_casual`로 보간하고, `λ' = 0.7·n/(n+10)`이다(n은 그 문맥에서 구어 원천이 관측한 횟수). 한두 번 나온 쌍이 맨 앞을 차지하지 않게 하려는 것이다. 유니그램은 `web + 1000·casual`로 가중한다.
+    - 구어 원천은 두 가지다.
+      - ChatbotData.csv(MIT)의 학습 분할: 질문 blake2b 해시 mod 5 ≠ 0인 약 80%. mod 5 = 0인 20%는 평가 전용이다.
+      - 손작성 `nextword.txt` 쌍 중 다음 어절이 웹 유니그램 상위 3만 안에 있는 것. 붙여 쓴 구는 제외한다.
+    - 구어 n-gram은 2회 이상 나온 것만 쓴다.
+    - 평가 결과(웹만 → 병합, 2026-09-25)
+      - 챗봇 평가 분할: hit@1 5.0% → 9.1%, hit@5 11.3% → 21.1%, 1음절 완성 24.7% → 35.1%
+      - 기본 216문장: hit@5 15.45%로 같다
+      - 웹 테스트: hit@1 8.74% → 8.59%, 1음절 완성 24.8% → 23.3%로 조금 떨어진다
+    - 파라미터 선택: K=0이면 챗봇 분할 점수가 더 높다. 하지만 그 분할은 학습 데이터와 같은 데이터셋이라 그 데이터 특유의 표현에 과적합된다(예: `혹시 → 반한`이 1위). 그래서 독립 세트인 216문장과 웹 테스트에서 손해가 없는 조합을 골랐다.
+  - **네이티브 다음 어절 비활성**: 메인 앱 번들에서 `usr/share/fcitx5/hangul/nextword.txt`를 뺀다(`bundleHangulEngineAssets`). 이 파일이 있으면 fcitx5-hangul `NextWordDictionary`의 후보가 `HorizontalCandidateComponent.mergeCandidates`에서 항상 코틀린 후보보다 앞선다. 그런데 손작성 쌍은 띄어쓰기를 무시한 구가 많고, 이 사전을 앞에 두면 정답률이 내려갔다. 쓸 만한 쌍은 구어 층으로 옮겼다. 네이티브 어절 완성(`completion.txt`)은 그대로 둔다.
+  - **정적 연어 강등**: `KoreanCollocationModel`에서 코드에 박아 둔 정적 연어는 코퍼스 n-gram 아래(0.83−i·0.01, 하한 0.75)로 내린다. 사용자 입력에서 학습해 주입한 bigram(`predictLearnedNextWords`)은 개인 데이터이므로 0.95−i·0.01을 유지한다.
 - 데이터는 CC BY-SA 4.0으로 표기하고 각 결과에서 정확한 한국어 위키낱말사전 문서 URL을 열어
   출처·기여자 이력에 도달할 수 있게 한다. 정의는 읽기 전용이며 `commitText`를 호출하지 않는다.
 - password·sensitive·`NoSpellCheck` editor에서는 query capture와 조회를 차단한다. 선택 영역 또는

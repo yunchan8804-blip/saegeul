@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Process
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
@@ -24,6 +25,7 @@ import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.ai.BundledKoreanNgram
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank
@@ -93,6 +95,11 @@ class FcitxApplication : Application() {
         BaseKoreanVocabulary { assets.open("ko_base_vocab.tsv").reader(Charsets.UTF_8) }
     }
 
+    /** 번들 코퍼스 어절 n-gram. [warmUpLanguageAssets]가 IO 스레드에서 읽어 채우며, 그 전에는 null이다. */
+    @Volatile
+    var bundledKoreanNgram: BundledKoreanNgram? = null
+        private set
+
     val correctionPatternStore: CorrectionPatternStore by lazy {
         CorrectionPatternStore(storeFile = File(filesDir, "personal_corrections.json"), cipher = vaultCipher)
     }
@@ -119,12 +126,21 @@ class FcitxApplication : Application() {
         coroutineScope.launch(Dispatchers.IO) {
             try {
                 baseKoreanVocabulary.load()
-                baseKoreanVocabulary.forEachWord { word, prior -> typoCorrector.addWord(word, prior) }
+                baseKoreanVocabulary.forEachWord(BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) { word, prior -> typoCorrector.addWord(word, prior) }
                 personalNgramModel.forEachUnigram { word, count ->
                     typoCorrector.addWord(word, PersonalNgramModel.personalPrior(count))
                 }
             } catch (e: Exception) {
                 Timber.w(e, "Failed to warm up language assets")
+            }
+        }
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val started = SystemClock.elapsedRealtime()
+                bundledKoreanNgram = assets.open(BundledKoreanNgram.ASSET_PATH).use(BundledKoreanNgram::read)
+                Timber.d("Bundled Korean n-gram loaded in ${SystemClock.elapsedRealtime() - started}ms")
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to load bundled Korean n-gram")
             }
         }
     }

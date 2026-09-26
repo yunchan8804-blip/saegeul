@@ -119,7 +119,7 @@ class KeyboardAwareTypoCorrectorTest {
         assertTrue("어휘 로드 실패", vocabulary.size() >= 20_000)
 
         val corrector = KeyboardAwareTypoCorrector()
-        vocabulary.forEachWord { word, prior -> corrector.addWord(word, prior) }
+        vocabulary.forEachWord(BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) { word, prior -> corrector.addWord(word, prior) }
 
         // warm-up
         corrector.correct("사묘ㅏ함니다")

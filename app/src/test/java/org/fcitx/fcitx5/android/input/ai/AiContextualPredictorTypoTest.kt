@@ -49,7 +49,7 @@ class AiContextualPredictorTypoTest {
         vocabulary = BaseKoreanVocabulary { vocabFile.reader(Charsets.UTF_8) }
         vocabulary.load()
         typoCorrector = KeyboardAwareTypoCorrector()
-        vocabulary.forEachWord { word, prior -> typoCorrector.addWord(word, prior) }
+        vocabulary.forEachWord(BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) { word, prior -> typoCorrector.addWord(word, prior) }
         correctionStore = CorrectionPatternStore()
         ngram = PersonalNgramModel()
         predictor = AiContextualPredictor(

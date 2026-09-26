@@ -344,6 +344,8 @@ fcitxComponent {
     installPrebuiltAssets = true
 }
 
+val nativeNextWordAsset = "usr/share/fcitx5/hangul/nextword.txt"
+
 val bundleHangulEngineAssets = tasks.register<Copy>("bundleHangulEngineAssets") {
     group = "build"
     description = "Copy Hangul engine assets into the main app so Play user builds include Korean input."
@@ -354,13 +356,24 @@ val bundleHangulEngineAssets = tasks.register<Copy>("bundleHangulEngineAssets") 
     dependsOn(":plugin:hangul:generateDataDescriptor")
     from(project(":plugin:hangul").file("src/main/assets")) {
         exclude("descriptor.json")
+        // 다음 어절은 앱의 코퍼스 n-gram(korean/ko-ngram.bin)이 맡는다. 네이티브 사전이 있으면
+        // 그 후보가 항상 먼저 나와 코퍼스 후보를 밀어내므로 메인 앱에는 싣지 않는다.
+        exclude(nativeNextWordAsset)
     }
     into(layout.projectDirectory.dir("src/main/assets"))
+    val staleNativeNextWord = layout.projectDirectory.file("src/main/assets/$nativeNextWordAsset").asFile
+    doLast {
+        staleNativeNextWord.delete()
+    }
     mustRunAfter("installFcitxComponent")
     mustRunAfter("deleteFcitxComponentExcludeFiles")
 }
 tasks.named("generateDataDescriptor") {
     dependsOn(bundleHangulEngineAssets)
+}
+// AssetManager로 직접 읽는 대용량 언어 자산은 dataDir 복사 대상에서 뺀다.
+extensions.configure<DataDescriptorPluginExtension>("generateDataDescriptor") {
+    excludes.addAll("ko_base_vocab.tsv", "korean/ko-ngram.bin")
 }
 
 ksp {

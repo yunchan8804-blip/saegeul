@@ -2755,7 +2755,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             personalSentenceVault = personalSentenceVault,
             personalGraphStore = personalGraphStore,
             sentencePackLookup = FcitxApplication.getInstance().sentencePacks::complete,
-            schedulePrefetchOnPredict = false
+            schedulePrefetchOnPredict = false,
+            bundledNgram = { FcitxApplication.getInstance().bundledKoreanNgram }
         )
     }
 
