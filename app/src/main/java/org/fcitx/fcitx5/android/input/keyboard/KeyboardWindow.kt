@@ -69,26 +69,41 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private lateinit var keyboardView: FrameLayout
 
-    private val keyboards: HashMap<String, BaseKeyboard> by lazy {
-        hashMapOf<String, BaseKeyboard>(
-            TextKeyboard.Name to TextKeyboard(context, theme),
-            HangulKeyboard.Name to HangulKeyboard(context, theme),
-            NumberKeyboard.Name to NumberKeyboard(context, theme)
-        ).apply {
-            MobileHangulLayout.entries
-                .filterNot { it == MobileHangulLayout.Physical }
-                .forEach { layout ->
-                    put(MobileHangulKeyboard.name(layout), MobileHangulKeyboard(context, theme, layout))
-                }
-        }
+    // 자판은 처음 쓸 때 만든다. 예전에는 첫 표시 때 모든 자판(영문·두벌식·숫자·모바일 한글 전부)을 한꺼번에
+    // 만들어 키보드가 뜨는 순간 메인 스레드를 수백 ms 막았다.
+    private val keyboardFactories: Map<String, () -> BaseKeyboard> = buildMap {
+        put(TextKeyboard.Name) { TextKeyboard(context, theme) }
+        put(HangulKeyboard.Name) { HangulKeyboard(context, theme) }
+        put(NumberKeyboard.Name) { NumberKeyboard(context, theme) }
+        MobileHangulLayout.entries
+            .filterNot { it == MobileHangulLayout.Physical }
+            .forEach { layout ->
+                put(MobileHangulKeyboard.name(layout)) { MobileHangulKeyboard(context, theme, layout) }
+            }
     }
+    private val keyboards = HashMap<String, BaseKeyboard>()
     private var currentKeyboardName = ""
     private var activeHangulLayout: String? = null
+    // 한글 자판 설정을 한 번이라도 받았는지. 그 뒤에 만들어지는 자판에도 같은 설정을 적용한다.
+    private var hangulLayoutKnown = false
     private var mobileHangulLayout by AppPrefs.getInstance().keyboard.mobileHangulLayout
     private var lastSymbolType: String by AppPrefs.getInstance().internal.lastSymbolLayout
     private val keyboardPrefs = AppPrefs.getInstance().keyboard
 
     private val currentKeyboard: BaseKeyboard? get() = keyboards[currentKeyboardName]
+
+    private fun keyboard(name: String): BaseKeyboard? = keyboards[name] ?: keyboardFactories[name]?.invoke()?.also {
+        keyboards[name] = it
+        if (hangulLayoutKnown) applyHangulLayout(it, activeHangulLayout)
+    }
+
+    private fun applyHangulLayout(target: BaseKeyboard, layout: String?) {
+        when (target) {
+            is TextKeyboard -> target.onHangulKeyboardLayoutUpdate(layout)
+            is HangulKeyboard -> target.onHangulKeyboardLayoutUpdate(layout)
+            else -> Unit
+        }
+    }
 
     private var inputMethodConfigRequest = 0
 
@@ -144,7 +159,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private fun attachLayout(target: String) {
         currentKeyboardName = resolveTextLayout(target)
-        currentKeyboard?.let {
+        keyboard(currentKeyboardName)?.let {
             it.keyActionListener = keyActionListener
             it.popupActionListener = popupActionListener
             keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
@@ -158,10 +173,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private fun updateInputMethod(ime: InputMethodEntry) {
         currentKeyboard?.onInputMethodUpdate(ime)
         val request = ++inputMethodConfigRequest
-        val textKeyboard = keyboards[TextKeyboard.Name] as TextKeyboard
         if (!HangulKeyLegends.isHangulInputMethod(ime.addon, ime.languageCode)) {
             activeHangulLayout = null
-            textKeyboard.onHangulKeyboardLayoutUpdate(null)
+            hangulLayoutKnown = true
+            (keyboards[TextKeyboard.Name] as? TextKeyboard)?.onHangulKeyboardLayoutUpdate(null)
             if (currentKeyboardName == HangulKeyboard.Name || currentKeyboardName.startsWith("MobileHangul:")) {
                 switchLayout(TextKeyboard.Name, false)
             }
@@ -178,9 +193,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             }.getOrNull()
             if (request != inputMethodConfigRequest) return@launch
             activeHangulLayout = layout
-            textKeyboard.onHangulKeyboardLayoutUpdate(layout)
-            (keyboards[HangulKeyboard.Name] as HangulKeyboard)
-                .onHangulKeyboardLayoutUpdate(layout)
+            hangulLayoutKnown = true
+            (keyboards[TextKeyboard.Name] as? TextKeyboard)?.onHangulKeyboardLayoutUpdate(layout)
+            (keyboards[HangulKeyboard.Name] as? HangulKeyboard)?.onHangulKeyboardLayoutUpdate(layout)
             val target = resolveHangulLayout(layout)
             if (currentKeyboardName == TextKeyboard.Name ||
                 currentKeyboardName == HangulKeyboard.Name ||
@@ -220,7 +235,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     fun switchLayout(to: String, remember: Boolean = true) {
         val target = resolveTextLayout(to.ifEmpty { rememberedSymbolTarget() })
         ContextCompat.getMainExecutor(service).execute {
-            if (keyboards.containsKey(target)) {
+            if (keyboardFactories.containsKey(target)) {
                 if (remember && KeyboardLayoutMemory.shouldRememberAsSymbolLayout(target)) {
                     lastSymbolType = target
                 }
