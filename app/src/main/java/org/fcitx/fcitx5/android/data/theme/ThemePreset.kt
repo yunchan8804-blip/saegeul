@@ -6,6 +6,60 @@ package org.fcitx.fcitx5.android.data.theme
 
 object ThemePreset {
 
+    /** Saegeul's default light theme: warm ivory paper with an ink-green accent. */
+    val SaegeulIvory = Theme.Builtin(
+        name = "SaegeulIvory",
+        isDark = false,
+        backgroundColor = 0xffEFE9DC,
+        barColor = 0xffEFE9DC,
+        keyboardColor = 0xffEFE9DC,
+        keyBackgroundColor = 0xffFFFCF5,
+        keyTextColor = 0xff101827,
+        candidateTextColor = 0xff101827,
+        candidateLabelColor = 0xff52605D,
+        candidateCommentColor = 0xff52605D,
+        altKeyBackgroundColor = 0xffE2DACA,
+        altKeyTextColor = 0xff3A4654,
+        accentKeyBackgroundColor = 0xff176B50,
+        accentKeyTextColor = 0xffFFFFFF,
+        keyPressHighlightColor = 0x1F101827,
+        keyShadowColor = 0xffC9BFAC,
+        popupBackgroundColor = 0xffFFFFFF,
+        popupTextColor = 0xff101827,
+        spaceBarColor = 0xffFFFCF5,
+        dividerColor = 0xffD8CFBD,
+        clipboardEntryColor = 0xffFFFCF5,
+        genericActiveBackgroundColor = 0xff176B50,
+        genericActiveForegroundColor = 0xffFFFFFF
+    )
+
+    /** Saegeul's default dark theme: deep navy ink with a jade accent. */
+    val SaegeulNavy = Theme.Builtin(
+        name = "SaegeulNavy",
+        isDark = true,
+        backgroundColor = 0xff101827,
+        barColor = 0xff101827,
+        keyboardColor = 0xff101827,
+        keyBackgroundColor = 0xff1E2A3C,
+        keyTextColor = 0xffFFF9ED,
+        candidateTextColor = 0xffFFF9ED,
+        candidateLabelColor = 0xffB8C8C2,
+        candidateCommentColor = 0xffB8C8C2,
+        altKeyBackgroundColor = 0xff162134,
+        altKeyTextColor = 0xffC9D4CF,
+        accentKeyBackgroundColor = 0xff55D6A6,
+        accentKeyTextColor = 0xff101827,
+        keyPressHighlightColor = 0x2EFFF9ED,
+        keyShadowColor = 0xff070B12,
+        popupBackgroundColor = 0xff26344A,
+        popupTextColor = 0xffFFF9ED,
+        spaceBarColor = 0xff1E2A3C,
+        dividerColor = 0xff2A374B,
+        clipboardEntryColor = 0xff1E2A3C,
+        genericActiveBackgroundColor = 0xff55D6A6,
+        genericActiveForegroundColor = 0xff101827
+    )
+
     /** Warm paper and ink palette tuned for dense Hangul key legends. */
     val HanjiLight = Theme.Builtin(
         name = "HanjiLight",

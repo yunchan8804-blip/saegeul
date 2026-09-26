@@ -27,6 +27,7 @@
 
 ### 💻 개발자 및 오픈소스
 - **[09. 빌드 및 개발자 가이드 (Build & Developer Guide)](09-Developer-and-Build-Guide.md):** Android SDK/NDK/CMake 빌드 환경, 재귀 서브모듈, 릴리스 검증 게이트
+- **[iOS 듀얼 플랫폼](../ios-dual-platform-plan.md)** / **[실행 백로그](../ios-port-backlog.md)** / **[인수인계](../HANDOFF-ios-port.md):** 아이폰 키보드 확장 포팅. 다음 에이전트는 인수인계부터.
 
 ---
 

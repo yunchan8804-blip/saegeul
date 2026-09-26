@@ -16,11 +16,12 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
-import org.fcitx.fcitx5.android.debug.gemma.GemmaAccumulationScheduler
-import org.fcitx.fcitx5.android.debug.gemma.GemmaAccumulationStore
-import org.fcitx.fcitx5.android.debug.gemma.GemmaAccumulationRuntime
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationScheduler
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationStore
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationRuntime
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -60,10 +61,24 @@ class GemmaAccumulationKeyboardDeviceTest {
             await("native accumulation did not stop after keyboard activation", 30_000) {
                 !OnDeviceGenerationControl.isGenerating
             }
+            val stateAtNativeStop = accumulationStore.load()
+            val openSequenceAtNativeStop = stateAtNativeStop.openSequence
+            val consecutiveUnproductiveAtNativeStop = stateAtNativeStop.consecutiveUnproductive
             SystemClock.sleep(2_000)
             assertTrue("Keyboard is no longer active after stability window", OnDeviceGenerationControl.isKeyboardActive)
             val stableCount = app.generatedSentenceBank.sentenceCount == countAtKeyboard
+            val stableState = accumulationStore.load()
             assertTrue("Generated material count changed while keyboard was active", stableCount)
+            assertEquals(
+                "키보드가 활성화된 뒤 공개 문맥 순번이 변경되었습니다.",
+                openSequenceAtNativeStop,
+                stableState.openSequence
+            )
+            assertEquals(
+                "키보드가 활성화된 뒤 consecutive-unproductive 상태가 변경되었습니다.",
+                consecutiveUnproductiveAtNativeStop,
+                stableState.consecutiveUnproductive
+            )
             assertFalse("Native generation remains active", OnDeviceGenerationControl.isGenerating)
             val evidence = JSONObject()
                 .put("observedNativeBeforeKeyboard", beforeKeyboard)
@@ -71,6 +86,10 @@ class GemmaAccumulationKeyboardDeviceTest {
                 .put("nativeStopped", !OnDeviceGenerationControl.isGenerating)
                 .put("stableStoredCount", stableCount)
                 .put("countAtKeyboard", countAtKeyboard)
+                .put("openSequenceAtNativeStop", openSequenceAtNativeStop)
+                .put("openSequenceStable", stableState.openSequence)
+                .put("consecutiveUnproductiveAtNativeStop", consecutiveUnproductiveAtNativeStop)
+                .put("consecutiveUnproductiveStable", stableState.consecutiveUnproductive)
                 .put("evidenceScope", "real keyboard visibility stops active native accumulation; no UI content claim")
             instrumentation.sendStatus(0, Bundle().apply {
                 putString("gemmaKeyboardStopEvidence", evidence.toString())

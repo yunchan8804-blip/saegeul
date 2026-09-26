@@ -9,11 +9,15 @@ class UserTypingContextCollector(
     private val maxCharLength: Int = 300,
     private val minTriggerChars: Int = 6,
     private val onTriggerAugmentation: (packageName: String, context: String) -> Unit = { _, _ -> },
-    private val onSentenceCommitted: ((packageName: String, sentence: String) -> Unit)? = null
+    private val onSentenceCommitted: ((packageName: String, sentence: String) -> Unit)? = null,
+    private val diagnostics: CollectionDiagnostics? = null
 ) {
     private val historyMap = LinkedHashMap<String, ArrayDeque<String>>()
     private val pendingBufferMap = LinkedHashMap<String, StringBuilder>()
     private val pendingEndingBoundaryMap = LinkedHashMap<String, Int>()
+
+    /** The (package, fieldId) of the editor session most recently started, if any. */
+    private var currentEditorSession: Pair<String, Int>? = null
 
     companion object {
         private val SENTENCE_TERMINATORS = setOf('.', '?', '!', '\n', '。', '？', '！')
@@ -172,8 +176,68 @@ class UserTypingContextCollector(
         buffer.setLength(pending.length - removedText.length)
         pendingEndingBoundaryMap.remove(packageName)
         if (buffer.isEmpty()) {
-            pendingBufferMap.remove(packageName)
+            discardPending(packageName)
         }
+    }
+
+    /**
+     * A backspace/Delete or an unpredicted cursor move broke continuity with the pending buffer.
+     * When [removedText] is known and matches the pending suffix, only that suffix is cut
+     * (same behavior as [removePendingSuffix]'s matching branch). Otherwise only the last
+     * whitespace-separated token is dropped, so a single stray keystroke never discards an
+     * entire in-progress sentence.
+     */
+    @Synchronized
+    fun onBackspaceContinuityLost(packageName: String, removedText: String?) {
+        val buffer = pendingBufferMap[packageName] ?: return
+        val pending = buffer.toString()
+        if (pending.isEmpty()) {
+            discardPending(packageName)
+            return
+        }
+
+        if (!removedText.isNullOrEmpty() && pending.endsWith(removedText)) {
+            buffer.setLength(pending.length - removedText.length)
+            pendingEndingBoundaryMap.remove(packageName)
+            if (buffer.isEmpty()) {
+                discardPending(packageName)
+            }
+            diagnostics?.dropped("backspace")
+            return
+        }
+
+        val trimmed = dropLastWhitespaceToken(pending)
+        pendingEndingBoundaryMap.remove(packageName)
+        if (trimmed.isEmpty()) {
+            discardPending(packageName)
+        } else {
+            buffer.setLength(0)
+            buffer.append(trimmed)
+        }
+        diagnostics?.dropped("backspace")
+    }
+
+    /**
+     * A new editor session started for [packageName]/[fieldId]. Pending text is discarded unless
+     * this is a same-field restart ([restarting] true and matching the previous session), which
+     * android issues for reasons unrelated to the user switching what they were writing.
+     */
+    @Synchronized
+    fun onEditorSessionStarted(packageName: String, fieldId: Int, restarting: Boolean) {
+        val key = packageName to fieldId
+        val sameSession = restarting && currentEditorSession == key
+        if (!sameSession) {
+            val prevPackage = currentEditorSession?.first
+            if (prevPackage != null && prevPackage != packageName) {
+                discardPending(prevPackage)
+            }
+            val hadPending = pendingBufferMap[packageName]?.isNotEmpty() == true
+            discardPending(packageName)
+            if (hadPending) {
+                diagnostics?.dropped("editorSwitch")
+            }
+        }
+        currentEditorSession = key
     }
 
     @Synchronized
@@ -190,7 +254,10 @@ class UserTypingContextCollector(
     }
 
     private fun emitSentence(packageName: String, sentence: String) {
-        if (sentence.isBlank()) return
+        if (sentence.isBlank()) {
+            diagnostics?.dropped("blank")
+            return
+        }
         onSentenceCommitted?.invoke(packageName, sentence)
         val deque = historyMap.getOrPut(packageName) { ArrayDeque() }
         deque.addLast(sentence)
@@ -206,5 +273,13 @@ class UserTypingContextCollector(
         val punctIdx = text.indexOfLast { it in SENTENCE_TERMINATORS }
         if (punctIdx >= 0) return punctIdx + 1
         return null
+    }
+
+    /** Drops the last whitespace-separated token; an empty result means the buffer had only one. */
+    private fun dropLastWhitespaceToken(text: String): String {
+        val trimmedEnd = text.trimEnd()
+        if (trimmedEnd.isEmpty()) return ""
+        val lastWhitespaceIdx = trimmedEnd.indexOfLast { it.isWhitespace() }
+        return if (lastWhitespaceIdx >= 0) trimmedEnd.substring(0, lastWhitespaceIdx) else ""
     }
 }

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_status_card_title">Right now</string>
+    <string name="dashboard_status_engine_label">AI suggestion engine</string>
+    <string name="dashboard_status_engine_not_attempted">Not attempted yet</string>
+    <string name="dashboard_status_engine_ready">Ready · %1$s · %2$s</string>
+    <string name="dashboard_status_engine_failed">Failed · %1$s · %2$s</string>
+    <string name="dashboard_status_engine_recovery_suffix"> · Recovered %1$d times</string>
+    <string name="dashboard_status_engine_hint">Tries again the next time you open the keyboard.</string>
+    <string name="dashboard_status_enrichment_label">Graph enrichment</string>
+    <string name="dashboard_status_notification_label">Notifications</string>
+    <string name="dashboard_status_notification_blocked">Notifications are off, so progress can\'t be reported.</string>
+    <string name="dashboard_status_notification_action">Open permission</string>
+    <string name="dashboard_status_collection_label">Collection</string>
+    <string name="dashboard_status_collection_learned">Learned %1$d sentences today</string>
+    <string name="dashboard_status_collection_dropped_count">Skipped %1$d</string>
+    <string name="dashboard_status_collection_recent_show">Show recent activity</string>
+    <string name="dashboard_status_collection_recent_hide">Hide recent activity</string>
+    <string name="dashboard_status_collection_recent_empty">No recent activity</string>
+    <string name="collection_drop_reason_privacy">privacy</string>
+    <string name="collection_drop_reason_short">too short</string>
+    <string name="collection_drop_reason_backspace">backspace</string>
+    <string name="collection_drop_reason_editor_switch">editor switch</string>
+    <string name="collection_drop_reason_duplicate">duplicate</string>
+    <string name="collection_drop_reason_blank">blank</string>
+    <string name="collection_drop_reason_unknown">other</string>
+    <string name="collection_event_kind_emitted">Learned</string>
+    <string name="collection_event_kind_dropped">Skipped</string>
+    <string name="collection_event_kind_batch_ready">Batch ready</string>
+    <string name="collection_event_kind_compiled">Compiled</string>
+</resources>

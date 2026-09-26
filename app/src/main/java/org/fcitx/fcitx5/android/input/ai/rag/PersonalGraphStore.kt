@@ -95,6 +95,15 @@ class PersonalGraphStore(
     @Synchronized
     fun stats(): GraphStats = GraphStats(nodes.size, edges.size, topics.size, graphBuiltMs, sourceSentenceCount)
 
+    /**
+     * The currently stored graph, for a caller (incremental graph enrichment) that wants to merge a
+     * new fragment into it via [PersonalGraphEnricher.mergeGraphs] and write the result back through
+     * [replaceGraph] - which still owns cap enforcement and alias rebuilding either way.
+     */
+    @Synchronized
+    fun snapshot(): Triple<List<Node>, List<Edge>, List<Topic>> =
+        Triple(nodes.values.toList(), edges.values.toList(), topics)
+
     @Synchronized
     fun clear() {
         nodes.clear()

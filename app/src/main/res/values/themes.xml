@@ -2,6 +2,20 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <style name="Theme.FcitxAppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/saegeul_canvas</item>
+        <item name="android:statusBarColor">@color/saegeul_canvas</item>
+        <item name="android:navigationBarColor">@color/saegeul_canvas</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:textColorPrimary">@color/saegeul_ink</item>
+        <item name="android:textColorSecondary">@color/saegeul_secondary</item>
+        <item name="colorPrimary">@color/saegeul_action</item>
+        <item name="colorOnPrimary">@color/saegeul_on_action</item>
+        <item name="colorSecondary">@color/saegeul_action</item>
+        <item name="colorOnSecondary">@color/saegeul_on_action</item>
+        <item name="colorSurface">@color/saegeul_surface</item>
+        <item name="colorOnSurface">@color/saegeul_ink</item>
+        <item name="colorControlNormal">@color/saegeul_ink</item>
         <item name="colorLogFatal">@color/red_A700</item>
         <item name="colorLogError">@color/red_400</item>
         <item name="colorLogWarning">@color/yellow_800</item>
@@ -14,8 +28,6 @@
 
     <style name="Theme.DialogTheme" parent="@android:style/Theme.DeviceDefault.Light.Dialog" />
 
-    <style name="Theme.OAuthDialog" parent="Theme.AppCompat.Light.Dialog.Alert" />
-
     <style name="Theme.VoicePermission" parent="@android:style/Theme.Translucent.NoTitleBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
@@ -24,8 +36,20 @@
     </style>
 
     <style name="Theme.TypingDnaDashboard" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:windowBackground">@color/saegeul_canvas</item>
+        <item name="android:statusBarColor">@color/saegeul_canvas</item>
+        <item name="android:navigationBarColor">@color/saegeul_canvas</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:textColorPrimary">@color/saegeul_ink</item>
+        <item name="android:textColorSecondary">@color/saegeul_secondary</item>
+        <item name="colorPrimary">@color/saegeul_action</item>
+        <item name="colorOnPrimary">@color/saegeul_on_action</item>
+        <item name="colorSecondary">@color/saegeul_action</item>
+        <item name="colorOnSecondary">@color/saegeul_on_action</item>
+        <item name="colorSurface">@color/saegeul_surface</item>
+        <item name="colorOnSurface">@color/saegeul_ink</item>
+        <item name="colorControlNormal">@color/saegeul_ink</item>
     </style>
 
     <style name="InputViewSnackbarTheme" parent="Theme.MaterialComponents.Light.NoActionBar" />

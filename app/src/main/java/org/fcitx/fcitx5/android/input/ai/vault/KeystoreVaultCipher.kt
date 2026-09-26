@@ -8,34 +8,58 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
-import android.security.keystore.StrongBoxUnavailableException
 import java.security.KeyStore
-import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
+import javax.crypto.KeyGenerator
 
 /**
  * Device-bound AES-GCM cipher backed by the Android Keystore.
  *
- * The key never leaves secure hardware/TEE and is not extractable; Saegeul keeps no backdoor,
- * escrow, or logging path for it. Encryption/decryption is delegated to [AesGcmVaultCipher] once
- * the Keystore-backed key has been resolved or generated.
+ * The wrapping key never leaves secure hardware/TEE and is not extractable; Saegeul keeps no
+ * backdoor, escrow, or logging path for it. Whole-file payload encryption runs on a random
+ * software data key that the hardware key wraps once per process ([EnvelopeVaultCipher]), because
+ * per-save hardware key operations are measured at seconds on some devices and stall typing.
+ * Data at rest stays hardware-key protected: the wrapped data key is only recoverable through
+ * the Keystore key.
  *
- * Not exercised by JVM unit tests: `AndroidKeyStore` only exists on-device.
+ * Key generations:
+ * - `saegeul.vault.v1` was generated with a StrongBox preference. On devices where StrongBox
+ *   (SPU) operations take seconds, loading or saving through that key froze input, so new keys
+ *   use a plain TEE key under [DEFAULT_ALIAS] (v2) and StrongBox is no longer preferred.
+ * - Blobs written by older generations keep decrypting: envelope blobs wrapped by the v1 key,
+ *   and pre-envelope blobs encrypted directly by the v1 key.
+ *
+ * Not exercised by JVM unit tests: `AndroidKeyStore` only exists on-device. The envelope contract
+ * itself is covered by `EnvelopeVaultCipherTest`.
  */
-class KeystoreVaultCipher(private val alias: String = DEFAULT_ALIAS) : VaultCipher {
+class KeystoreVaultCipher(
+    private val alias: String = DEFAULT_ALIAS,
+    private val legacyAlias: String = LEGACY_ALIAS
+) : VaultCipher {
 
-    override val id: String = "aesgcm"
+    private val envelope: EnvelopeVaultCipher by lazy {
+        EnvelopeVaultCipher(wrapping = AesGcmVaultCipher(keyOrCreate(alias)))
+    }
 
-    @Volatile
-    private var cachedKey: SecretKey? = null
+    private val legacyEnvelope: EnvelopeVaultCipher? by lazy {
+        if (hasKey(legacyAlias)) {
+            EnvelopeVaultCipher(wrapping = AesGcmVaultCipher(keyOrCreate(legacyAlias)), magic = EnvelopeVaultCipher.MAGIC_PREVIOUS)
+        } else {
+            null
+        }
+    }
 
-    private val delegate: VaultCipher by lazy { AesGcmVaultCipher(keyOrCreate()) }
+    private val legacyDirect: AesGcmVaultCipher? by lazy {
+        if (hasKey(legacyAlias)) AesGcmVaultCipher(keyOrCreate(legacyAlias)) else null
+    }
 
-    /** True when the key lives inside a TEE or StrongBox; false if unknown/software-backed. */
+    override val id: String get() = envelope.id
+
+    /** True when the active wrapping key lives inside a TEE or StrongBox; false if unknown/software-backed. */
     val isHardwareBacked: Boolean
         get() {
-            val key = keyOrCreate()
+            val key = keyOrCreate(alias)
             val level = securityLevelOf(key)
             return if (level != null) {
                 level >= KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT
@@ -44,32 +68,53 @@ class KeystoreVaultCipher(private val alias: String = DEFAULT_ALIAS) : VaultCiph
             }
         }
 
-    /** True only when the key is confirmed StrongBox-backed (API 31+). */
+    /** True only when the active wrapping key is confirmed StrongBox-backed (API 31+). */
     val isStrongBoxBacked: Boolean
-        get() = securityLevelOf(keyOrCreate())?.let { it == KeyProperties.SECURITY_LEVEL_STRONGBOX } ?: false
+        get() = securityLevelOf(keyOrCreate(alias))?.let { it == KeyProperties.SECURITY_LEVEL_STRONGBOX } ?: false
 
-    override fun encrypt(plain: ByteArray, aad: ByteArray): ByteArray = delegate.encrypt(plain, aad)
+    override fun encrypt(plain: ByteArray, aad: ByteArray): ByteArray = envelope.encrypt(plain, aad)
 
-    override fun decrypt(blob: ByteArray, aad: ByteArray): ByteArray = delegate.decrypt(blob, aad)
+    override fun decrypt(blob: ByteArray, aad: ByteArray): ByteArray = when {
+        EnvelopeVaultCipher.hasEnvelopeHeader(blob) && matchesHeader(blob, EnvelopeVaultCipher.MAGIC_CURRENT) ->
+            envelope.decrypt(blob, aad)
+        legacyEnvelope != null ->
+            legacyEnvelope!!.decrypt(blob, aad)
+        else ->
+            throw java.security.GeneralSecurityException("No vault key available to decrypt this blob")
+    }
 
-    @Synchronized
-    private fun keyOrCreate(): SecretKey {
-        cachedKey?.let { return it }
+    private fun matchesHeader(blob: ByteArray, magic: ByteArray): Boolean {
+        if (blob.size < magic.size) return false
+        for (index in magic.indices) {
+            if (blob[index] != magic[index]) return false
+        }
+        return true
+    }
+
+    private fun hasKey(targetAlias: String): Boolean {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        val existing = keyStore.getKey(alias, null) as? SecretKey
-        val key = existing ?: generateKey()
-        cachedKey = key
+        return keyStore.getEntry(targetAlias, null) is KeyStore.SecretKeyEntry
+    }
+
+    private fun keyOrCreate(targetAlias: String): SecretKey = keyed(targetAlias) {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        val existing = keyStore.getKey(targetAlias, null) as? SecretKey
+        existing ?: generateKey()
+    }
+
+    private inline fun keyed(targetAlias: String, block: () -> SecretKey): SecretKey {
+        val existing = cachedKeys[targetAlias]
+        if (existing != null) return existing
+        val key = block()
+        cachedKeys[targetAlias] = key
         return key
     }
 
+    private val cachedKeys = HashMap<String, SecretKey>()
+
     private fun generateKey(): SecretKey {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            try {
-                return generateWithSpec(buildKeySpec(strongBox = true))
-            } catch (e: StrongBoxUnavailableException) {
-                // StrongBox unavailable on this device; fall back to a TEE-backed key below.
-            }
-        }
+        // StrongBox는 의도적으로 요구하지 않는다. SPU 연산이 수 초로 측정된 기기에서 금고
+        // 저장·조회가 입력을 멈춘다. TEE 하드웨어 키로 같은 추출 불가 경계를 유지한다.
         return generateWithSpec(buildKeySpec(strongBox = false))
     }
 
@@ -115,6 +160,11 @@ class KeystoreVaultCipher(private val alias: String = DEFAULT_ALIAS) : VaultCiph
     companion object {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_SIZE_BITS = 256
-        private const val DEFAULT_ALIAS = "saegeul.vault.v1"
+
+        /** Current generation: plain TEE hardware key (no StrongBox preference). */
+        const val DEFAULT_ALIAS = "saegeul.vault.v2"
+
+        /** First generation alias, kept only for decrypting data written by older installs. */
+        const val LEGACY_ALIAS = "saegeul.vault.v1"
     }
 }

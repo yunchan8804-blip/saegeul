@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_home_eyebrow">Gemma</string>
+    <string name="gemma_home_title">AI sentence prep</string>
+    <string name="gemma_home_summary">Prepares sentences on-device in advance, so they\'re ready to suggest as you type</string>
+    <string name="gemma_home_open">Open prep screen</string>
+    <string name="gemma_home_vault_title">My language vault</string>
+</resources>

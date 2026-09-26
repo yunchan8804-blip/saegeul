@@ -208,4 +208,48 @@ class UserTypingContextCollectorTest {
         assertFalse(collector.flushPending("com.kakao.talk"))
         assertTrue(committedSentences.isEmpty())
     }
+
+    @Test
+    fun unknownRemovedTextDropsOnlyTheLastWhitespaceToken() {
+        collector.recordCommittedText("com.kakao.talk", "안녕하세요 반갑")
+
+        collector.onBackspaceContinuityLost("com.kakao.talk", null)
+
+        assertTrue(collector.hasPending("com.kakao.talk"))
+        assertTrue(collector.flushPending("com.kakao.talk"))
+        assertEquals("안녕하세요", committedSentences.single().second)
+    }
+
+    @Test
+    fun exactRemovedSuffixTrimsOnlyThatSuffix() {
+        collector.recordCommittedText("com.kakao.talk", "안녕")
+
+        collector.onBackspaceContinuityLost("com.kakao.talk", "녕")
+        assertTrue(collector.hasPending("com.kakao.talk"))
+
+        collector.recordCommittedText("com.kakao.talk", "녕하세요")
+        assertEquals("안녕하세요", committedSentences.single().second)
+    }
+
+    @Test
+    fun differentFieldIdOnEditorSessionStartedDiscardsPending() {
+        collector.onEditorSessionStarted("com.kakao.talk", fieldId = 1, restarting = false)
+        collector.recordCommittedText("com.kakao.talk", "안녕")
+        assertTrue(collector.hasPending("com.kakao.talk"))
+
+        collector.onEditorSessionStarted("com.kakao.talk", fieldId = 2, restarting = true)
+
+        assertFalse(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun sameFieldIdRestartingPreservesPending() {
+        collector.onEditorSessionStarted("com.kakao.talk", fieldId = 1, restarting = false)
+        collector.recordCommittedText("com.kakao.talk", "안녕")
+        assertTrue(collector.hasPending("com.kakao.talk"))
+
+        collector.onEditorSessionStarted("com.kakao.talk", fieldId = 1, restarting = true)
+
+        assertTrue(collector.hasPending("com.kakao.talk"))
+    }
 }

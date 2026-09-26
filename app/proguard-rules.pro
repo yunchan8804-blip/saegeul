@@ -37,6 +37,17 @@
 -keep class org.fcitx.fcitx5.android.core.RawConfig { *; }
 -keep class org.fcitx.fcitx5.android.data.UserDataManager** { *; }
 
+# On-device Gemma (LiteRT-LM). The AAR ships no consumer proguard rules of its own.
+# Its JNI bridge (LiteRtLmJni, Conversation/Session's Jni*CallbackImpl) is called by native code by
+# class and method signature, and R8's shrinker (still active with -dontobfuscate above, which only
+# disables renaming) cannot see that from Java/Kotlin call graphs alone.
+-keep class com.google.ai.edge.litertlm.** { *; }
+-keep interface com.google.ai.edge.litertlm.** { *; }
+-keepclasseswithmembers class com.google.ai.edge.litertlm.** {
+    native <methods>;
+}
+-dontwarn com.google.ai.edge.litertlm.**
+
 # remove kotlin null checks
 -processkotlinnullchecks remove
 

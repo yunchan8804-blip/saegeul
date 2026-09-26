@@ -36,21 +36,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore
-import org.fcitx.fcitx5.android.input.ai.EffectiveAiProfile
-import org.fcitx.fcitx5.android.input.ai.AiProviderKind
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
-import org.fcitx.fcitx5.android.input.ai.AiProviderResolver
-import org.fcitx.fcitx5.android.input.ai.AiAuthMode
-import org.fcitx.fcitx5.android.input.ai.AiOAuthLoginActivity
-import org.fcitx.fcitx5.android.input.ai.AiOAuthSessionIdentity
-import org.fcitx.fcitx5.android.input.ai.AiOAuthSessionManager
-import org.fcitx.fcitx5.android.input.ai.AiOAuthSessionStore
-import org.fcitx.fcitx5.android.input.ai.AiProviderSetupActivity
-import org.fcitx.fcitx5.android.input.ai.AiUsageStore
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.gif.GifCache
 import org.fcitx.fcitx5.android.input.gif.GifProviderCredentialState
 import org.fcitx.fcitx5.android.input.gif.GifProviderCredentialStore
@@ -78,12 +66,9 @@ import splitties.resources.styledColor
 
 /** User-visible controls for network input, BYOK credentials, and local traces. */
 class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
-    private lateinit var providerPreference: Preference
-    private lateinit var clearAiProviderPreference: Preference
     private lateinit var voiceModePreference: Preference
     private lateinit var voiceProviderPreference: Preference
     private lateinit var clearVoiceProviderPreference: Preference
-    private lateinit var usagePreference: Preference
     private lateinit var gifSelectionPreference: Preference
     private lateinit var gifProviderPreference: Preference
     private lateinit var clearGifProviderPreference: Preference
@@ -93,11 +78,29 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     private lateinit var typingDnaSyncPreference: Preference
     private lateinit var clearTypingDnaPreference: Preference
     private lateinit var sentencePackPreference: Preference
+    private lateinit var notificationPermissionPreference: Preference
+    private lateinit var gemmaModelPreference: Preference
+    private lateinit var offlineModeSwitch: SwitchPreferenceCompat
 
     private var summaryRefreshJob: Job? = null
     private var summaryGeneration = 0L
     private var hasSummarySnapshot = false
     private var typingDnaSyncJob: Job? = null
+    private var privacySettingsResumed = false
+
+    // sync the offline-mode switch when `advanced.offlineMode` changes from another screen
+    // (e.g. Advanced Settings) while this fragment isn't the visible one.
+    @androidx.annotation.Keep
+    private val offlineModeChangeListener =
+        org.fcitx.fcitx5.android.data.prefs.ManagedPreference.OnChangeListener<Boolean> { _, v ->
+            if (privacySettingsResumed) return@OnChangeListener
+            if (::offlineModeSwitch.isInitialized) offlineModeSwitch.isChecked = v
+        }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        AppPrefs.getInstance().advanced.offlineMode.registerOnChangeListener(offlineModeChangeListener)
+    }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
@@ -108,6 +111,122 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 setTint(preferenceIconTint)
             }
         preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
+            addCategory(R.string.privacy_ai_vault_category) {
+                gemmaModelPreference = Preference(ctx).apply {
+                    setTitle(R.string.privacy_ai_gemma_model_title)
+                    isIconSpaceReserved = false
+                    setOnPreferenceClickListener {
+                        ctx.startActivity(android.content.Intent(
+                            ctx,
+                            org.fcitx.fcitx5.android.ui.main.ai.install.GemmaModelActivity::class.java
+                        ))
+                        true
+                    }
+                }
+                addPreference(gemmaModelPreference)
+                addPreference(
+                    title = R.string.privacy_ai_vault_dashboard_title,
+                    summary = R.string.privacy_ai_vault_dashboard_summary,
+                    onClick = {
+                        ctx.startActivity(android.content.Intent(
+                            ctx,
+                            org.fcitx.fcitx5.android.ui.main.ai.TypingDnaDashboardActivity::class.java
+                        ))
+                    }
+                )
+                addPreference(SwitchPreferenceCompat(ctx).apply {
+                    key = "automatic_ondevice_suggestions_opt_in"
+                    setTitle(R.string.gemma_automatic_enable)
+                    isPersistent = true
+                    setDefaultValue(true)
+                    isChecked = prefs.internal.automaticOnDeviceSuggestionsOptIn.getValue()
+                    if (OnDeviceAiSupport.isSupported) {
+                        setSummary(R.string.gemma_automatic_enable_description)
+                    } else {
+                        isEnabled = false
+                        setSummary(R.string.privacy_ai_automatic_release_summary)
+                    }
+                })
+                addPreference(SwitchPreferenceCompat(ctx).apply {
+                    key = "automatic_ondevice_suggestions_use_gpu"
+                    setTitle(R.string.privacy_ai_gpu_acceleration_title)
+                    setSummary(R.string.privacy_ai_gpu_acceleration_summary)
+                    isPersistent = true
+                    setDefaultValue(true)
+                    isChecked = prefs.internal.automaticOnDeviceSuggestionsUseGpu.getValue()
+                    isEnabled = OnDeviceAiSupport.isSupported
+                })
+                addPreference(SwitchPreferenceCompat(ctx).apply {
+                    key = "background_progress_notifications"
+                    setTitle(R.string.privacy_ai_background_notifications_title)
+                    setSummary(R.string.privacy_ai_background_notifications_summary)
+                    isPersistent = true
+                    setDefaultValue(true)
+                    isChecked = prefs.internal.backgroundProgressNotifications.getValue()
+                })
+                addPreference(SwitchPreferenceCompat(ctx).apply {
+                    key = "collection_feedback_in_keyboard"
+                    setTitle(R.string.privacy_ai_collection_feedback_title)
+                    setSummary(R.string.privacy_ai_collection_feedback_summary)
+                    isPersistent = true
+                    setDefaultValue(true)
+                    isChecked = prefs.internal.collectionFeedbackInKeyboard.getValue()
+                })
+                notificationPermissionPreference = Preference(ctx).apply {
+                    setTitle(R.string.privacy_ai_open_notification_settings_title)
+                    setSummary(R.string.privacy_ai_open_notification_settings_summary)
+                    isIconSpaceReserved = false
+                    setOnPreferenceClickListener {
+                        ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                        })
+                        true
+                    }
+                }
+                addPreference(notificationPermissionPreference)
+                typingDnaPreference = Preference(ctx).apply {
+                    title = getString(R.string.privacy_ai_typing_dna_report_title)
+                    icon = themedPreferenceIcon(R.drawable.ic_baseline_auto_awesome_24)
+                    isSelectable = false
+                }
+                addPreference(typingDnaPreference)
+                typingDnaSyncPreference = Preference(ctx).apply {
+                    title = getString(R.string.privacy_ai_typing_dna_sync_title)
+                    summary = getString(R.string.privacy_ai_typing_dna_sync_summary)
+                    isIconSpaceReserved = false
+                    setOnPreferenceClickListener {
+                        startTypingDnaSync()
+                        true
+                    }
+                }
+                addPreference(typingDnaSyncPreference)
+                clearTypingDnaPreference = Preference(ctx).apply {
+                    title = getString(R.string.privacy_ai_typing_dna_clear_title)
+                    summary = getString(R.string.privacy_ai_typing_dna_clear_summary)
+                    isIconSpaceReserved = false
+                    setOnPreferenceClickListener {
+                        AlertDialog.Builder(ctx)
+                            .setTitle(R.string.privacy_ai_typing_dna_clear_dialog_title)
+                            .setMessage(R.string.privacy_ai_typing_dna_clear_dialog_message)
+                            .setPositiveButton(R.string.delete) { _, _ ->
+                                val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
+                                app.typingDnaRepository.clear()
+                                app.typingDnaVault.purge()
+                                app.personalNgramModel.clear()
+                                app.personalSentenceVault.clear()
+                                org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.recentSentSentences?.clear()
+                                refreshSummaries()
+                                Toast.makeText(ctx, R.string.privacy_ai_typing_dna_cleared_toast, Toast.LENGTH_SHORT).show()
+                            }
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show()
+                        true
+                    }
+                }
+                addPreference(clearTypingDnaPreference)
+                setTypingDnaSyncBusy(typingDnaSyncJob?.isActive == true)
+                updateNotificationPermissionVisibility()
+            }
             addCategory(R.string.privacy_network_controls) {
                 addPreference(SwitchPreferenceCompat(ctx).apply {
                     key = "privacy_offline_mode"
@@ -124,7 +243,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                         }
                         true
                     }
-                })
+                }.also { offlineModeSwitch = it })
                 sentencePackPreference = Preference(ctx).apply {
                     setTitle(R.string.sentence_packs_title)
                     setSummary(R.string.sentence_packs_default_summary)
@@ -140,26 +259,6 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     }
                 }
                 addPreference(sentencePackPreference)
-            }
-            addCategory(R.string.ai_provider_settings) {
-                providerPreference = Preference(ctx).apply {
-                    setTitle(R.string.ai_provider_settings)
-                    icon = themedPreferenceIcon(R.drawable.ic_baseline_auto_awesome_24)
-                    setOnPreferenceClickListener {
-                        showProviderModeDialog()
-                        true
-                    }
-                }
-                addPreference(providerPreference)
-                clearAiProviderPreference = Preference(ctx).apply {
-                    setTitle(R.string.ai_clear_custom_provider)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        clearAiProvider()
-                        true
-                    }
-                }
-                addPreference(clearAiProviderPreference)
             }
             addCategory(R.string.voice_provider_settings) {
                 voiceModePreference = Preference(ctx).apply {
@@ -237,80 +336,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 }
                 addPreference(clearGiphyProviderPreference)
             }
-            addCategory("AI 언어 지문 (Typing DNA)") {
-                typingDnaPreference = Preference(ctx).apply {
-                    title = "내 언어 지문 리포트"
-                    icon = themedPreferenceIcon(R.drawable.ic_baseline_auto_awesome_24)
-                    isSelectable = false
-                }
-                addPreference(typingDnaPreference)
-                addPreference(
-                    title = "AI 언어 지문 상세 그래프 대시보드 보기",
-                    summary = "학습 진행 레벨, 데이터 축적 현황 및 톤 밸런스 그래프를 확인합니다.",
-                    onClick = {
-                        ctx.startActivity(android.content.Intent(ctx, org.fcitx.fcitx5.android.ui.main.ai.TypingDnaDashboardActivity::class.java))
-                    }
-                )
-                if (BuildConfig.DEBUG) {
-                    addPreference(
-                        title = "기기에서 문장 재료 쌓기",
-                        summary = "고정 문장 재료를 기기에서 자동으로 쌓는 debug 실험을 엽니다.",
-                        onClick = {
-                            ctx.startActivity(
-                                android.content.Intent().setClassName(
-                                    ctx,
-                                    "org.fcitx.fcitx5.android.debug.gemma.GemmaExperimentActivity"
-                                )
-                            )
-                        }
-                    )
-                }
-                typingDnaSyncPreference = Preference(ctx).apply {
-                    title = "지금 언어 지문 분석 및 동기화"
-                    summary = "최근 타이핑 데이터를 바탕으로 내 말투와 어휘 습관을 즉시 업데이트합니다."
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        startTypingDnaSync()
-                        true
-                    }
-                }
-                addPreference(typingDnaSyncPreference)
-                clearTypingDnaPreference = Preference(ctx).apply {
-                    title = "언어 지문 전체 초기화 (Zero-Knowledge)"
-                    summary = "학습된 모든 말투, 종결 어미, 나만의 표현을 기기에서 영구 삭제합니다."
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        AlertDialog.Builder(ctx)
-                            .setTitle("언어 지문 초기화")
-                            .setMessage("학습된 말투, 종결 어미, 나만의 표현을 기기에서 완전히 삭제하시겠습니까?")
-                            .setPositiveButton(R.string.delete) { _, _ ->
-                                val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-                                app.typingDnaRepository.clear()
-                                app.typingDnaVault.purge()
-                                app.personalNgramModel.clear()
-                                app.personalSentenceVault.clear()
-                                refreshSummaries()
-                                Toast.makeText(ctx, "언어 지문이 안전하게 초기화되었습니다.", Toast.LENGTH_SHORT).show()
-                            }
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .show()
-                        true
-                    }
-                }
-                addPreference(clearTypingDnaPreference)
-                setTypingDnaSyncBusy(typingDnaSyncJob?.isActive == true)
-            }
             addCategory(R.string.privacy_local_data) {
-                usagePreference = Preference(ctx).apply {
-                    setTitle(R.string.ai_usage_title)
-                    isIconSpaceReserved = false
-                    isSelectable = false
-                }
-                addPreference(usagePreference)
-                addPreference(R.string.ai_usage_clear, onClick = {
-                    AiUsageStore(ctx).clear()
-                    refreshSummaries()
-                })
                 addPreference(R.string.gif_cache_clear, onClick = {
                     GifCache(ctx).clear()
                     Toast.makeText(ctx, R.string.gif_cache_cleared, Toast.LENGTH_SHORT).show()
@@ -329,34 +355,68 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         observeSentencePackSummary()
+        observeGemmaModelSummary()
+    }
+
+    /** Summary line: the shared install-status title, plus its detail (e.g. live download %) when there is one. */
+    private fun observeGemmaModelSummary() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaModelInstaller.state(requireContext().applicationContext)
+                    .collect { state ->
+                        if (!::gemmaModelPreference.isInitialized) return@collect
+                        val ctx = requireContext()
+                        val uiState = org.fcitx.fcitx5.android.ui.main.ai.install.GemmaInstallUiState.from(state)
+                        val title = ctx.getString(uiState.titleRes)
+                        val detail = uiState.detailRes?.let { ctx.getString(it, *uiState.detailArgs.toTypedArray()) }
+                        gemmaModelPreference.summary = if (detail != null) "$title · $detail" else title
+                    }
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        if (::providerPreference.isInitialized) {
+        privacySettingsResumed = true
+        if (::voiceModePreference.isInitialized) {
             setTypingDnaSyncBusy(typingDnaSyncJob?.isActive == true)
             refreshSummaries()
         }
+        updateNotificationPermissionVisibility()
         val intent = requireActivity().intent
         val action = intent.getStringExtra(MainActivity.EXTRA_PRIVACY_AI_ACTION)
-        if (action != MainActivity.PRIVACY_AI_ACTION_WRITING_SETUP &&
-            action != MainActivity.PRIVACY_AI_ACTION_VOICE_SETUP
-        ) return
+        if (action != MainActivity.PRIVACY_AI_ACTION_VOICE_SETUP) return
         intent.removeExtra(MainActivity.EXTRA_PRIVACY_AI_ACTION)
         view?.post {
             if (!isAdded) return@post
-            if (action == MainActivity.PRIVACY_AI_ACTION_WRITING_SETUP) {
-                showProviderModeDialog()
-            } else {
-                showVoiceProviderDialog()
-            }
+            showVoiceProviderDialog()
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        privacySettingsResumed = false
     }
 
     override fun onDestroyView() {
         summaryGeneration++
         summaryRefreshJob?.cancel()
         super.onDestroyView()
+    }
+
+    override fun onDestroy() {
+        AppPrefs.getInstance().advanced.offlineMode.unregisterOnChangeListener(offlineModeChangeListener)
+        super.onDestroy()
+    }
+
+    private fun updateNotificationPermissionVisibility() {
+        if (!::notificationPermissionPreference.isInitialized) return
+        val ctx = requireContext()
+        notificationPermissionPreference.isVisible =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                androidx.core.content.ContextCompat.checkSelfPermission(
+                    ctx, android.Manifest.permission.POST_NOTIFICATIONS
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     private fun observeSentencePackSummary() {
@@ -392,8 +452,9 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     }
 
     private fun refreshSummaries() {
-        if (!::providerPreference.isInitialized) return
-        val ctx = requireContext().applicationContext
+        if (!::voiceModePreference.isInitialized) return
+        val configuration = android.content.res.Configuration(requireContext().resources.configuration)
+        val ctx = requireContext().applicationContext.createConfigurationContext(configuration)
         val generation = ++summaryGeneration
         summaryRefreshJob?.cancel()
         if (!hasSummarySnapshot && view != null) showSummariesLoading()
@@ -413,38 +474,6 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     }
 
     private fun createSummarySnapshot(ctx: Context): PrivacyAiSummarySnapshot {
-        val effective = AiProviderResolver.resolve(ctx)
-        val aiStore = AiProviderCredentialStore(ctx)
-        val providerSummary = effective.profile?.let { profile ->
-            val source = when {
-                effective.source == EffectiveAiProfile.Source.Custom &&
-                    profile.authMode == AiAuthMode.OAuthPkce -> {
-                    ctx.getString(R.string.ai_auth_mode_oauth)
-                }
-                effective.source == EffectiveAiProfile.Source.Custom -> {
-                    ctx.getString(R.string.ai_provider_source_custom)
-                }
-                effective.source == EffectiveAiProfile.Source.BundledDebug -> {
-                    ctx.getString(R.string.ai_provider_source_bundled)
-                }
-                else -> ctx.getString(R.string.ai_provider_source_missing)
-            }
-            val authentication = when (profile.authMode) {
-                AiAuthMode.ApiKey -> ctx.getString(R.string.ai_auth_api_key)
-                AiAuthMode.OAuthPkce -> if (AiOAuthSessionStore(ctx).hasSession(profile)) {
-                    ctx.getString(R.string.ai_auth_oauth_connected)
-                } else {
-                    ctx.getString(R.string.ai_auth_oauth_reauth)
-                }
-            }
-            ctx.getString(
-                R.string.ai_provider_configured_summary,
-                profile.displayName,
-                profile.baseUrl,
-                "$source · $authentication"
-            )
-        } ?: ctx.getString(R.string.ai_not_configured)
-        val clearAiProviderVisible = aiStore.hasCustomProfile()
         val voiceMode = VoiceProviderModeStore(ctx).load()
         val voiceStore = VoiceProviderCredentialStore(ctx)
         val voiceProfile = voiceStore.load()
@@ -479,14 +508,6 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             else -> ctx.getString(R.string.voice_provider_status_missing)
         }
         val clearVoiceProviderVisible = voiceStore.hasStoredProfile()
-        val usage = AiUsageStore(ctx).snapshot()
-        val usageSummary = ctx.getString(
-            R.string.ai_usage_summary,
-            usage.totalRequests,
-            usage.successfulRequests,
-            usage.failedRequests,
-            usage.inputCharacters
-        )
         val gifProvider = GifProviderResolver.resolve(ctx)
         val gifSelectionSummary = when (gifProvider.selection) {
             GifProviderSelection.Standard -> ctx.getString(R.string.gif_provider_selection_standard)
@@ -522,17 +543,21 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val typingDnaStats = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
             .typingDnaRepository.getStats()
         val typingDnaSummary = if (!typingDnaStats.hasLearnedData) {
-            "아직 학습된 언어 지문이 없습니다. 키보드를 사용하면 자동으로 내 말투가 학습됩니다."
+            ctx.getString(R.string.privacy_ai_typing_dna_no_data_summary)
         } else {
-            "Lv.${typingDnaStats.level} ${typingDnaStats.levelTitle} · 문장 ${typingDnaStats.totalSentences}개 · 단어쌍 ${typingDnaStats.bigramsCount}개 · 어미 ${typingDnaStats.endingsCount}개"
+            ctx.getString(
+                R.string.privacy_ai_typing_dna_stats_summary,
+                typingDnaStats.level,
+                typingDnaStats.levelTitle,
+                typingDnaStats.totalSentences,
+                typingDnaStats.bigramsCount,
+                typingDnaStats.endingsCount
+            )
         }
         return PrivacyAiSummarySnapshot(
-            providerSummary = providerSummary,
-            clearAiProviderVisible = clearAiProviderVisible,
             voiceModeSummary = voiceModeSummary,
             voiceProviderSummary = voiceProviderSummary,
             clearVoiceProviderVisible = clearVoiceProviderVisible,
-            usageSummary = usageSummary,
             gifSelectionSummary = gifSelectionSummary,
             gifProviderSummary = gifProviderSummary,
             clearGifProviderVisible = clearGifProviderVisible,
@@ -543,12 +568,9 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     }
 
     private fun applySummarySnapshot(snapshot: PrivacyAiSummarySnapshot) {
-        providerPreference.summary = snapshot.providerSummary
-        clearAiProviderPreference.isVisible = snapshot.clearAiProviderVisible
         voiceModePreference.summary = snapshot.voiceModeSummary
         voiceProviderPreference.summary = snapshot.voiceProviderSummary
         clearVoiceProviderPreference.isVisible = snapshot.clearVoiceProviderVisible
-        usagePreference.summary = snapshot.usageSummary
         gifSelectionPreference.summary = snapshot.gifSelectionSummary
         gifProviderPreference.summary = snapshot.gifProviderSummary
         clearGifProviderPreference.isVisible = snapshot.clearGifProviderVisible
@@ -559,10 +581,8 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
 
     private fun showSummariesLoading() {
         val summary = getString(R.string.privacy_ai_summary_loading)
-        providerPreference.summary = summary
         voiceModePreference.summary = summary
         voiceProviderPreference.summary = summary
-        usagePreference.summary = summary
         gifSelectionPreference.summary = summary
         gifProviderPreference.summary = summary
         giphyProviderPreference.summary = summary
@@ -571,10 +591,8 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
 
     private fun showSummariesLoadFailure() {
         val summary = getString(R.string.privacy_ai_summary_load_failed)
-        providerPreference.summary = summary
         voiceModePreference.summary = summary
         voiceProviderPreference.summary = summary
-        usagePreference.summary = summary
         gifSelectionPreference.summary = summary
         gifProviderPreference.summary = summary
         giphyProviderPreference.summary = summary
@@ -613,7 +631,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 if (canUpdatePreferenceView()) {
                     Toast.makeText(
                         ctx,
-                        "언어 지문 분석 완료 (분석 문장: ${totalSentences}개)",
+                        ctx.getString(R.string.privacy_ai_typing_dna_sync_done_toast, totalSentences),
                         Toast.LENGTH_SHORT
                     ).show()
                     refreshSummaries()
@@ -646,12 +664,9 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     }
 
     private data class PrivacyAiSummarySnapshot(
-        val providerSummary: String,
-        val clearAiProviderVisible: Boolean,
         val voiceModeSummary: String,
         val voiceProviderSummary: String,
         val clearVoiceProviderVisible: Boolean,
-        val usageSummary: String,
         val gifSelectionSummary: String,
         val gifProviderSummary: String,
         val clearGifProviderVisible: Boolean,
@@ -659,57 +674,6 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val clearGiphyProviderVisible: Boolean,
         val typingDnaSummary: String
     )
-
-    private fun showProviderModeDialog() {
-        val ctx = requireContext()
-        val effective = AiProviderResolver.resolve(ctx)
-        val existingOAuthNeedsLogin = effective.source == EffectiveAiProfile.Source.Custom &&
-            effective.profile?.let { profile ->
-                profile.authMode == AiAuthMode.OAuthPkce && !AiOAuthSessionStore(ctx).hasSession(profile)
-            } == true
-        val options = buildList {
-            if (existingOAuthNeedsLogin) add(getString(R.string.ai_auth_mode_oauth_relogin))
-            add("Google Gemini (추천 · 무료 API 키)")
-            add("OpenAI (API 키)")
-            add(getString(R.string.ai_auth_mode_auto_discovery))
-            add(getString(R.string.ai_auth_mode_advanced))
-        }
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.ai_auth_mode_title)
-            .setItems(options.toTypedArray()) { _, which ->
-                if (existingOAuthNeedsLogin && which == 0) {
-                    startActivity(AiOAuthLoginActivity.createIntent(ctx))
-                } else {
-                    when (which - if (existingOAuthNeedsLogin) 1 else 0) {
-                        0 -> showGeminiProviderDialog()
-                        1 -> showOpenAiProviderDialog()
-                        2 -> startActivity(AiProviderSetupActivity.createIntent(ctx))
-                        else -> showAdvancedProviderModeDialog()
-                    }
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun showAdvancedProviderModeDialog() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.ai_auth_mode_advanced)
-            .setItems(
-                arrayOf(
-                    getString(R.string.ai_auth_mode_api_key_advanced),
-                    getString(R.string.ai_auth_mode_oauth_advanced)
-                )
-            ) { _, which ->
-                if (which == 0) {
-                    showCompatibleProviderDialog()
-                } else {
-                    showOAuthProviderDialog()
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
 
     private fun showVoiceModeDialog() {
         val ctx = requireContext()
@@ -859,466 +823,6 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             R.string.voice_model_accurate
         }
     )
-
-    private fun showGeminiProviderDialog() {
-        val ctx = requireContext()
-        val store = AiProviderCredentialStore(ctx)
-        val configured = store.load()?.takeIf {
-            it.kind == AiProviderKind.Gemini && it.authMode == AiAuthMode.ApiKey
-        }
-        val apiKey = EditText(ctx).apply {
-            hint = if (configured == null) {
-                "Google AI Studio API Key (AIzaSy...)"
-            } else {
-                getString(R.string.ai_provider_key_unchanged_hint)
-            }
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
-            }
-            maxLines = 1
-            isSaveEnabled = false
-        }
-        val horizontal = ctx.dp(20)
-        val container = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
-            isFocusableInTouchMode = true
-            addView(TextView(ctx).apply {
-                text = "Google AI Studio(aistudio.google.com)에서 발급받은 무료 API 키를 입력하세요.\n초고속 Gemini 2.0 Flash 모델로 실시간 AI 문맥 제안 및 문장 다듬기가 활성화됩니다."
-                textSize = 13f
-                setPadding(0, 0, 0, ctx.dp(8))
-            })
-            addView(apiKey)
-        }
-        val dialog = AlertDialog.Builder(ctx)
-            .setTitle("Google Gemini (AI Studio)")
-            .setMessage("API 키는 기기 내 Android Keystore로 안전하게 암호화되어 저장됩니다.")
-            .setView(container)
-            .setPositiveButton(R.string.save, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.window?.setSoftInputMode(
-                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
-                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
-            )
-            container.requestFocus()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val key = apiKey.text.toString().trim().ifEmpty {
-                    configured?.apiKey.orEmpty()
-                }
-                val profile = AiProviderProfile(
-                    kind = AiProviderKind.Gemini,
-                    displayName = "Google Gemini",
-                    baseUrl = AiProviderProfile.GEMINI_BASE_URL,
-                    authMode = AiAuthMode.ApiKey,
-                    apiKey = key,
-                    fastModel = "gemini-2.0-flash",
-                    balancedModel = "gemini-2.0-flash",
-                    qualityModel = "gemini-2.0-flash",
-                    capabilities = setOf("chat_completions")
-                )
-                val validated = runCatching { profile.validate() }
-                    .onFailure { error ->
-                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
-                    }.getOrNull() ?: return@setOnClickListener
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
-                replaceProviderProfile(validated) { result ->
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
-                    result.onSuccess {
-                        apiKey.text?.clear()
-                        dialog.dismiss()
-                        refreshSummaries()
-                        Toast.makeText(
-                            ctx,
-                            "Google Gemini 설정이 저장되었습니다.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }.onFailure { error ->
-                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
-                    }
-                }
-            }
-        }
-        dialog.setOnDismissListener { apiKey.text?.clear() }
-        dialog.show()
-    }
-
-    private fun showOpenAiProviderDialog() {
-        val ctx = requireContext()
-        val store = AiProviderCredentialStore(ctx)
-        val configured = store.load()?.takeIf {
-            it.kind == AiProviderKind.OpenAI && it.authMode == AiAuthMode.ApiKey
-        }
-        val apiKey = EditText(ctx).apply {
-            setHint(
-                if (configured == null) {
-                    R.string.ai_provider_key_hint
-                } else {
-                    R.string.ai_provider_key_unchanged_hint
-                }
-            )
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
-            }
-            maxLines = 1
-            isSaveEnabled = false
-        }
-        val horizontal = ctx.dp(20)
-        val container = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
-            isFocusableInTouchMode = true
-            addView(TextView(ctx).apply {
-                setText(R.string.ai_openai_api_key_endpoint_summary)
-            })
-            addView(apiKey)
-        }
-        val dialog = AlertDialog.Builder(ctx)
-            .setTitle(R.string.ai_openai_api_key_settings)
-            .setMessage(R.string.ai_openai_api_key_security_note)
-            .setView(container)
-            .setPositiveButton(R.string.save, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.window?.setSoftInputMode(
-                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
-                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
-            )
-            container.requestFocus()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val key = apiKey.text.toString().trim().ifEmpty {
-                    configured?.apiKey.orEmpty()
-                }
-                val validated = runCatching {
-                    AiProviderProfile(apiKey = key).validate()
-                }.onFailure { error ->
-                    apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
-                }.getOrNull() ?: return@setOnClickListener
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
-                replaceProviderProfile(validated) { result ->
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
-                    result.onSuccess {
-                        apiKey.text?.clear()
-                        dialog.dismiss()
-                        refreshSummaries()
-                        Toast.makeText(
-                            ctx,
-                            R.string.ai_openai_api_key_saved,
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }.onFailure { error ->
-                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
-                    }
-                }
-            }
-        }
-        dialog.setOnDismissListener { apiKey.text?.clear() }
-        dialog.show()
-    }
-
-    private fun showCompatibleProviderDialog() {
-        val ctx = requireContext()
-        val store = AiProviderCredentialStore(ctx)
-        val custom = store.load()?.takeIf {
-            it.authMode == AiAuthMode.ApiKey && it.kind == AiProviderKind.OpenAICompatible
-        }
-        val effective = custom ?: AiProviderResolver.resolve(ctx).profile
-        val container = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            val horizontal = ctx.dp(20)
-            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
-            isFocusableInTouchMode = true
-        }
-        fun field(hint: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT): EditText {
-            // Prefilled values hide the EditText hint, so repeat it as a fixed label above
-            // the field (same idiom as the app profile form labels).
-            container.addView(
-                TextView(ctx).apply {
-                    setText(hint)
-                    setPadding(0, ctx.dp(12), 0, 0)
-                },
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-            return EditText(ctx).apply {
-                setHint(hint)
-                setText(value)
-                inputType = type
-                maxLines = 1
-                container.addView(
-                    this,
-                    LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                )
-            }
-        }
-
-        val name = field(R.string.ai_provider_name_hint, effective?.displayName.orEmpty())
-        val baseUrl = field(
-            R.string.ai_provider_url_hint,
-            effective?.baseUrl ?: AiProviderProfile.OPENAI_BASE_URL,
-            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-        )
-        val apiKey = field(
-            R.string.ai_provider_key_hint,
-            "",
-            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        ).apply {
-            hint = if (custom == null) {
-                getString(R.string.ai_provider_key_hint)
-            } else {
-                getString(R.string.ai_provider_key_unchanged_hint)
-            }
-        }
-        val fast = field(R.string.ai_fast_model_hint, effective?.fastModel ?: "gpt-5.6-luna")
-        val balanced = field(
-            R.string.ai_balanced_model_hint,
-            effective?.balancedModel ?: "gpt-5.6-terra"
-        )
-        val quality = field(R.string.ai_quality_model_hint, effective?.qualityModel ?: "gpt-5.6-sol")
-        val scrollContent = boundedAdvancedDialogContent(ctx, container)
-
-        val dialog = AlertDialog.Builder(ctx)
-            .setTitle(R.string.ai_compatible_api_settings)
-            .setMessage(R.string.ai_compatible_api_security_note)
-            .setView(scrollContent)
-            .setPositiveButton(R.string.save, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.window?.setSoftInputMode(
-                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
-                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
-            )
-            container.requestFocus()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val key = apiKey.text.toString().trim().ifEmpty { custom?.apiKey.orEmpty() }
-                val profile = AiProviderProfile(
-                    kind = when (baseUrl.text.toString().trimEnd('/')) {
-                        AiProviderProfile.OPENAI_BASE_URL -> AiProviderKind.OpenAI
-                        AiProviderProfile.GEMINI_BASE_URL -> AiProviderKind.Gemini
-                        else -> AiProviderKind.OpenAICompatible
-                    },
-                    displayName = name.text.toString(),
-                    baseUrl = baseUrl.text.toString(),
-                    authMode = AiAuthMode.ApiKey,
-                    apiKey = key,
-                    fastModel = fast.text.toString(),
-                    balancedModel = balanced.text.toString(),
-                    qualityModel = quality.text.toString()
-                )
-                val validated = runCatching(profile::validate)
-                    .onFailure { error ->
-                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
-                    }
-                    .getOrNull() ?: return@setOnClickListener
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
-                replaceProviderProfile(validated) { result ->
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
-                    result.onSuccess {
-                        dialog.dismiss()
-                        refreshSummaries()
-                    }.onFailure { error ->
-                        apiKey.error = error.message ?: getString(R.string.ai_provider_invalid)
-                    }
-                }
-            }
-        }
-        dialog.show()
-    }
-
-    private fun showOAuthProviderDialog() {
-        val ctx = requireContext()
-        val store = AiProviderCredentialStore(ctx)
-        val custom = store.load()?.takeIf { it.authMode == AiAuthMode.OAuthPkce }
-        val container = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            val horizontal = ctx.dp(20)
-            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
-        }
-        fun field(hint: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT): EditText {
-            // Prefilled values hide the EditText hint, so repeat it as a fixed label above
-            // the field (same idiom as the app profile form labels).
-            container.addView(
-                TextView(ctx).apply {
-                    setText(hint)
-                    setPadding(0, ctx.dp(12), 0, 0)
-                },
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-            return EditText(ctx).apply {
-                setHint(hint)
-                setText(value)
-                inputType = type
-                maxLines = 1
-                isSaveEnabled = false
-                container.addView(
-                    this,
-                    LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                )
-            }
-        }
-        val uriType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-        val name = field(R.string.ai_provider_name_hint, custom?.displayName.orEmpty())
-        val baseUrl = field(R.string.ai_provider_url_hint, custom?.baseUrl.orEmpty(), uriType)
-        val authorizationEndpoint = field(
-            R.string.ai_oauth_authorization_endpoint_hint,
-            custom?.oauthAuthorizationEndpoint.orEmpty(),
-            uriType
-        )
-        val tokenEndpoint = field(
-            R.string.ai_oauth_token_endpoint_hint,
-            custom?.oauthTokenEndpoint.orEmpty(),
-            uriType
-        )
-        val revocationEndpoint = field(
-            R.string.ai_oauth_revocation_endpoint_hint,
-            custom?.oauthRevocationEndpoint.orEmpty(),
-            uriType
-        )
-        val clientId = field(R.string.ai_oauth_client_id_hint, custom?.oauthClientId.orEmpty())
-        val scopes = field(
-            R.string.ai_oauth_scopes_hint,
-            custom?.oauthScopes ?: AiProviderProfile.DEFAULT_OAUTH_SCOPES
-        )
-        val fast = field(R.string.ai_fast_model_hint, custom?.fastModel ?: "gpt-5.6-luna")
-        val balanced = field(
-            R.string.ai_balanced_model_hint,
-            custom?.balancedModel ?: "gpt-5.6-terra"
-        )
-        val quality = field(R.string.ai_quality_model_hint, custom?.qualityModel ?: "gpt-5.6-sol")
-        val scrollContent = boundedAdvancedDialogContent(ctx, container)
-
-        val dialog = AlertDialog.Builder(ctx)
-            .setTitle(R.string.ai_auth_mode_oauth)
-            .setMessage(R.string.ai_oauth_security_note)
-            .setView(scrollContent)
-            .setPositiveButton(R.string.ai_oauth_save_and_sign_in, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.window?.setSoftInputMode(
-                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
-                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
-            )
-            container.requestFocus()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val profile = AiProviderProfile(
-                    kind = AiProviderKind.OpenAICompatible,
-                    displayName = name.text.toString(),
-                    baseUrl = baseUrl.text.toString(),
-                    authMode = AiAuthMode.OAuthPkce,
-                    apiKey = "",
-                    oauthAuthorizationEndpoint = authorizationEndpoint.text.toString(),
-                    oauthTokenEndpoint = tokenEndpoint.text.toString(),
-                    oauthRevocationEndpoint = revocationEndpoint.text.toString(),
-                    oauthClientId = clientId.text.toString(),
-                    oauthScopes = scopes.text.toString(),
-                    fastModel = fast.text.toString(),
-                    balancedModel = balanced.text.toString(),
-                    qualityModel = quality.text.toString()
-                )
-                val validated = runCatching(profile::validate)
-                    .onFailure { error ->
-                        baseUrl.error = error.message ?: getString(R.string.ai_provider_invalid)
-                    }
-                    .getOrNull() ?: return@setOnClickListener
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
-                replaceProviderProfile(validated) { result ->
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
-                    result.onSuccess {
-                        dialog.dismiss()
-                        refreshSummaries()
-                        startActivity(AiOAuthLoginActivity.createIntent(ctx))
-                    }.onFailure { error ->
-                        baseUrl.error = error.message ?: getString(R.string.ai_provider_invalid)
-                    }
-                }
-            }
-        }
-        dialog.show()
-    }
-
-    private fun boundedAdvancedDialogContent(
-        context: android.content.Context,
-        content: View
-    ): ScrollView {
-        val heightDp = (context.resources.configuration.screenHeightDp / 5)
-            .coerceIn(132, 240)
-        val maxHeight = context.dp(heightDp)
-        return object : ScrollView(context) {
-            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                val available = View.MeasureSpec.getSize(heightMeasureSpec)
-                val cappedHeight = if (available > 0) minOf(available, maxHeight) else maxHeight
-                super.onMeasure(
-                    widthMeasureSpec,
-                    View.MeasureSpec.makeMeasureSpec(cappedHeight, View.MeasureSpec.AT_MOST)
-                )
-            }
-        }.apply {
-            isFillViewport = true
-            addView(content)
-        }
-    }
-
-    /** Revoke/clear the previous OAuth session when its authentication identity changes. */
-    private fun replaceProviderProfile(
-        profile: AiProviderProfile,
-        onComplete: (Result<Unit>) -> Unit
-    ) {
-        val ctx = requireContext()
-        val store = AiProviderCredentialStore(ctx)
-        lifecycleScope.launch {
-            val result = runCatching {
-                val previous = store.load()
-                if (!AiOAuthSessionIdentity.canPreserveSession(previous, profile)) {
-                    if (previous?.authMode == AiAuthMode.OAuthPkce) {
-                        runCatching { AiOAuthSessionManager(ctx).revokeAndClear(previous) }
-                    } else {
-                        AiOAuthSessionStore(ctx).clear()
-                    }
-                }
-                store.save(profile)
-            }
-            onComplete(result)
-        }
-    }
-
-    private fun clearAiProvider() {
-        val ctx = requireContext()
-        val store = AiProviderCredentialStore(ctx)
-        val profile = store.load()
-        lifecycleScope.launch {
-            val revoked = if (profile?.authMode == AiAuthMode.OAuthPkce) {
-                runCatching { AiOAuthSessionManager(ctx).revokeAndClear(profile) }
-                    .getOrDefault(false)
-            } else {
-                AiOAuthSessionStore(ctx).clear()
-                true
-            }
-            store.clear()
-            refreshSummaries()
-            Toast.makeText(
-                ctx,
-                if (revoked) R.string.ai_provider_removed else R.string.ai_oauth_revocation_failed,
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
 
     private fun showGifProviderSelectionDialog() {
         val ctx = requireContext()

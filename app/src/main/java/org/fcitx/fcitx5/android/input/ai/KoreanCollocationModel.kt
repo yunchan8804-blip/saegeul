@@ -141,8 +141,12 @@ class KoreanCollocationModel {
         "은" to listOf("어때?", "확인했어?", "괜찮아?", "어려워")
     )
 
-    private val dynamicHonorificBigrams = java.util.concurrent.ConcurrentHashMap<String, MutableList<String>>()
-    private val dynamicInformalBigrams = java.util.concurrent.ConcurrentHashMap<String, MutableList<String>>()
+    private val morphology = ChoseongMorphologyEngine()
+    private val PARTICLES_REQUIRING_BATCHIM = setOf("이", "을", "과", "은")
+    private val PARTICLES_FORBIDDING_BATCHIM = setOf("가", "를", "와", "는")
+
+    private val dynamicHonorificBigrams = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.CopyOnWriteArrayList<String>>()
+    private val dynamicInformalBigrams = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.CopyOnWriteArrayList<String>>()
 
     /**
      * Injects dynamically learned bigram transitions (e.g. from Typing DNA compiler).
@@ -151,7 +155,7 @@ class KoreanCollocationModel {
     fun injectDynamicBigrams(bigrams: Map<String, List<String>>, isInformal: Boolean) {
         val target = if (isInformal) dynamicInformalBigrams else dynamicHonorificBigrams
         for ((prev, nextList) in bigrams) {
-            val list = target.getOrPut(prev) { mutableListOf() }
+            val list = target.getOrPut(prev) { java.util.concurrent.CopyOnWriteArrayList() }
             for (next in nextList) {
                 if (!list.contains(next)) {
                     list.add(0, next)
@@ -200,6 +204,12 @@ class KoreanCollocationModel {
         // 2. Trailing Particle lookup (e.g. "회의를" -> endsWith "를" -> ["확인했습니다", ...])
         for ((particle, completions) in particleMap) {
             if (clean.endsWith(particle) && clean.length > particle.length) {
+                val stemChar = clean[clean.length - particle.length - 1]
+                if (morphology.isHangulSyllable(stemChar)) {
+                    val hasBatchim = ((stemChar.code - 0xAC00) % 28) > 0
+                    if (particle in PARTICLES_REQUIRING_BATCHIM && !hasBatchim) continue
+                    if (particle in PARTICLES_FORBIDDING_BATCHIM && hasBatchim) continue
+                }
                 return completions.take(limit)
             }
         }

@@ -13,7 +13,8 @@ package org.fcitx.fcitx5.android.ads
 internal enum class AdFormat {
     REWARDED,
     NATIVE,
-    INTERSTITIAL
+    INTERSTITIAL,
+    BANNER
 }
 
 internal enum class BlockReason {
@@ -27,7 +28,10 @@ internal enum class BlockReason {
     IME_SURFACE,
     PERMISSION_FLOW,
     FIRST_LAUNCH,
-    CONSENT_UNAVAILABLE
+    CONSENT_UNAVAILABLE,
+    FREQUENCY_CAPPED,
+    COOLDOWN_ACTIVE,
+    MIN_ACTIONS_NOT_MET
 }
 
 internal data class AdVenue(
@@ -35,7 +39,10 @@ internal data class AdVenue(
     val screen: String,
     val trigger: String,
     val format: AdFormat,
-    val requiresConsent: Boolean
+    val requiresConsent: Boolean,
+    val dailyCap: Int = Int.MAX_VALUE,
+    val cooldownMinutes: Long = 0L,
+    val minActions: Int = 0
 )
 
 internal data class SignedAvenueConfig(
@@ -102,6 +109,8 @@ internal object AdServingPolicy {
         if (config.signature.isNullOrBlank()) return BlockReason.CONFIG_UNSIGNED
         if (config.expiresAtEpochMs <= nowEpochMs) return BlockReason.CONFIG_EXPIRED
         if (config.issuedAtEpochMs <= 0L) return BlockReason.CONFIG_EXPIRED
+        if (config.issuedAtEpochMs > nowEpochMs) return BlockReason.CONFIG_NON_MONOTONIC
+        if (config.expiresAtEpochMs <= config.issuedAtEpochMs) return BlockReason.CONFIG_EXPIRED
         if (config.version <= (lastAcceptedVersion ?: 0L)) {
             return BlockReason.CONFIG_NON_MONOTONIC
         }

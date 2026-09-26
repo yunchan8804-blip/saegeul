@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_install_notify_progress_title">Downloading Saegeul AI</string>
+    <string name="gemma_install_notify_progress_text_with_eta">%1$s / %2$s · about %3$s left</string>
+    <string name="gemma_install_notify_progress_text_no_eta">%1$s / %2$s</string>
+    <string name="gemma_install_notify_done_title">Saegeul AI is ready</string>
+    <string name="gemma_install_action_pause">Pause</string>
+    <string name="gemma_install_eta_minutes">%1$d min</string>
+    <string name="gemma_install_eta_seconds">%1$d sec</string>
+</resources>

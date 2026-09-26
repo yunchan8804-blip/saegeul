@@ -25,6 +25,15 @@ internal object ContextualPredictionInput {
         else -> "$contextBeforeCursor $currentStroke"
     }
 
+    fun activePreedit(
+        bufferedHangulPrefix: String,
+        clientPreedit: String,
+        enginePreedit: String
+    ): String {
+        val currentPreedit = clientPreedit.trim().ifEmpty { enginePreedit.trim() }
+        return bufferedHangulPrefix + currentPreedit
+    }
+
     fun resolve(textBeforeCursor: String, composingText: String): Resolved {
         val endsWithWhitespace = textBeforeCursor.isNotEmpty() && textBeforeCursor.last() in WHITESPACE
 

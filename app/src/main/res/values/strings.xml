@@ -32,6 +32,8 @@
     <string name="enable_ime_hint">Enable &lt;b>%1$s&lt;/b> in Language and input settings</string>
     <string name="select_ime">Select Input Method</string>
     <string name="select_ime_hint">Select &lt;b>%1$s&lt;/b> as your default input method</string>
+    <string name="setup_ai_suggestion_hint">Downloading the Gemma model (about 2.6GB) to your device lets it suggest the next sentence whenever you pause typing. All processing stays on the device and your text never leaves it. We recommend downloading over Wi-Fi.</string>
+    <string name="setup_ai_suggestion_button">Prepare model</string>
     <string name="next">Next</string>
     <string name="prev">Prev</string>
     <string name="done">Done</string>
@@ -241,8 +243,6 @@
     <string name="auto_snippet_expansion_summary" tools:ignore="MissingTranslation">Expand built-in aliases such as :address1 and enabled quick-phrase keywords beginning with : when Space or Enter is pressed</string>
     <string name="offline_mode" tools:ignore="MissingTranslation">Completely offline mode</string>
     <string name="offline_mode_summary" tools:ignore="MissingTranslation">Block AI, GIF search, transcription, and every remote input provider</string>
-    <string name="graph_enrich_auto" tools:ignore="MissingTranslation">Auto-enrich knowledge graph</string>
-    <string name="graph_enrich_auto_summary" tools:ignore="MissingTranslation">When on, once 30 or more new sentences have accumulated and 24 hours have passed since the last enrichment, PII-scrubbed sentences are sent to your configured AI provider (your own computer) during keyboard use to refresh your personal knowledge graph. Never runs in offline mode or for blocked apps.</string>
     <string name="mobile_hangul_layout" tools:ignore="MissingTranslation">Korean keyboard surface</string>
     <string name="mobile_hangul_physical" tools:ignore="MissingTranslation">Physical layout</string>
     <string name="mobile_hangul_chunjiin" tools:ignore="MissingTranslation">Chunjiin</string>
@@ -276,6 +276,12 @@
     <string name="landscape">Landscape</string>
     <string name="keyboard_bottom_padding">Keyboard bottom padding</string>
     <string name="keyboard_side_padding">Keyboard side padding</string>
+    <string name="one_hand_mode">One-hand mode</string>
+    <string name="one_hand_mode_left">Left</string>
+    <string name="one_hand_mode_right">Right</string>
+    <string name="one_hand_mode_switch_side">Move to the other side</string>
+    <string name="one_hand_mode_turn_off">Turn off one-hand mode</string>
+    <string name="key_text_scale">Key text size</string>
     <string name="clipboard_suggestion">Show clipboard suggestions</string>
     <string name="disable_addon_warn_title">Disable Addon</string>
     <string name="disable_addon_warn_name">Disabling %1$s will also:</string>
@@ -311,7 +317,7 @@
     <string name="exception_table_conf_filename">The extension of \"%1$s\" does not indicate a configuration file of table-based input method (.conf or .conf.in)</string>
     <string name="exception_table_dict_filename">The extension of \"%1$s\" does not indicate a dictionary file of table-based input method (.dict or .txt)</string>
     <string name="exception_table_import_both_files">Please select both of above files to import</string>
-    <string name="notification_permission_message">Without the permission to post notifications, we are not able to notify you when some time-consuming operations are done.</string>
+    <string name="notification_permission_message">Without the permission to post notifications, we are not able to notify you when some time-consuming operations are done. You can turn this on later in Settings &gt; Privacy &amp; AI &gt; Language Vault.</string>
     <string name="notification_permission_title">No Notification Permission</string>
     <string name="toolbar_num_row_on_password">Show number row on toolbar when inputting password</string>
     <string name="show_number_row">Always show number row</string>
@@ -328,6 +334,8 @@
     <string name="horizontal_candidate_always_fill">Always fill width</string>
     <string name="two_row_candidate_bar">Two-row candidate bar</string>
     <string name="two_row_candidate_bar_summary">Display word candidates on the top row and AI sentence recommendations on the bottom row (1 row when disabled)</string>
+    <string name="candidate_placeholder_no_words">No word suggestions</string>
+    <string name="candidate_placeholder_no_sentences">No sentence suggestions · Keep typing to build personalization</string>
     <string name="inline_suggestions">Show inline autofill suggestions</string>
     <string name="delete_all_except_pinned">Delete all items except pinned ones?</string>
     <string name="num_items_deleted">%1$d item(s) deleted</string>
@@ -578,191 +586,18 @@
     <string name="snippet_missing_value" tools:ignore="MissingTranslation">This snippet needs a value in the encrypted profile</string>
     <string name="snippet_insert_failed" tools:ignore="MissingTranslation">Could not expand the snippet; the trigger was preserved</string>
     <string name="quickphrase" tools:ignore="MissingTranslation">Quick phrase</string>
-    <string name="ai_assistant_title" tools:ignore="MissingTranslation">AI writing</string>
+    <string name="continue_writing_title" tools:ignore="MissingTranslation">Continue writing</string>
     <string name="ai_back" tools:ignore="MissingTranslation">Keyboard</string>
-    <string name="ai_source_label" tools:ignore="MissingTranslation">Text sent to AI</string>
-    <string name="ai_transmission_disclosure" tools:ignore="MissingTranslation">Tapping an action sends the text above, any custom instruction, and connection information such as your IP address to %1$s to generate writing. This app requests store=false and does not save source text or results in usage history. Provider processing and retention follow that provider’s terms.</string>
-    <string name="ai_source_scope_selection" tools:ignore="MissingTranslation">Selected text</string>
-    <string name="ai_source_scope_editor" tools:ignore="MissingTranslation">Current input</string>
-    <string name="ai_source_scope_cursor_context" tools:ignore="MissingTranslation">Text around cursor</string>
-    <string name="ai_source_preview_more" tools:ignore="MissingTranslation">More</string>
-    <string name="ai_source_preview_collapse" tools:ignore="MissingTranslation">Less</string>
-    <string name="ai_source_preview_full" tools:ignore="MissingTranslation">View full text</string>
-    <string name="ai_source_preview_back" tools:ignore="MissingTranslation">Back to actions</string>
-    <string name="ai_result_source" tools:ignore="MissingTranslation">Original text</string>
-    <string name="ai_direct_prompt_hint" tools:ignore="MissingTranslation">Type a custom writing request</string>
-    <string name="ai_direct_prompt_title" tools:ignore="MissingTranslation">AI request</string>
-    <string name="ai_direct_prompt_context" tools:ignore="MissingTranslation">Applies to the current input</string>
-    <string name="ai_direct_prompt_context_selection" tools:ignore="MissingTranslation">Applies to selected text</string>
-    <string name="ai_direct_prompt_context_editor" tools:ignore="MissingTranslation">Applies to the entire current input</string>
-    <string name="ai_direct_prompt_context_cursor" tools:ignore="MissingTranslation">Applies to text around the cursor</string>
-    <string name="ai_direct_prompt_context_shared" tools:ignore="MissingTranslation">Applies to the shared reply text</string>
-    <string name="ai_direct_prompt_context_clipboard" tools:ignore="MissingTranslation">Applies to clipboard text</string>
-    <string name="ai_direct_prompt_run" tools:ignore="MissingTranslation">Run</string>
-    <string name="ai_direct_prompt_clear" tools:ignore="MissingTranslation">Clear</string>
-    <string name="ai_actions_writing" tools:ignore="MissingTranslation">Writing</string>
-    <string name="ai_actions_tone" tools:ignore="MissingTranslation">Tone</string>
-    <string name="ai_actions_translation" tools:ignore="MissingTranslation">Translate</string>
-    <string name="ai_actions_more" tools:ignore="MissingTranslation">More</string>
-    <string name="ai_actions_less" tools:ignore="MissingTranslation">Less</string>
-    <string name="ai_actions_more_description" tools:ignore="MissingTranslation">Show tone and translation actions</string>
-    <string name="ai_actions_less_description" tools:ignore="MissingTranslation">Hide tone and translation actions</string>
-    <string name="ai_setup_required_accessibility" tools:ignore="MissingTranslation">%1$s AI writing supports proofreading, composing, replies, custom instructions, tone changes, and translation. Connect it to use these actions.</string>
-    <string name="ai_select_action" tools:ignore="MissingTranslation">Review the source, then choose an AI action</string>
-    <string name="ai_loading" tools:ignore="MissingTranslation">Generating suggestions…</string>
     <string name="voice_connection_label" tools:ignore="MissingTranslation">Voice connection: %1$s</string>
     <string name="ai_retry" tools:ignore="MissingTranslation">Retry</string>
-    <string name="ai_undo" tools:ignore="MissingTranslation">Undo</string>
-    <string name="ai_undo_applied" tools:ignore="MissingTranslation">Applied · Undo</string>
-    <string name="ai_error" tools:ignore="MissingTranslation">AI error: %1$s</string>
-    <string name="ai_error_empty_result" tools:ignore="MissingTranslation">The provider returned no usable suggestion</string>
-    <string name="ai_suggestion_contract_failed" tools:ignore="MissingTranslation">AI did not produce the requested number of distinct drafts. Please try again.</string>
-    <string name="ai_response_too_large" tools:ignore="MissingTranslation">The AI response was too large. Try a shorter request.</string>
-    <string name="ai_response_refused" tools:ignore="MissingTranslation">The AI provider declined this request. Try changing the request.</string>
-    <string name="ai_response_output_limit" tools:ignore="MissingTranslation">The AI response reached its output limit. Try a shorter request.</string>
-    <string name="ai_response_content_filter" tools:ignore="MissingTranslation">The AI response was stopped by a safety filter. Try changing the request.</string>
-    <string name="ai_response_incomplete" tools:ignore="MissingTranslation">The AI response did not finish. Please try again.</string>
-    <string name="ai_result_number" tools:ignore="MissingTranslation">Suggestion %1$d</string>
-    <string name="ai_replace" tools:ignore="MissingTranslation">Replace</string>
-    <string name="ai_insert" tools:ignore="MissingTranslation">Insert</string>
-    <string name="ai_append" tools:ignore="MissingTranslation">Append</string>
-    <string name="ai_diff_changes" tools:ignore="MissingTranslation">Choose corrections to apply</string>
-    <string name="ai_diff_apply_selected" tools:ignore="MissingTranslation">Apply selected</string>
-    <string name="ai_diff_no_changes" tools:ignore="MissingTranslation">No changes found</string>
-    <string name="ai_result_no_changes" tools:ignore="MissingTranslation">This result matches the original. Nothing to apply.</string>
-    <string name="ai_result_applied" tools:ignore="MissingTranslation">Applied · You can undo it.</string>
-    <string name="ai_results_ready" tools:ignore="MissingTranslation">AI suggestions are ready.</string>
-    <string name="ai_action_selected" tools:ignore="MissingTranslation">%1$s, selected</string>
-    <string name="ai_diff_change" tools:ignore="MissingTranslation">%1$d. %2$s → %3$s</string>
-    <string name="ai_diff_empty" tools:ignore="MissingTranslation">∅</string>
-    <string name="ai_share_target" tools:ignore="MissingTranslation">Use as AI reply context</string>
-    <string name="ai_share_received" tools:ignore="MissingTranslation">Reply context is ready. Open AI writing from the keyboard in the reply field.</string>
-    <string name="ai_share_rejected" tools:ignore="MissingTranslation">Only non-empty plain text can be used as reply context</string>
-    <string name="ai_clipboard_source_select" tools:ignore="MissingTranslation">Choose clipboard text</string>
-    <string name="ai_clipboard_source_title" tools:ignore="MissingTranslation">Choose reply context</string>
-    <string name="ai_clipboard_source_empty" tools:ignore="MissingTranslation">No non-sensitive clipboard text is available</string>
-    <string name="ai_clipboard_source_failed" tools:ignore="MissingTranslation">Could not read clipboard history</string>
-    <string name="ai_reply_source_shared" tools:ignore="MissingTranslation">Shared reply context</string>
-    <string name="ai_reply_source_clipboard" tools:ignore="MissingTranslation">Clipboard reply context</string>
-    <string name="ai_reply_cursor_required" tools:ignore="MissingTranslation">Place a single cursor in the reply field before choosing external context</string>
-    <string name="ai_insert_reply" tools:ignore="MissingTranslation">Insert reply</string>
-    <string name="ai_action_proofread" tools:ignore="MissingTranslation">Proofread</string>
-    <string name="ai_action_polite" tools:ignore="MissingTranslation">Polite</string>
-    <string name="ai_action_casual" tools:ignore="MissingTranslation">Chat</string>
-    <string name="ai_action_business" tools:ignore="MissingTranslation">Business</string>
-    <string name="ai_action_decline" tools:ignore="MissingTranslation">Decline</string>
-    <string name="ai_action_apology" tools:ignore="MissingTranslation">Apology</string>
-    <string name="ai_action_customer_service" tools:ignore="MissingTranslation">Customer care</string>
-    <string name="ai_action_compose" tools:ignore="MissingTranslation">3 drafts</string>
-    <string name="ai_action_reply" tools:ignore="MissingTranslation">Reply drafts</string>
-    <string name="ai_action_custom" tools:ignore="MissingTranslation">Custom request</string>
-    <string name="ai_action_translate_english" tools:ignore="MissingTranslation">English</string>
-    <string name="ai_action_translate_korean" tools:ignore="MissingTranslation">Korean</string>
-    <string name="ai_action_translate_japanese" tools:ignore="MissingTranslation">Japanese</string>
-    <string name="ai_action_translate_chinese" tools:ignore="MissingTranslation">Chinese</string>
-    <string name="ai_not_configured" tools:ignore="MissingTranslation">Writing AI is not connected yet</string>
-    <string name="ai_setup_required" tools:ignore="MissingTranslation">Writing AI is not connected yet. Connect a computer or enter a writing API key.</string>
     <string name="ai_setup_action" tools:ignore="MissingTranslation">Set up</string>
-    <string name="ai_private_disabled" tools:ignore="MissingTranslation">AI is disabled in password and private fields</string>
-    <string name="ai_offline_disabled" tools:ignore="MissingTranslation">Turn off completely offline mode to use AI</string>
-    <string name="ai_no_source" tools:ignore="MissingTranslation">Select text or type an instruction immediately before the cursor</string>
-    <string name="ai_source_too_large" tools:ignore="MissingTranslation">The selected text is too long. Select 4,000 characters or fewer and try again.</string>
-    <string name="ai_editor_changed" tools:ignore="MissingTranslation">The input field, text, or cursor changed. Open AI writing again.</string>
-    <string name="ai_apply_failed" tools:ignore="MissingTranslation">Could not apply this suggestion. No fallback was attempted.</string>
-    <string name="ai_undo_failed" tools:ignore="MissingTranslation">Could not undo because the text or cursor changed</string>
     <string name="privacy_ai" tools:ignore="MissingTranslation">Privacy &amp; AI</string>
     <string name="privacy_network_controls" tools:ignore="MissingTranslation">Network controls</string>
-    <string name="ai_provider_settings" tools:ignore="MissingTranslation">Writing AI connection</string>
-    <string name="ai_clear_custom_provider" tools:ignore="MissingTranslation">Disconnect writing AI</string>
-    <string name="ai_provider_configured_summary" tools:ignore="MissingTranslation">%1$s · %2$s · %3$s</string>
-    <string name="ai_provider_source_custom" tools:ignore="MissingTranslation">encrypted BYOK profile</string>
-    <string name="ai_provider_source_bundled" tools:ignore="MissingTranslation">private debug build profile</string>
-    <string name="ai_provider_source_missing" tools:ignore="MissingTranslation">not configured</string>
-    <string name="ai_provider_name_hint" tools:ignore="MissingTranslation">Provider name</string>
-    <string name="ai_provider_url_hint" tools:ignore="MissingTranslation">Responses API base URL</string>
-    <string name="ai_provider_key_hint" tools:ignore="MissingTranslation">API key</string>
-    <string name="ai_provider_key_unchanged_hint" tools:ignore="MissingTranslation">API key (leave blank to keep it)</string>
-    <string name="ai_fast_model_hint" tools:ignore="MissingTranslation">Fast model</string>
-    <string name="ai_balanced_model_hint" tools:ignore="MissingTranslation">Balanced model</string>
-    <string name="ai_quality_model_hint" tools:ignore="MissingTranslation">Quality model</string>
-    <string name="ai_provider_security_note" tools:ignore="MissingTranslation">The key is encrypted with Android Keystore in no-backup storage. It is excluded from app backups, exports, logs, and the clipboard.</string>
-    <string name="ai_provider_invalid" tools:ignore="MissingTranslation">Check the key, HTTPS URL, and model names</string>
-    <string name="ai_auth_mode_title" tools:ignore="MissingTranslation">Connect writing AI</string>
-    <string name="ai_auth_mode_auto_discovery" tools:ignore="MissingTranslation">Find my computer automatically (recommended)</string>
-    <string name="ai_auth_mode_api_key" tools:ignore="MissingTranslation">Use an OpenAI API key</string>
-    <string name="ai_auth_mode_oauth" tools:ignore="MissingTranslation">OAuth 2.0 login (PKCE)</string>
-    <string name="ai_auth_mode_oauth_relogin" tools:ignore="MissingTranslation">Sign in to existing connection again</string>
-    <string name="ai_auth_mode_oauth_advanced" tools:ignore="MissingTranslation">Advanced OAuth settings</string>
-    <string name="ai_auth_mode_advanced" tools:ignore="MissingTranslation">Advanced connection settings</string>
-    <string name="ai_auth_mode_api_key_advanced" tools:ignore="MissingTranslation">OpenAI-compatible API endpoint</string>
-    <string name="ai_openai_api_key_settings" tools:ignore="MissingTranslation">Connect an OpenAI API key</string>
-    <string name="ai_openai_api_key_endpoint_summary" tools:ignore="MissingTranslation">Official OpenAI API · writing only</string>
-    <string name="ai_openai_api_key_security_note" tools:ignore="MissingTranslation">Enter your OpenAI API key. Requests use your OpenAI API usage and billing. The key is encrypted with Android Keystore in no-backup storage and is never shared with voice dictation.</string>
-    <string name="ai_openai_api_key_saved" tools:ignore="MissingTranslation">OpenAI writing AI is connected</string>
-    <string name="ai_compatible_api_settings" tools:ignore="MissingTranslation">OpenAI-compatible API</string>
-    <string name="ai_compatible_api_security_note" tools:ignore="MissingTranslation">Advanced settings for a compatible HTTPS endpoint and its models. Use the standard OpenAI API key option for OpenAI.</string>
-    <string name="ai_auth_api_key" tools:ignore="MissingTranslation">API key</string>
-    <string name="ai_auth_oauth_connected" tools:ignore="MissingTranslation">OAuth connected</string>
-    <string name="ai_auth_oauth_reauth" tools:ignore="MissingTranslation">OAuth sign-in required</string>
-    <string name="ai_oauth_authorization_endpoint_hint" tools:ignore="MissingTranslation">Authorization endpoint (HTTPS)</string>
-    <string name="ai_oauth_token_endpoint_hint" tools:ignore="MissingTranslation">Token endpoint (HTTPS)</string>
-    <string name="ai_oauth_revocation_endpoint_hint" tools:ignore="MissingTranslation">Revocation endpoint (HTTPS, optional)</string>
-    <string name="ai_oauth_client_id_hint" tools:ignore="MissingTranslation">Public client ID (no client secret)</string>
-    <string name="ai_oauth_scopes_hint" tools:ignore="MissingTranslation">Scopes separated by spaces</string>
-    <string name="ai_oauth_security_note" tools:ignore="MissingTranslation">Uses an external browser, Authorization Code, state, and PKCE S256. No client secret is accepted. Tokens are Keystore-encrypted in no-backup storage. This login uses your endpoint’s OAuth/OIDC, not Tailscale OAuth Apps or Serve identity headers; Tailscale is only the network path. All endpoints must use HTTPS, including private, loopback, MagicDNS, and .ts.net addresses.</string>
-    <string name="ai_oauth_save_and_sign_in" tools:ignore="MissingTranslation">Save and sign in</string>
-    <string name="ai_oauth_browser_waiting" tools:ignore="MissingTranslation">Complete the secure sign-in in your browser…</string>
-    <string name="ai_oauth_profile_missing" tools:ignore="MissingTranslation">The OAuth provider profile is missing</string>
-    <string name="ai_oauth_pkce_unavailable" tools:ignore="MissingTranslation">Secure PKCE S256 is unavailable on this device</string>
-    <string name="ai_oauth_browser_unavailable" tools:ignore="MissingTranslation">No supported browser is available for OAuth sign-in</string>
-    <string name="ai_oauth_start_failed" tools:ignore="MissingTranslation">Could not start OAuth sign-in. Try again shortly.</string>
-    <string name="ai_oauth_authorization_failed" tools:ignore="MissingTranslation">OAuth authorization was canceled or failed</string>
-    <string name="ai_oauth_state_mismatch" tools:ignore="MissingTranslation">OAuth state validation failed. Nothing was saved.</string>
-    <string name="ai_oauth_profile_changed" tools:ignore="MissingTranslation">The OAuth provider changed during sign-in. Start again with the current profile.</string>
-    <string name="ai_oauth_token_failed" tools:ignore="MissingTranslation">Could not exchange the authorization code for a token</string>
-    <string name="ai_oauth_connected" tools:ignore="MissingTranslation">OAuth account connected</string>
-    <string name="ai_oauth_reauth_required" tools:ignore="MissingTranslation">Your AI connection has expired. Sign in again to keep using AI features.</string>
-    <string name="ai_api_key_rejected" tools:ignore="MissingTranslation">Writing AI rejected this API key. Check the key in settings and try again.</string>
-    <string name="ai_provider_removed" tools:ignore="MissingTranslation">AI provider and local credentials removed</string>
-    <string name="ai_oauth_revocation_failed" tools:ignore="MissingTranslation">Local tokens were removed, but the remote server did not confirm revocation</string>
-    <string name="ai_setup_wizard_title" tools:ignore="MissingTranslation">Connect AI from your computer</string>
-    <string name="ai_setup_wizard_summary" tools:ignore="MissingTranslation">Looking for a computer with AI connection enabled on the same Wi-Fi. Tap its name to connect.</string>
-    <string name="ai_setup_security_summary" tools:ignore="MissingTranslation">API keys and client secrets are never copied to this phone. Only a verified HTTPS setup is accepted.</string>
-    <string name="ai_setup_scanning" tools:ignore="MissingTranslation">Looking for computers…</string>
-    <string name="ai_setup_choose_computer" tools:ignore="MissingTranslation">Choose a computer to continue</string>
-    <string name="ai_setup_no_computers" tools:ignore="MissingTranslation">No computer was found. Check that both devices use the same Wi-Fi and the computer connection helper is running.</string>
-    <string name="ai_setup_only_untrusted_computers" tools:ignore="MissingTranslation">A computer was found, but it did not provide a trusted HTTPS setup.</string>
-    <string name="ai_setup_discovery_failed" tools:ignore="MissingTranslation">Could not search this network. Check Wi-Fi and try again.</string>
-    <string name="ai_setup_scan_again" tools:ignore="MissingTranslation">Search again</string>
-    <string name="ai_setup_enter_address" tools:ignore="MissingTranslation">Enter computer address</string>
-    <string name="ai_setup_enter_address_summary" tools:ignore="MissingTranslation">If automatic search is unavailable, enter the HTTPS address shown by the computer helper.</string>
-    <string name="ai_setup_manifest_url_hint" tools:ignore="MissingTranslation">https://my-computer.example</string>
-    <string name="ai_setup_check_address" tools:ignore="MissingTranslation">Check address</string>
-    <string name="ai_setup_address_invalid" tools:ignore="MissingTranslation">Enter a valid HTTPS computer address</string>
-    <string name="ai_setup_manual_computer" tools:ignore="MissingTranslation">Computer entered manually</string>
-    <string name="ai_setup_checking_connection" tools:ignore="MissingTranslation">Checking the secure connection…</string>
-    <string name="ai_setup_connection_failed" tools:ignore="MissingTranslation">Could not verify this computer. Check its HTTPS certificate and connection helper.</string>
-    <string name="ai_setup_tailnet_address_unavailable" tools:ignore="MissingTranslation">Could not find this computer address. If you entered a Tailscale address, connect this device to Tailscale and try again.</string>
-    <string name="ai_setup_address_unavailable" tools:ignore="MissingTranslation">Could not find this computer address. Check the address and network connection, then try again.</string>
-    <string name="ai_setup_network_unavailable" tools:ignore="MissingTranslation">Could not connect to this computer. Check the network connection and computer connection helper, then try again.</string>
-    <string name="ai_setup_certificate_untrusted" tools:ignore="MissingTranslation">Could not verify this computer’s HTTPS certificate. Check the secure address shown by the computer connection helper.</string>
-    <string name="ai_setup_manifest_invalid" tools:ignore="MissingTranslation">The computer connection information is not valid. Update or restart the computer connection helper, then try again.</string>
-    <string name="ai_setup_confirm_title" tools:ignore="MissingTranslation">Connect to this computer?</string>
-    <string name="ai_setup_confirm_message" tools:ignore="MissingTranslation">Computer: %1$s\nAI service: %2$s\nSecure address: %3$s\n\nNo API key or client secret will be saved on this phone. Continue in the browser to sign in.</string>
-    <string name="ai_setup_connect" tools:ignore="MissingTranslation">Connect</string>
-    <string name="ai_setup_saving" tools:ignore="MissingTranslation">Preparing secure sign-in…</string>
-    <string name="ai_setup_save_failed" tools:ignore="MissingTranslation">Could not save this connection</string>
-    <string name="ai_setup_login_not_finished" tools:ignore="MissingTranslation">Sign-in was not completed. Select the computer to try again.</string>
-    <string name="ai_setup_connected" tools:ignore="MissingTranslation">AI is connected</string>
-    <string name="ai_setup_computer_description" tools:ignore="MissingTranslation">%1$s, secure address %2$s</string>
     <plurals name="ai_setup_computers_found" tools:ignore="MissingTranslation">
         <item quantity="one">%1$d computer found</item>
         <item quantity="other">%1$d computers found</item>
     </plurals>
     <string name="privacy_local_data" tools:ignore="MissingTranslation">Local data</string>
-    <string name="ai_usage_title" tools:ignore="MissingTranslation">AI usage summary</string>
-    <string name="ai_usage_summary" tools:ignore="MissingTranslation">Requests %1$d · success %2$d · failure %3$d · sent characters %4$d</string>
-    <string name="ai_usage_clear" tools:ignore="MissingTranslation">Clear AI usage summary</string>
     <string name="gif_provider_settings" tools:ignore="MissingTranslation">GIF provider</string>
     <string name="gif_provider_selection_title" tools:ignore="MissingTranslation">GIF source</string>
     <string name="gif_provider_selection_standard" tools:ignore="MissingTranslation">Standard · KLIPY when configured, otherwise Animated Noto Emoji</string>
@@ -868,7 +703,7 @@
     <string name="voice_models_configured">precision %1$s / realtime %2$s</string>
     <string name="voice_provider_key_hint">OpenAI STT API key</string>
     <string name="voice_provider_key_unchanged_hint">STT API key (leave blank to keep it)</string>
-    <string name="voice_provider_security_note">This key is used only for speech-to-text. It is encrypted with Android Keystore in no-backup storage and is never shared with the writing AI, backups, exports, logs, or clipboard.</string>
+    <string name="voice_provider_security_note">This key is used only for speech-to-text. It is encrypted with Android Keystore in no-backup storage and is never shared with backups, exports, logs, or clipboard.</string>
     <string name="voice_model_accurate">Accuracy first · gpt-4o-transcribe</string>
     <string name="voice_model_efficient">Lower cost and faster · gpt-4o-mini-transcribe</string>
     <string name="voice_provider_invalid">Check the STT API key and transcription model</string>
@@ -996,7 +831,6 @@
     <string name="blocked_app_ai_policy" tools:ignore="MissingTranslation">This app\'s keyboard profile blocks AI writing.</string>
     <string name="cta_open_offline_mode" tools:ignore="MissingTranslation">Open offline mode setting</string>
     <string name="cta_open_app_profile" tools:ignore="MissingTranslation">Open app profile settings</string>
-    <string name="cta_open_writing_setup" tools:ignore="MissingTranslation">Open AI connection settings</string>
     <string name="cta_open_voice_setup" tools:ignore="MissingTranslation">Open voice connection settings</string>
     <string name="cta_open_gif_settings" tools:ignore="MissingTranslation">Open GIF settings</string>
     <string name="cta_open_phrase_settings" tools:ignore="MissingTranslation">Open phrase settings</string>
@@ -1008,13 +842,15 @@
     <string name="typing_dna_card_title" tools:ignore="MissingTranslation">AI My Language Vault Status</string>
     <string name="typing_dna_card_hardware_suffix" tools:ignore="MissingTranslation"> · 🔒 Hardware encrypted</string>
     <string name="vault_title" tools:ignore="MissingTranslation">My Language Vault</string>
-    <string name="vault_hero_subtitle" tools:ignore="MissingTranslation">Learned words %1$d · analyzed sentences %2$d</string>
     <string name="vault_level_title" tools:ignore="MissingTranslation">Lv.%1$d | AI coexisting user</string>
     <string name="vault_level_description" tools:ignore="MissingTranslation">The device records word connections and speaking style from the sentences you enter. Levels increase by analyzed sentence count.</string>
-    <string name="vault_level_number" tools:ignore="MissingTranslation">LV\n%1$d</string>
+    <string name="vault_level_number" tools:ignore="MissingTranslation">Lv.%1$d</string>
     <string name="vault_level_content_description" tools:ignore="MissingTranslation">Learning level %1$d</string>
     <string name="vault_level_progress_max" tools:ignore="MissingTranslation">Maximum level reached · continuing to record analyzed sentences</string>
-    <string name="vault_level_progress_next" tools:ignore="MissingTranslation">%2$d analyzed sentences until Lv.%1$d · %3$d%% complete</string>
+    <string name="vault_widget_title" tools:ignore="MissingTranslation">내 언어 금고 위젯</string>
+    <string name="vault_widget_prompt" tools:ignore="MissingTranslation">홈 화면에서 레벨, 진행률, 분석 문장 수를 바로 볼 수 있는 위젯을 추가할까요?</string>
+    <string name="vault_widget_add" tools:ignore="MissingTranslation">추가</string>
+    <string name="vault_level_progress_next" tools:ignore="MissingTranslation">%2$d more sentences to Lv.%1$d</string>
     <string name="vault_security_title" tools:ignore="MissingTranslation">Encrypted with this device\'s hardware key</string>
     <string name="vault_security_strongbox" tools:ignore="MissingTranslation">StrongBox secure chip</string>
     <string name="vault_security_tee" tools:ignore="MissingTranslation">TEE hardware key</string>
@@ -1037,11 +873,101 @@
     <string name="vault_timeline_summary" tools:ignore="MissingTranslation">%1$d sentences in the last 30 days · daily maximum %2$d</string>
     <string name="vault_timeline_summary_preview" tools:ignore="MissingTranslation">0 sentences in the last 30 days · daily maximum 0</string>
     <string name="vault_timeline_empty" tools:ignore="MissingTranslation">No learned sentences have been recorded yet. Enter and complete a sentence to add one.</string>
-    <string name="vault_frequent_words_title" tools:ignore="MissingTranslation">Frequent words</string>
     <string name="vault_category_title" tools:ignore="MissingTranslation">By app category</string>
     <string name="vault_category_messenger" tools:ignore="MissingTranslation">Messenger</string>
     <string name="vault_category_work" tools:ignore="MissingTranslation">Work</string>
     <string name="vault_category_general" tools:ignore="MissingTranslation">General</string>
+    <string name="persona_label_messenger" tools:ignore="MissingTranslation">Messenger</string>
+    <string name="persona_label_work" tools:ignore="MissingTranslation">Work</string>
+    <string name="persona_label_email" tools:ignore="MissingTranslation">Email</string>
+    <string name="persona_label_social" tools:ignore="MissingTranslation">Social</string>
+    <string name="persona_label_notes" tools:ignore="MissingTranslation">Notes &amp; docs</string>
+    <string name="persona_label_browser" tools:ignore="MissingTranslation">Search &amp; browser</string>
+    <string name="persona_label_commerce" tools:ignore="MissingTranslation">Shopping &amp; finance</string>
+    <string name="persona_label_general" tools:ignore="MissingTranslation">General</string>
+
+    <string name="vault_home_headline" tools:ignore="MissingTranslation">Learning your writing style</string>
+    <string name="vault_home_learned_line_with_streak" tools:ignore="MissingTranslation">%1$d sentences learned · 🔥 day %2$d</string>
+    <string name="vault_home_learned_line" tools:ignore="MissingTranslation">%1$d sentences learned</string>
+    <string name="vault_home_points_chip" tools:ignore="MissingTranslation">💎 %1$d</string>
+    <string name="vault_learning_title" tools:ignore="MissingTranslation">Learning status</string>
+    <string name="vault_learning_body_release" tools:ignore="MissingTranslation">It learns automatically every time you type.</string>
+    <string name="vault_learning_body_engine_failed" tools:ignore="MissingTranslation">Couldn\'t get AI suggestions ready\nIt will try again next time you open the keyboard.</string>
+    <string name="vault_learning_body_running_eta" tools:ignore="MissingTranslation">Learning · about %1$d min left</string>
+    <string name="vault_learning_body_running_calculating" tools:ignore="MissingTranslation">Learning · figuring out the time left</string>
+    <string name="vault_learning_body_waiting" tools:ignore="MissingTranslation">Starting soon</string>
+    <string name="vault_learning_body_waiting_keyboard" tools:ignore="MissingTranslation">Paused for now · you\'re using the keyboard</string>
+    <string name="vault_learning_body_paused" tools:ignore="MissingTranslation">Stopped · %1$s</string>
+    <string name="vault_learning_reason_problem" tools:ignore="MissingTranslation">something went wrong</string>
+    <string name="vault_learning_body_material_only" tools:ignore="MissingTranslation">Learning</string>
+    <string name="vault_learning_body_model_unavailable" tools:ignore="MissingTranslation">Saegeul AI needs its model</string>
+    <string name="vault_learning_body_up_to_date" tools:ignore="MissingTranslation">All caught up · %1$s</string>
+    <string name="vault_learning_body_ready" tools:ignore="MissingTranslation">Saegeul is ready to start learning</string>
+    <string name="vault_learning_action_get_model" tools:ignore="MissingTranslation">Get the model</string>
+    <string name="vault_learning_switch_label" tools:ignore="MissingTranslation">Learn automatically</string>
+    <string name="vault_learning_switch_hint" tools:ignore="MissingTranslation">Learns in the background whenever the battery is above 30%.</string>
+    <string name="vault_learning_notification_hint" tools:ignore="MissingTranslation">Turn on notifications to see progress</string>
+    <string name="vault_applied_at_today" tools:ignore="MissingTranslation">today %1$s</string>
+    <string name="vault_applied_at_yesterday" tools:ignore="MissingTranslation">yesterday %1$s</string>
+    <string name="vault_applied_at_date" tools:ignore="MissingTranslation">%1$d/%2$d</string>
+    <string name="vault_feedback_title" tools:ignore="MissingTranslation">Suggestion use</string>
+    <string name="vault_feedback_empty" tools:ignore="MissingTranslation">Pick keyboard suggestions and this shows how much they helped.</string>
+    <string name="vault_feedback_counts_line" tools:ignore="MissingTranslation">You picked %2$d of %1$d suggestions</string>
+    <string name="vault_feedback_personal_line" tools:ignore="MissingTranslation">%1$d%% of those came from your own writing</string>
+    <string name="vault_style_title" tools:ignore="MissingTranslation">My style</string>
+    <string name="vault_style_categories_line" tools:ignore="MissingTranslation">Mostly used in: %1$s</string>
+    <string name="vault_storage_title" tools:ignore="MissingTranslation">Storage and backup</string>
+    <string name="vault_storage_lock_line" tools:ignore="MissingTranslation">🔒 Kept encrypted on this phone only</string>
+    <string name="vault_storage_info_content_description" tools:ignore="MissingTranslation">More details</string>
+    <string name="vault_storage_dialog_title" tools:ignore="MissingTranslation">How is it stored?</string>
+    <string name="vault_storage_dialog_key_strongbox" tools:ignore="MissingTranslation">Locked with the strongest dedicated security chip.</string>
+    <string name="vault_storage_dialog_key_tee" tools:ignore="MissingTranslation">Locked in the device\'s secure area.</string>
+    <string name="vault_storage_dialog_key_software" tools:ignore="MissingTranslation">Locked with a key that only opens on this device.</string>
+    <string name="vault_storage_dialog_body" tools:ignore="MissingTranslation">Saegeul never sends your sentences elsewhere. Backup files are only ever made when you export them yourself.</string>
+    <string name="vault_storage_backup_row" tools:ignore="MissingTranslation">Export or import a backup file</string>
+    <string name="vault_storage_backup_unavailable" tools:ignore="MissingTranslation">Couldn\'t open the backup screen.</string>
+    <string name="vault_storage_clear_button" tools:ignore="MissingTranslation">Clear my language vault</string>
+    <string name="vault_storage_clear_dialog_message" tools:ignore="MissingTranslation">Your learned style and recorded sentences will all be erased. This can\'t be undone.</string>
+    <string name="vault_storage_cleared_toast" tools:ignore="MissingTranslation">Your language vault has been safely reset.</string>
+    <string name="vault_sync_toast_completed" tools:ignore="MissingTranslation">Just reflected your style · %1$d sentences learned</string>
+    <string name="vault_sync_toast_no_new" tools:ignore="MissingTranslation">Nothing new to reflect · %1$d sentences learned</string>
+    <string name="vault_sync_toast_loaded" tools:ignore="MissingTranslation">Loaded what was saved · %1$d sentences learned</string>
+    <string name="vault_dev_section_title" tools:ignore="MissingTranslation">Developer info</string>
+    <string name="vault_dev_section_expand" tools:ignore="MissingTranslation">Show</string>
+    <string name="vault_dev_section_collapse" tools:ignore="MissingTranslation">Hide</string>
+
+    <string name="typing_dna_chart_accumulation_title" tools:ignore="MissingTranslation">Sentences learned so far</string>
+    <string name="typing_dna_chart_label_sentences" tools:ignore="MissingTranslation">Sentences learned</string>
+    <string name="typing_dna_chart_label_word_pairs" tools:ignore="MissingTranslation">Words you often connect</string>
+    <string name="typing_dna_chart_label_endings" tools:ignore="MissingTranslation">Endings you often use</string>
+    <string name="typing_dna_chart_label_phrases" tools:ignore="MissingTranslation">Sentences you often use</string>
+    <string name="typing_dna_chart_tone_title" tools:ignore="MissingTranslation">Tone balance</string>
+    <string name="typing_dna_chart_tone_empty" tools:ignore="MissingTranslation">Keep typing to see your tone balance.</string>
+    <string name="typing_dna_chart_tone_honorific_legend" tools:ignore="MissingTranslation">● Formal %1$d%%</string>
+    <string name="typing_dna_chart_tone_informal_legend" tools:ignore="MissingTranslation">● Casual %1$d%%</string>
+    <string name="typing_dna_chart_category_title" tools:ignore="MissingTranslation">Apps you write in most</string>
+    <string name="typing_dna_chart_transitions_title" tools:ignore="MissingTranslation">Words you often connect</string>
+    <string name="typing_dna_chart_transitions_empty" tools:ignore="MissingTranslation">Type more and word pairs you often use together will show up here.</string>
+    <string name="typing_dna_chart_privacy_title" tools:ignore="MissingTranslation">Privacy</string>
+    <string name="typing_dna_chart_privacy_zero_knowledge" tools:ignore="MissingTranslation">Zero-knowledge · %1$d%% learned on this device</string>
+    <string name="typing_dna_chart_privacy_cloud" tools:ignore="MissingTranslation">Sent to the cloud: %1$dB · PII scrubbing applied</string>
+    <string name="typing_dna_chart_privacy_discard" tools:ignore="MissingTranslation">The original sentence is permanently discarded right after learning.</string>
+    <string name="typing_dna_chart_accessibility_header" tools:ignore="MissingTranslation">Style chart.</string>
+    <string name="typing_dna_chart_accessibility_accumulation" tools:ignore="MissingTranslation">%1$d sentences learned, %2$d connected words, %3$d endings, %4$d phrases.</string>
+    <string name="typing_dna_chart_accessibility_privacy" tools:ignore="MissingTranslation">On-device privacy %1$d percent.</string>
+
+    <string name="style_report_title" tools:ignore="MissingTranslation">My style report</string>
+    <string name="vault_style_report_row" tools:ignore="MissingTranslation">View my style report</string>
+    <string name="style_report_empty_message" tools:ignore="MissingTranslation">Write a few more sentences and your style will show up here</string>
+    <string name="style_report_accumulation_footer" tools:ignore="MissingTranslation">The more you write, the more accurate Saegeul gets</string>
+    <string name="style_report_recent_title" tools:ignore="MissingTranslation">Last 30 days</string>
+    <string name="style_report_category_title" tools:ignore="MissingTranslation">Apps you write in most</string>
+    <string name="style_report_category_empty" tools:ignore="MissingTranslation">Write a few sentences to see which apps you use most.</string>
+    <string name="style_report_style_title" tools:ignore="MissingTranslation">Your style</string>
+    <string name="style_report_transitions_title" tools:ignore="MissingTranslation">Top words you often connect</string>
+    <string name="style_report_endings_title" tools:ignore="MissingTranslation">Endings you often use</string>
+    <string name="style_report_footer_privacy" tools:ignore="MissingTranslation">This report is only ever made on this phone</string>
+
     <string name="enrich_now_button" tools:ignore="MissingTranslation">Enrich now</string>
     <string name="dashboard_graph_stats_line" tools:ignore="MissingTranslation">Knowledge graph: %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="enrichment_card_title" tools:ignore="MissingTranslation">LLM enrichment</string>
@@ -1050,6 +976,58 @@
     <string name="enrichment_status_never" tools:ignore="MissingTranslation">LLM enrichment has not run yet</string>
     <string name="enrichment_status_legacy" tools:ignore="MissingTranslation">Earlier enrichment results exist · no recent run record</string>
     <string name="enrichment_status_running" tools:ignore="MissingTranslation">LLM enrichment is running…</string>
+    <string name="enrichment_status_queued" tools:ignore="MissingTranslation">Starting to build your relationship graph soon</string>
+    <string name="enrichment_status_running_chunk" tools:ignore="MissingTranslation">Processing batch %1$d of %2$d…</string>
+    <string name="enrichment_status_waiting_lease" tools:ignore="MissingTranslation">Waiting for Saegeul AI to finish preparing sentence material…</string>
+
+    <string name="enrichment_state_queued_title" tools:ignore="MissingTranslation">Getting ready to start</string>
+    <string name="enrichment_state_running_title" tools:ignore="MissingTranslation">Building your relationship graph</string>
+    <string name="enrichment_state_running_detail_calculating" tools:ignore="MissingTranslation">Batch %1$d of %2$d · calculating time left</string>
+    <string name="enrichment_state_running_detail_eta" tools:ignore="MissingTranslation">Batch %1$d of %2$d · about %3$d min left</string>
+    <string name="enrichment_state_running_detail_incremental_calculating" tools:ignore="MissingTranslation">Applying %1$d new sentences · batch %2$d of %3$d · calculating time left</string>
+    <string name="enrichment_state_running_detail_incremental_eta" tools:ignore="MissingTranslation">Applying %1$d new sentences · batch %2$d of %3$d · about %4$d min left</string>
+    <string name="enrichment_state_running_guidance" tools:ignore="MissingTranslation">No need to wait - what\'s done so far already improves your suggestions.</string>
+    <string name="enrichment_state_waiting_title" tools:ignore="MissingTranslation">Starting once sentence material is ready</string>
+    <string name="enrichment_state_waiting_detail_now" tools:ignore="MissingTranslation">Waiting</string>
+    <string name="enrichment_state_waiting_detail_minutes" tools:ignore="MissingTranslation">Waiting for %1$d min</string>
+    <string name="enrichment_state_waiting_keyboard_title" tools:ignore="MissingTranslation">Paused while the keyboard is in use</string>
+    <string name="enrichment_state_waiting_keyboard_guidance" tools:ignore="MissingTranslation">It will resume on its own about 30 seconds after the keyboard closes.</string>
+    <string name="enrichment_state_paused_title" tools:ignore="MissingTranslation">Paused while building your relationship graph (%1$d/%2$d batches done)</string>
+    <string name="enrichment_state_paused_title_no_progress" tools:ignore="MissingTranslation">Building your relationship graph is paused</string>
+    <string name="enrichment_state_paused_auto_hint" tools:ignore="MissingTranslation">This resumes automatically when the battery is above 30%. To do it now, tap [Apply now].</string>
+    <string name="enrichment_state_succeeded_title" tools:ignore="MissingTranslation">Your relationship graph is up to date</string>
+    <string name="enrichment_state_partial_title" tools:ignore="MissingTranslation">Only partly applied</string>
+    <string name="enrichment_state_succeeded_detail" tools:ignore="MissingTranslation">%1$s · %2$d words · %3$d links · %4$d topics</string>
+    <string name="enrichment_state_succeeded_auto_hint" tools:ignore="MissingTranslation">Once 10 new sentences pile up, this updates automatically.</string>
+    <string name="enrichment_state_never_title" tools:ignore="MissingTranslation">No relationship graph yet</string>
+    <string name="enrichment_state_never_detail" tools:ignore="MissingTranslation">Groups words you often use together from your own sentences, to tailor suggestion order to you.</string>
+    <string name="enrichment_state_model_unavailable_title" tools:ignore="MissingTranslation">Saegeul AI model needed</string>
+    <string name="enrichment_state_error_title" tools:ignore="MissingTranslation">Something went wrong building the graph</string>
+    <string name="enrichment_state_error_title_with_code" tools:ignore="MissingTranslation">Generation failed (code: %1$s)</string>
+
+    <string name="enrichment_pause_reason_battery_unknown" tools:ignore="MissingTranslation">Can\'t check the battery level</string>
+    <string name="enrichment_pause_reason_battery_low" tools:ignore="MissingTranslation">Battery is under 20%</string>
+    <string name="enrichment_pause_reason_power_save" tools:ignore="MissingTranslation">Battery saver is on</string>
+    <string name="enrichment_pause_reason_thermal" tools:ignore="MissingTranslation">Running too hot</string>
+    <string name="enrichment_pause_reason_low_memory" tools:ignore="MissingTranslation">Low on memory</string>
+    <string name="enrichment_pause_reason_keyboard_active" tools:ignore="MissingTranslation">The keyboard is in use</string>
+    <string name="enrichment_pause_reason_screen_on" tools:ignore="MissingTranslation">The screen is on</string>
+    <string name="enrichment_pause_reason_user_stopped" tools:ignore="MissingTranslation">You stopped it</string>
+    <string name="enrichment_pause_reason_lease_wait_timeout" tools:ignore="MissingTranslation">Waited too long for a turn</string>
+    <string name="enrichment_pause_reason_unknown" tools:ignore="MissingTranslation">Paused for an unknown reason</string>
+    <string name="enrichment_pause_reason_app_terminated" tools:ignore="MissingTranslation">Paused because the app restarted. Tap [Apply now] to continue.</string>
+
+    <string name="enrichment_action_stop" tools:ignore="MissingTranslation">Stop</string>
+    <string name="enrichment_action_apply_now" tools:ignore="MissingTranslation">Apply now</string>
+    <string name="enrichment_action_prioritize_graph" tools:ignore="MissingTranslation">Build graph first</string>
+    <string name="enrichment_action_resume" tools:ignore="MissingTranslation">Resume</string>
+    <string name="enrichment_action_create" tools:ignore="MissingTranslation">Create</string>
+    <string name="enrichment_action_open_model_management" tools:ignore="MissingTranslation">Open model management</string>
+    <string name="enrichment_action_retry" tools:ignore="MissingTranslation">Rebuild</string>
+
+    <string name="enrichment_applied_today" tools:ignore="MissingTranslation">Applied today %1$s</string>
+    <string name="enrichment_applied_yesterday" tools:ignore="MissingTranslation">Applied yesterday %1$s</string>
+    <string name="enrichment_applied_date" tools:ignore="MissingTranslation">Applied %1$d/%2$d</string>
     <string name="enrichment_status_succeeded" tools:ignore="MissingTranslation">LLM enrichment complete</string>
     <string name="enrichment_status_partial" tools:ignore="MissingTranslation">Partially enriched · you can run it again</string>
     <string name="enrichment_status_no_data" tools:ignore="MissingTranslation">There are no sentences to enrich yet</string>
@@ -1060,6 +1038,7 @@
     <string name="enrichment_unavailable_offline" tools:ignore="MissingTranslation">LLM enrichment is unavailable in offline mode</string>
     <string name="enrichment_unavailable_provider" tools:ignore="MissingTranslation">Connect an AI provider with an API key or OAuth to use sentence recommendations and LLM enrichment.</string>
     <string name="enrichment_unavailable_oauth" tools:ignore="MissingTranslation">Sign in to your AI provider again to run LLM enrichment.</string>
+    <string name="enrichment_unavailable_release_build" tools:ignore="MissingTranslation">Saegeul AI graph enrichment is not available in this build.</string>
     <string name="enrichment_setup_action" tools:ignore="MissingTranslation">AI connection settings</string>
     <string name="dashboard_loading_message" tools:ignore="MissingTranslation">Loading your language vault…</string>
     <string name="dashboard_loading_failed" tools:ignore="MissingTranslation">Couldn\'t load your language vault. Please try again.</string>
@@ -1079,18 +1058,18 @@
     <string name="enrich_partial" tools:ignore="MissingTranslation">Partially enriched: %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="enrich_bg_title" tools:ignore="MissingTranslation">Analysis &amp; sync complete</string>
     <string name="enrich_bg_message" tools:ignore="MissingTranslation">AI enrichment will continue in the background. It can take up to a minute. You can leave this screen — you\'ll get a notification when it\'s done.</string>
-    <string name="enrich_notify_channel" tools:ignore="MissingTranslation">Language vault enrichment</string>
     <string name="enrich_notify_running" tools:ignore="MissingTranslation">Enriching your language vault…</string>
     <string name="enrich_notify_done" tools:ignore="MissingTranslation">Language vault enrichment complete · %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="enrich_notify_partial" tools:ignore="MissingTranslation">Language vault partially enriched · %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="enrich_notify_no_data" tools:ignore="MissingTranslation">Not enough learned sentences yet to enrich</string>
-    <string name="enrich_notify_failed" tools:ignore="MissingTranslation">Language vault enrichment failed. Please try again later</string>
+    <string name="enrich_notify_progress_chunk" tools:ignore="MissingTranslation">Processing piece %1$d of %2$d…</string>
+    <string name="notify_channel_ai_progress" tools:ignore="MissingTranslation">AI background progress</string>
+    <string name="notify_channel_ai_alerts" tools:ignore="MissingTranslation">AI action needed</string>
     <string name="sync_done_title" tools:ignore="MissingTranslation">Analysis and sync complete</string>
     <string name="sync_llm_missing_message" tools:ignore="MissingTranslation">No AI provider is connected, so only analysis and sync ran. Connect your computer in Privacy &amp; AI settings to also run AI enrichment.</string>
     <string name="sync_offline_message" tools:ignore="MissingTranslation">Offline mode is on, so AI enrichment did not run.</string>
     <string name="sync_enriched_done" tools:ignore="MissingTranslation">Analysis, sync, and AI enrichment complete: %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="sync_done_prefix" tools:ignore="MissingTranslation">Analysis and sync complete, %1$s</string>
-    <string name="sync_pill_last" tools:ignore="MissingTranslation">Last analyzed %1$s</string>
     <string name="sync_level_never" tools:ignore="MissingTranslation">Not analyzed yet</string>
     <string name="sync_level_sync_only" tools:ignore="MissingTranslation">Last run: analysis and sync only (no AI enrichment)</string>
     <string name="sync_level_enriched" tools:ignore="MissingTranslation">Last run: AI enrichment complete · %1$s</string>

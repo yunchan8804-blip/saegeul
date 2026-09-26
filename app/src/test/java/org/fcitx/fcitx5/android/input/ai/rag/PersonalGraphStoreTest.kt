@@ -46,6 +46,38 @@ class PersonalGraphStoreTest {
     }
 
     @Test
+    fun snapshotReturnsTheCurrentlyStoredGraph() {
+        val store = PersonalGraphStore()
+        val node = PersonalGraphStore.Node("회의", listOf("업무"), 3.0f)
+        val edge = PersonalGraphStore.Edge("회의", "참석", 0.8f)
+        val topic = PersonalGraphStore.Topic("t0", "업무", listOf("회의"))
+        store.replaceGraph(
+            nodes = listOf(node, PersonalGraphStore.Node("참석", emptyList(), 1.0f)),
+            edges = listOf(edge),
+            topics = listOf(topic),
+            builtMs = 1L
+        )
+
+        val (nodes, edges, topics) = store.snapshot()
+
+        assertEquals(2, nodes.size)
+        assertTrue(nodes.contains(node))
+        assertEquals(listOf(edge), edges)
+        assertEquals(listOf(topic), topics)
+    }
+
+    @Test
+    fun snapshotIsEmptyForAFreshStore() {
+        val store = PersonalGraphStore()
+
+        val (nodes, edges, topics) = store.snapshot()
+
+        assertTrue(nodes.isEmpty())
+        assertTrue(edges.isEmpty())
+        assertTrue(topics.isEmpty())
+    }
+
+    @Test
     fun replaceGraphTrimsNodesAndEdgesToCapacity() {
         val store = PersonalGraphStore()
         val nodes = (0 until 2500).map { i -> PersonalGraphStore.Node("n$i", emptyList(), i.toFloat()) }

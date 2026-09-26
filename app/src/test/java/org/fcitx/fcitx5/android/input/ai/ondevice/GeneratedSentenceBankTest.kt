@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -193,6 +194,86 @@ class GeneratedSentenceBankTest {
     }
 
     @Test
+    fun openIngestionAcceptsNewStartsAndPersistsForCompletion() {
+        val file = file("open-ingestion.json")
+        val cipher = AesGcmVaultCipher(AesGcmVaultCipher.randomKey())
+        val bank = GeneratedSentenceBank(file, cipher)
+
+        val report = bank.addGeneratedOpen(
+            responseWith("주말 전시 관람 같이 하실래요?", "저녁 메뉴 결정 같이 할까요?"),
+            MODEL_ID, SHA
+        )
+        assertEquals(2, report.added)
+        assertEquals(0, report.rejected)
+        assertTrue(bank.complete("주말 전시 ", 3).isNotEmpty())
+
+        val reloaded = GeneratedSentenceBank(file, cipher)
+        reloaded.load()
+        assertTrue(reloaded.complete("저녁 메뉴 ", 3).isNotEmpty())
+    }
+
+    @Test
+    fun openIngestionRejectsPiiShortRepeatedAndDuplicateWithoutChangingPrefixRules() {
+        val bank = GeneratedSentenceBank(file("open-rejections.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        val response = responseWith(
+            "이번 주말 전시에 같이 가실래요?",
+            "연락처는 010-1234-5678이에요.",
+            "오늘 가요.",
+            "오늘 계획을 오늘 계획을 오늘 계획을 확인해요."
+        )
+        val report = bank.addGeneratedOpen(response, MODEL_ID, SHA)
+        assertEquals(1, report.added)
+        assertEquals(3, report.rejected)
+        assertEquals(1, bank.addGeneratedOpen(responseWith("이번 주말 전시에 같이 가실래요?"), MODEL_ID, SHA).duplicate)
+
+        val prefixReport = bank.addGeneratedForPrefix(
+            responseWith("이번 주말 전시에 같이 가실래요?"),
+            "회의 자료를 ", MODEL_ID, SHA
+        )
+        assertEquals(1, prefixReport.rejected)
+        assertEquals(IngestionRejectionReason.PREFIX_MISMATCH, prefixReport.rejectionReasons.keys.single())
+    }
+
+    @Test
+    fun recentPublicStartsUsesNewestTwoWordsDeduplicatesAndLeavesSnapshotUntouched() {
+        val file = file("recent-starts.json")
+        val cipher = AesGcmVaultCipher(AesGcmVaultCipher.randomKey())
+        val bank = GeneratedSentenceBank(file, cipher)
+        bank.addGeneratedOpen(responseWith(
+            "오늘 회의 자료를 확인해요.",
+            "저녁 메뉴를 먼저 정할까요?",
+            "오늘 회의 시간을 조정해요."
+        ), MODEL_ID, SHA)
+        val revision = bank.revision
+        val count = bank.sentenceCount
+
+        assertEquals(listOf("오늘 회의 ", "저녁 메뉴를 "), bank.recentPublicStarts())
+        assertEquals(listOf("오늘 회의 "), bank.recentPublicStarts(1))
+        assertTrue(GeneratedMaterialPolicy.openPromptFor(0, bank.recentPublicStarts()).contains("[\"오늘 회의 \",\"저녁 메뉴를 \"]"))
+        assertEquals(revision, bank.revision)
+        assertEquals(count, bank.sentenceCount)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { bank.recentPublicStarts(0) }
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { bank.recentPublicStarts(13) }
+    }
+
+    @Test
+    fun recentPublicStartsExcludesStoredSentenceWhoseFirstTwoWordsCannotFormPromptHistory() {
+        val file = file("non-korean-start.json")
+        val cipher = AesGcmVaultCipher(AesGcmVaultCipher.randomKey())
+        val bank = GeneratedSentenceBank(file, cipher)
+        assertEquals(1, bank.addGeneratedOpen(responseWith("😀 😀 모두 좋은 아침이에요."), MODEL_ID, SHA).added)
+
+        val starts = bank.recentPublicStarts()
+        assertTrue(starts.isEmpty())
+        assertTrue(GeneratedMaterialPolicy.openPromptFor(0, starts).contains("제외 시작구절 JSON: []"))
+
+        val reloaded = GeneratedSentenceBank(file, cipher)
+        reloaded.load()
+        assertEquals(1, reloaded.sentenceCount)
+        assertTrue(reloaded.complete("😀 😀 ", 3).isNotEmpty())
+    }
+
+    @Test
     fun prefixIngestionRejectsRepeatedPrefixAndRepeatedThreeWordWindows() {
         val bank = GeneratedSentenceBank(file("prefix-policy.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
         val report = bank.addGeneratedForPrefix(
@@ -205,6 +286,62 @@ class GeneratedSentenceBankTest {
         )
         assertEquals(1, report.added)
         assertEquals(2, report.rejected)
+    }
+
+    @Test
+    fun prefixIngestionReportsFirstRejectionReasonWithoutSourceText() {
+        val bank = GeneratedSentenceBank(file("rejection-reasons.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        val pii = "회의 자료를 010-1234-5678 확인합니다."
+        val report = bank.addGeneratedForPrefix(
+            "[1,${JSONObject.quote(pii)},${JSONObject.quote("회의 자료를 오늘 확인\n하겠습니다.")}," +
+                "${JSONObject.quote("회의 자료를 오늘 확인하겠습니다")}," +
+                "${JSONObject.quote("안녕하세요 오늘 확인하겠습니다.")}," +
+                "${JSONObject.quote("회의 자료를 회의 자료를 오늘 확인하겠습니다.")}," +
+                "${JSONObject.quote("회의 자료를 오늘 확인하겠습니다. 다음에 연락드리겠습니다.")}]",
+            "회의 자료를 ", MODEL_ID, SHA
+        )
+
+        assertEquals(0, report.added)
+        assertEquals(7, report.rejected)
+        assertEquals(
+            mapOf(
+                IngestionRejectionReason.NON_STRING to 1,
+                IngestionRejectionReason.PII to 1,
+                IngestionRejectionReason.INVALID_SENTENCE to 1,
+                IngestionRejectionReason.MISSING_TERMINAL to 1,
+                IngestionRejectionReason.PREFIX_MISMATCH to 1,
+                IngestionRejectionReason.REPEATED_PREFIX to 1,
+                IngestionRejectionReason.MULTIPLE_SENTENCES to 1
+            ),
+            report.rejectionReasons
+        )
+        assertEquals(report.rejected, report.rejectionReasons.values.sum())
+        assertFalse(report.toString().contains(pii))
+    }
+
+    @Test
+    fun prefixIngestionReportsInvalidSentenceAndRepetitionAfterEarlierChecks() {
+        val bank = GeneratedSentenceBank(file("rejection-reason-order.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        val report = bank.addGeneratedForPrefix(
+            responseWith(
+                "회의 자료를.",
+                "회의 자료를 오늘 확인하고 오늘 확인하고 오늘 확인하겠습니다.",
+                "회의 자료를 확인했습니다.",
+                "회의 자료를 오늘 확인하겠습니다."
+            ),
+            "회의 자료를 ", MODEL_ID, SHA
+        )
+
+        assertEquals(2, report.added)
+        assertEquals(2, report.rejected)
+        assertEquals(
+            mapOf(
+                IngestionRejectionReason.INVALID_SENTENCE to 1,
+                IngestionRejectionReason.REPETITION to 1
+            ),
+            report.rejectionReasons
+        )
+        assertEquals(report.rejected, report.rejectionReasons.values.sum())
     }
 
     @Test

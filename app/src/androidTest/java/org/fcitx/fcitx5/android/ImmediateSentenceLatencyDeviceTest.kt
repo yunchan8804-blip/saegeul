@@ -12,6 +12,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Base64
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
@@ -28,9 +29,11 @@ import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
 import org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput
+import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -38,6 +41,9 @@ import java.io.FileOutputStream
 class ImmediateSentenceLatencyDeviceTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+    private val rowDiagnosticsEnabled: Boolean =
+        InstrumentationRegistry.getArguments().getString(ROW_DIAGNOSTICS_ARGUMENT) == "true"
 
     @Test
     fun sentencePackCandidatesAppearWithinOneSecondAndAppendExactlyOffline() {
@@ -59,7 +65,16 @@ class ImmediateSentenceLatencyDeviceTest {
         }
         val requestedLatencyCase = InstrumentationRegistry.getArguments().getString(LATENCY_CASE_ARGUMENT)
         val latencyCase = requestedLatencyCase?.toIntOrNull()
-        val prefixes = if (candidateSource == GENERATED_SOURCE) GENERATED_PREFIXES else LATENCY_PREFIXES
+        val requestedPublicPrefix = InstrumentationRegistry.getArguments()
+            .getString(PUBLIC_PREFIX_BASE64_ARGUMENT)
+        require(candidateSource == GENERATED_SOURCE || requestedPublicPrefix == null) {
+            "$PUBLIC_PREFIX_BASE64_ARGUMENT 는 $GENERATED_SOURCE 에서만 허용합니다."
+        }
+        val prefixes = when {
+            requestedPublicPrefix != null -> listOf(decodePublicPrefix(requestedPublicPrefix))
+            candidateSource == GENERATED_SOURCE -> GENERATED_PREFIXES
+            else -> LATENCY_PREFIXES
+        }
         require(requestedLatencyCase == null || latencyCase in prefixes.indices.map { it + 1 }) {
             "latencyCase는 1..${prefixes.size}이어야 합니다."
         }
@@ -87,7 +102,7 @@ class ImmediateSentenceLatencyDeviceTest {
                 waitForEditorText(editor, "", readyDeadline)
                 waitForServiceSelection(ime, editor, "", readyDeadline)
                 assertTrue("오프라인 문장팩 검증 중 네트워크 AI 입력은 차단되어야 한다.", onMain {
-                    !ime.allowsAiInputFeatures()
+                    !ime.allowsOnDeviceContextCompletionFeatures()
                 })
                 assertTrue("일반 debug editor에서는 문장팩 텍스트 검사가 허용되어야 한다.", onMain {
                     ime.allowsTextInspectionFeatures()
@@ -263,6 +278,31 @@ class ImmediateSentenceLatencyDeviceTest {
         throw AssertionError("기본 문장팩이 준비되지 않았습니다. builtinCount=${latest.builtinCount}, loading=${latest.isLoading}")
     }
 
+    private fun decodePublicPrefix(encoded: String): String {
+        val bytes = try {
+            Base64.decode(encoded, Base64.NO_WRAP)
+        } catch (error: IllegalArgumentException) {
+            throw IllegalArgumentException("$PUBLIC_PREFIX_BASE64_ARGUMENT 가 올바른 Base64가 아닙니다.", error)
+        }
+        val prefix = bytes.toString(Charsets.UTF_8)
+        require(prefix.toByteArray(Charsets.UTF_8).contentEquals(bytes)) {
+            "$PUBLIC_PREFIX_BASE64_ARGUMENT 는 UTF-8 문자열이어야 합니다."
+        }
+        require(prefix.length in 3..64) {
+            "$PUBLIC_PREFIX_BASE64_ARGUMENT 복호문 길이는 3..64여야 합니다."
+        }
+        require(prefix.any { it in '가'..'힣' }) {
+            "$PUBLIC_PREFIX_BASE64_ARGUMENT 복호문에는 한글이 포함되어야 합니다."
+        }
+        require(prefix.lastOrNull() == ' ') {
+            "$PUBLIC_PREFIX_BASE64_ARGUMENT 복호문은 ASCII 공백으로 끝나야 합니다."
+        }
+        require(!KoreanPiiScrubber.containsPii(prefix)) {
+            "$PUBLIC_PREFIX_BASE64_ARGUMENT 복호문에는 PII가 포함될 수 없습니다."
+        }
+        return prefix
+    }
+
     private fun waitForSnapshotCandidate(
         ime: FcitxInputMethodService,
         prefix: String,
@@ -403,8 +443,10 @@ class ImmediateSentenceLatencyDeviceTest {
                     if (candidate.boundsMatch) return candidate
                 }
             }
+            if (rowDiagnosticsEnabled) recordPollTimeline(ime, automation, result, startedAt)
             SystemClock.sleep(POLL_INTERVAL_MS)
         }
+        recordRowDiagnostics(ime, automation, result)
         throw AssertionError("deadline 안에 접근성/live 좌표가 일치하는 sentence_pack 후보가 IME 후보 행에 보이지 않았습니다.")
     }
 
@@ -435,6 +477,114 @@ class ImmediateSentenceLatencyDeviceTest {
         val bounds = Rect().also(node::getBoundsInScreen)
         if (!node.isVisibleToUser || bounds.width() <= 0 || bounds.height() <= 0) return null
         return A11yCandidateGeometry(node, bounds)
+    }
+
+    private fun recordRowDiagnostics(
+        ime: FcitxInputMethodService,
+        automation: UiAutomation,
+        result: LatencyResult
+    ) {
+        onMain {
+            val snapshot = ime.getContextualCandidateSnapshot(sentenceLimit = CANDIDATE_LIMIT)
+            result.snapshotSentenceTexts = snapshot.sentences.map { candidate ->
+                "${candidate.metricsCandidate?.source ?: "unattributed"}|${candidate.word.text}"
+            }
+            val decor = ime.window.window?.decorView
+            result.imeRowTextViews = decor?.let(::collectDecorTextViews).orEmpty()
+        }
+        result.a11yImeTexts = automation.windows
+            .asSequence()
+            .filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            .mapNotNull { it.root }
+            .flatMap { root -> collectA11yTexts(root).asSequence() }
+            .take(MAX_ROW_DIAGNOSTIC_ITEMS)
+            .toList()
+    }
+
+    private fun collectDecorTextViews(decor: View): List<String> {
+        val items = mutableListOf<String>()
+        fun walk(current: View) {
+            if (items.size >= MAX_ROW_DIAGNOSTIC_ITEMS) return
+            if (current is TextView) {
+                val text = current.text?.toString().orEmpty()
+                if (text.isNotEmpty()) {
+                    val visible = Rect()
+                    val visibleRect = current.getGlobalVisibleRect(visible)
+                    val location = IntArray(2)
+                    current.getLocationOnScreen(location)
+                    val full = Rect(
+                        location[0],
+                        location[1],
+                        location[0] + current.width,
+                        location[1] + current.height
+                    )
+                    items += "$text|shown=${current.isShown}|visibleRect=$visibleRect" +
+                        "|full=$full|clipped=${!visibleRect || visible != full}"
+                }
+            }
+            (current as? ViewGroup)?.children?.forEach(::walk)
+        }
+        walk(decor)
+        return items
+    }
+
+    private fun recordPollTimeline(
+        ime: FcitxInputMethodService,
+        automation: UiAutomation,
+        result: LatencyResult,
+        startedAt: Long
+    ) {
+        if (result.pollTimeline.size >= MAX_POLL_TIMELINE_ITEMS) return
+        val elapsed = SystemClock.elapsedRealtime() - startedAt
+        val snapshotTexts = onMain {
+            ime.getContextualCandidateSnapshot(sentenceLimit = CANDIDATE_LIMIT).sentences.map { candidate ->
+                "${candidate.metricsCandidate?.source ?: "unattributed"}|${candidate.word.text}"
+            }
+        }
+        val rowTexts = automation.windows
+            .asSequence()
+            .filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            .mapNotNull { it.root }
+            .flatMap { root -> collectA11yTexts(root, minTextLength = 2).asSequence() }
+            .take(MAX_POLL_ROW_ITEMS)
+            .toList()
+        result.pollTimeline += "t=${elapsed}ms|snap=$snapshotTexts|cache=${readCachedPredictionSummary(ime)}|row=$rowTexts"
+    }
+
+    private fun readCachedPredictionSummary(ime: FcitxInputMethodService): String = try {
+        val cache = readDeclaredField(ime, "contextualResultCache")
+        if (cache == null) {
+            "none"
+        } else {
+            val key = requireNotNull(readDeclaredField(cache, "key")) { "cache key was null" }
+            val stroke = readDeclaredField(key, "stroke")
+            val context = readDeclaredField(key, "context")
+            val predictions = readDeclaredField(cache, "predictions") as List<*>
+            val rendered = predictions.joinToString(separator = ",") { entry ->
+                val prediction = entry as AiPrediction
+                "${prediction.source}:${prediction.confidenceScore}:${prediction.text}"
+            }
+            "stroke='$stroke',context='$context'|$rendered"
+        }
+    } catch (error: Throwable) {
+        "${error.javaClass.simpleName}: ${error.message}"
+    }
+
+    private fun collectA11yTexts(node: AccessibilityNodeInfo, minTextLength: Int = 1): List<String> {
+        val items = mutableListOf<String>()
+        fun walk(current: AccessibilityNodeInfo) {
+            if (items.size >= MAX_ROW_DIAGNOSTIC_ITEMS) return
+            current.text?.toString()?.takeIf { it.length >= minTextLength }?.let { text ->
+                val bounds = Rect().also(current::getBoundsInScreen)
+                items += "$text|visible=${current.isVisibleToUser}|clickable=${current.isClickable}" +
+                    "|bounds=$bounds"
+            }
+            for (index in 0 until current.childCount) {
+                current.getChild(index)?.let(::walk)
+            }
+        }
+        walk(node)
+        return items
     }
 
     private fun recordCandidateGeometry(candidate: VerifiedCandidate, result: LatencyResult) {
@@ -709,6 +859,10 @@ class ImmediateSentenceLatencyDeviceTest {
                         .put("imeBounds", result.imeBounds?.toJson())
                         .put("liveRootViewIsDecor", result.liveRootViewIsDecor)
                         .put("liveGeometryError", result.liveGeometryError)
+                        .put("snapshotSentenceTexts", JSONArray(result.snapshotSentenceTexts))
+                        .put("imeRowTextViews", JSONArray(result.imeRowTextViews))
+                        .put("a11yImeTexts", JSONArray(result.a11yImeTexts))
+                        .put("pollTimeline", JSONArray(result.pollTimeline))
                         .put("a11yLiveBoundsMatch", result.a11yLiveBoundsMatch)
                         .put("candidateSource", result.candidateSource)
                         .put("clickInsertionMatched", result.clickInsertionMatched)
@@ -879,6 +1033,10 @@ class ImmediateSentenceLatencyDeviceTest {
         var imeBounds: Rect? = null,
         var liveRootViewIsDecor: Boolean? = null,
         var liveGeometryError: String? = null,
+        var snapshotSentenceTexts: List<String> = emptyList(),
+        var imeRowTextViews: List<String> = emptyList(),
+        var a11yImeTexts: List<String> = emptyList(),
+        val pollTimeline: MutableList<String> = mutableListOf(),
         var a11yLiveBoundsMatch: Boolean? = null,
         var candidateSource: String? = null,
         var clickInsertionMatched: Boolean? = null,
@@ -935,10 +1093,15 @@ class ImmediateSentenceLatencyDeviceTest {
         const val VISIBLE_LATENCY_LIMIT_MS = 1_000L
         const val POLL_INTERVAL_MS = 25L
         const val MAX_ERROR_MESSAGE_CHARS = 400
+        const val MAX_ROW_DIAGNOSTIC_ITEMS = 40
+        const val MAX_POLL_TIMELINE_ITEMS = 60
+        const val MAX_POLL_ROW_ITEMS = 16
         const val TAP_MODE_ARGUMENT = "tapMode"
         const val LATENCY_CASE_ARGUMENT = "latencyCase"
         const val CANDIDATE_SOURCE_ARGUMENT = "candidateSource"
+        const val PUBLIC_PREFIX_BASE64_ARGUMENT = "publicPrefixBase64"
         const val RESTORE_OFFLINE_MODE_ARGUMENT = "restoreOfflineMode"
+        const val ROW_DIAGNOSTICS_ARGUMENT = "rowDiagnostics"
         const val ACCESSIBILITY_TAP_MODE = "accessibility"
         const val TOUCH_TAP_MODE = "touch"
         const val TOUCH_UP_DELAY_MS = 40L

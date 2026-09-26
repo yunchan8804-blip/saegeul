@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.Keep
@@ -18,9 +19,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.ads.ThemePointRewardedController
+import org.fcitx.fcitx5.android.data.points.PointLedger
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemeOwnershipStore
+import org.fcitx.fcitx5.android.data.theme.ThemeShopCatalog
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.utils.applyNavBarInsetsBottomPadding
 import org.fcitx.fcitx5.android.utils.importErrorDialog
@@ -200,6 +205,11 @@ class ThemeListFragment : Fragment() {
     }
 
     private fun selectTheme(theme: Theme) {
+        val shopTheme = ThemeShopCatalog.find(theme.name)
+        if (shopTheme != null && !ThemeOwnershipStore(requireContext()).isOwned(theme.name)) {
+            showShopPurchaseDialog(shopTheme)
+            return
+        }
         if (followSystemDayNightTheme) {
             val ctx = requireContext()
             AlertDialog.Builder(ctx)
@@ -218,6 +228,56 @@ class ThemeListFragment : Fragment() {
             return
         }
         ThemeManager.setNormalModeTheme(theme)
+    }
+
+    private fun showShopPurchaseDialog(shop: ThemeShopCatalog.ShopTheme) {
+        val ctx = requireContext()
+        val ledger = PointLedger(ctx)
+        val ownership = ThemeOwnershipStore(ctx)
+        val balanceView = TextView(ctx).apply {
+            setPadding(48, 16, 48, 0)
+            text = "현재 포인트: ${ledger.balance()}점"
+        }
+        var dialog: AlertDialog? = null
+        fun tryPurchase() {
+            if (ledger.balance() < shop.price) return
+            lifecycleScope.launch(Dispatchers.IO) {
+                val spent = ledger.spend(
+                    shop.price, System.currentTimeMillis(), "theme:${shop.theme.name}"
+                )
+                withContext(Dispatchers.Main) {
+                    if (spent) {
+                        ownership.markOwned(shop.theme.name)
+                        dialog?.dismiss()
+                        ThemeManager.setNormalModeTheme(shop.theme)
+                        updateSelectedThemes()
+                        ctx.toast("${shop.displayName} 테마를 구매했어요")
+                    } else {
+                        ctx.toast("포인트가 부족해요")
+                    }
+                }
+            }
+        }
+        val rewarded = ThemePointRewardedController(requireActivity()) { earned ->
+            balanceView.text = "현재 포인트: ${ledger.balance()}점"
+            ctx.toast("포인트 +${earned}점")
+            tryPurchase()
+        }
+        rewarded.prepare()
+        dialog = AlertDialog.Builder(ctx)
+            .setTitle("테마 상점 · ${shop.displayName}")
+            .setMessage("이 테마는 포인트 ${shop.price}점이면 사용할 수 있어요. 광고 1편을 시청하면 포인트 1점을 모을 수 있어요.")
+            .setView(balanceView)
+            .setPositiveButton("구매") { _, _ -> tryPurchase() }
+            .setNeutralButton("광고 보고 +1") { _, _ ->
+                if (rewarded.isEligible()) {
+                    rewarded.showIfEligible()
+                } else {
+                    ctx.toast("포인트 적립은 하루 3회, 20분 간격으로 할 수 있어요")
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun editTheme(theme: Theme.Custom) {

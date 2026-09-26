@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_install_notify_progress_title">새글 AI 받는 중</string>
+    <string name="gemma_install_notify_progress_text_with_eta">%1$s / %2$s · 약 %3$s 남음</string>
+    <string name="gemma_install_notify_progress_text_no_eta">%1$s / %2$s</string>
+    <string name="gemma_install_notify_done_title">새글 AI가 준비됐어요</string>
+    <string name="gemma_install_action_pause">일시정지</string>
+    <string name="gemma_install_eta_minutes">%1$d분</string>
+    <string name="gemma_install_eta_seconds">%1$d초</string>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_accumulation_notify_progress_title">Preparing sentence material</string>
+    <string name="gemma_accumulation_notify_progress_text">%1$d/%2$d contexts · %3$d stored</string>
+    <string name="gemma_accumulation_notify_done_title">%1$d sentence material(s) added</string>
+    <string name="gemma_accumulation_notify_done_text">%1$d stored in total</string>
+    <string name="gemma_accumulation_notify_failed_title">Sentence material preparation failed</string>
+</resources>

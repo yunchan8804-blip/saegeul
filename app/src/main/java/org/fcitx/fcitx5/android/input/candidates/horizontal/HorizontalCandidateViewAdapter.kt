@@ -21,7 +21,8 @@ import splitties.views.setPaddingDp
 
 open class HorizontalCandidateViewAdapter(
     val theme: Theme,
-    var rowHeightDp: Int = KawaiiBarComponent.HEIGHT
+    var rowHeightDp: Int = KawaiiBarComponent.HEIGHT,
+    private val isSentenceRow: Boolean = false
 ) : RecyclerView.Adapter<CandidateViewHolder>() {
 
     init {
@@ -47,7 +48,7 @@ open class HorizontalCandidateViewAdapter(
 
     @CallSuper
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
-        val ui = CandidateItemUi(parent.context, theme)
+        val ui = CandidateItemUi(parent.context, theme, isSentenceRow)
         ui.root.apply {
             minimumWidth = dp(36)
             setPaddingDp(6, 0, 6, 0)

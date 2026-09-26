@@ -26,10 +26,12 @@ object KoreanSentenceEndingExtractor {
 
     fun endingOf(fragment: String): String? {
         val normalized = normalizeFragment(fragment)
-        return observedEndings.firstOrNull { normalized.endsWith(it) }
+        if (normalized.isBlank()) return null
+        return org.fcitx.fcitx5.android.input.ai.morphology.KoreanMorphologicalEndingAnalyzer.extractEnding(normalized)
     }
 
     fun topEndings(sentences: Iterable<String>, limit: Int = 5): List<String> {
+        if (limit <= 0) return emptyList()
         val counts = mutableMapOf<String, Int>()
         sentences.forEach { sentence ->
             sentenceFragments(sentence).forEach { fragment ->

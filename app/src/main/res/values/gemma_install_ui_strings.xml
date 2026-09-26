@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-2.1-or-later
+  SPDX-FileCopyrightText: Copyright 2026 YunChan
+-->
+<resources>
+    <!-- Shared "새글 AI" install-status card: title/detail/button for every GemmaInstallState. -->
+    <string name="gemma_install_title_unsupported">Saegeul AI isn\'t available on this phone</string>
+    <string name="gemma_install_title_not_installed">Saegeul AI isn\'t installed yet</string>
+    <string name="gemma_install_detail_not_installed">About %1$s · downloads over Wi-Fi</string>
+    <string name="gemma_install_title_downloading">Downloading Saegeul AI</string>
+    <string name="gemma_install_detail_downloading_eta">%1$s / %2$s · %3$d%% · about %4$d min left</string>
+    <string name="gemma_install_detail_downloading_calculating">%1$s / %2$s · %3$d%% · estimating time left</string>
+    <string name="gemma_install_title_waiting_wifi">Will resume once connected to Wi-Fi</string>
+    <string name="gemma_install_title_waiting_network">Will resume once connected to the internet</string>
+    <string name="gemma_install_detail_percent_received">%1$d%% received</string>
+    <string name="gemma_install_title_paused">Download paused</string>
+    <string name="gemma_install_detail_percent">%1$d%%</string>
+    <string name="gemma_install_title_verifying">Verifying the downloaded file</string>
+    <string name="gemma_install_title_installed">Saegeul AI ready ✓</string>
+    <string name="gemma_install_title_failed_storage">Not enough storage space</string>
+    <string name="gemma_install_detail_failed_storage">Free up at least %1$s</string>
+    <string name="gemma_install_title_failed_offline">Can\'t download in full offline mode</string>
+    <string name="gemma_install_title_failed_generic">Couldn\'t finish downloading</string>
+    <string name="gemma_install_detail_failed_generic">What was already downloaded is kept</string>
+    <string name="gemma_install_title_failed_verify">The downloaded file was damaged - download it again</string>
+    <string name="gemma_install_button_install">Install Saegeul AI</string>
+    <string name="gemma_install_button_pause">Pause</string>
+    <string name="gemma_install_button_mobile_data">Use mobile data</string>
+    <string name="gemma_install_button_resume">Resume</string>
+    <string name="gemma_install_button_retry">Try again</string>
+    <string name="gemma_install_button_retry_fresh">Download again</string>
+    <string name="gemma_install_button_open_settings">Open settings</string>
+
+    <!-- One-time consent notice and the metered-network dialog shown by GemmaInstallFlow.start. -->
+    <string name="gemma_install_consent_message">Saegeul AI downloads the Gemma model (by Google) from Hugging Face. What you type is never sent anywhere.</string>
+    <string name="gemma_install_consent_terms_button">Gemma terms of use</string>
+    <string name="gemma_install_consent_confirm">Continue</string>
+    <string name="gemma_install_metered_title">You\'re on mobile data right now</string>
+    <string name="gemma_install_metered_message">Saegeul AI is about 2.6GB. Downloading it over mobile data may use up your data plan.</string>
+    <string name="gemma_install_metered_wifi_button">Wait for Wi-Fi</string>
+    <string name="gemma_install_metered_mobile_button">Use mobile data</string>
+
+    <!-- Product model-management screen (GemmaModelActivity). -->
+    <string name="gemma_model_activity_title">Saegeul AI</string>
+    <string name="gemma_model_description">It learns your writing style to suggest your next sentence. Everything runs on this phone.</string>
+    <string name="gemma_model_info_size_label">Size</string>
+    <string name="gemma_model_info_model_label">Model</string>
+    <string name="gemma_model_info_model_value">Google Gemma 4 E2B</string>
+    <string name="gemma_model_info_version_label">Version</string>
+    <string name="gemma_model_terms_link">Gemma terms of use</string>
+    <string name="gemma_model_license_row">LiteRT-LM open source license (Apache-2.0)</string>
+    <string name="gemma_model_delete_button">Delete model</string>
+    <string name="gemma_model_delete_dialog_title">Delete Saegeul AI?</string>
+    <string name="gemma_model_delete_dialog_message">Deleting Saegeul AI stops AI suggestions and continue-writing. Your learned writing style stays.</string>
+    <string name="gemma_model_import_toggle">Import from a file</string>
+    <string name="gemma_model_import_button">Choose file</string>
+    <string name="gemma_model_import_progress">Importing…</string>
+    <string name="gemma_model_import_failed">Couldn\'t import the file</string>
+    <string name="gemma_model_import_succeeded">Saegeul AI is ready</string>
+    <string name="gemma_model_dev_experiment_link">Gemma experiment screen</string>
+
+    <!-- Settings ("개인정보·AI") entry row. -->
+    <string name="privacy_ai_gemma_model_title">Saegeul AI</string>
+
+    <!-- Onboarding page. -->
+    <string name="setup_ai_new_title">Turn on Saegeul AI</string>
+    <string name="setup_ai_new_body">It learns your writing style to suggest your next sentence. Everything runs only on this phone.</string>
+    <string name="setup_ai_new_secondary">You can finish setup while it downloads - check progress from the notification.</string>
+
+    <!-- Keyboard continue-writing prompt when the model isn't installed yet. -->
+    <string name="gemma_context_install_prompt_title">Install Saegeul AI to use continue-writing</string>
+    <string name="gemma_context_install_button">Install</string>
+    <string name="setup_ai_page_summary">Install it to get sentence suggestions and Continue writing.</string>
+</resources>

@@ -46,6 +46,15 @@
         <exclude
             domain="database"
             path="clbdb-journal" />
+        <exclude
+            domain="sharedpref"
+            path="gemma_accumulation_state.xml" />
+        <exclude
+            domain="sharedpref"
+            path="graph_enrichment_status.xml" />
+        <exclude
+            domain="sharedpref"
+            path="gemma_model_install_state.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude
@@ -93,5 +102,14 @@
         <exclude
             domain="database"
             path="clbdb-journal" />
+        <exclude
+            domain="sharedpref"
+            path="gemma_accumulation_state.xml" />
+        <exclude
+            domain="sharedpref"
+            path="graph_enrichment_status.xml" />
+        <exclude
+            domain="sharedpref"
+            path="gemma_model_install_state.xml" />
     </device-transfer>
 </data-extraction-rules>

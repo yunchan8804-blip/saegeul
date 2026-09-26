@@ -60,6 +60,9 @@ ALLOWED_REDIRECT_URIS = {
 DEFAULT_AGY_MODEL = "gemini-3.8-flash-high"
 DEFAULT_AGY_EFFORT = "high"
 AGY_EFFORT_CHOICES = ("low", "medium", "high")
+DEFAULT_CODEX_MODEL = "gpt-6-astra"
+DEFAULT_CODEX_EFFORT = "low"
+CODEX_EFFORT_CHOICES = ("low", "medium", "high", "xhigh")
 OAUTH_CLIENT_ID = "saegeul-android-public"
 OAUTH_SCOPES = "openid offline_access ai.invoke"
 ACCESS_TOKEN_TTL_SECONDS = 60 * 60
@@ -635,6 +638,38 @@ def pkce_challenge(verifier: str) -> str:
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
 
+def validate_codex_model(value: str) -> str:
+    if (
+        not isinstance(value, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}", value) is None
+    ):
+        raise ValueError(
+            "the Codex model must be 1 to 120 ASCII letters, digits, dots, underscores, colons, slashes, or hyphens"
+        )
+    return value
+
+
+def validate_codex_effort(value: str) -> str:
+    if value not in CODEX_EFFORT_CHOICES:
+        allowed = ", ".join(CODEX_EFFORT_CHOICES)
+        raise ValueError(f"the Codex reasoning effort must be one of: {allowed}")
+    return value
+
+
+def codex_model_argument(value: str) -> str:
+    try:
+        return validate_codex_model(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+
+
+def codex_effort_argument(value: str) -> str:
+    try:
+        return validate_codex_effort(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+
+
 class CliBackendRunner:
     MODEL_CODEX = "codex"
     MODEL_CLAUDE = "claude"
@@ -645,12 +680,17 @@ class CliBackendRunner:
         sandbox_dir: Path,
         agy_model: str = DEFAULT_AGY_MODEL,
         agy_effort: str = DEFAULT_AGY_EFFORT,
+        codex_model: str = DEFAULT_CODEX_MODEL,
+        codex_effort: str = DEFAULT_CODEX_EFFORT,
     ):
         self.sandbox_dir = sandbox_dir
         self.sandbox_dir.mkdir(parents=True, exist_ok=True)
+        self.codex_model = validate_codex_model(codex_model)
+        self.codex_effort = validate_codex_effort(codex_effort)
         # The packaged app's WindowsApps codex.exe can be visible to PATH but deny direct
         # CreateProcess access. Prefer the npm command shim used by the user's logged-in CLI.
         self.codex = find_executable("codex.cmd", "codex", "codex.exe")
+        self.codex_command = codex_command_prefix(self.codex) if self.codex else []
         self.claude = find_executable("claude.exe", "claude")
         self.agy = find_executable("agy.exe", "agy.cmd", "agy")
         self.agy_model = agy_model
@@ -662,7 +702,7 @@ class CliBackendRunner:
         available = set()
         environment = cli_environment()
         if self.codex:
-            result = run_quiet([self.codex, "login", "status"], environment, timeout=15)
+            result = run_quiet([*self.codex_command, "login", "status"], environment, timeout=15)
             if result and result.returncode == 0:
                 available.add(self.MODEL_CODEX)
         if self.claude:
@@ -708,6 +748,10 @@ class CliBackendRunner:
         if not self._slot.acquire(blocking=False):
             raise RuntimeError("computer AI is already processing another request")
         try:
+            # The sandbox lives under the OS temp directory, so a temp cleanup can remove it while
+            # this long-lived gateway keeps running. Every CLI runs with it as cwd or -C, and a
+            # missing directory makes the child fail to start, so recreate it before each run.
+            self.sandbox_dir.mkdir(parents=True, exist_ok=True)
             prompt = cli_prompt(instructions, input_text, allow_partial_suggestions)
             if model == self.MODEL_CODEX:
                 output = self._run_codex(prompt)
@@ -721,9 +765,12 @@ class CliBackendRunner:
 
     def _run_codex(self, prompt: str) -> str:
         assert self.codex
+        assert self.codex_command
         command = [
-            self.codex,
+            *self.codex_command,
             "exec",
+            "--model",
+            self.codex_model,
             "--yolo",
             "--ephemeral",
             "--skip-git-repo-check",
@@ -731,11 +778,12 @@ class CliBackendRunner:
             "--ignore-rules",
             "-c",
             'web_search="disabled"',
+            "-c",
+            f'model_reasoning_effort="{self.codex_effort}"',
             "--color",
             "never",
             "-C",
             str(self.sandbox_dir),
-            "-",
         ]
         result = run_quiet(
             command,
@@ -768,11 +816,21 @@ class CliBackendRunner:
             raise RuntimeError("Claude Code print request failed")
         try:
             document = json.loads(result.stdout)
-            if document.get("is_error") is True or document.get("subtype") != "success":
-                raise RuntimeError("Claude Code print request failed")
-            return str(document.get("result") or "").strip()
         except json.JSONDecodeError as error:
             raise RuntimeError("Claude Code returned invalid JSON") from error
+        # Current print runs stream a JSON array of events and the last "result" event carries the
+        # answer; older builds printed that event object on its own.
+        if isinstance(document, list):
+            events = [event for event in document if isinstance(event, dict)]
+            document = next(
+                (event for event in reversed(events) if event.get("type") == "result"),
+                events[-1] if events else None,
+            )
+        if not isinstance(document, dict):
+            raise RuntimeError("Claude Code returned invalid JSON")
+        if document.get("is_error") is True or document.get("subtype") != "success":
+            raise RuntimeError("Claude Code print request failed")
+        return str(document.get("result") or "").strip()
 
     def _run_agy(self, prompt: str) -> str:
         assert self.agy
@@ -812,6 +870,24 @@ def find_executable(*names: str) -> str | None:
                 if winget_candidate.is_file() and not winget_candidate.name.lower().endswith(".ps1"):
                     return str(winget_candidate)
     return None
+
+
+def codex_command_prefix(executable: str) -> list[str]:
+    if os.name != "nt":
+        return [executable]
+    shim = Path(executable)
+    if not shim.is_absolute() or shim.suffix.lower() not in {".cmd", ".bat"}:
+        return [executable]
+    entry = shim.parent / "node_modules" / "@openai" / "codex" / "bin" / "codex.js"
+    if not entry.is_file():
+        return [executable]
+    node = shim.parent / "node.exe"
+    if node.is_file():
+        return [str(node), str(entry)]
+    node_executable = find_executable("node.exe", "node")
+    if not node_executable:
+        raise ValueError("the npm Codex entry requires a Node.js executable")
+    return [node_executable, str(entry)]
 
 
 def cli_environment() -> dict[str, str]:
@@ -1247,7 +1323,13 @@ def normalized_computer_name(value: str) -> str:
 
 def run_cli_gateway(args: argparse.Namespace) -> None:
     sandbox = Path(args.sandbox_dir).expanduser().resolve()
-    runner = CliBackendRunner(sandbox, agy_model=args.agy_model, agy_effort=args.agy_effort)
+    runner = CliBackendRunner(
+        sandbox,
+        agy_model=args.agy_model,
+        agy_effort=args.agy_effort,
+        codex_model=args.codex_model,
+        codex_effort=args.codex_effort,
+    )
     origin = public_origin(args.public_origin) if args.public_origin else tailscale_origin(
         args.tailscale_https_port
     )
@@ -1281,6 +1363,7 @@ def run_cli_gateway(args: argparse.Namespace) -> None:
         )
         print(f"Verified provider: {manifest.get('display_name', 'Computer AI')}")
         print(f"CLI backends: {', '.join(sorted(runner.available))}")
+        print(f"Codex configured model: {runner.codex_model} (effort={runner.codex_effort})")
         if CliBackendRunner.MODEL_AGY in runner.available:
             print(f"AGY model: {runner.agy_model} (effort={runner.agy_effort})")
         advertise(
@@ -1465,6 +1548,18 @@ def parse_args() -> argparse.Namespace:
         choices=AGY_EFFORT_CHOICES,
         default=os.environ.get("FCITX_AI_AGY_EFFORT", DEFAULT_AGY_EFFORT),
         help="agy reasoning effort",
+    )
+    parser.add_argument(
+        "--codex-model",
+        type=codex_model_argument,
+        default=os.environ.get("FCITX_AI_CODEX_MODEL", DEFAULT_CODEX_MODEL),
+        help="Codex session model id",
+    )
+    parser.add_argument(
+        "--codex-effort",
+        type=codex_effort_argument,
+        default=os.environ.get("FCITX_AI_CODEX_EFFORT", DEFAULT_CODEX_EFFORT),
+        help="Codex reasoning effort",
     )
     return parser.parse_args()
 

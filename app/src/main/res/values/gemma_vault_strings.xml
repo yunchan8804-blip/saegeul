@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_vault_title">Language vault enrichment</string>
+    <string name="gemma_vault_description">Reflects your personal input, and Gemma prepares public sentences on-device.</string>
+    <string name="gemma_vault_private_boundary">Public sentence material doesn\'t use text from your personal language vault.</string>
+    <string name="gemma_vault_count">%1$d public sentence materials</string>
+    <string name="gemma_vault_last_run">Last run %1$s</string>
+    <string name="gemma_vault_last_run_none">No run history yet.</string>
+    <string name="gemma_vault_automatic">Automatic background enrichment</string>
+    <string name="gemma_vault_automatic_notice">Turning this off also stops any preparation in progress and scheduled runs.</string>
+    <string name="gemma_vault_guard_notice" formatted="false">Automatic enrichment runs at 30% battery or higher, manual enrichment at 20% or higher. It stops while you\'re typing, or in power saving, severe heat, or low memory conditions. Timing may be delayed by Android\'s scheduling.</string>
+    <string name="gemma_vault_generate">Enrich language vault</string>
+    <string name="gemma_vault_manual_description">Prepares more sentences at once than automatic enrichment. May stop early depending on device conditions.</string>
+    <string name="gemma_vault_stop">Stop enrichment</string>
+    <string name="gemma_vault_stop_notice">This also turns off automatic enrichment.</string>
+    <string name="gemma_vault_model_prepare">Prepare Gemma model</string>
+    <string name="gemma_vault_model">Manage model</string>
+    <string name="gemma_vault_manual_scheduled">Scheduled Gemma sentence enrichment.</string>
+    <string name="gemma_vault_manual_status">Sentence enrichment scheduled. %1$s</string>
+    <string name="gemma_vault_state_read_failed">Couldn\'t read Gemma\'s preparation state. Check again in a moment.</string>
+    <string name="gemma_vault_action_failed">Couldn\'t complete the Gemma sentence enrichment request. Please try again.</string>
+    <string name="gemma_vault_personal_sync_running">Reflecting your personal input…</string>
+    <string name="gemma_vault_personal_sync_completed">Reflected your personal input. %1$d sentences analyzed</string>
+    <string name="gemma_vault_personal_sync_no_new">No new personal input to reflect. %1$d sentences analyzed</string>
+    <string name="gemma_vault_personal_sync_failed">Couldn\'t reflect your personal input. Please try again.</string>
+    <string name="gemma_vault_personal_graph_title">Personal graph</string>
+    <string name="gemma_vault_personal_graph_description">Shows statistics for the personal input reflected on this device.</string>
+</resources>

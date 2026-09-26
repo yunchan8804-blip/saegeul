@@ -82,7 +82,9 @@ object PickerData {
             "❏", "❐", "❑", "❒", "◈", "◉", "◊", "○", "◢", "◣",
             "◤", "◥", "❢", "❣", "❤", "❥", "❦", "❧"
         ),
-        Category("[全]", R.drawable.symbol_fullwidth) to arrayOf(
+        // Text tab, not an icon: the hanja-styled vector icon this replaced can't be told apart
+        // from a CJK character at a glance, so this category names itself instead.
+        Category("전각") to arrayOf(
             "１", "２", "３", "４", "５", "６", "７", "８", "９", "０",
             "！", "＠", "＃", "＄", "％", "＾", "＆", "＊", "（", "）",
             "‘", "’", "＝", "＿", "｀", "：", "；", "？",

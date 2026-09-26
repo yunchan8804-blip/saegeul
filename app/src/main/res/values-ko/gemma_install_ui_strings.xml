@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-2.1-or-later
+  SPDX-FileCopyrightText: Copyright 2026 YunChan
+-->
+<resources>
+    <!-- 공용 "새글 AI" 설치 상태 카드: GemmaInstallState별 제목/세부/버튼. -->
+    <string name="gemma_install_title_unsupported">이 휴대폰에서는 새글 AI를 쓸 수 없어요</string>
+    <string name="gemma_install_title_not_installed">새글 AI가 아직 설치되지 않았어요</string>
+    <string name="gemma_install_detail_not_installed">약 %1$s · 와이파이에서 받아요</string>
+    <string name="gemma_install_title_downloading">새글 AI 받는 중</string>
+    <string name="gemma_install_detail_downloading_eta">%1$s / %2$s · %3$d%% · 약 %4$d분 남음</string>
+    <string name="gemma_install_detail_downloading_calculating">%1$s / %2$s · %3$d%% · 남은 시간 계산 중</string>
+    <string name="gemma_install_title_waiting_wifi">와이파이에 연결되면 이어서 받아요</string>
+    <string name="gemma_install_title_waiting_network">인터넷에 연결되면 이어서 받아요</string>
+    <string name="gemma_install_detail_percent_received">%1$d%% 받음</string>
+    <string name="gemma_install_title_paused">받기를 멈췄어요</string>
+    <string name="gemma_install_detail_percent">%1$d%%</string>
+    <string name="gemma_install_title_verifying">받은 파일을 확인하는 중이에요</string>
+    <string name="gemma_install_title_installed">새글 AI 준비됨 ✓</string>
+    <string name="gemma_install_title_failed_storage">저장 공간이 부족해요</string>
+    <string name="gemma_install_detail_failed_storage">%1$s 이상 비워 주세요</string>
+    <string name="gemma_install_title_failed_offline">완전 오프라인 모드에서는 받을 수 없어요</string>
+    <string name="gemma_install_title_failed_generic">받기를 끝내지 못했어요</string>
+    <string name="gemma_install_detail_failed_generic">받은 데까지는 남아 있어요</string>
+    <string name="gemma_install_title_failed_verify">받은 파일이 손상돼 다시 받아야 해요</string>
+    <string name="gemma_install_button_install">새글 AI 설치하기</string>
+    <string name="gemma_install_button_pause">일시정지</string>
+    <string name="gemma_install_button_mobile_data">모바일 데이터로 받기</string>
+    <string name="gemma_install_button_resume">이어 받기</string>
+    <string name="gemma_install_button_retry">다시 시도</string>
+    <string name="gemma_install_button_retry_fresh">다시 받기</string>
+    <string name="gemma_install_button_open_settings">설정 열기</string>
+
+    <!-- GemmaInstallFlow.start가 보여주는 최초 1회 동의 문구와 모바일 데이터 확인 다이얼로그. -->
+    <string name="gemma_install_consent_message">새글 AI 모델(Google Gemma)을 Hugging Face에서 받아요. 입력한 글은 보내지 않아요.</string>
+    <string name="gemma_install_consent_terms_button">Gemma 이용약관</string>
+    <string name="gemma_install_consent_confirm">확인</string>
+    <string name="gemma_install_metered_title">지금 모바일 데이터로 연결돼 있어요</string>
+    <string name="gemma_install_metered_message">새글 AI는 약 2.6GB예요. 모바일 데이터로 받으면 요금이 나올 수 있어요.</string>
+    <string name="gemma_install_metered_wifi_button">와이파이에서 받기</string>
+    <string name="gemma_install_metered_mobile_button">모바일 데이터로 받기</string>
+
+    <!-- 제품용 모델 관리 화면(GemmaModelActivity). -->
+    <string name="gemma_model_activity_title">새글 AI</string>
+    <string name="gemma_model_description">내 말투를 배워 문장을 추천해요. 모든 처리는 이 휴대폰 안에서 해요.</string>
+    <string name="gemma_model_info_size_label">크기</string>
+    <string name="gemma_model_info_model_label">모델</string>
+    <string name="gemma_model_info_model_value">Google Gemma 4 E2B</string>
+    <string name="gemma_model_info_version_label">버전</string>
+    <string name="gemma_model_terms_link">Gemma 이용약관</string>
+    <string name="gemma_model_license_row">LiteRT-LM 오픈소스 라이선스(Apache-2.0)</string>
+    <string name="gemma_model_delete_button">모델 삭제</string>
+    <string name="gemma_model_delete_dialog_title">새글 AI를 지울까요?</string>
+    <string name="gemma_model_delete_dialog_message">새글 AI를 지우면 AI 추천과 이어쓰기가 멈춰요. 배운 말투는 남아요.</string>
+    <string name="gemma_model_import_toggle">파일에서 가져오기</string>
+    <string name="gemma_model_import_button">파일 선택</string>
+    <string name="gemma_model_import_progress">가져오는 중…</string>
+    <string name="gemma_model_import_failed">파일을 가져오지 못했어요</string>
+    <string name="gemma_model_import_succeeded">새글 AI 준비를 마쳤어요</string>
+    <string name="gemma_model_dev_experiment_link">Gemma 실험 화면</string>
+
+    <!-- 설정 "개인정보·AI" 항목. -->
+    <string name="privacy_ai_gemma_model_title">새글 AI</string>
+
+    <!-- 온보딩 페이지. -->
+    <string name="setup_ai_new_title">새글 AI 켜기</string>
+    <string name="setup_ai_new_body">내 말투를 배워 다음 문장을 추천해요. 모든 처리는 이 휴대폰 안에서만 해요.</string>
+    <string name="setup_ai_new_secondary">받는 동안 설정을 마쳐도 돼요. 알림에서 진행 상황을 볼 수 있어요.</string>
+
+    <!-- 모델이 없을 때 키보드 이어쓰기 안내. -->
+    <string name="gemma_context_install_prompt_title">새글 AI를 설치하면 이어쓰기를 쓸 수 있어요</string>
+    <string name="gemma_context_install_button">설치하기</string>
+    <string name="setup_ai_page_summary">설치하면 문장 추천과 이어쓰기를 쓸 수 있어요.</string>
+</resources>

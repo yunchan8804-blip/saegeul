@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -36,19 +35,19 @@ class InternalPromptCaptureSessionTest {
 
     @Test
     fun `session respects the feature supplied character limit`() {
+        val spec = InternalPromptSpecs.gifSearch(80)
         val session = InternalPromptCaptureSession(
-            "가".repeat(InternalPromptSpecs.Ai.maxCharacters + 20),
-            maxCharacters = InternalPromptSpecs.Ai.maxCharacters
+            "가".repeat(spec.maxCharacters + 20),
+            maxCharacters = spec.maxCharacters
         )
 
         session.commit("추가")
 
-        assertEquals(InternalPromptSpecs.Ai.maxCharacters, session.displayText.length)
+        assertEquals(spec.maxCharacters, session.displayText.length)
     }
 
     @Test
-    fun `AI keeps an empty prompt open while GIF submits trending search`() {
-        assertFalse(InternalPromptSpecs.Ai.allowBlankSubmission)
+    fun `GIF search submits trending search on a blank prompt`() {
         assertTrue(InternalPromptSpecs.gifSearch(80).allowBlankSubmission)
     }
 

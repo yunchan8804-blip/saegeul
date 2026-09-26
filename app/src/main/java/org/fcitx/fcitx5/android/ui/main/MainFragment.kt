@@ -12,6 +12,7 @@ import androidx.preference.PreferenceCategory
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
+import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardPreference
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
@@ -20,7 +21,7 @@ import org.fcitx.fcitx5.android.utils.navigateWithAnim
 class MainFragment : PaddingPreferenceFragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
-    private var typingDnaCardPreference: org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardPreference? = null
+    private var typingDnaCardPreference: TypingDnaCardPreference? = null
 
     override fun onStart() {
         super.onStart()
@@ -51,7 +52,7 @@ class MainFragment : PaddingPreferenceFragment() {
         val ctx = requireContext()
         val productSurfaces = ProductSurfacePolicy.forBuild(BuildConfig.SHOW_DEVELOPER_SURFACES)
         preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
-            val dnaCard = org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardPreference(ctx)
+            val dnaCard = TypingDnaCardPreference(ctx)
             typingDnaCardPreference = dnaCard
             addPreference(dnaCard)
             addCategory(R.string.languages_and_input) {
@@ -60,20 +61,6 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.drawable.ic_baseline_language_24,
                     SettingsRoute.InputMethodList
                 )
-            }
-            if (productSurfaces.showRawEngineSettings) {
-                addCategory(R.string.engine_developer_tools) {
-                    addDestinationPreference(
-                        R.string.global_options,
-                        R.drawable.ic_baseline_tune_24,
-                        SettingsRoute.GlobalConfig
-                    )
-                    addDestinationPreference(
-                        R.string.addons,
-                        R.drawable.ic_baseline_extension_24,
-                        SettingsRoute.AddonList
-                    )
-                }
             }
             addCategory(R.string.product_settings) {
                 addDestinationPreference(
@@ -128,6 +115,20 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.drawable.ic_baseline_library_books_24,
                     SettingsRoute.PersonalDictionary
                 )
+            }
+            if (productSurfaces.showRawEngineSettings) {
+                addCategory(R.string.engine_developer_tools) {
+                    addDestinationPreference(
+                        R.string.global_options,
+                        R.drawable.ic_baseline_tune_24,
+                        SettingsRoute.GlobalConfig
+                    )
+                    addDestinationPreference(
+                        R.string.addons,
+                        R.drawable.ic_baseline_extension_24,
+                        SettingsRoute.AddonList
+                    )
+                }
             }
         }
     }

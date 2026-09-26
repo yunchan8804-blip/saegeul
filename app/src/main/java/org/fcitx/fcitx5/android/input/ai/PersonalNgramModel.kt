@@ -62,7 +62,8 @@ class PersonalNgramModel(
          * 우선하도록 1.0f 이상에서 시작해 로그 스케일로 증가하고 3.0f에서 상한선을 둔다.
          */
         fun personalPrior(count: Float): Float {
-            val raw = 1.0f + 0.5f * ln(1.0 + count).toFloat()
+            val safeCount = if (count.isNaN() || count < 0f) 0f else count
+            val raw = 1.0f + 0.5f * ln(1.0 + safeCount).toFloat()
             return raw.coerceAtMost(3.0f)
         }
     }
@@ -92,11 +93,11 @@ class PersonalNgramModel(
     }
 
     @Synchronized
-    fun learn(sentence: String, packageName: String) {
+    fun learn(sentence: String, packageName: String, personaOverride: String? = null) {
         val scrubbed = KoreanPiiScrubber.scrub(sentence)
         val tokens = PersonalNgramTokenizer.tokenize(scrubbed)
         if (tokens.isEmpty()) return
-        val category = TypingDnaVault.categorizePackage(packageName)
+        val category = TypingDnaVault.categorizePackage(packageName, personaOverride)
         val now = clock()
         for (name in setOf("*", category)) {
             val t = tableFor(name)
@@ -217,16 +218,6 @@ class PersonalNgramModel(
         val prev2 = if (ctxTokens.size >= 2) ctxTokens[ctxTokens.size - 2] else null
         val category = TypingDnaVault.categorizePackage(packageName)
 
-        val contextScores = combinedScores(prev2, prev1, category, now)
-        val p1Blend = combinedUnigramProbabilities(category, now)
-
-        val categoryTable = tableFor(category)
-        val starTable = tableFor("*")
-        val vocabulary = HashSet<String>()
-        vocabulary.addAll(categoryTable.uni.keys)
-        vocabulary.addAll(starTable.uni.keys)
-        vocabulary.remove(START)
-
         val strokeChoseongOnly = stroke.isNotEmpty() && stroke.all { morphology.isChoseong(it) }
         val strokeJamo = morphology.decomposeHangul(stroke)
 
@@ -235,8 +226,17 @@ class PersonalNgramModel(
         // 누적되어 절대 줄어들지 않으므로(pruning으로 인한 stale 항목 가능) 아래 루프에서
         // 반드시 현재 vocabulary 소속 여부를 다시 확인한다 — 완전성은 각 매칭 조건의 첫 글자가
         // 곧 해당 인덱스의 키와 같다는 사실로 보장된다.
-        val candidateWords: Collection<String> = if (stroke.isEmpty()) {
-            vocabulary
+        val candidateWords: Collection<String>
+        val vocabulary: HashSet<String>
+        if (stroke.isEmpty()) {
+            val categoryTable = tableFor(category)
+            val starTable = tableFor("*")
+            vocabulary = HashSet<String>().apply {
+                addAll(categoryTable.uni.keys)
+                addAll(starTable.uni.keys)
+                remove(START)
+            }
+            candidateWords = vocabulary
         } else {
             val gathered = HashSet<String>()
             wordsByFirstChar[stroke[0]]?.let { gathered.addAll(it) }
@@ -244,8 +244,20 @@ class PersonalNgramModel(
             if (strokeChoseongOnly) {
                 wordsByChoseongFirst[stroke[0]]?.let { gathered.addAll(it) }
             }
-            gathered
+            if (gathered.isEmpty()) return emptyList()
+
+            val categoryTable = tableFor(category)
+            val starTable = tableFor("*")
+            vocabulary = HashSet<String>().apply {
+                addAll(categoryTable.uni.keys)
+                addAll(starTable.uni.keys)
+                remove(START)
+            }
+            candidateWords = gathered
         }
+
+        val contextScores = combinedScores(prev2, prev1, category, now)
+        val p1Blend = combinedUnigramProbabilities(category, now)
 
         val scored = mutableListOf<NgramCandidate>()
         for (w in candidateWords) {

@@ -16,12 +16,14 @@ import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.data.ExternalAiCredentialPurge
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -29,16 +31,20 @@ import org.fcitx.fcitx5.android.input.ai.BundledKoreanNgram
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackRepository
 import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher
+import org.fcitx.fcitx5.android.data.points.LevelRewardStore
 import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
+import org.fcitx.fcitx5.android.input.ai.VaultHabitStore
 import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.ui.main.LogActivity
 import org.fcitx.fcitx5.android.utils.AppUtil
+import org.fcitx.fcitx5.android.utils.BackgroundProgressNotifier
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.setupForest
 import org.fcitx.fcitx5.android.utils.startActivity
@@ -56,11 +62,24 @@ class FcitxApplication : Application() {
     )
 
     val typingDnaRepository: TypingDnaRepository by lazy {
+        TypingDnaRepository.onSentencesAnalyzed = { analyzed, newLevel ->
+            val now = System.currentTimeMillis()
+            VaultHabitStore(this).record(now, analyzed)
+            LevelRewardStore(this).grantIfLevelUp(newLevel, now)
+        }
         TypingDnaRepository(File(filesDir, "typing_dna.json"), cipher = vaultCipher)
     }
 
     val typingDnaVault: TypingDnaVault by lazy {
-        TypingDnaVault(stagingFile = File(filesDir, "typing_dna_pending.json"), cipher = vaultCipher)
+        TypingDnaVault(
+            stagingFile = File(filesDir, "typing_dna_pending.json"),
+            cipher = vaultCipher,
+            diagnostics = collectionDiagnostics
+        )
+    }
+
+    val collectionDiagnostics: org.fcitx.fcitx5.android.input.ai.CollectionDiagnostics by lazy {
+        org.fcitx.fcitx5.android.input.ai.CollectionDiagnostics(this)
     }
 
     val personalNgramModel: PersonalNgramModel by lazy {
@@ -114,7 +133,7 @@ class FcitxApplication : Application() {
      */
     fun warmUpLanguageAssets() {
         sentencePacks.prepare()
-        if (BuildConfig.DEBUG) {
+        if (OnDeviceAiSupport.isSupported) {
             applicationScope.launch {
                 try {
                     generatedSentenceBank.load()
@@ -243,6 +262,10 @@ class FcitxApplication : Application() {
             Timber.d("Last pid is $lastPid. Set it to current pid: $currentPid")
             setValue(currentPid)
         }
+        if (!isDirectBootMode) {
+            purgeExternalAiCredentialsIfNeeded(sharedPrefs)
+        }
+        BackgroundProgressNotifier.ensureChannels(ctx)
         ClipboardManager.init(ctx)
         ThemeManager.init(resources.configuration)
         Locales.onLocaleChange(resources.configuration)
@@ -260,6 +283,45 @@ class FcitxApplication : Application() {
             ContextCompat.RECEIVER_EXPORTED
         )
         warmUpLanguageAssets()
+        if (!isDirectBootMode) {
+            // A cloud/device-transfer restore can bring back automatic-learning's `enabled=true`
+            // preference without the Gemma model itself (it lives under noBackupFilesDir and is
+            // never restored). Force it back off in that case so the toggle never shows "on" with
+            // nothing behind it.
+            applicationScope.launch {
+                try {
+                    org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaModelInstaller
+                        .enforceAutomaticLearningRequiresModel(ctx)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Timber.w(error, "Failed to enforce automatic-learning model requirement")
+                }
+            }
+            // Creating the controller re-registers the on-device graph enrichment schedule, on any
+            // device OnDeviceAiSupport reports as supported (create() returns null otherwise).
+            org.fcitx.fcitx5.android.ui.main.ai.GemmaPreparationFactory.create(this)
+        }
+    }
+
+    /**
+     * Removes on-disk files and Keystore aliases left by the removed external writing-AI feature.
+     * Guarded by a one-shot [SharedPreferences] flag; a partial failure is logged and retried on
+     * the next normal (non-direct-boot) start instead of being silently swallowed.
+     */
+    private fun purgeExternalAiCredentialsIfNeeded(sharedPrefs: android.content.SharedPreferences) {
+        if (sharedPrefs.getBoolean(ExternalAiCredentialPurge.PREF_KEY, false)) return
+        val purged = runCatching {
+            ExternalAiCredentialPurge.purge(noBackupFilesDir) { alias ->
+                val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+                if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
+            }
+        }.onFailure {
+            Timber.w("external AI credential purge failed: ${it.javaClass.simpleName}")
+        }.getOrDefault(false)
+        if (purged) {
+            sharedPrefs.edit { putBoolean(ExternalAiCredentialPurge.PREF_KEY, true) }
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

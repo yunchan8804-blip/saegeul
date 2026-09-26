@@ -5,4 +5,26 @@
     <string name="privacy_ai_typing_dna_sync_summary">최근 타이핑 데이터를 바탕으로 내 말투와 어휘 습관을 즉시 업데이트합니다.</string>
     <string name="privacy_ai_typing_dna_sync_busy">언어 지문을 분석하고 동기화하는 중…</string>
     <string name="privacy_ai_typing_dna_sync_failed">언어 지문을 분석하고 동기화하지 못했습니다. 다시 시도해 주세요.</string>
+    <string name="privacy_ai_vault_category">언어 금고</string>
+    <string name="privacy_ai_vault_dashboard_title">언어 금고 대시보드</string>
+    <string name="privacy_ai_vault_dashboard_summary">Gemma 공개 문장 준비와 개인 언어 지문을 기기 안에서 관리합니다.</string>
+    <string name="privacy_ai_automatic_release_summary">이 빌드에서는 온디바이스 추천을 지원하지 않습니다.</string>
+    <string name="privacy_ai_gpu_acceleration_title">GPU 가속</string>
+    <string name="privacy_ai_gpu_acceleration_summary">키보드를 다시 열면 적용됩니다.</string>
+    <string name="privacy_ai_background_notifications_title">백그라운드 진행 알림</string>
+    <string name="privacy_ai_background_notifications_summary">문장 재료 준비, 그래프 강화 같은 백그라운드 AI 작업 진행 상황을 알림으로 보여줍니다.</string>
+    <string name="privacy_ai_collection_feedback_title">키보드 수집 피드백</string>
+    <string name="privacy_ai_collection_feedback_summary">입력하는 동안 키보드 상태 표시줄에 학습 진행 상황을 잠깐 보여줍니다.</string>
+    <string name="privacy_ai_open_notification_settings_title">알림 권한 열기</string>
+    <string name="privacy_ai_open_notification_settings_summary">알림이 꺼져 있어 진행 상황을 알려드릴 수 없습니다. 시스템 설정에서 허용해 주세요.</string>
+    <string name="privacy_ai_typing_dna_report_title">내 언어 지문 리포트</string>
+    <string name="privacy_ai_typing_dna_sync_title">지금 언어 지문 분석 및 동기화</string>
+    <string name="privacy_ai_typing_dna_clear_title">언어 지문 전체 초기화 (Zero-Knowledge)</string>
+    <string name="privacy_ai_typing_dna_clear_summary">학습된 모든 말투, 종결 어미, 나만의 표현을 기기에서 영구 삭제합니다.</string>
+    <string name="privacy_ai_typing_dna_clear_dialog_title">언어 지문 초기화</string>
+    <string name="privacy_ai_typing_dna_clear_dialog_message">학습된 말투, 종결 어미, 나만의 표현을 기기에서 완전히 삭제하시겠습니까?</string>
+    <string name="privacy_ai_typing_dna_cleared_toast">언어 지문이 안전하게 초기화되었습니다.</string>
+    <string name="privacy_ai_typing_dna_no_data_summary">아직 학습된 언어 지문이 없습니다. 키보드를 사용하면 자동으로 내 말투가 학습됩니다.</string>
+    <string name="privacy_ai_typing_dna_stats_summary">Lv.%1$d %2$s · 문장 %3$d개 · 단어쌍 %4$d개 · 어미 %5$d개</string>
+    <string name="privacy_ai_typing_dna_sync_done_toast">언어 지문 분석 완료 (분석 문장: %1$d개)</string>
 </resources>

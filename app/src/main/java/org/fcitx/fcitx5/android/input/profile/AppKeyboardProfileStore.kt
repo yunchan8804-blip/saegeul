@@ -37,22 +37,32 @@ class AppKeyboardProfileStore(context: Context) {
 
     fun profileFor(packageName: String?): AppKeyboardProfile? = synchronized(IO_LOCK) {
         val normalized = packageName?.let(AppKeyboardProfile::normalizePackageName).orEmpty()
-        profiles().firstOrNull { it.packageName == normalized }
+        if (normalized.isEmpty()) return null
+        profiles().firstOrNull { it.packageName.equals(normalized, ignoreCase = true) }
     }
 
-    fun upsert(profile: AppKeyboardProfile) = synchronized(IO_LOCK) {
-        val validated = profile.validate()
-        val updated = profiles().filterNot { it.packageName == validated.packageName }.toMutableList()
-        if (validated.hasOverrides) updated += validated
-        write(updated.sortedBy { it.packageName.lowercase() })
+    fun upsert(profile: AppKeyboardProfile) {
+        synchronized(IO_LOCK) {
+            val validated = profile.validate()
+            val updated = profiles().filterNot { it.packageName.equals(validated.packageName, ignoreCase = true) }.toMutableList()
+            if (validated.hasOverrides) updated += validated
+            write(updated.sortedBy { it.packageName.lowercase() })
+        }
     }
 
-    fun remove(packageName: String) = synchronized(IO_LOCK) {
-        val normalized = AppKeyboardProfile.normalizePackageName(packageName)
-        write(profiles().filterNot { it.packageName == normalized })
+    fun remove(packageName: String) {
+        synchronized(IO_LOCK) {
+            val normalized = AppKeyboardProfile.normalizePackageName(packageName)
+            if (normalized.isEmpty()) return@synchronized
+            write(profiles().filterNot { it.packageName.equals(normalized, ignoreCase = true) })
+        }
     }
 
-    fun clear() = synchronized(IO_LOCK) { atomicFile.delete() }
+    fun clear() {
+        synchronized(IO_LOCK) {
+            atomicFile.delete()
+        }
+    }
 
     private fun write(profiles: List<AppKeyboardProfile>) {
         if (profiles.isEmpty()) {
@@ -79,7 +89,7 @@ class AppKeyboardProfileStore(context: Context) {
 internal fun encodeAppKeyboardProfiles(profiles: Collection<AppKeyboardProfile>): ByteArray {
     val normalized = profiles.mapNotNull { profile ->
         runCatching { profile.validate() }.getOrNull()?.takeIf(AppKeyboardProfile::hasOverrides)
-    }.associateBy(AppKeyboardProfile::packageName).values.sortedBy { it.packageName.lowercase() }
+    }.associateBy { it.packageName.lowercase() }.values.sortedBy { it.packageName.lowercase() }
     return buildJsonObject {
         put("version", FORMAT_VERSION)
         put("profiles", buildJsonArray {
@@ -92,6 +102,7 @@ internal fun encodeAppKeyboardProfiles(profiles: Collection<AppKeyboardProfile>)
                     profile.bufferedInputTransport?.let { put("transport", it.name) }
                     put("network", profile.networkPolicy.name)
                     put("ai", profile.aiPolicy.name)
+                    profile.persona?.let { put("persona", it) }
                 })
             }
         })
@@ -104,8 +115,11 @@ internal fun decodeAppKeyboardProfiles(bytes: ByteArray): List<AppKeyboardProfil
     val version = root["version"]?.jsonPrimitive?.intOrNull ?: LEGACY_FORMAT_VERSION
     require(version in LEGACY_FORMAT_VERSION..FORMAT_VERSION)
     val profiles = root["profiles"]?.jsonArray ?: JsonArray(emptyList())
-    profiles.mapNotNull { element -> decodeProfile(element.jsonObject) }
-        .associateBy(AppKeyboardProfile::packageName)
+    profiles.mapNotNull { element ->
+        val obj = element as? JsonObject ?: return@mapNotNull null
+        decodeProfile(obj)
+    }
+        .associateBy { it.packageName.lowercase() }
         .values
         .sortedBy { it.packageName.lowercase() }
 }.getOrDefault(emptyList())
@@ -118,7 +132,8 @@ private fun decodeProfile(json: JsonObject): AppKeyboardProfile? = runCatching {
         toolbarVisibility = json.enumOrNull("toolbar") ?: AppToolbarVisibility.Inherit,
         bufferedInputTransport = json.enumOrNull("transport"),
         networkPolicy = json.enumOrNull("network") ?: AppFeaturePolicy.Inherit,
-        aiPolicy = json.enumOrNull("ai") ?: AppFeaturePolicy.Inherit
+        aiPolicy = json.enumOrNull("ai") ?: AppFeaturePolicy.Inherit,
+        persona = json.string("persona")
     ).validate().takeIf(AppKeyboardProfile::hasOverrides)
 }.getOrNull()
 

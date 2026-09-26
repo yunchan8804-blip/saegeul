@@ -23,6 +23,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnPreDraw
 import androidx.core.view.forEach
 import androidx.core.view.updateLayoutParams
+import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -30,6 +31,7 @@ import androidx.navigation.fragment.NavHostFragment
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.ads.DashboardBannerController
 import org.fcitx.fcitx5.android.databinding.ActivityMainBinding
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.SentencePackDialog
@@ -50,6 +52,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var navController: NavController
     private lateinit var rootView: ViewGroup
+    private lateinit var bannerContainer: ViewGroup
+    private lateinit var banner: DashboardBannerController
     private var sentencePackPromptScheduled = false
     private var sentencePackPromptAwaitingFirstFrame = false
     private var notificationPermissionPromptVisible = false
@@ -68,8 +72,14 @@ class MainActivity : AppCompatActivity() {
                 rightMargin = navBars.right
             }
             binding.toolbar.topPadding = statusBars.top
+            bannerContainer.updatePadding(bottom = navBars.bottom)
             windowInsets
         }
+        bannerContainer = binding.bannerAdContainer
+        banner = DashboardBannerController(this, bannerContainer)
+        banner.attach(object : DashboardBannerController.VisibilityListener {
+            override fun onBannerVisibilityChanged(visible: Boolean) = Unit
+        })
         setContentView(binding.root)
         // always show toolbar back arrow icon
         // https://android.googlesource.com/platform/frameworks/support/+/32e643112d0217619237a0d7101b50919c6caf51/navigation/navigation-ui/src/main/java/androidx/navigation/ui/AbstractAppBarOnDestinationChangedListener.kt#80
@@ -110,7 +120,7 @@ class MainActivity : AppCompatActivity() {
     private fun scheduleSentencePackPrompt() {
         if (
             sentencePackPromptScheduled || sentencePackPromptAwaitingFirstFrame ||
-            notificationPermissionPromptVisible || SetupPage.hasUndonePage()
+            notificationPermissionPromptVisible || SetupPage.hasUndonePage(this)
         ) return
         val preferences = PreferenceManager.getDefaultSharedPreferences(this)
         if (preferences.getString(SENTENCE_PACK_PROMPT_SCHEMA_KEY, null) == SENTENCE_PACK_PROMPT_SCHEMA) return
@@ -153,7 +163,7 @@ class MainActivity : AppCompatActivity() {
     private fun processIntent(intent: Intent?) {
         val action = intent?.action ?: return
         when (action) {
-            Intent.ACTION_MAIN -> if (SetupActivity.shouldShowUp()) {
+            Intent.ACTION_MAIN -> if (SetupActivity.shouldShowUp(this)) {
                 startActivity<SetupActivity>()
             }
             Intent.ACTION_VIEW -> intent.data?.let {
@@ -279,7 +289,6 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_SETTINGS_ROUTE = "${BuildConfig.APPLICATION_ID}.EXTRA_SETTINGS_ROUTE"
         const val EXTRA_PRIVACY_AI_ACTION =
             "${BuildConfig.APPLICATION_ID}.EXTRA_PRIVACY_AI_ACTION"
-        const val PRIVACY_AI_ACTION_WRITING_SETUP = "writing_setup"
         const val PRIVACY_AI_ACTION_VOICE_SETUP = "voice_setup"
         private const val SENTENCE_PACK_PROMPT_SCHEMA_KEY = "sentence_pack_prompt_schema"
         private const val SENTENCE_PACK_PROMPT_SCHEMA = "1"

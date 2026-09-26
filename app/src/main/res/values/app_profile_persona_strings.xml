@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_profile_persona">Input context (persona)</string>
+    <string name="app_profile_persona_auto">Auto</string>
+    <string name="app_profile_summary_persona">Persona: %1$s</string>
+</resources>

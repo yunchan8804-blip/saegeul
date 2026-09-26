@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.ui.setup
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -57,7 +58,7 @@ class SetupActivity : FragmentActivity() {
         }
         nextButton = binding.nextButton.apply {
             setOnClickListener {
-                if (viewPager.currentItem != SetupPage.entries.size - 1)
+                if (viewPager.currentItem != SetupPage.visiblePages(this@SetupActivity).size - 1)
                     viewPager.currentItem += 1
                 else finish()
             }
@@ -72,7 +73,7 @@ class SetupActivity : FragmentActivity() {
                     // hide prev button for the first page
                     prevButton.visibility = if (position != 0) View.VISIBLE else View.GONE
                     nextButton.text =
-                        getString(if (position.isLastPage()) R.string.done else R.string.next)
+                        getString(if (position.isLastPage(this@SetupActivity)) R.string.done else R.string.next)
                 }
             })
         }
@@ -82,13 +83,15 @@ class SetupActivity : FragmentActivity() {
             }
             nextButton.apply {
                 // hide next button for the last page when allDone == false
-                (allDone || !viewPager.currentItem.isLastPage()).let {
+                (allDone || !viewPager.currentItem.isLastPage(this@SetupActivity)).let {
                     visibility = if (it) View.VISIBLE else View.GONE
                 }
             }
         }
         // skip to undone page
-        firstUndonePage()?.let { viewPager.currentItem = it.ordinal }
+        firstUndonePage(this)?.let { page ->
+            viewPager.currentItem = SetupPage.visiblePages(this).indexOf(page)
+        }
         shown = true
         createNotificationChannel()
     }
@@ -112,7 +115,7 @@ class SetupActivity : FragmentActivity() {
     }
 
     override fun onPause() {
-        if (SetupPage.hasUndonePage())
+        if (SetupPage.hasUndonePage(this))
             NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_baseline_keyboard_24)
                 .setContentTitle(getText(R.string.app_name))
@@ -138,12 +141,12 @@ class SetupActivity : FragmentActivity() {
     }
 
     private inner class Adapter : FragmentStateAdapter(this) {
-        override fun getItemCount(): Int = SetupPage.entries.size
+        override fun getItemCount(): Int = SetupPage.visiblePages(this@SetupActivity).size
 
         override fun createFragment(position: Int): Fragment =
             SetupFragment().apply {
                 arguments = Bundle().apply {
-                    putSerializable(SetupFragment.PAGE, SetupPage.valueOf(position))
+                    putSerializable(SetupFragment.PAGE, SetupPage.valueOf(this@SetupActivity, position))
                 }
             }
     }
@@ -152,6 +155,6 @@ class SetupActivity : FragmentActivity() {
         private var shown = false
         private const val CHANNEL_ID = "setup"
         private const val NOTIFY_ID = 233
-        fun shouldShowUp() = !shown && SetupPage.hasUndonePage()
+        fun shouldShowUp(context: Context) = !shown && SetupPage.hasUndonePage(context)
     }
 }

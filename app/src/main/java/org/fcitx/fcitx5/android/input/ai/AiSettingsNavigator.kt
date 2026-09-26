@@ -15,10 +15,6 @@ object AiSettingsNavigator {
         open(context, null)
     }
 
-    fun openWritingSetup(context: Context) {
-        open(context, MainActivity.PRIVACY_AI_ACTION_WRITING_SETUP)
-    }
-
     fun openVoiceSetup(context: Context) {
         open(context, MainActivity.PRIVACY_AI_ACTION_VOICE_SETUP)
     }

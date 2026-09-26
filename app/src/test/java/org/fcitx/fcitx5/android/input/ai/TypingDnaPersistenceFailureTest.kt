@@ -55,7 +55,7 @@ class TypingDnaPersistenceFailureTest {
         val baseline = TypingDnaProfile(updatedAt = 1L, totalAnalyzedSentences = 4)
         repository.save(baseline)
         val beforeDigest = digest(storage)
-        val vault = TypingDnaVault(thresholdPerCategory = 15)
+        val vault = TypingDnaVault(thresholdPerCategory = 20)
         vault.recordSentence("com.kakao.talk", "친구야 오늘 저녁에 만나자")
         val compiler = TypingDnaCompiler(
             collocationModel = KoreanCollocationModel(),

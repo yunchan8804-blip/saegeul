@@ -24,18 +24,11 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.widget.AppCompatEditText
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnAttach
-import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.ai.AiAuthMode
-import org.fcitx.fcitx5.android.input.ai.AiOAuthLoginActivity
-import org.fcitx.fcitx5.android.input.ai.AiProviderCredentialStore
-import org.fcitx.fcitx5.android.input.ai.AiProviderKind
-import org.fcitx.fcitx5.android.input.ai.AiProviderProfile
 
 /**
  * A deterministic, debug-only editor host for headed IME E2E checks.
@@ -162,53 +155,6 @@ class AiEditorTestActivity : Activity() {
             },
             button("Long multiline", "Load a long multiline editor source") {
                 loadLongMultilineSource()
-            }
-        ))
-        controls.addView(buttonRow(
-            button("OAuth browser", "Launch the configured OAuth browser flow") {
-                // A credential-free HTTPS profile gives the debug host a deterministic way to
-                // exercise AppAuth browser discovery without touching a user's real provider.
-                AiProviderCredentialStore(this@AiEditorTestActivity).save(
-                    AiProviderProfile(
-                        kind = AiProviderKind.OpenAICompatible,
-                        displayName = "OAuth browser E2E",
-                        baseUrl = "https://example.com/v1",
-                        authMode = AiAuthMode.OAuthPkce,
-                        oauthAuthorizationEndpoint = "https://example.com/authorize",
-                        oauthTokenEndpoint = "https://example.com/token",
-                        oauthClientId = "fcitx-debug-browser-e2e",
-                        capabilities = setOf("responses")
-                    )
-                )
-                startActivity(AiOAuthLoginActivity.createIntent(this@AiEditorTestActivity))
-            }
-        ))
-        controls.addView(buttonRow(
-            button("Local result", "Arm one local AI result card without network or credentials") {
-                AiDebugGenerationOverride.armForNextRequest()
-                Toast.makeText(
-                    this@AiEditorTestActivity,
-                    "Local AI result armed for the next action. No network is used.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            },
-            button("Local no-change", "Arm one local AI result identical to the reviewed source") {
-                AiDebugGenerationOverride.armNoChangeForNextRequest()
-                Toast.makeText(
-                    this@AiEditorTestActivity,
-                    "Local no-change result armed for the next action. No network is used.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        ))
-        controls.addView(buttonRow(
-            button("Local 8s loading", "Keep the next local AI request loading for eight seconds") {
-                AiDebugGenerationOverride.armDelayedForNextRequest()
-                Toast.makeText(
-                    this@AiEditorTestActivity,
-                    "Local delayed result armed. The next action stays loading for 8 seconds. No network is used.",
-                    Toast.LENGTH_SHORT
-                ).show()
             }
         ))
         addView(

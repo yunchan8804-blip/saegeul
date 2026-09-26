@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.content.Context
-import org.fcitx.fcitx5.android.input.ai.AiEndpointPolicy
 
 enum class VoiceProviderMode {
     DeviceDictation,

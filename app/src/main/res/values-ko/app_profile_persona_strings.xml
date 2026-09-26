@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_profile_persona">입력 상황(페르소나)</string>
+    <string name="app_profile_persona_auto">자동</string>
+    <string name="app_profile_summary_persona">페르소나: %1$s</string>
+</resources>

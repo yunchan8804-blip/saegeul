@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
+import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
 
 /**
  * Re-ranks and filters sentence-line (isSentenceCompletion=true) candidates using purely
@@ -41,7 +43,13 @@ object SentenceRelevanceReranker {
         if (sentences.isEmpty()) return emptyList()
 
         if (contextBeforeCursor.isBlank()) {
-            return sentences.sortedByDescending { it.confidenceScore }.take(limit)
+            return sentences.mapNotNull { pred ->
+                if (!KoreanSyntaxRuleFilter.isGrammaticallySound(pred.text, contextBeforeCursor)) return@mapNotNull null
+                val correctedText = KoreanJosaBitmaskEngine.correctJosaMismatch(pred.text)
+                if (KoreanJosaBitmaskEngine.hasJosaMismatch(correctedText)) return@mapNotNull null
+                val safe = if (pred.confidenceScore.isNaN() || pred.confidenceScore < 0f) 0f else pred.confidenceScore.coerceIn(0f, MAX_CONFIDENCE)
+                pred.copy(text = correctedText, confidenceScore = safe)
+            }.sortedByDescending { it.confidenceScore }.take(limit)
         }
 
         val recentCtxStems = PersonalNgramTokenizer.tokenize(contextBeforeCursor)
@@ -66,21 +74,37 @@ object SentenceRelevanceReranker {
 
         val scored = mutableListOf<Pair<AiPrediction, Float>>()
         for (pred in sentences) {
-            if (pred.append == null && pred.text.trim() == contextBeforeCursor.trim()) continue
+            // Stage 1 Syntax Rule Filter: reject ungrammatical candidates immediately
+            if (!KoreanSyntaxRuleFilter.isGrammaticallySound(pred.text, contextBeforeCursor)) {
+                continue
+            }
 
-            val rawRemainder = pred.append?.suffix ?: pred.text.substring(
-                contextBeforeCursor.commonPrefixWith(pred.text).length
+            // Stage 0 Phonological Josa Engine: seamlessly correct particle mismatch
+            val correctedText = KoreanJosaBitmaskEngine.correctJosaMismatch(pred.text)
+            if (KoreanJosaBitmaskEngine.hasJosaMismatch(correctedText)) {
+                continue
+            }
+            val candidate = if (correctedText != pred.text) {
+                pred.copy(text = correctedText)
+            } else {
+                pred
+            }
+
+            if (candidate.append == null && candidate.text.trim() == contextBeforeCursor.trim()) continue
+
+            val rawRemainder = candidate.append?.suffix ?: candidate.text.substring(
+                contextBeforeCursor.commonPrefixWith(candidate.text).length
             )
             val remainder = rawRemainder.trim()
             if (remainder.isEmpty()) continue
 
-            val sTokenStems = PersonalNgramTokenizer.tokenize(pred.text)
+            val sTokenStems = PersonalNgramTokenizer.tokenize(candidate.text)
                 .map { PersonalNgramTokenizer.stem(it) ?: it }
                 .toSet()
             val shared = (topicalCtxStems intersect sTokenStems).size
             val overlapFactor = 1.0f + minOf(shared, TOPICAL_OVERLAP_MAX_SHARED) * TOPICAL_OVERLAP_BOOST_PER_TOKEN
 
-            val wordBoundary = when (pred.append?.joinMode) {
+            val wordBoundary = when (candidate.append?.joinMode) {
                 ContextualAppend.JoinMode.ATTACH -> false
                 ContextualAppend.JoinMode.NEXT_WORD -> true
                 null -> contextBeforeCursor.endsWith(" ") ||
@@ -98,9 +122,11 @@ object SentenceRelevanceReranker {
 
             val graphFactor = graphStore?.proximityBoost(graphCtxStems, sTokenStems) ?: 1.0f
 
-            val newScore = (pred.confidenceScore * overlapFactor * bridgeFactor * lengthFactor * graphFactor)
-                .coerceIn(0f, MAX_CONFIDENCE)
-            scored.add(pred to newScore)
+            val safeScore = if (candidate.confidenceScore.isNaN() || candidate.confidenceScore < 0f) 0f else candidate.confidenceScore
+            val safeGraphFactor = if (graphFactor.isNaN() || graphFactor < 0f) 1.0f else graphFactor
+            val rawCalculated = safeScore * overlapFactor * bridgeFactor * lengthFactor * safeGraphFactor
+            val newScore = if (rawCalculated.isNaN()) 0f else rawCalculated.coerceIn(0f, MAX_CONFIDENCE)
+            scored.add(candidate to newScore)
         }
 
         return scored

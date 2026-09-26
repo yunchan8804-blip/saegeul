@@ -8,14 +8,17 @@ package org.fcitx.fcitx5.android.input
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.os.Build
+import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
+import android.widget.LinearLayout
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
 import androidx.core.view.updateLayoutParams
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
@@ -25,6 +28,8 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionIndicator
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
@@ -35,8 +40,11 @@ import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseWindow
 import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseAuthCoordinator
 import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.FoldKeyboardProfileResolver
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardViewportReader
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.PinnedNumberRow
+import org.fcitx.fcitx5.android.input.keyboard.ThumbSplitPreferences
 import org.fcitx.fcitx5.android.input.ocr.OcrDocumentCoordinator
 import org.fcitx.fcitx5.android.input.ocr.OcrWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
@@ -99,6 +107,38 @@ class InputView(
     private val rightPaddingSpace = view(::View) {
         setOnClickListener(placeholderOnClickListener)
     }
+
+    // Shown in the empty side of a one-hand keyboard, over left/rightPaddingSpace.
+    private val oneHandSwitchSideButton =
+        ToolButton(themedContext, R.drawable.ic_baseline_swap_horiz_24, theme).apply {
+            contentDescription = context.getString(R.string.one_hand_mode_switch_side)
+            setOnClickListener {
+                oneHandMode.setValue(
+                    when (oneHandMode.getValue()) {
+                        OneHandMode.Left -> OneHandMode.Right
+                        OneHandMode.Right -> OneHandMode.Left
+                        OneHandMode.Off -> OneHandMode.Off
+                    }
+                )
+            }
+        }
+    private val oneHandOffButton =
+        ToolButton(themedContext, R.drawable.ic_baseline_close_24, theme).apply {
+            contentDescription = context.getString(R.string.one_hand_mode_turn_off)
+            setOnClickListener { oneHandMode.setValue(OneHandMode.Off) }
+        }
+    private val oneHandControls = LinearLayout(themedContext).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        val size = dp(48)
+        addView(oneHandSwitchSideButton, LinearLayout.LayoutParams(size, size))
+        addView(
+            oneHandOffButton,
+            LinearLayout.LayoutParams(size, size).apply { topMargin = dp(8) }
+        )
+        visibility = GONE
+    }
+
     private val bottomPaddingSpace = view(::View) {
         // height as keyboardBottomPadding
         // bottomMargin as WindowInsets (Navigation Bar) offset
@@ -159,6 +199,7 @@ class InputView(
     private val keyboardSidePaddingLandscape = keyboardPrefs.keyboardSidePaddingLandscape
     private val keyboardBottomPadding = keyboardPrefs.keyboardBottomPadding
     private val keyboardBottomPaddingLandscape = keyboardPrefs.keyboardBottomPaddingLandscape
+    private val oneHandMode = keyboardPrefs.oneHandMode
 
     private val keyboardSizePrefs = listOf(
         keyboardHeightPercent,
@@ -167,6 +208,7 @@ class InputView(
         keyboardSidePaddingLandscape,
         keyboardBottomPadding,
         keyboardBottomPaddingLandscape,
+        oneHandMode,
     )
 
     private val thumbSplitPrefs = listOf(
@@ -228,6 +270,8 @@ class InputView(
         }
         if (thumbSplitPrefs.any { it.key == key }) {
             keyboardWindow.updateThumbSplitProfile()
+            // split-active width also decides whether one-hand mode is honored
+            updateKeyboardSize()
         }
     }
 
@@ -277,6 +321,11 @@ class InputView(
                 endOfParent()
                 bottomOfParent()
             })
+            add(oneHandControls, lParams {
+                below(kawaiiBar.view)
+                startOfParent()
+                bottomOfParent()
+            })
             add(windowManager.view, lParams {
                 below(kawaiiBar.view)
                 above(bottomPaddingSpace)
@@ -316,6 +365,18 @@ class InputView(
         promptInputBar.onSubmit = { finishInternalPromptInput(submit = true) }
     }
 
+    private fun isThumbSplitActive(): Boolean = FoldKeyboardProfileResolver.resolve(
+        KeyboardViewportReader.read(context),
+        ThumbSplitPreferences(
+            compactEnabled = keyboardPrefs.splitKeyboardCompact.getValue(),
+            expandedEnabled = keyboardPrefs.splitKeyboardExpanded.getValue(),
+            compactPortraitGapDp = keyboardPrefs.splitKeyboardCompactGapPortrait.getValue(),
+            compactLandscapeGapDp = keyboardPrefs.splitKeyboardCompactGapLandscape.getValue(),
+            expandedPortraitGapDp = keyboardPrefs.splitKeyboardExpandedGapPortrait.getValue(),
+            expandedLandscapeGapDp = keyboardPrefs.splitKeyboardExpandedGapLandscape.getValue()
+        )
+    ).enabled
+
     private fun updateKeyboardSize() {
         windowManager.view.updateLayoutParams {
             height = inputContentHeightPx
@@ -323,35 +384,69 @@ class InputView(
         bottomPaddingSpace.updateLayoutParams {
             height = keyboardBottomPaddingPx
         }
-        val sidePadding = keyboardSidePaddingPx
-        if (sidePadding == 0) {
-            // hide side padding space views when unnecessary
-            leftPaddingSpace.visibility = GONE
-            rightPaddingSpace.visibility = GONE
-            windowManager.view.updateLayoutParams<LayoutParams> {
-                startToEnd = unset
-                endToStart = unset
-                startOfParent()
-                endOfParent()
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val splitActive = isThumbSplitActive()
+        val mode = oneHandMode.getValue()
+        val insets = KeyboardFrame.compute(
+            windowWidthPx = resources.displayMetrics.widthPixels,
+            density = resources.displayMetrics.density,
+            isLandscape = landscape,
+            userSidePaddingPx = keyboardSidePaddingPx,
+            oneHandMode = mode,
+            isSplitActive = splitActive
+        )
+        applyFrameInsets(insets)
+        updateOneHandControls(if (splitActive) OneHandMode.Off else mode, insets)
+    }
+
+    private fun applyFrameInsets(insets: KeyboardFrame.Insets) {
+        // hide side padding space views when unnecessary
+        leftPaddingSpace.visibility = if (insets.startPx == 0) GONE else VISIBLE
+        rightPaddingSpace.visibility = if (insets.endPx == 0) GONE else VISIBLE
+        leftPaddingSpace.updateLayoutParams {
+            width = insets.startPx
+        }
+        rightPaddingSpace.updateLayoutParams {
+            width = insets.endPx
+        }
+        windowManager.view.updateLayoutParams<LayoutParams> {
+            startToStart = unset
+            endToEnd = unset
+            startToEnd = unset
+            endToStart = unset
+            if (insets.startPx == 0) startOfParent() else startToEndOf(leftPaddingSpace)
+            if (insets.endPx == 0) endOfParent() else endToStartOf(rightPaddingSpace)
+        }
+        preedit.ui.root.setPadding(insets.startPx, 0, insets.endPx, 0)
+        kawaiiBar.view.setPadding(insets.startPx, 0, insets.endPx, 0)
+    }
+
+    private fun updateOneHandControls(mode: OneHandMode, insets: KeyboardFrame.Insets) {
+        when (mode) {
+            OneHandMode.Off -> oneHandControls.visibility = GONE
+            OneHandMode.Right -> {
+                // keyboard docked right, empty space (and controls) on the left
+                oneHandControls.visibility = VISIBLE
+                oneHandControls.updateLayoutParams<LayoutParams> {
+                    width = insets.startPx
+                    startToEnd = unset
+                    endToStart = unset
+                    endToEnd = unset
+                    startOfParent()
+                }
             }
-        } else {
-            leftPaddingSpace.visibility = VISIBLE
-            rightPaddingSpace.visibility = VISIBLE
-            leftPaddingSpace.updateLayoutParams {
-                width = sidePadding
-            }
-            rightPaddingSpace.updateLayoutParams {
-                width = sidePadding
-            }
-            windowManager.view.updateLayoutParams<LayoutParams> {
-                startToStart = unset
-                endToEnd = unset
-                startToEndOf(leftPaddingSpace)
-                endToStartOf(rightPaddingSpace)
+            OneHandMode.Left -> {
+                // keyboard docked left, empty space (and controls) on the right
+                oneHandControls.visibility = VISIBLE
+                oneHandControls.updateLayoutParams<LayoutParams> {
+                    width = insets.endPx
+                    startToEnd = unset
+                    startToStart = unset
+                    endToStart = unset
+                    endOfParent()
+                }
             }
         }
-        preedit.ui.root.setPadding(sidePadding, 0, sidePadding, 0)
-        kawaiiBar.view.setPadding(sidePadding, 0, sidePadding, 0)
     }
 
     /** Gives result-heavy assistant surfaces more room, then restores the user's keyboard size. */
@@ -388,23 +483,6 @@ class InputView(
         )
     }
 
-    /**
-     * Reattaches the one canonical keyboard surface and redirects its engine output into an
-     * IME-owned prompt buffer. The target editor is never used as scratch space.
-     */
-    fun beginAiPromptInput(
-        initialText: String,
-        contextLabel: CharSequence,
-        onSubmit: (String) -> Unit,
-        onCancel: () -> Unit
-    ): Boolean = beginInternalPromptInput(
-        spec = InternalPromptSpecs.Ai,
-        initialText = initialText,
-        aiContext = contextLabel,
-        onSubmit = onSubmit,
-        onCancel = onCancel
-    )
-
     /** Opens the canonical keyboard for a GIF query without letting it touch the target editor. */
     fun beginGifSearchPromptInput(
         initialText: String,
@@ -414,7 +492,6 @@ class InputView(
     ): Boolean = beginInternalPromptInput(
         spec = InternalPromptSpecs.gifSearch(maxCharacters),
         initialText = initialText,
-        aiContext = null,
         onSubmit = onSubmit,
         onCancel = onCancel
     )
@@ -422,14 +499,13 @@ class InputView(
     private fun beginInternalPromptInput(
         spec: InternalPromptSpec,
         initialText: String,
-        aiContext: CharSequence?,
         onSubmit: (String) -> Unit,
         onCancel: () -> Unit
     ): Boolean {
         promptOnSubmit = onSubmit
         promptOnCancel = onCancel
         promptCaptureToken = null
-        promptInputBar.configure(spec, aiContext)
+        promptInputBar.configure(spec)
         promptInputBar.updateLayoutParams<LayoutParams> {
             height = promptInputBar.preferredHeightPx
         }
@@ -643,6 +719,10 @@ class InputView(
 
     fun updateSelection(start: Int, end: Int) {
         broadcaster.onSelectionUpdate(start, end)
+    }
+
+    fun updateAutomaticSuggestionIndicator(indicator: OnDeviceAutomaticSuggestionIndicator) {
+        kawaiiBar.updateAutomaticSuggestionIndicator(indicator)
     }
 
     fun postRefreshContextualCandidates(delayMs: Long = 16L) {

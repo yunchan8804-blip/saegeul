@@ -9,9 +9,12 @@ import android.util.AtomicFile
 import java.io.File
 
 /**
- * Explicitly managed words live outside Android backup and the app's user-data ZIP export.
- * The file contains only category and word fields; input text, selection history, and package
- * names are never collected.
+ * Explicitly managed words live outside Android's own auto backup and the legacy plaintext
+ * settings-ZIP export, but they ARE included (as `kind: CORPUS`, raw bytes - this store has no
+ * [org.fcitx.fcitx5.android.input.ai.vault.VaultCipher] layer of its own) in the encrypted vault
+ * backup (`org.fcitx.fcitx5.android.data.backup.VaultBackup`): the user typed these words in on
+ * purpose, so they are core corpus, not incidental data. The file contains only category and word
+ * fields; input text, selection history, and package names are never collected.
  */
 class PersonalDictionaryStore(context: Context) {
     private val file = File(context.noBackupFilesDir, RELATIVE_PATH)

@@ -177,8 +177,8 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         contentDescription = ctx.getString(R.string.typo_recovery)
     }
 
-    val aiAssistantButton = toolButton(R.drawable.ic_baseline_auto_awesome_24).apply {
-        contentDescription = ctx.getString(R.string.ai_assistant_title)
+    val continueWritingButton = toolButton(R.drawable.ic_baseline_auto_awesome_24).apply {
+        contentDescription = ctx.getString(R.string.continue_writing_title)
     }
 
     val precisionDictationButton = toolButton(R.drawable.ic_precision_dictation_24).apply {
@@ -195,5 +195,9 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     val moreButton = toolButton(R.drawable.ic_baseline_more_horiz_24).apply {
         contentDescription = ctx.getString(R.string.status_area)
+    }
+
+    val oneHandModeButton = toolButton(R.drawable.ic_baseline_swap_horiz_24).apply {
+        contentDescription = ctx.getString(R.string.one_hand_mode)
     }
 }

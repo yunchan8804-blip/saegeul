@@ -25,6 +25,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.points.PointLedger
 import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
 
 /**
@@ -135,6 +136,8 @@ class TypingDnaCardPreference @JvmOverloads constructor(
 
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
+        holder.isDividerAllowedAbove = false
+        holder.isDividerAllowedBelow = false
         val card = holder.itemView.findViewById<MaterialCardView>(R.id.card_typing_dna)
         val tvLevelBadge = holder.itemView.findViewById<TextView>(R.id.tv_main_card_level_badge)
         val tvTitle = holder.itemView.findViewById<TextView>(R.id.tv_main_card_title)
@@ -254,6 +257,10 @@ class TypingDnaCardPreference @JvmOverloads constructor(
             }
             if (snapshot.isHardwareBacked) {
                 append(context.getString(R.string.typing_dna_card_hardware_suffix))
+            }
+            val balance = PointLedger(context).balance()
+            if (balance > 0) {
+                append(" · 💎 포인트 ${balance}점")
             }
         }
         progressBar?.apply {

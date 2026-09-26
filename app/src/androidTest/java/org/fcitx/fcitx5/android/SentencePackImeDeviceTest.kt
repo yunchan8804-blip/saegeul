@@ -66,7 +66,7 @@ class SentencePackImeDeviceTest {
             val editor = selectNormalAndClear(currentActivity)
             requestEditorFocusAndIme(currentActivity, editor)
             val ime = waitForCurrentEditor(editorTarget(editor))
-            assertTrue("오프라인 문장팩 테스트 중에는 네트워크 AI 입력이 차단되어야 한다.", onMain { !ime.allowsAiInputFeatures() })
+            assertTrue("오프라인 문장팩 테스트 중에는 네트워크 AI 입력이 차단되어야 한다.", onMain { !ime.allowsOnDeviceContextCompletionFeatures() })
             assertTrue("일반 debug editor에서는 문장팩을 위한 텍스트 검사가 허용되어야 한다.", onMain { ime.allowsTextInspectionFeatures() })
 
             assertTrue(onMain { ime.commitToEditor(prefix) })

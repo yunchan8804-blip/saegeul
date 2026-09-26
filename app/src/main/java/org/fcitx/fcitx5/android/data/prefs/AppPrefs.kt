@@ -13,6 +13,8 @@ import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode
 import org.fcitx.fcitx5.android.input.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.KeyTextScale
+import org.fcitx.fcitx5.android.input.OneHandMode
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
@@ -38,6 +40,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val pid = int("pid", 0)
         val editorInfoInspector = bool("editor_info_inspector", false)
         val needNotifications = bool("need_notifications", true)
+        val automaticOnDeviceSuggestionsOptIn =
+            bool("automatic_ondevice_suggestions_opt_in", true)
+        val automaticOnDeviceSuggestionsUseGpu =
+            bool("automatic_ondevice_suggestions_use_gpu", true)
+        val backgroundProgressNotifications =
+            bool("background_progress_notifications", true)
+        val collectionFeedbackInKeyboard =
+            bool("collection_feedback_in_keyboard", true)
+        /** Whether the "새글 AI 모델(Google Gemma)을 Hugging Face에서 받아요" consent notice has been shown once (onboarding or the install dialog); [org.fcitx.fcitx5.android.ui.main.ai.install.GemmaInstallFlow] skips it after. */
+        val gemmaInstallConsentShown =
+            bool("gemma_install_consent_shown", false)
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
@@ -47,12 +60,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             "offline_mode",
             false,
             R.string.offline_mode_summary
-        )
-        val graphEnrichAuto = switch(
-            R.string.graph_enrich_auto,
-            "graph_enrich_auto",
-            false,
-            R.string.graph_enrich_auto_summary
         )
         val autoSnippetExpansion = switch(
             R.string.auto_snippet_expansion,
@@ -285,6 +292,22 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             keyboardBottomPadding = primary
             keyboardBottomPaddingLandscape = secondary
         }
+
+        val oneHandMode = enumList(
+            R.string.one_hand_mode,
+            "one_hand_mode",
+            OneHandMode.Off
+        )
+
+        val keyTextScale = int(
+            R.string.key_text_scale,
+            "key_text_scale",
+            KeyTextScale.DEFAULT_PERCENT,
+            KeyTextScale.MIN_PERCENT,
+            KeyTextScale.MAX_PERCENT,
+            "%",
+            KeyTextScale.STEP_PERCENT
+        )
 
         val splitKeyboardCompact = switch(
             R.string.split_keyboard_compact,

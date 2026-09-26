@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="vault_backup_title" tools:ignore="MissingTranslation">Backup</string>
+    <string name="vault_backup_summary" tools:ignore="MissingTranslation">Export your language vault to a file, or import it on a new phone.</string>
+    <string name="vault_backup_export_button" tools:ignore="MissingTranslation">Export</string>
+    <string name="vault_backup_import_button" tools:ignore="MissingTranslation">Import</string>
+    <string name="vault_backup_last_export_none" tools:ignore="MissingTranslation">Never exported yet</string>
+    <string name="vault_backup_last_export_at" tools:ignore="MissingTranslation">Last export: %1$s</string>
+    <string name="vault_backup_cloud_coming_soon" tools:ignore="MissingTranslation">Automatic cloud backup is coming soon.</string>
+    <string name="vault_backup_password_title" tools:ignore="MissingTranslation">Set a password</string>
+    <string name="vault_backup_password_hint" tools:ignore="MissingTranslation">Password (8+ characters)</string>
+    <string name="vault_backup_password_confirm_hint" tools:ignore="MissingTranslation">Confirm password</string>
+    <string name="vault_backup_password_warning" tools:ignore="MissingTranslation">If you forget this password, the backup can never be opened again.</string>
+    <string name="vault_backup_password_too_short" tools:ignore="MissingTranslation">Password must be at least 8 characters</string>
+    <string name="vault_backup_password_mismatch" tools:ignore="MissingTranslation">Passwords don\'t match</string>
+    <string name="vault_backup_confirm_button" tools:ignore="MissingTranslation">Confirm</string>
+    <string name="vault_backup_cancel_button" tools:ignore="MissingTranslation">Cancel</string>
+    <string name="vault_backup_export_in_progress" tools:ignore="MissingTranslation">Exporting…</string>
+    <string name="vault_backup_export_done" tools:ignore="MissingTranslation">Exported · %1$d sentences</string>
+    <string name="vault_backup_export_failed" tools:ignore="MissingTranslation">Couldn\'t export. Please try again later.</string>
+    <string name="vault_backup_export_failed_too_large" tools:ignore="MissingTranslation">Your vault is too large to export.</string>
+    <string name="vault_backup_import_password_title" tools:ignore="MissingTranslation">Password for this backup</string>
+    <string name="vault_backup_import_password_hint" tools:ignore="MissingTranslation">Password</string>
+    <string name="vault_backup_checking" tools:ignore="MissingTranslation">Checking…</string>
+    <string name="vault_backup_import_summary" tools:ignore="MissingTranslation">Backup from %1$s · %2$d of your sentences · %3$d ready suggestions. This will replace your current vault.</string>
+    <string name="vault_backup_import_summary_with_skipped" tools:ignore="MissingTranslation">Backup from %1$s · %2$d of your sentences · %3$d ready suggestions. %4$d derived items will be skipped and relearned. This will replace your current vault.</string>
+    <string name="vault_backup_replace_button" tools:ignore="MissingTranslation">Replace</string>
+    <string name="vault_backup_importing" tools:ignore="MissingTranslation">Importing…</string>
+    <string name="vault_backup_import_done" tools:ignore="MissingTranslation">Imported. Restarting Saegeul…</string>
+    <string name="vault_backup_error_wrong_password" tools:ignore="MissingTranslation">That password isn\'t right</string>
+    <string name="vault_backup_error_corrupted" tools:ignore="MissingTranslation">This backup file is damaged</string>
+    <string name="vault_backup_error_newer_version" tools:ignore="MissingTranslation">Please update Saegeul and try again</string>
+    <string name="vault_backup_error_not_a_backup" tools:ignore="MissingTranslation">This isn\'t a Saegeul backup file</string>
+    <string name="vault_backup_error_generic" tools:ignore="MissingTranslation">Something went wrong. Please try again later.</string>
+    <string name="vault_backup_locked_direct_boot" tools:ignore="MissingTranslation">Please unlock your phone first</string>
+    <string name="vault_backup_export_file_name" tools:ignore="MissingTranslation">saegeul-backup-%1$s.saegeulbackup</string>
+</resources>

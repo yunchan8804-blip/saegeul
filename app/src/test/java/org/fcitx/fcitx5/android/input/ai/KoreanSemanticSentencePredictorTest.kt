@@ -17,17 +17,14 @@ import org.junit.Test
 class KoreanSemanticSentencePredictorTest {
 
     private lateinit var semanticPredictor: KoreanSemanticSentencePredictor
-    private lateinit var prefetcher: AiSentenceCompletionPrefetcher
     private lateinit var contextualPredictor: AiContextualPredictor
 
     @Before
     fun setUp() {
         semanticPredictor = KoreanSemanticSentencePredictor()
-        prefetcher = AiSentenceCompletionPrefetcher(clientProvider = null)
         contextualPredictor = AiContextualPredictor(
             morphology = ChoseongMorphologyEngine(),
-            semanticPredictor = semanticPredictor,
-            prefetcher = prefetcher
+            semanticPredictor = semanticPredictor
         )
     }
 
@@ -180,22 +177,6 @@ class KoreanSemanticSentencePredictorTest {
             "5000 semantic predictions must complete in under 1500ms (took ${elapsedMs}ms)",
             elapsedMs < 1500.0
         )
-    }
-
-    @Test
-    fun testAiSentenceCompletionPrefetcherCaching() {
-        val testContext = "내일 오전 10시에 회의 가능하신가요?"
-        val syntheticPredictions = listOf(
-            "네, 10시에 참석 가능합니다.",
-            "일정 확인 후 바로 말씀드리겠습니다.",
-            "그때 뵙겠습니다!"
-        )
-
-        prefetcher.putPredictions(testContext, syntheticPredictions)
-        val cached = prefetcher.getCachedPredictions(testContext)
-        assertNotNull(cached)
-        assertEquals(3, cached!!.size)
-        assertEquals("네, 10시에 참석 가능합니다.", cached[0])
     }
 
     @org.junit.Ignore("semantic 고정 템플릿 문장은 문장 줄에서 제거됨(사용자 데이터·input_continuation 기반으로 전환). 새 동작은 AiContextualPredictorInputContinuationTest가 커버")

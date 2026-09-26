@@ -11,7 +11,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection

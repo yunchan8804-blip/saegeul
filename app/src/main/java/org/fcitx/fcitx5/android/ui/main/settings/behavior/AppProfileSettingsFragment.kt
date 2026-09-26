@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.input.profile.AppFeaturePolicy
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfile
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileStore
 import org.fcitx.fcitx5.android.input.profile.AppToolbarVisibility
+import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
@@ -91,6 +92,11 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
         }
         if (profile.aiPolicy != AppFeaturePolicy.Inherit) {
             add(getString(R.string.app_profile_summary_ai, policyLabel(profile.aiPolicy)))
+        }
+        profile.persona?.let { id ->
+            PersonaRegistry.byId(id)?.let {
+                add(getString(R.string.app_profile_summary_persona, getString(it.labelRes)))
+            }
         }
     }.joinToString(" · ").ifEmpty { getString(R.string.app_profile_uses_global) }
 
@@ -171,6 +177,14 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
             policyValues.map(::policyLabel),
             existing?.aiPolicy ?: AppFeaturePolicy.Inherit
         )
+        val personas: List<String?> = listOf(null) + PersonaRegistry.all.map { it.id }
+        val (personaSpinner, personaValues) = choice(
+            R.string.app_profile_persona,
+            personas,
+            listOf(getString(R.string.app_profile_persona_auto)) +
+                PersonaRegistry.all.map { getString(it.labelRes) },
+            existing?.persona
+        )
 
         val scroll = ScrollView(ctx).apply { addView(content) }
         val dialog = AlertDialog.Builder(ctx)
@@ -184,12 +198,12 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
             }
             .create()
         dialog.setOnShowListener {
-            // The profile form has six selectors. Let the custom panel scroll inside a bounded
+            // The profile form has seven selectors. Let the custom panel scroll inside a bounded
             // viewport so the dialog buttons never fall below the visible display.
             scroll.layoutParams = scroll.layoutParams.apply {
                 height = appProfileDialogViewportHeight(
                     ctx.resources.displayMetrics.heightPixels,
-                    ctx.dp(420),
+                    ctx.dp(480),
                     ctx.dp(220)
                 )
             }
@@ -202,7 +216,8 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
                     toolbarVisibility = toolbarValues[toolbarSpinner.selectedItemPosition],
                     bufferedInputTransport = transportValues[transportSpinner.selectedItemPosition],
                     networkPolicy = policyValues[networkSpinner.selectedItemPosition],
-                    aiPolicy = policyValues[aiSpinner.selectedItemPosition]
+                    aiPolicy = policyValues[aiSpinner.selectedItemPosition],
+                    persona = personaValues[personaSpinner.selectedItemPosition]
                 )
                 runCatching { store.upsert(profile) }
                     .onSuccess {

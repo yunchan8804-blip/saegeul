@@ -22,7 +22,6 @@ import org.junit.Test
 class SemanticSentenceRecommendationE2ETest {
 
     private lateinit var semanticPredictor: KoreanSemanticSentencePredictor
-    private lateinit var prefetcher: AiSentenceCompletionPrefetcher
     private lateinit var personalSentenceVault: PersonalSentenceVault
     private lateinit var contextualPredictor: AiContextualPredictor
 
@@ -47,12 +46,10 @@ class SemanticSentenceRecommendationE2ETest {
     @Before
     fun setUp() {
         semanticPredictor = KoreanSemanticSentencePredictor()
-        prefetcher = AiSentenceCompletionPrefetcher(clientProvider = null)
         personalSentenceVault = PersonalSentenceVault(storeFile = null)
         contextualPredictor = AiContextualPredictor(
             morphology = ChoseongMorphologyEngine(),
             semanticPredictor = semanticPredictor,
-            prefetcher = prefetcher,
             personalSentenceVault = personalSentenceVault
         )
     }

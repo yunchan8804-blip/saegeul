@@ -69,7 +69,7 @@ class PersonalSentenceVault(
      * "sentence I once wrote". Updates memory only; call [save] to persist to disk.
      */
     @Synchronized
-    fun record(sentence: String, packageName: String): Boolean {
+    fun record(sentence: String, packageName: String, personaOverride: String? = null): Boolean {
         val scrubbed = KoreanPiiScrubber.scrub(sentence).trim()
         if (scrubbed.isEmpty()) return false
         val tokens = PersonalNgramTokenizer.tokenize(scrubbed)
@@ -85,7 +85,7 @@ class PersonalSentenceVault(
         val doc = Doc(
             id = scrubbed,
             text = scrubbed,
-            category = TypingDnaVault.categorizePackage(packageName),
+            category = TypingDnaVault.categorizePackage(packageName, personaOverride),
             lastSeenMs = now,
             count = 1,
             tokens = tokens
@@ -163,6 +163,20 @@ class PersonalSentenceVault(
     fun stats(): VaultStats = VaultStats(sentences = docs.size, uniqueTerms = postings.size)
 
     /**
+     * The actual number of stored sentences per app category (the category each sentence was
+     * recorded under, via [record]'s [packageName] - see [TypingDnaVault.categorizePackage]). Unlike
+     * [org.fcitx.fcitx5.android.input.ai.TypingDnaStats.categoryCounts], which is a weighted count
+     * derived from compiled persona profiles, this is a plain tally of actual sentences and is the
+     * source of truth for "which app do I mostly type in".
+     */
+    @Synchronized
+    fun categoryCounts(): Map<String, Int> {
+        val counts = mutableMapOf<String, Int>()
+        docs.values.forEach { doc -> counts[doc.category] = (counts[doc.category] ?: 0) + 1 }
+        return counts
+    }
+
+    /**
      * Exports up to [limit] stored sentences (already PII-scrubbed) for the companion
      * enrichment pipeline, ranked by [decayedCount] descending so the sentences that are still
      * most "alive" (recent and/or repeated) are sent first. Read-only; does not affect retrieval.
@@ -173,6 +187,22 @@ class PersonalSentenceVault(
         val now = clock()
         return docs.values
             .sortedByDescending { decayedCount(it, now) }
+            .take(limit)
+            .map { it.text }
+    }
+
+    /**
+     * Exports up to [limit] stored sentences (already PII-scrubbed) last seen strictly after
+     * [sinceMs], most-recent first - the incremental counterpart to [exportForEnrichment] for graph
+     * enrichment cycles that already have a graph to add to, so only what accumulated since it was
+     * last built gets processed instead of re-scanning the whole vault. Read-only.
+     */
+    @Synchronized
+    fun exportSince(sinceMs: Long, limit: Int): List<String> {
+        if (docs.isEmpty()) return emptyList()
+        return docs.values
+            .filter { it.lastSeenMs > sinceMs }
+            .sortedByDescending { it.lastSeenMs }
             .take(limit)
             .map { it.text }
     }

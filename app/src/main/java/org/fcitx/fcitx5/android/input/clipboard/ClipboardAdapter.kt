@@ -54,25 +54,35 @@ abstract class ClipboardAdapter(
             lines: Int = 4,
             chars: Int = 128
         ): String = buildString {
+            if (lines <= 0 || chars <= 0 || str.isEmpty()) return ""
             val length = str.length
             var lineBreak = -1
             for (i in 1..lines) {
                 val start = lineBreak + 1   // skip previous '\n'
-                val excerptEnd = min(start + chars, length)
+                if (start >= length) break
+                var excerptEnd = min(start + chars, length)
+                if (excerptEnd in (start + 1)..<length && Character.isHighSurrogate(str[excerptEnd - 1])) {
+                    excerptEnd--
+                }
                 lineBreak = str.indexOf('\n', start)
                 if (lineBreak < 0) {
                     // no line breaks remaining, substring to end of text
+                    val count = maxOf(0, excerptEnd - start)
                     if (mask) {
-                        append(ClipboardEntry.BULLET.repeat(excerptEnd - start))
+                        append(ClipboardEntry.BULLET.repeat(count))
                     } else {
                         append(str.substring(start, excerptEnd))
                     }
                     break
                 } else {
-                    val end = min(excerptEnd, lineBreak)
+                    var end = min(excerptEnd, lineBreak)
+                    if (end in (start + 1)..<length && Character.isHighSurrogate(str[end - 1])) {
+                        end--
+                    }
+                    val count = maxOf(0, end - start)
                     // append one line exactly
                     if (mask) {
-                        append(ClipboardEntry.BULLET.repeat(end - start))
+                        append(ClipboardEntry.BULLET.repeat(count))
                     } else {
                         appendLine(str.substring(start, end))
                     }

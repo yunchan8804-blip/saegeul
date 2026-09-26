@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import android.os.SystemClock
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank
-import org.fcitx.fcitx5.android.debug.gemma.GemmaMaterialGenerator
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaMaterialGenerator
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

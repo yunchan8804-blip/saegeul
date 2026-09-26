@@ -36,8 +36,8 @@ class AesGcmVaultCipher(private val key: SecretKey) : VaultCipher {
     }
 
     override fun decrypt(blob: ByteArray, aad: ByteArray): ByteArray {
-        if (blob.size < IV_LENGTH_BYTES) {
-            throw GeneralSecurityException("Vault blob too short to contain an IV")
+        if (blob.size < MIN_BLOB_LENGTH) {
+            throw GeneralSecurityException("Vault blob too short to contain an IV and authentication tag")
         }
         val iv = blob.copyOfRange(0, IV_LENGTH_BYTES)
         val ciphertext = blob.copyOfRange(IV_LENGTH_BYTES, blob.size)
@@ -52,6 +52,7 @@ class AesGcmVaultCipher(private val key: SecretKey) : VaultCipher {
         private const val TAG_LENGTH_BITS = 128
         private const val IV_LENGTH_BYTES = 12
         private const val KEY_SIZE_BITS = 256
+        const val MIN_BLOB_LENGTH = IV_LENGTH_BYTES + (TAG_LENGTH_BITS / 8)
 
         /** Generates a fresh random AES-256 key using a SecureRandom-backed key generator. */
         fun randomKey(): SecretKey {

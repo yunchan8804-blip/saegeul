@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_context_title">Complete context on-device</string>
+    <string name="gemma_context_source_label">Current context</string>
+    <string name="gemma_context_complete">Complete context</string>
+    <string name="gemma_context_cancel">Cancel</string>
+    <string name="gemma_context_candidate_label">Completion candidate</string>
+    <string name="gemma_context_apply">Append</string>
+    <string name="gemma_context_back">Back to keyboard</string>
+    <string name="gemma_context_running">Completing context on-device…</string>
+    <string name="gemma_context_preparing">Preparing the model on-device…</string>
+    <string name="gemma_context_ready">The completion candidate is ready, and on-device processing has finished.</string>
+    <string name="gemma_context_timing">First response %1$dms · Total %2$dms · On-device processing confirmed finished</string>
+    <string name="gemma_context_timing_no_first">First response not observed · Total %1$dms · On-device processing confirmed finished</string>
+    <string name="gemma_context_applied">Appended the context completion.</string>
+    <string name="gemma_context_model_missing">Couldn\'t find the on-device Gemma model.</string>
+    <string name="gemma_context_unsupported">Context completion isn\'t available on this device.</string>
+    <string name="gemma_context_private_disabled">Context completion isn\'t available in password fields, sensitive inputs, or fields where personalization learning is disabled.</string>
+    <string name="gemma_context_ai_blocked">This app\'s keyboard profile blocks AI input.</string>
+    <string name="gemma_context_no_text">Nothing to complete yet.</string>
+    <string name="gemma_context_too_long">Context can only be completed at 2,048 characters or fewer.</string>
+    <string name="gemma_context_cursor_required">Couldn\'t read the editor\'s context. Place the cursor at the end of the text with nothing selected, in a supported field, and try again.</string>
+    <string name="gemma_context_terminal">The sentence has already ended. Completions aren\'t generated after punctuation.</string>
+    <string name="gemma_context_unsupported_context">This context format isn\'t supported yet. Use a single line of context, 2,048 characters or fewer, without line breaks or leading spaces.</string>
+    <string name="gemma_context_editor_changed">Cancelled context completion because the app, text, or cursor changed.</string>
+    <string name="gemma_context_cancel_draining">Cancelled, waiting for on-device processing to finish…</string>
+    <string name="gemma_context_cancelled">Cancelled context completion.</string>
+    <string name="gemma_context_failed">On-device context completion failed.</string>
+    <string name="gemma_context_no_candidate">Couldn\'t produce a completion candidate that keeps the original text.</string>
+    <string name="gemma_context_resource_limited">Can\'t start context completion due to battery, power saving, memory, or heat conditions.</string>
+    <string name="gemma_context_timed_out">On-device context completion timed out.</string>
+    <string name="gemma_context_apply_failed">Couldn\'t append the context. Please check your input and try again.</string>
+</resources>

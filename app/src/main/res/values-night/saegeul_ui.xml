@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="saegeul_canvas">#101827</color>
+    <color name="saegeul_surface">#192536</color>
+    <color name="saegeul_ink">#FFF9ED</color>
+    <color name="saegeul_secondary">#B8C8C2</color>
+    <color name="saegeul_action">#55D6A6</color>
+    <color name="saegeul_on_action">#101827</color>
+    <color name="saegeul_subtle">#20392F</color>
+    <color name="saegeul_outline">#43534F</color>
+    <color name="widget_glow_color">#FF55D6A6</color>
+</resources>

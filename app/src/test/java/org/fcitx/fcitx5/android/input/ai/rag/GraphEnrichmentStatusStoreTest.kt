@@ -27,6 +27,58 @@ class GraphEnrichmentStatusStoreTest {
     }
 
     @Test
+    fun recordIncrementalApplyUpdatesCountsWithoutLeavingRunning() {
+        val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
+        store.recordStarted(10L)
+
+        store.recordIncrementalApply(15L, nodes = 5, edges = 3, topics = 2)
+
+        assertEquals(
+            GraphEnrichmentStatus(
+                phase = GraphEnrichmentPhase.RUNNING,
+                startedMs = 10L,
+                lastAppliedMs = 15L,
+                nodes = 5,
+                edges = 3,
+                topics = 2,
+                failure = GraphEnrichmentFailure.NONE
+            ),
+            store.snapshot()
+        )
+
+        store.recordIncrementalApply(25L, nodes = 9, edges = 6, topics = 3)
+
+        assertEquals(GraphEnrichmentPhase.RUNNING, store.snapshot().phase)
+        assertEquals(25L, store.snapshot().lastAppliedMs)
+        assertEquals(9, store.snapshot().nodes)
+    }
+
+    @Test
+    fun recordQueuedClearsAStaleFailureAndPreservesAppliedGraphCounts() {
+        val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
+        store.recordStarted(10L)
+        store.recordResult(PersonalGraphEnricher.EnrichResult(true, "ok", 2, 1, 1), 20L)
+        store.recordStarted(30L)
+        store.recordFailure(40L, failure = GraphEnrichmentFailure.DEVICE_BUSY)
+
+        store.recordQueued()
+
+        assertEquals(
+            GraphEnrichmentStatus(
+                phase = GraphEnrichmentPhase.QUEUED,
+                startedMs = 30L,
+                finishedMs = 40L,
+                lastAppliedMs = 20L,
+                nodes = 2,
+                edges = 1,
+                topics = 1,
+                failure = GraphEnrichmentFailure.NONE
+            ),
+            store.snapshot()
+        )
+    }
+
+    @Test
     fun startedRunPreservesPreviouslyAppliedGraphCounts() {
         val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
         store.recordStarted(10L)
@@ -133,6 +185,36 @@ class GraphEnrichmentStatusStoreTest {
         assertEquals(2, store.snapshot().nodes)
         assertEquals(1, store.snapshot().edges)
         assertEquals(1, store.snapshot().topics)
+    }
+
+    @Test
+    fun recordFailureStoresTheExceptionClassNameOnlyForAGenuineUnhandledFailure() {
+        val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
+        store.recordStarted(10L)
+
+        store.recordFailure(20L, failure = GraphEnrichmentFailure.UNKNOWN, detail = "IllegalStateException")
+
+        assertEquals("IllegalStateException", store.snapshot().failureDetail)
+
+        // An interrupted pause never carries a detail, even if one were passed in.
+        store.recordStarted(30L)
+        store.recordFailure(40L, interrupted = true, detail = "ShouldNeverBeStored")
+        assertEquals(null, store.snapshot().failureDetail)
+    }
+
+    @Test
+    fun startingOrRecordingAResultClearsAPreviouslyStoredFailureDetail() {
+        val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
+        store.recordStarted(10L)
+        store.recordFailure(20L, failure = GraphEnrichmentFailure.UNKNOWN, detail = "IllegalStateException")
+        assertEquals("IllegalStateException", store.snapshot().failureDetail)
+
+        store.recordStarted(30L)
+        assertEquals(null, store.snapshot().failureDetail)
+
+        store.recordFailure(40L, failure = GraphEnrichmentFailure.UNKNOWN, detail = "IllegalStateException")
+        store.recordResult(PersonalGraphEnricher.EnrichResult(true, "ok", 1, 1, 1), 50L)
+        assertEquals(null, store.snapshot().failureDetail)
     }
 
     @Test

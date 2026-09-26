@@ -62,7 +62,7 @@ class PopupKeyboardUi(
             text = this@PopupKeyUi.text
             scaleMode = AutoScaleTextView.Mode.Proportional
             textSize = 23f
-            setTextColor(theme.keyTextColor)
+            setTextColor(theme.popupTextColor)
         }
 
         override val root = frameLayout {

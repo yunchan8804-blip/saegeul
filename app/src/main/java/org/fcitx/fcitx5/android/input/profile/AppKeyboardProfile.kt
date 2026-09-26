@@ -38,11 +38,18 @@ data class AppKeyboardProfile(
     val toolbarVisibility: AppToolbarVisibility = AppToolbarVisibility.Inherit,
     val bufferedInputTransport: BufferedInputTransport? = null,
     val networkPolicy: AppFeaturePolicy = AppFeaturePolicy.Inherit,
-    val aiPolicy: AppFeaturePolicy = AppFeaturePolicy.Inherit
+    val aiPolicy: AppFeaturePolicy = AppFeaturePolicy.Inherit,
+    /**
+     * Persona override for Typing DNA collection categorization; a
+     * [org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry] id, or null to auto-detect
+     * from the package name. Missing on older serialized profiles decodes to null (auto).
+     */
+    val persona: String? = null
 ) {
     fun normalized(): AppKeyboardProfile = copy(
         packageName = normalizePackageName(packageName),
-        themeName = themeName?.trim()?.take(MAX_THEME_NAME_LENGTH)?.takeIf(String::isNotEmpty)
+        themeName = themeName?.trim()?.take(MAX_THEME_NAME_LENGTH)?.takeIf(String::isNotEmpty),
+        persona = persona?.trim()?.take(MAX_PERSONA_LENGTH)?.takeIf(String::isNotEmpty)
     )
 
     fun validate(): AppKeyboardProfile = normalized().also {
@@ -52,10 +59,12 @@ data class AppKeyboardProfile(
     val hasOverrides: Boolean
         get() = mobileHangulLayout != null || themeName != null ||
             toolbarVisibility != AppToolbarVisibility.Inherit || bufferedInputTransport != null ||
-            networkPolicy != AppFeaturePolicy.Inherit || aiPolicy != AppFeaturePolicy.Inherit
+            networkPolicy != AppFeaturePolicy.Inherit || aiPolicy != AppFeaturePolicy.Inherit ||
+            persona != null
 
     companion object {
         const val MAX_THEME_NAME_LENGTH = 160
+        const val MAX_PERSONA_LENGTH = 64
         private val PACKAGE_NAME = Regex("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)*")
 
         fun normalizePackageName(value: String): String = value.trim().take(255)
@@ -91,7 +100,11 @@ object AppKeyboardProfileResolver {
         privateEditor: Boolean
     ): EffectiveAppKeyboardProfile {
         val normalizedPackage = packageName?.let(AppKeyboardProfile::normalizePackageName).orEmpty()
-        val profile = profiles.firstOrNull { it.packageName == normalizedPackage }
+        val profile = if (normalizedPackage.isNotEmpty()) {
+            profiles.firstOrNull { it.packageName.equals(normalizedPackage, ignoreCase = true) }
+        } else {
+            null
+        }
         val profileAllowsNetwork = profile?.networkPolicy
             ?.resolve(defaults.networkAllowed) ?: defaults.networkAllowed
         val profileAllowsAi = profile?.aiPolicy?.resolve(defaults.aiAllowed) ?: defaults.aiAllowed

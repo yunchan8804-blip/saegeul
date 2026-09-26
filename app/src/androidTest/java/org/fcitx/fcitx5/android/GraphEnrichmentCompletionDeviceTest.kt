@@ -106,7 +106,8 @@ class GraphEnrichmentCompletionDeviceTest {
                     GraphEnrichmentPhase.FAILED,
                     GraphEnrichmentPhase.NO_DATA,
                     GraphEnrichmentPhase.INTERRUPTED -> terminalFailure(status)
-                    GraphEnrichmentPhase.NEVER -> Unit
+                    GraphEnrichmentPhase.NEVER,
+                    GraphEnrichmentPhase.QUEUED -> Unit
                 }
             }
             SystemClock.sleep(POLL_INTERVAL_MS)
@@ -131,6 +132,7 @@ class GraphEnrichmentCompletionDeviceTest {
                     GraphEnrichmentPhase.NO_DATA,
                     GraphEnrichmentPhase.INTERRUPTED -> terminalFailure(status)
                     GraphEnrichmentPhase.NEVER,
+                    GraphEnrichmentPhase.QUEUED,
                     GraphEnrichmentPhase.RUNNING -> Unit
                 }
             }
@@ -146,8 +148,8 @@ class GraphEnrichmentCompletionDeviceTest {
         val expectedText = onMain {
             activity.getString(
                 when (phase) {
-                    GraphEnrichmentPhase.SUCCEEDED -> R.string.enrichment_status_succeeded
-                    GraphEnrichmentPhase.PARTIAL -> R.string.enrichment_status_partial
+                    GraphEnrichmentPhase.SUCCEEDED -> R.string.enrichment_state_succeeded_title
+                    GraphEnrichmentPhase.PARTIAL -> R.string.enrichment_state_partial_title
                     else -> throw AssertionError("Terminal phase $phase cannot render as successful.")
                 }
             )

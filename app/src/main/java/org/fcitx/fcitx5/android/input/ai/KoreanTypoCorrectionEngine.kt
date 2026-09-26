@@ -15,6 +15,8 @@ class KoreanTypoCorrectionEngine(
     private val extraLexicon: List<String> = emptyList()
 ) {
 
+    private val morphology = ChoseongMorphologyEngine()
+
     private val commonTypoDictionary = mapOf(
         "오눌" to "오늘",
         "오뉼" to "오늘",
@@ -164,8 +166,9 @@ class KoreanTypoCorrectionEngine(
     }
 
     fun correct(rawWord: String, limit: Int = 3): List<String> {
-        val word = rawWord.trim()
+        val word = java.text.Normalizer.normalize(rawWord.trim(), java.text.Normalizer.Form.NFC)
         if (word.length < 2) return emptyList()
+        if (word.none(Char::isLetter)) return emptyList()
 
         // Fast-path: If word is already a valid standard word and not a known typo, it needs no correction
         if (standardDictionary.contains(word) && !hasExplicitTypo(word)) {
@@ -391,13 +394,15 @@ class KoreanTypoCorrectionEngine(
     fun calculateReplacementOverlap(beforeCursor: String, candidate: String): Int {
         if (beforeCursor.isEmpty() || candidate.isEmpty()) return 0
 
-        val trimmedBefore = beforeCursor.trimEnd()
-        val trailingSpaces = beforeCursor.length - trimmedBefore.length
+        val normalizedBefore = java.text.Normalizer.normalize(beforeCursor, java.text.Normalizer.Form.NFC)
+        val normalizedCandidate = java.text.Normalizer.normalize(candidate, java.text.Normalizer.Form.NFC)
+        val trimmedBefore = normalizedBefore.trimEnd()
+        val trailingSpaces = normalizedBefore.length - trimmedBefore.length
         if (trimmedBefore.isEmpty()) return 0
 
         // 0. Full sentence or clause typo correction match
         val correctedBefore = correctSentence(trimmedBefore)
-        if (correctedBefore != null && (candidate == correctedBefore || candidate.startsWith(correctedBefore))) {
+        if (correctedBefore != null && (normalizedCandidate == correctedBefore || normalizedCandidate.startsWith(correctedBefore))) {
             return trimmedBefore.length + trailingSpaces
         }
 
@@ -409,7 +414,7 @@ class KoreanTypoCorrectionEngine(
             .trim()
         if (lastClause.isNotEmpty() && lastClause != trimmedBefore) {
             val correctedClause = correctSentence(lastClause)
-            if (correctedClause != null && (candidate == correctedClause || candidate.startsWith(correctedClause))) {
+            if (correctedClause != null && (normalizedCandidate == correctedClause || normalizedCandidate.startsWith(correctedClause))) {
                 return lastClause.length + trailingSpaces
             }
         }
@@ -420,12 +425,29 @@ class KoreanTypoCorrectionEngine(
             .substringAfterLast('\t')
             .substringAfterLast('\r')
             .ifEmpty { trimmedBefore }
-        val isCandidateSingleWord = !candidate.contains(" ")
+        val isCandidateSingleWord = !normalizedCandidate.contains(" ")
+
+        if (trailingSpaces == 0 &&
+            lastWord.any(morphology::isChoseong) &&
+            lastWord.all { morphology.isHangulSyllable(it) || morphology.isChoseong(it) }
+        ) {
+            val candidateFirstWord = normalizedCandidate.takeWhile { !it.isWhitespace() }
+            val queryChoseong = morphology.extractChoseongSequence(lastWord)
+            val candidateChoseong = morphology.extractChoseongSequence(candidateFirstWord)
+            val queryJamo = morphology.decomposeHangul(lastWord)
+            val candidateJamo = morphology.decomposeHangul(candidateFirstWord)
+            val isChoseongOnly = lastWord.all(morphology::isChoseong)
+            if ((isChoseongOnly && candidateChoseong.startsWith(queryChoseong)) ||
+                candidateJamo.startsWith(queryJamo)
+            ) {
+                return lastWord.length
+            }
+        }
 
         // 1. Check if lastWord is a typo of candidate (or candidate is a typo correction for lastWord)
-        if (isCandidateSingleWord && lastWord.isNotBlank() && lastWord != candidate) {
+        if (isCandidateSingleWord && lastWord.isNotBlank() && lastWord != normalizedCandidate) {
             val corrections = correct(lastWord)
-            if (corrections.contains(candidate)) {
+            if (corrections.contains(normalizedCandidate)) {
                 return lastWord.length + trailingSpaces
             }
         }
@@ -435,13 +457,13 @@ class KoreanTypoCorrectionEngine(
         if (!isCandidateSingleWord && lastWord.isNotBlank()) {
             val corrections = correct(lastWord)
             for (corr in corrections) {
-                val normalizedBefore = trimmedBefore.dropLast(lastWord.length) + corr
-                if (candidate.startsWith(normalizedBefore)) {
+                val normalizedBeforeWithCorr = trimmedBefore.dropLast(lastWord.length) + corr
+                if (normalizedCandidate.startsWith(normalizedBeforeWithCorr)) {
                     return trimmedBefore.length + trailingSpaces
                 }
                 if (lastClause.isNotEmpty() && lastClause != trimmedBefore) {
                     val normalizedClause = lastClause.dropLast(lastWord.length) + corr
-                    if (candidate.startsWith(normalizedClause)) {
+                    if (normalizedCandidate.startsWith(normalizedClause)) {
                         return lastClause.length + trailingSpaces
                     }
                 }
@@ -449,8 +471,8 @@ class KoreanTypoCorrectionEngine(
         }
 
         // 2. Standard longest suffix/prefix overlap match
-        for (i in candidate.length downTo 1) {
-            val prefix = candidate.substring(0, i).trimEnd()
+        for (i in normalizedCandidate.length downTo 1) {
+            val prefix = normalizedCandidate.substring(0, i).trimEnd()
             if (prefix.isNotEmpty() && trimmedBefore.endsWith(prefix)) {
                 return prefix.length + trailingSpaces
             }

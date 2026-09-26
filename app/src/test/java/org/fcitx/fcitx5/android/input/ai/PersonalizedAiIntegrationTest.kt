@@ -38,7 +38,6 @@ class PersonalizedAiIntegrationTest {
         predictor = AiContextualPredictor(
             morphology = morphology,
             semanticPredictor = semanticPredictor,
-            prefetcher = null,
             personalizedStore = store,
             ngram = ngram
         )

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-2.1-or-later
+  SPDX-FileCopyrightText: Copyright 2026 YunChan
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_widget_card"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="내 언어 금고"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/widget_last_sync"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="12sp"
+            tools:text="마지막 분석 17:06"
+            xmlns:tools="http://schemas.android.com/tools" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_level"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/saegeul_ink"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        tools:text="Lv.6 · 언어 지문 장인"
+        xmlns:tools="http://schemas.android.com/tools" />
+
+    <ProgressBar
+        android:id="@+id/widget_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:progressTint="@color/saegeul_ink"
+        android:progressBackgroundTint="@color/card_stroke_color" />
+
+    <TextView
+        android:id="@+id/widget_sentences"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/saegeul_secondary"
+        android:textSize="12sp"
+        tools:text="분석 문장 309개"
+        xmlns:tools="http://schemas.android.com/tools" />
+
+</LinearLayout>

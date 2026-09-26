@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vault_backup_title">백업</string>
+    <string name="vault_backup_summary">내 언어 금고를 파일로 내보내고, 새 기기에서 가져올 수 있어요.</string>
+    <string name="vault_backup_export_button">내보내기</string>
+    <string name="vault_backup_import_button">가져오기</string>
+    <string name="vault_backup_last_export_none">아직 내보낸 적 없어요</string>
+    <string name="vault_backup_last_export_at">마지막 내보내기: %1$s</string>
+    <string name="vault_backup_cloud_coming_soon">클라우드 자동 백업은 준비 중이에요.</string>
+    <string name="vault_backup_password_title">비밀번호 설정</string>
+    <string name="vault_backup_password_hint">비밀번호 (8자 이상)</string>
+    <string name="vault_backup_password_confirm_hint">비밀번호 확인</string>
+    <string name="vault_backup_password_warning">이 비밀번호를 잊으면 백업을 열 수 없어요.</string>
+    <string name="vault_backup_password_too_short">비밀번호는 8자 이상이어야 해요</string>
+    <string name="vault_backup_password_mismatch">비밀번호가 서로 달라요</string>
+    <string name="vault_backup_confirm_button">확인</string>
+    <string name="vault_backup_cancel_button">취소</string>
+    <string name="vault_backup_export_in_progress">내보내는 중이에요…</string>
+    <string name="vault_backup_export_done">내보냈어요 · 문장 %1$d개</string>
+    <string name="vault_backup_export_failed">내보내지 못했어요. 잠시 뒤 다시 시도해 주세요.</string>
+    <string name="vault_backup_export_failed_too_large">금고 용량이 너무 커서 내보낼 수 없어요.</string>
+    <string name="vault_backup_import_password_title">가져올 백업의 비밀번호</string>
+    <string name="vault_backup_import_password_hint">비밀번호</string>
+    <string name="vault_backup_checking">확인하는 중이에요…</string>
+    <string name="vault_backup_import_summary">%1$s에 만든 백업 · 내 문장 %2$d개 · 준비된 추천 문장 %3$d개. 지금 금고를 이 내용으로 바꿔요.</string>
+    <string name="vault_backup_import_summary_with_skipped">%1$s에 만든 백업 · 내 문장 %2$d개 · 준비된 추천 문장 %3$d개. 파생 데이터 %4$d개는 건너뛰고 다시 학습해요. 지금 금고를 이 내용으로 바꿔요.</string>
+    <string name="vault_backup_replace_button">바꾸기</string>
+    <string name="vault_backup_importing">가져오는 중이에요…</string>
+    <string name="vault_backup_import_done">가져왔어요. 새글을 다시 시작해요.</string>
+    <string name="vault_backup_error_wrong_password">비밀번호가 맞지 않아요</string>
+    <string name="vault_backup_error_corrupted">백업 파일이 손상됐어요</string>
+    <string name="vault_backup_error_newer_version">새글을 업데이트한 뒤 다시 시도해 주세요</string>
+    <string name="vault_backup_error_not_a_backup">새글 백업 파일이 아니에요</string>
+    <string name="vault_backup_error_generic">문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.</string>
+    <string name="vault_backup_locked_direct_boot">휴대폰 잠금을 푼 뒤 이용해 주세요</string>
+    <string name="vault_backup_export_file_name">새글-백업-%1$s.saegeulbackup</string>
+</resources>

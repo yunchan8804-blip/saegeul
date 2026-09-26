@@ -12,19 +12,20 @@ import org.junit.Test
 class TypingDnaEditorContinuityTest {
 
     @Test
-    fun `continuity loss discards only current package pending context`() {
+    fun `continuity loss with unknown removed text drops only the trailing token`() {
         val collector = UserTypingContextCollector()
         val sink = TypingDnaCommitSink(collector)
 
         sink.onEditorTextCommitted("com.example.chat", "확정 문장입니다.", inspectionAllowed = true)
-        sink.onEditorTextCommitted("com.example.chat", "내가 뭘 ", inspectionAllowed = true)
+        sink.onEditorTextCommitted("com.example.chat", "안녕하세요 반갑", inspectionAllowed = true)
         sink.onEditorTextCommitted("com.example.work", "회의를 ", inspectionAllowed = true)
 
-        sink.onEditorContinuityLost("com.example.chat", inspectionAllowed = true)
+        sink.onEditorContinuityLost("com.example.chat", removedText = null, inspectionAllowed = true)
 
-        assertFalse(collector.hasPending("com.example.chat"))
+        assertTrue(collector.hasPending("com.example.chat"))
+        assertTrue(collector.flushPending("com.example.chat"))
         assertTrue(collector.hasPending("com.example.work"))
-        assertEquals(listOf("확정 문장입니다."), collector.getSentences("com.example.chat"))
+        assertEquals(listOf("확정 문장입니다.", "안녕하세요"), collector.getSentences("com.example.chat"))
     }
 
     @Test

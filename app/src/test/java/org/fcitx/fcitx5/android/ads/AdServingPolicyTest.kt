@@ -155,8 +155,179 @@ class AdServingPolicyTest {
     }
 
     @Test
+    fun typingDnaDashboardBannerIsAllowed() {
+        val venue = LocalAvenueCatalog.typingDnaDashboardBanner
+        val config = signed(venues = listOf(venue), version = 1)
+        val decision = AdServingPolicy.evaluate(
+            request(config, venueId = venue.id, lastAcceptedVersion = null)
+        )
+        assertTrue(AdServingPolicy.canPublish(venue))
+        assertTrue(decision.allow)
+        assertNull(decision.reason)
+    }
+
+    @Test
     fun typingDnaAdGateAllowsSyncCompleteAndBlocksOffline() {
-        assertTrue(TypingDnaAdGate.shouldShowInterstitial(offlineMode = false, nowEpochMs = now))
-        assertFalse(TypingDnaAdGate.shouldShowInterstitial(offlineMode = true, nowEpochMs = now))
+        val adEligible = AvenueFrequencyState(dayIndex = 0, actionsTotal = 99)
+        assertTrue(
+            TypingDnaAdGate.shouldShowInterstitial(
+                offlineMode = false,
+                frequency = adEligible,
+                nowEpochMs = now
+            )
+        )
+        assertFalse(
+            TypingDnaAdGate.shouldShowInterstitial(
+                offlineMode = true,
+                frequency = adEligible,
+                nowEpochMs = now
+            )
+        )
+    }
+
+    @Test
+    fun typingDnaAdGateAllowsBannerAndBlocksOffline() {
+        assertTrue(TypingDnaAdGate.shouldShowBanner(offlineMode = false, nowEpochMs = now))
+        assertFalse(TypingDnaAdGate.shouldShowBanner(offlineMode = true, nowEpochMs = now))
+    }
+
+    @Test
+    fun syncCompleteInterstitialIsCappedOncePerDay() {
+        val venue = LocalAvenueCatalog.typingDnaSyncComplete
+        val dayIndex = now / 86_400_000L
+        val shown = AvenueFrequencyState(
+            dayIndex = dayIndex,
+            shownToday = 1,
+            lastShownEpochMs = now - 3_600_000L,
+            actionsTotal = 99
+        )
+        assertEquals(
+            BlockReason.FREQUENCY_CAPPED,
+            AvenueFrequencyPolicy.evaluate(venue, shown, now)
+        )
+    }
+
+    @Test
+    fun syncCompleteInterstitialHonorsCooldownAndBackwardsClock() {
+        val venue = LocalAvenueCatalog.typingDnaSyncComplete
+        val dayIndex = now / 86_400_000L
+        val recent = AvenueFrequencyState(
+            dayIndex = dayIndex,
+            shownToday = 0,
+            lastShownEpochMs = now - 3_600_000L,
+            actionsTotal = 99
+        )
+        assertEquals(
+            BlockReason.COOLDOWN_ACTIVE,
+            AvenueFrequencyPolicy.evaluate(venue, recent, now)
+        )
+        val backwards = AvenueFrequencyState(
+            dayIndex = dayIndex,
+            shownToday = 0,
+            lastShownEpochMs = now + 3_600_000L,
+            actionsTotal = 99
+        )
+        assertEquals(
+            BlockReason.COOLDOWN_ACTIVE,
+            AvenueFrequencyPolicy.evaluate(venue, backwards, now)
+        )
+    }
+
+    @Test
+    fun syncCompleteInterstitialWaitsForMinActions() {
+        val venue = LocalAvenueCatalog.typingDnaSyncComplete
+        val fresh = AvenueFrequencyState(dayIndex = 0, actionsTotal = venue.minActions - 1)
+        assertEquals(
+            BlockReason.MIN_ACTIONS_NOT_MET,
+            AvenueFrequencyPolicy.evaluate(venue, fresh, now)
+        )
+        val ready = AvenueFrequencyState(dayIndex = 0, actionsTotal = venue.minActions)
+        assertNull(AvenueFrequencyPolicy.evaluate(venue, ready, now))
+    }
+
+    @Test
+    fun gateBlocksSyncInterstitialWithoutEnoughActions() {
+        val fresh = AvenueFrequencyState(dayIndex = 0, actionsTotal = 2)
+        assertFalse(
+            TypingDnaAdGate.shouldShowInterstitial(
+                offlineMode = false,
+                frequency = fresh,
+                nowEpochMs = now
+            )
+        )
+    }
+
+    @Test
+    fun bannerVenueIsNotFrequencyCapped() {
+        val venue = LocalAvenueCatalog.typingDnaDashboardBanner
+        val shown = AvenueFrequencyState(
+            dayIndex = now / 86_400_000L,
+            shownToday = 500,
+            lastShownEpochMs = now,
+            actionsTotal = 0
+        )
+        assertNull(AvenueFrequencyPolicy.evaluate(venue, shown, now))
+    }
+
+    @Test
+    fun bannerPlacementOnImeSurfaceIsBlocked() {
+        val venue = AdVenue(
+            id = "ime-banner",
+            screen = "키보드 입력",
+            trigger = "ime surface banner",
+            format = AdFormat.BANNER,
+            requiresConsent = true
+        )
+        val decision = AdServingPolicy.evaluate(
+            request(signed(venues = listOf(venue)), venueId = venue.id)
+        )
+        assertFalse(AdServingPolicy.canPublish(venue))
+        assertFalse(decision.allow)
+        assertEquals(BlockReason.IME_SURFACE, decision.reason)
+    }
+
+    @Test
+    fun themePointEarnRewardedVenueIsAllowed() {
+        val venue = LocalAvenueCatalog.themePointEarn
+        val config = signed(venues = listOf(venue), version = 1)
+        val decision = AdServingPolicy.evaluate(
+            request(config, venueId = venue.id, lastAcceptedVersion = null)
+        )
+        assertTrue(AdServingPolicy.canPublish(venue))
+        assertTrue(decision.allow)
+        assertNull(decision.reason)
+    }
+
+    @Test
+    fun themePointEarnIsCappedAtThreePerDayWithCooldown() {
+        val venue = LocalAvenueCatalog.themePointEarn
+        val dayIndex = now / 86_400_000L
+        val exhausted = AvenueFrequencyState(
+            dayIndex = dayIndex,
+            shownToday = 3,
+            lastShownEpochMs = now - 30 * 60_000L,
+            actionsTotal = 0
+        )
+        assertEquals(
+            BlockReason.FREQUENCY_CAPPED,
+            AvenueFrequencyPolicy.evaluate(venue, exhausted, now)
+        )
+        val inCooldown = AvenueFrequencyState(
+            dayIndex = dayIndex,
+            shownToday = 1,
+            lastShownEpochMs = now - 10 * 60_000L,
+            actionsTotal = 0
+        )
+        assertEquals(
+            BlockReason.COOLDOWN_ACTIVE,
+            AvenueFrequencyPolicy.evaluate(venue, inCooldown, now)
+        )
+        val afterCooldown = AvenueFrequencyState(
+            dayIndex = dayIndex,
+            shownToday = 1,
+            lastShownEpochMs = now - 25 * 60_000L,
+            actionsTotal = 0
+        )
+        assertNull(AvenueFrequencyPolicy.evaluate(venue, afterCooldown, now))
     }
 }

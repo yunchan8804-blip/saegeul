@@ -19,4 +19,5 @@
     <string name="sentence_packs_retry">다시 시도</string>
     <string name="sentence_packs_latest">최신버전</string>
     <string name="sentence_packs_progress">%1$s / %2$s</string>
+    <string name="sentence_packs_download_done">문장팩을 설치했어요 · 추가 예문 %1$d개</string>
 </resources>

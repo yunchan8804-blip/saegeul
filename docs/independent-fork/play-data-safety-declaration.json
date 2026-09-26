@@ -16,32 +16,37 @@
   },
   "releaseProviderSet": [
     {
-      "id": "openai-compatible-ai",
-      "data": ["approximate_location", "other_user_generated_content"],
-      "networkEnabledByDefault": false,
-      "requiresExternalApproval": false
-    },
-    {
       "id": "openai-compatible-speech",
-      "data": ["approximate_location", "voice_or_sound_recordings"],
+      "data": [
+        "approximate_location",
+        "voice_or_sound_recordings"
+      ],
       "networkEnabledByDefault": false,
       "requiresExternalApproval": false
     },
     {
       "id": "google-fonts",
-      "data": ["approximate_location"],
+      "data": [
+        "approximate_location"
+      ],
       "networkEnabledByDefault": false,
       "requiresExternalApproval": false
     },
     {
       "id": "klipy",
-      "data": ["approximate_location", "in_app_search_history"],
+      "data": [
+        "approximate_location",
+        "in_app_search_history"
+      ],
       "networkEnabledByDefault": false,
       "requiresExternalApproval": true
     },
     {
       "id": "wikimedia-commons",
-      "data": ["approximate_location", "in_app_search_history"],
+      "data": [
+        "approximate_location",
+        "in_app_search_history"
+      ],
       "networkEnabledByDefault": false,
       "requiresExternalApproval": false
     },
@@ -58,13 +63,9 @@
     },
     {
       "id": "github-raw-content",
-      "data": ["approximate_location"],
-      "networkEnabledByDefault": false,
-      "requiresExternalApproval": false
-    },
-    {
-      "id": "oauth-provider",
-      "data": ["approximate_location"],
+      "data": [
+        "approximate_location"
+      ],
       "networkEnabledByDefault": false,
       "requiresExternalApproval": false
     },
@@ -77,6 +78,14 @@
       ],
       "networkEnabledByDefault": false,
       "requiresExternalApproval": false
+    },
+    {
+      "id": "huggingface-model-download",
+      "data": [
+        "approximate_location"
+      ],
+      "networkEnabledByDefault": false,
+      "requiresExternalApproval": false
     }
   ],
   "dataTypes": [
@@ -84,12 +93,15 @@
       "id": "approximate_location",
       "playCategory": "Location",
       "playType": "Approximate location",
-      "source": "Connection IP address visible to selected online providers",
+      "source": "Connection IP address visible to selected online providers, including Hugging Face when the user chooses to download the on-device Saegeul AI (Gemma) model",
       "collected": true,
       "shared": true,
       "processedEphemerally": false,
       "optional": true,
-      "purposes": ["App functionality", "Advertising"]
+      "purposes": [
+        "App functionality",
+        "Advertising"
+      ]
     },
     {
       "id": "in_app_search_history",
@@ -100,18 +112,9 @@
       "shared": true,
       "processedEphemerally": false,
       "optional": true,
-      "purposes": ["App functionality"]
-    },
-    {
-      "id": "other_user_generated_content",
-      "playCategory": "App activity",
-      "playType": "Other user-generated content",
-      "source": "AI source text and custom instructions explicitly submitted by the user; PII-scrubbed accumulated sentences sent for personal knowledge-graph enrichment by the configured AI provider (which may be the user's own companion) either when the user explicitly submits them from the dashboard or, only if the user has enabled the opt-in auto-enrichment setting (off by default), automatically during keyboard use once enough new sentences have accumulated",
-      "collected": true,
-      "shared": true,
-      "processedEphemerally": false,
-      "optional": true,
-      "purposes": ["App functionality"]
+      "purposes": [
+        "App functionality"
+      ]
     },
     {
       "id": "voice_or_sound_recordings",
@@ -122,7 +125,9 @@
       "shared": true,
       "processedEphemerally": false,
       "optional": true,
-      "purposes": ["App functionality"]
+      "purposes": [
+        "App functionality"
+      ]
     },
     {
       "id": "app_interactions",
@@ -133,7 +138,11 @@
       "shared": true,
       "processedEphemerally": false,
       "optional": true,
-      "purposes": ["App functionality", "Analytics", "Advertising"]
+      "purposes": [
+        "App functionality",
+        "Analytics",
+        "Advertising"
+      ]
     },
     {
       "id": "device_or_other_ids",
@@ -144,7 +153,11 @@
       "shared": true,
       "processedEphemerally": false,
       "optional": true,
-      "purposes": ["App functionality", "Analytics", "Advertising"]
+      "purposes": [
+        "App functionality",
+        "Analytics",
+        "Advertising"
+      ]
     }
   ],
   "notCollectedOffDevice": [
@@ -154,7 +167,10 @@
     "Personal dictionary",
     "Files and docs other than audio classified above",
     "Crash logs",
-    "Diagnostics"
+    "Diagnostics",
+    "Personal language vault (learned style, recorded sentences, relationship graph) processed only by the on-device Gemma model",
+    "On-device AI prompts and generated suggestions",
+    "Encrypted vault backup files, created only when the user exports them to a location they choose"
   ],
   "submissionRules": [
     "Do not change shared to false without provider-role evidence for every shipped provider.",

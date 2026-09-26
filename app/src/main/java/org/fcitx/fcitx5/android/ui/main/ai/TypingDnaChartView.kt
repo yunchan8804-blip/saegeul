@@ -15,7 +15,9 @@ import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
+import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import splitties.dimensions.dp
 import kotlin.math.min
 
@@ -30,8 +32,16 @@ class TypingDnaChartView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    /**
+     * One drawable block of the non-compact chart. [setVisibleSections] lets a caller (e.g. the "내
+     * 말투 리포트" screen) show only the section(s) it needs from this same view instead of
+     * reimplementing the drawing; the developer-info dashboard keeps the default (every section).
+     */
+    enum class Section { ACCUMULATION, TONE_BALANCE, CATEGORY_DISTRIBUTION, TOP_TRANSITIONS, PRIVACY_GAUGE }
+
     private var stats: TypingDnaStats? = null
     private var compact: Boolean = false
+    private var visibleSections: Set<Section> = Section.entries.toSet()
     private var animationProgress: Float = 1.0f
     private var progressAnimator: ValueAnimator? = null
 
@@ -55,6 +65,19 @@ class TypingDnaChartView @JvmOverloads constructor(
     private val slateGray = Color.parseColor("#64748B")
     private val barBackgroundLight = Color.parseColor("#1A888888")
 
+    // One color per PersonaRegistry.all slot (8 personas), reused by index so a given persona
+    // keeps the same color across renders regardless of which categories are active.
+    private val categoryPalette = intArrayOf(
+        tealCyan,
+        primaryBlue,
+        amberOrange,
+        Color.parseColor("#EC4899"),
+        purpleViolet,
+        emeraldGreen,
+        Color.parseColor("#F97316"),
+        slateGray
+    )
+
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         textPaint.isFakeBoldText = true
@@ -63,6 +86,14 @@ class TypingDnaChartView @JvmOverloads constructor(
     fun setCompact(value: Boolean) {
         if (compact == value) return
         compact = value
+        requestLayout()
+        invalidate()
+    }
+
+    /** Which non-compact sections to draw; ignored in compact mode. Defaults to every section. */
+    fun setVisibleSections(sections: Set<Section>) {
+        if (visibleSections == sections) return
+        visibleSections = sections
         requestLayout()
         invalidate()
     }
@@ -97,14 +128,24 @@ class TypingDnaChartView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        val s = stats
-        val topBigramsCount = if (compact) 0 else s?.topBigrams?.take(4)?.size ?: 0
-        val baseHeight = if (compact) {
-            dp(118)
-        } else {
-            dp(456) + (if (topBigramsCount > 0) dp(28) + (topBigramsCount * dp(32)) else dp(24))
-        }
+        val baseHeight = if (compact) dp(118) else dp(16) + visibleSections.sumOf { sectionHeight(it, stats) }
         setMeasuredDimension(width, resolveSize(baseHeight, heightMeasureSpec))
+    }
+
+    /** Approximate drawn height of one non-compact [section], mirroring [onDraw]'s own increments. */
+    private fun sectionHeight(section: Section, s: TypingDnaStats?): Int = when (section) {
+        Section.ACCUMULATION -> dp(20) + dp(36) * 4 + dp(10)
+        Section.TONE_BALANCE -> dp(18) + dp(48)
+        Section.CATEGORY_DISTRIBUTION -> {
+            val activeCategoryCount = s?.categoryCounts?.values?.count { it > 0 } ?: 0
+            val categoryLegendRows = if (activeCategoryCount <= 0) 1 else (activeCategoryCount + 2) / 3
+            dp(18) + dp(50) + (categoryLegendRows - 1).coerceAtLeast(0) * dp(16)
+        }
+        Section.TOP_TRANSITIONS -> {
+            val topBigramsCount = s?.topBigrams?.take(4)?.size ?: 0
+            (if (topBigramsCount > 0) dp(22) + topBigramsCount * dp(30) else dp(28)) + dp(8)
+        }
+        Section.PRIVACY_GAUGE -> dp(12) + dp(96) + dp(8)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -135,56 +176,64 @@ class TypingDnaChartView @JvmOverloads constructor(
             return
         }
 
-        canvas.drawText("데이터 축적 현황 (온디바이스 학습)", paddingL, currentY, textPaint)
-        currentY += dp(20f)
+        if (Section.ACCUMULATION in visibleSections) {
+            canvas.drawText(context.getString(R.string.typing_dna_chart_accumulation_title), paddingL, currentY, textPaint)
+            currentY += dp(20f)
 
-        val maxVal = maxOf(s.totalSentences, s.bigramsCount, s.endingsCount, s.phrasesCount, 15).toFloat()
-        drawMetricBar(canvas, "분석 문장", s.totalSentences, maxVal, primaryBlue, paddingL, currentY, availableWidth)
-        currentY += dp(36f)
-        drawMetricBar(canvas, "단어 연어(Bigram)", s.bigramsCount, maxVal, emeraldGreen, paddingL, currentY, availableWidth)
-        currentY += dp(36f)
-        drawMetricBar(canvas, "종결 어미", s.endingsCount, maxVal, amberOrange, paddingL, currentY, availableWidth)
-        currentY += dp(36f)
-        drawMetricBar(canvas, "완성 상용구", s.phrasesCount, maxVal, purpleViolet, paddingL, currentY, availableWidth)
-        currentY += dp(46f)
-
-        canvas.drawText("문체 및 톤 밸런스 (Tone Balance)", paddingL, currentY, textPaint)
-        currentY += dp(18f)
-        drawToneSplitBar(canvas, s.honorificRatio, s.informalRatio, paddingL, currentY, availableWidth)
-        currentY += dp(48f)
-
-        canvas.drawText("사용 환경별 페르소나 분포 (Category)", paddingL, currentY, textPaint)
-        currentY += dp(18f)
-        drawCategorySplitBar(
-            canvas,
-            s.messengerSentencesRatio,
-            s.workSentencesRatio,
-            s.generalSentencesRatio,
-            paddingL,
-            currentY,
-            availableWidth
-        )
-        currentY += dp(50f)
-
-        val topList = s.topBigrams.take(4)
-        if (topList.isNotEmpty()) {
-            canvas.drawText("자주 이어지는 나만의 단어 연결 (Top Transitions)", paddingL, currentY, textPaint)
-            currentY += dp(22f)
-            topList.forEach { bg ->
-                drawBigramRow(canvas, "${bg.prev} → ${bg.next}", bg.weight, paddingL, currentY, availableWidth)
-                currentY += dp(30f)
-            }
-        } else {
-            subTextPaint.textSize = dp(11f)
-            subTextPaint.color = getThemedSubTextColor()
-            canvas.drawText("키보드로 단어를 입력하면 자주 쓰는 단어 연결이 분석됩니다.", paddingL, currentY, subTextPaint)
-            currentY += dp(28f)
+            val maxVal = maxOf(s.totalSentences, s.bigramsCount, s.endingsCount, s.phrasesCount, 15).toFloat()
+            drawMetricBar(canvas, context.getString(R.string.typing_dna_chart_label_sentences), s.totalSentences, maxVal, primaryBlue, paddingL, currentY, availableWidth)
+            currentY += dp(36f)
+            drawMetricBar(canvas, context.getString(R.string.typing_dna_chart_label_word_pairs), s.bigramsCount, maxVal, emeraldGreen, paddingL, currentY, availableWidth)
+            currentY += dp(36f)
+            drawMetricBar(canvas, context.getString(R.string.typing_dna_chart_label_endings), s.endingsCount, maxVal, amberOrange, paddingL, currentY, availableWidth)
+            currentY += dp(36f)
+            drawMetricBar(canvas, context.getString(R.string.typing_dna_chart_label_phrases), s.phrasesCount, maxVal, purpleViolet, paddingL, currentY, availableWidth)
+            currentY += dp(10f)
         }
 
-        currentY += dp(8f)
-        canvas.drawText("온디바이스 프라이버시 게이지", paddingL, currentY, textPaint)
-        currentY += dp(12f)
-        drawPrivacyGauge(canvas, s.privacyOnDevicePercent, s.cloudBytesExported, paddingL, currentY, availableWidth)
+        if (Section.TONE_BALANCE in visibleSections) {
+            canvas.drawText(context.getString(R.string.typing_dna_chart_tone_title), paddingL, currentY, textPaint)
+            currentY += dp(18f)
+            drawToneSplitBar(canvas, s.honorificRatio, s.informalRatio, paddingL, currentY, availableWidth)
+            currentY += dp(48f)
+        }
+
+        if (Section.CATEGORY_DISTRIBUTION in visibleSections) {
+            canvas.drawText(context.getString(R.string.typing_dna_chart_category_title), paddingL, currentY, textPaint)
+            currentY += dp(18f)
+            val categoryLegendRows = drawCategorySplitBar(
+                canvas,
+                s.categoryCounts,
+                paddingL,
+                currentY,
+                availableWidth
+            )
+            currentY += dp(50f) + (categoryLegendRows - 1).coerceAtLeast(0) * dp(16f)
+        }
+
+        if (Section.TOP_TRANSITIONS in visibleSections) {
+            val topList = s.topBigrams.take(4)
+            if (topList.isNotEmpty()) {
+                canvas.drawText(context.getString(R.string.typing_dna_chart_transitions_title), paddingL, currentY, textPaint)
+                currentY += dp(22f)
+                topList.forEach { bg ->
+                    drawBigramRow(canvas, "${bg.prev} → ${bg.next}", bg.weight, paddingL, currentY, availableWidth)
+                    currentY += dp(30f)
+                }
+            } else {
+                subTextPaint.textSize = dp(11f)
+                subTextPaint.color = getThemedSubTextColor()
+                canvas.drawText(context.getString(R.string.typing_dna_chart_transitions_empty), paddingL, currentY, subTextPaint)
+                currentY += dp(28f)
+            }
+            currentY += dp(8f)
+        }
+
+        if (Section.PRIVACY_GAUGE in visibleSections) {
+            canvas.drawText(context.getString(R.string.typing_dna_chart_privacy_title), paddingL, currentY, textPaint)
+            currentY += dp(12f)
+            drawPrivacyGauge(canvas, s.privacyOnDevicePercent, s.cloudBytesExported, paddingL, currentY, availableWidth)
+        }
     }
 
     private fun drawMetricBar(
@@ -246,7 +295,7 @@ class TypingDnaChartView @JvmOverloads constructor(
         if (total < 0.001f) {
             subTextPaint.textSize = dp(11f)
             subTextPaint.color = getThemedSubTextColor()
-            canvas.drawText("타이핑이 쌓이면 존댓말/친근체 비중이 나타납니다.", x, y + barHeight + dp(14f), subTextPaint)
+            canvas.drawText(context.getString(R.string.typing_dna_chart_tone_empty), x, y + barHeight + dp(14f), subTextPaint)
             return
         }
 
@@ -270,66 +319,72 @@ class TypingDnaChartView @JvmOverloads constructor(
         val iPercent = (informalRatio * 100).toInt()
         subTextPaint.textSize = dp(11f)
         subTextPaint.color = emeraldGreen
-        canvas.drawText("● 존댓말/격식체 $hPercent%", x, legendY, subTextPaint)
+        canvas.drawText(context.getString(R.string.typing_dna_chart_tone_honorific_legend, hPercent), x, legendY, subTextPaint)
         subTextPaint.color = purpleViolet
-        val rightLegend = "● 친근체/반말 $iPercent%"
+        val rightLegend = context.getString(R.string.typing_dna_chart_tone_informal_legend, iPercent)
         canvas.drawText(rightLegend, x + totalWidth - subTextPaint.measureText(rightLegend), legendY, subTextPaint)
     }
 
+    /**
+     * Draws an N-segment split bar (one segment per active [PersonaRegistry] persona, in
+     * registry order, colored from [categoryPalette] by registry index so a persona's color is
+     * stable across renders) plus a wrapped legend below it. Returns the number of legend rows
+     * drawn so the caller can reserve enough vertical space.
+     */
     private fun drawCategorySplitBar(
         canvas: Canvas,
-        messengerRatio: Float,
-        workRatio: Float,
-        generalRatio: Float,
+        categoryCounts: Map<String, Int>,
         x: Float,
         y: Float,
         totalWidth: Float
-    ) {
+    ): Int {
         val barHeight = dp(12f)
         val cornerRadius = dp(6f)
-        val total = messengerRatio + workRatio + generalRatio
 
         bgPaint.color = barBackgroundLight
         scratchRect.set(x, y, x + totalWidth, y + barHeight)
         canvas.drawRoundRect(scratchRect, cornerRadius, cornerRadius, bgPaint)
 
-        if (total < 0.001f) {
+        val entries = PersonaRegistry.all.mapIndexedNotNull { index, persona ->
+            val count = categoryCounts[persona.id] ?: 0
+            if (count > 0) Triple(persona, count, categoryPalette[index % categoryPalette.size]) else null
+        }
+        val total = entries.sumOf { it.second }
+
+        if (entries.isEmpty() || total <= 0) {
             subTextPaint.textSize = dp(11f)
             subTextPaint.color = getThemedSubTextColor()
-            canvas.drawText("메신저·업무·일반 환경별 말투가 여기에 나뉩니다.", x, y + barHeight + dp(14f), subTextPaint)
-            return
+            canvas.drawText(
+                context.getString(R.string.vault_category_chart_empty_hint),
+                x, y + barHeight + dp(14f), subTextPaint
+            )
+            return 1
         }
 
-        val mW = totalWidth * (messengerRatio / total) * animationProgress
-        val wW = totalWidth * (workRatio / total) * animationProgress
+        var segmentStart = x
+        entries.forEach { (_, count, color) ->
+            val segmentWidth = totalWidth * (count.toFloat() / total) * animationProgress
+            barPaint.color = color
+            val segmentEnd = (segmentStart + segmentWidth).coerceAtMost(x + totalWidth)
+            scratchRect.set(segmentStart, y, segmentEnd, y + barHeight)
+            canvas.drawRoundRect(scratchRect, cornerRadius, cornerRadius, barPaint)
+            segmentStart = (segmentEnd + dp(2f)).coerceAtMost(x + totalWidth)
+        }
 
-        barPaint.color = tealCyan
-        scratchRect.set(x, y, x + mW, y + barHeight)
-        canvas.drawRoundRect(scratchRect, cornerRadius, cornerRadius, barPaint)
-
-        barPaint.color = primaryBlue
-        val wLeft = (x + mW + dp(2f)).coerceAtMost(x + totalWidth)
-        val wRight = (wLeft + wW).coerceAtMost(x + totalWidth)
-        scratchRect.set(wLeft, y, wRight, y + barHeight)
-        canvas.drawRoundRect(scratchRect, cornerRadius, cornerRadius, barPaint)
-
-        barPaint.color = slateGray
-        val gLeft = (wRight + dp(2f)).coerceAtMost(x + totalWidth)
-        scratchRect.set(gLeft, y, x + totalWidth, y + barHeight)
-        canvas.drawRoundRect(scratchRect, cornerRadius, cornerRadius, barPaint)
-
-        val legendY = y + barHeight + dp(14f)
-        val mPercent = (messengerRatio * 100).toInt()
-        val wPercent = (workRatio * 100).toInt()
-        val gPercent = (generalRatio * 100).toInt()
         subTextPaint.textSize = dp(11f)
-        subTextPaint.color = tealCyan
-        canvas.drawText("● 메신저 $mPercent%", x, legendY, subTextPaint)
-        subTextPaint.color = primaryBlue
-        canvas.drawText("● 업무 $wPercent%", x + (totalWidth / 3f), legendY, subTextPaint)
-        subTextPaint.color = slateGray
-        val rightLegend = "● 일반 $gPercent%"
-        canvas.drawText(rightLegend, x + totalWidth - subTextPaint.measureText(rightLegend), legendY, subTextPaint)
+        val columns = 3
+        val columnWidth = totalWidth / columns
+        entries.forEachIndexed { i, (persona, count, color) ->
+            val row = i / columns
+            val col = i % columns
+            val percent = (count * 100f / total).toInt()
+            val legendX = x + col * columnWidth
+            val legendY = y + barHeight + dp(14f) + row * dp(16f)
+            subTextPaint.color = color
+            canvas.drawText("● ${context.getString(persona.labelRes)} $percent%", legendX, legendY, subTextPaint)
+        }
+
+        return (entries.size + columns - 1) / columns
     }
 
     private fun drawBigramRow(
@@ -400,18 +455,28 @@ class TypingDnaChartView @JvmOverloads constructor(
         val textX = x + size + dp(16f)
         subTextPaint.textSize = dp(12f)
         subTextPaint.color = emeraldGreen
-        canvas.drawText("Zero-Knowledge · 온디바이스 학습 ${privacyPercent}%", textX, y + dp(28f), subTextPaint)
+        canvas.drawText(context.getString(R.string.typing_dna_chart_privacy_zero_knowledge, privacyPercent), textX, y + dp(28f), subTextPaint)
         subTextPaint.color = getThemedSubTextColor()
-        canvas.drawText("클라우드 전송 ${cloudBytes}B · PII 스크러빙 적용", textX, y + dp(48f), subTextPaint)
-        canvas.drawText("원본 문장은 학습 직후 기기에서 영구 파기됩니다.", textX, y + dp(66f), subTextPaint)
+        canvas.drawText(context.getString(R.string.typing_dna_chart_privacy_cloud, cloudBytes), textX, y + dp(48f), subTextPaint)
+        canvas.drawText(context.getString(R.string.typing_dna_chart_privacy_discard), textX, y + dp(66f), subTextPaint)
     }
 
     private fun buildContentDescription(s: TypingDnaStats): String {
         return buildString {
-            append("AI 언어 지문 차트. 레벨 ${s.level} ${s.levelTitle}. ")
-            append("분석 문장 ${s.totalSentences}개, 단어쌍 ${s.bigramsCount}개, ")
-            append("종결어미 ${s.endingsCount}개, 상용구 ${s.phrasesCount}개. ")
-            append("온디바이스 개인정보 보호 ${s.privacyOnDevicePercent}퍼센트.")
+            append(context.getString(R.string.typing_dna_chart_accessibility_header))
+            if (Section.ACCUMULATION in visibleSections) {
+                append(" ")
+                append(
+                    context.getString(
+                        R.string.typing_dna_chart_accessibility_accumulation,
+                        s.totalSentences, s.bigramsCount, s.endingsCount, s.phrasesCount
+                    )
+                )
+            }
+            if (Section.PRIVACY_GAUGE in visibleSections) {
+                append(" ")
+                append(context.getString(R.string.typing_dna_chart_accessibility_privacy, s.privacyOnDevicePercent))
+            }
         }
     }
 

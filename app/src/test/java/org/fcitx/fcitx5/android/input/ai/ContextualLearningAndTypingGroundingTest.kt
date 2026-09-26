@@ -29,7 +29,6 @@ class ContextualLearningAndTypingGroundingTest {
         predictor = AiContextualPredictor(
             morphology = morphology,
             semanticPredictor = semanticPredictor,
-            prefetcher = null,
             personalizedStore = store
         )
     }

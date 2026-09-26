@@ -25,8 +25,11 @@ class TypingDnaVaultTest {
         assertEquals(TypingDnaVault.CATEGORY_MESSENGER, TypingDnaVault.categorizePackage("com.kakao.talk"))
         assertEquals(TypingDnaVault.CATEGORY_MESSENGER, TypingDnaVault.categorizePackage("org.telegram.messenger"))
         assertEquals(TypingDnaVault.CATEGORY_WORK, TypingDnaVault.categorizePackage("com.slack"))
-        assertEquals(TypingDnaVault.CATEGORY_WORK, TypingDnaVault.categorizePackage("com.google.android.gm"))
-        assertEquals(TypingDnaVault.CATEGORY_GENERAL, TypingDnaVault.categorizePackage("com.android.chrome"))
+        // Gmail now has its own dedicated "email" persona instead of being folded into "work".
+        assertEquals("email", TypingDnaVault.categorizePackage("com.google.android.gm"))
+        // Chrome now has its own dedicated "browser" persona instead of falling back to "general".
+        assertEquals("browser", TypingDnaVault.categorizePackage("com.android.chrome"))
+        assertEquals(TypingDnaVault.CATEGORY_GENERAL, TypingDnaVault.categorizePackage("com.some.unknown.app"))
     }
 
     @Test
@@ -80,18 +83,47 @@ class TypingDnaVaultTest {
     @Test
     fun stagingFileRehydratesAfterNewVaultInstance() {
         val staging = java.io.File.createTempFile("typing_dna_pending", ".json").apply { deleteOnExit() }
-        val first = TypingDnaVault(thresholdPerCategory = 15, stagingFile = staging)
+        val first = TypingDnaVault(thresholdPerCategory = 20, stagingFile = staging)
         first.recordSentence("com.kakao.talk", "친구야 오늘 저녁에 만나자 ㅋㅋ")
         first.recordSentence("com.slack", "배포 모니터링 부탁드립니다.")
         assertTrue(staging.exists() && staging.length() > 2)
 
-        val second = TypingDnaVault(thresholdPerCategory = 15, stagingFile = staging)
+        val second = TypingDnaVault(thresholdPerCategory = 20, stagingFile = staging)
         assertEquals(1, second.getSentences(TypingDnaVault.CATEGORY_MESSENGER).size)
         assertEquals(1, second.getSentences(TypingDnaVault.CATEGORY_WORK).size)
 
         assertEquals(2, second.processPending { _, _ -> })
-        val third = TypingDnaVault(thresholdPerCategory = 15, stagingFile = staging)
+        val third = TypingDnaVault(thresholdPerCategory = 20, stagingFile = staging)
         assertEquals(0, third.totalBufferedCount())
+    }
+
+    @Test
+    fun defaultThresholdIsTen() {
+        var batchReceivedSize: Int? = null
+        val vault = TypingDnaVault(
+            onBatchReady = { _, sentences -> batchReceivedSize = sentences.size }
+        )
+        repeat(9) { idx -> vault.recordSentence("com.kakao.talk", "문장 번호 $idx 입니다") }
+        assertEquals(null, batchReceivedSize)
+
+        assertTrue(vault.recordSentence("com.kakao.talk", "문장 번호 10 입니다"))
+        assertEquals(10, batchReceivedSize)
+    }
+
+    @Test
+    fun pendingByCategoryReportsCountsAndOmitsEmptyCategories() {
+        val vault = TypingDnaVault(thresholdPerCategory = 20)
+        vault.recordSentence("com.kakao.talk", "친구야 오늘 저녁에 만나자")
+        vault.recordSentence("com.slack", "배포 모니터링 부탁드립니다")
+        vault.recordSentence("com.slack", "회의 자료 검토 부탁드립니다")
+
+        val pending = vault.pendingByCategory()
+        assertEquals(1, pending[TypingDnaVault.CATEGORY_MESSENGER])
+        assertEquals(2, pending[TypingDnaVault.CATEGORY_WORK])
+        assertFalse(pending.containsKey(TypingDnaVault.CATEGORY_GENERAL))
+
+        vault.purge(TypingDnaVault.CATEGORY_MESSENGER)
+        assertFalse(vault.pendingByCategory().containsKey(TypingDnaVault.CATEGORY_MESSENGER))
     }
 
     @Test

@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
 import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkInfo
@@ -15,15 +14,17 @@ import androidx.work.WorkManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.debug.gemma.GemmaAccumulationScheduler
-import org.fcitx.fcitx5.android.debug.gemma.GemmaAccumulationStore
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationScheduler
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationStore
 import org.fcitx.fcitx5.android.debug.gemma.GemmaExperimentActivity
-import org.fcitx.fcitx5.android.debug.gemma.GemmaModelFiles
-import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedMaterialPolicy
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationEligibility
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationSnapshot
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaModelFiles
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
-import org.json.JSONObject
 import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.TimeUnit
@@ -32,9 +33,9 @@ class GemmaAccumulationCoverageDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     @Test
-    fun accumulateCoverageAcrossPublicPrefixes() = runBlocking(Dispatchers.Default) {
+    fun accumulateNewPublicContexts() = runBlocking(Dispatchers.Default) {
         val context = instrumentation.targetContext
-        val overallDeadline = SystemClock.elapsedRealtime() + TOTAL_BUDGET_MS
+        val deadline = SystemClock.elapsedRealtime() + TOTAL_BUDGET_MS
         val app = context.applicationContext as FcitxApplication
         val store = GemmaAccumulationStore.get(context)
         val priorEnabled = store.load().enabled
@@ -47,49 +48,79 @@ class GemmaAccumulationCoverageDeviceTest {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }) as GemmaExperimentActivity
             await("keyboard inactive", 10_000) { !OnDeviceGenerationControl.isKeyboardActive }
+
             app.generatedSentenceBank.load()
-            awaitThermalClear(context, app, store, overallDeadline)
+            val beforeCount = app.generatedSentenceBank.sentenceCount
+            val beforeStarts = app.generatedSentenceBank.recentPublicStarts().toSet()
+            val beforeState = store.load()
+            assertEligibility("자동 축적 시작", GemmaGenerationEligibility.snapshot(context))
             GemmaAccumulationScheduler.setEnabled(context, true)
 
             var run = 0
-            while (run < MAX_RUNS && SystemClock.elapsedRealtime() < overallDeadline) {
-                awaitWorkIdle(context, store, overallDeadline)
-                val beforeRequest = GeneratedMaterialPolicy.PREFIXES.associateWith(app.generatedSentenceBank::exactPrefixCount)
-                if (beforeRequest.values.all { it >= 1 }) break
-                awaitThermalClear(context, app, store, overallDeadline)
-                GemmaAccumulationScheduler.requestNow(context)
-                awaitWorkIdle(context, store, overallDeadline)
-                run++
-                val counts = GeneratedMaterialPolicy.PREFIXES.associateWith(app.generatedSentenceBank::exactPrefixCount)
+            var newOpenStart: String? = null
+            while (run < MAX_RUNS && SystemClock.elapsedRealtime() < deadline) {
+                awaitWorkIdle(context, store, deadline)
+                app.generatedSentenceBank.load()
                 val state = store.load()
-                val thermal = thermalStatus(context)
+                newOpenStart = findNewOpenStart(app, beforeStarts)
+                if (app.generatedSentenceBank.sentenceCount > beforeCount &&
+                    state.openSequence > beforeState.openSequence && newOpenStart != null) break
+
+                assertEligibility("자동 축적 재요청", GemmaGenerationEligibility.snapshot(context))
+                GemmaAccumulationScheduler.requestNow(context)
+                awaitWorkIdle(context, store, deadline)
+                run++
+                val progressedState = store.load()
                 instrumentation.sendStatus(0, Bundle().apply {
                     putString("gemmaAccumulationCoverageProgress", JSONObject()
+                        .put("contract", "continuous_public_context_expansion")
                         .put("run", run)
-                        .put("thermalStatus", thermal)
-                        .put("counts", JSONObject(counts as Map<*, *>))
-                        .put("status", state.status)
-                        .put("added", state.added)
-                        .put("rejected", state.rejected)
-                        .put("duplicates", state.duplicates)
-                        .put("attemptsTotal", state.attempts.values.sum())
+                        .put("thermalStatus", GemmaGenerationEligibility.snapshot(context).thermalStatus)
+                        .put("stored", app.generatedSentenceBank.sentenceCount)
+                        .put("openSequence", progressedState.openSequence)
+                        .put("consecutiveUnproductive", progressedState.consecutiveUnproductive)
+                        .put("newRecentPublicStart", findNewOpenStart(app, beforeStarts) != null)
+                        .put("status", progressedState.status)
+                        .put("added", progressedState.added)
+                        .put("rejected", progressedState.rejected)
+                        .put("duplicates", progressedState.duplicates)
+                        .put("attemptsTotal", progressedState.attempts.values.sum())
                         .toString())
                 })
-                if (counts.values.all { it >= 1 }) break
             }
-            val covered = GeneratedMaterialPolicy.PREFIXES.associateWith(app.generatedSentenceBank::exactPrefixCount)
-            assertTrue("Not all public prefixes covered after $run runs: $covered", covered.values.all { it >= 1 })
-            GemmaAccumulationScheduler.setEnabled(context, false)
-            await("native generation stopped", 30_000) { !OnDeviceGenerationControl.isGenerating }
+
             app.generatedSentenceBank.load()
-            val reloaded = GeneratedMaterialPolicy.PREFIXES.associateWith(app.generatedSentenceBank::exactPrefixCount)
-            assertTrue("Reloaded coverage changed: $reloaded", reloaded.values.all { it >= 1 })
-            val evidence = JSONObject()
-                .put("runs", run)
-                .put("prefixCounts", JSONObject(reloaded as Map<*, *>))
-                .put("reloaded", true)
+            val afterCount = app.generatedSentenceBank.sentenceCount
+            val afterState = store.load()
+            newOpenStart = findNewOpenStart(app, beforeStarts)
+            assertTrue("자동 축적이 새 공개 문장을 저장하지 않았습니다.", afterCount > beforeCount)
+            assertTrue("자동 축적이 공개 문맥 순번을 진행하지 않았습니다.", afterState.openSequence > beforeState.openSequence)
+            assertTrue("자동 축적 뒤 새 공개 시작구절이 없습니다.", newOpenStart != null)
+
+            GemmaAccumulationScheduler.setEnabled(context, false)
+            await("native generation stopped", STOP_TIMEOUT_MS) { !OnDeviceGenerationControl.isGenerating }
+            app.generatedSentenceBank.load()
+            val reloadedCount = app.generatedSentenceBank.sentenceCount
+            val reloadedState = store.load()
+            assertEquals("공개 문맥 저장이 reload 뒤 달라졌습니다.", afterCount, reloadedCount)
+            assertEquals("중지 뒤 공개 문맥 순번이 달라졌습니다.", afterState.openSequence, reloadedState.openSequence)
+            assertTrue(
+                "reload 뒤 새 공개 시작구절의 suffix 조회가 실패했습니다.",
+                app.generatedSentenceBank.complete(requireNotNull(newOpenStart), 2).isNotEmpty()
+            )
+            assertFalse("자동 축적을 끈 뒤 native 생성이 남아 있습니다.", OnDeviceGenerationControl.isGenerating)
             instrumentation.sendStatus(0, Bundle().apply {
-                putString("gemmaAccumulationCoverageEvidence", evidence.toString())
+                putString("gemmaAccumulationCoverageEvidence", JSONObject()
+                    .put("contract", "continuous_public_context_expansion_replaces_fixed_20_auto_completion")
+                    .put("runs", run)
+                    .put("beforeCount", beforeCount)
+                    .put("reloadedCount", reloadedCount)
+                    .put("openSequenceBefore", beforeState.openSequence)
+                    .put("openSequenceAfter", reloadedState.openSequence)
+                    .put("newRecentPublicStart", true)
+                    .put("reloaded", true)
+                    .put("nativeStopped", true)
+                    .toString())
             })
         } finally {
             try {
@@ -100,35 +131,15 @@ class GemmaAccumulationCoverageDeviceTest {
         }
     }
 
-    private suspend fun awaitThermalClear(
-        context: android.content.Context,
-        app: FcitxApplication,
-        store: GemmaAccumulationStore,
-        deadline: Long
-    ) {
-        var nextReport = SystemClock.elapsedRealtime()
-        while (SystemClock.elapsedRealtime() < deadline) {
-            val thermal = thermalStatus(context)
-            if (thermal < PowerManager.THERMAL_STATUS_MODERATE) return
-            if (SystemClock.elapsedRealtime() >= nextReport) {
-                val counts = GeneratedMaterialPolicy.PREFIXES.associateWith(app.generatedSentenceBank::exactPrefixCount)
-                instrumentation.sendStatus(0, Bundle().apply {
-                    putString("gemmaAccumulationThermalWait", JSONObject()
-                        .put("thermalStatus", thermal)
-                        .put("elapsedMs", TOTAL_BUDGET_MS - (deadline - SystemClock.elapsedRealtime()))
-                        .put("counts", JSONObject(counts as Map<*, *>))
-                        .put("status", store.state.value.status)
-                        .toString())
-                })
-                nextReport += THERMAL_REPORT_INTERVAL_MS
-            }
-            delay(THERMAL_POLL_MS)
+    private fun findNewOpenStart(app: FcitxApplication, beforeStarts: Set<String>): String? =
+        app.generatedSentenceBank.recentPublicStarts().firstOrNull { start ->
+            start !in beforeStarts
         }
-        throw AssertionError("Thermal status did not clear before the 900 second coverage deadline")
-    }
 
-    private fun thermalStatus(context: android.content.Context): Int =
-        if (Build.VERSION.SDK_INT >= 29) context.getSystemService(PowerManager::class.java).currentThermalStatus else 0
+    private fun assertEligibility(phase: String, snapshot: GemmaGenerationSnapshot) {
+        val reason = GemmaGenerationEligibility.evaluate(snapshot)
+        assertTrue("$phase 안전 조건이 충족되지 않았습니다: ${reason?.message}", reason == null)
+    }
 
     private suspend fun awaitWorkIdle(context: android.content.Context, store: GemmaAccumulationStore, deadline: Long) {
         val waitDeadline = minOf(deadline, SystemClock.elapsedRealtime() + RUN_TIMEOUT_MS)
@@ -145,17 +156,9 @@ class GemmaAccumulationCoverageDeviceTest {
             }
             val oneTimeActive = oneTime.any { !it.state.isFinished }
             val periodicActive = periodic.any { it.state == WorkInfo.State.RUNNING }
-            val active = oneTimeActive || periodicActive
-            if (!active && !OnDeviceGenerationControl.isGenerating) return
+            if (!oneTimeActive && !periodicActive && !OnDeviceGenerationControl.isGenerating) return
             delay(POLL_MS)
         }
-        val manager = WorkManager.getInstance(context)
-        reportWorkDiagnostic(
-            context,
-            store,
-            manager.getWorkInfosForUniqueWork(ONE_TIME).get(WORK_TIMEOUT_SECONDS, TimeUnit.SECONDS),
-            manager.getWorkInfosForUniqueWork(PERIODIC).get(WORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        )
         throw AssertionError("Accumulation work did not become idle within ${RUN_TIMEOUT_MS}ms")
     }
 
@@ -170,9 +173,7 @@ class GemmaAccumulationCoverageDeviceTest {
             .put("state", info.state.name)
             .put("runAttemptCount", info.runAttemptCount)
             .put("stopReason", if (Build.VERSION.SDK_INT >= 31) info.stopReason else JSONObject.NULL)
-            .put("nextScheduleTimeMillis", info.nextScheduleTimeMillis)
         val app = context.applicationContext as FcitxApplication
-        val counts = GeneratedMaterialPolicy.PREFIXES.associateWith(app.generatedSentenceBank::exactPrefixCount)
         instrumentation.sendStatus(0, Bundle().apply {
             putString("gemmaAccumulationWorkDiagnostic", JSONObject()
                 .put("oneTime", JSONArray(oneTime.map(::workJson)))
@@ -180,10 +181,12 @@ class GemmaAccumulationCoverageDeviceTest {
                 .put("status", store.state.value.status)
                 .put("errorPresent", store.state.value.error != null)
                 .put("attemptsTotal", store.state.value.attempts.values.sum())
+                .put("openSequence", store.state.value.openSequence)
+                .put("consecutiveUnproductive", store.state.value.consecutiveUnproductive)
                 .put("keyboardActive", OnDeviceGenerationControl.isKeyboardActive)
                 .put("isGenerating", OnDeviceGenerationControl.isGenerating)
-                .put("thermalStatus", thermalStatus(context))
-                .put("prefixCounts", JSONObject(counts as Map<*, *>))
+                .put("thermalStatus", GemmaGenerationEligibility.snapshot(context).thermalStatus)
+                .put("stored", app.generatedSentenceBank.sentenceCount)
                 .toString())
         })
     }
@@ -201,8 +204,7 @@ class GemmaAccumulationCoverageDeviceTest {
         const val MAX_RUNS = 10
         const val TOTAL_BUDGET_MS = 900_000L
         const val RUN_TIMEOUT_MS = 180_000L
-        const val THERMAL_POLL_MS = 1_000L
-        const val THERMAL_REPORT_INTERVAL_MS = 10_000L
+        const val STOP_TIMEOUT_MS = 30_000L
         const val DIAGNOSTIC_INTERVAL_MS = 10_000L
         const val POLL_MS = 250L
         const val WORK_TIMEOUT_SECONDS = 30L

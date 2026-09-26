@@ -4,7 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.effects
 
+import android.animation.ValueAnimator
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -15,9 +19,11 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.SweepGradient
+import android.os.PowerManager
 import android.os.SystemClock
 import android.view.Choreographer
 import android.view.View
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
 import java.util.concurrent.CopyOnWriteArrayList
@@ -50,6 +56,16 @@ class RgbChromaEffectView(
     private var phase = 0f
     private var lastFrameTimeMs = 0L
     private var isFrameCallbackPosted = false
+
+    private var powerSaveMode = false
+    private var powerSaveReceiverRegistered = false
+
+    private val powerSaveReceiver = object : BroadcastReceiver() {
+        override fun onReceive(receivedContext: Context, intent: Intent) {
+            powerSaveMode = currentPowerSaveMode()
+            refreshGateVisibility()
+        }
+    }
 
     // Signature Chroma Palettes
     private val rainbowColors = intArrayOf(
@@ -210,9 +226,63 @@ class RgbChromaEffectView(
             return
         }
 
+        if (!canAnimate()) {
+            stopLoop()
+            visibility = GONE
+            invalidate()
+            return
+        }
+
         visibility = VISIBLE
         startLoop()
         invalidate()
+    }
+
+    private fun hasActiveEffect(): Boolean {
+        val def = effectDef
+        val ambientMode = def?.effectiveAmbientMode ?: "off"
+        val reactiveMode = def?.effectiveReactiveMode ?: "off"
+        return ambientMode != "off" || reactiveMode != "off" || reactiveEvents.isNotEmpty()
+    }
+
+    private fun currentPowerSaveMode(): Boolean =
+        (context.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isPowerSaveMode ?: false
+
+    private fun canAnimate(): Boolean =
+        EffectGate.shouldAnimate(powerSaveMode, ValueAnimator.areAnimatorsEnabled())
+
+    /**
+     * Re-evaluates whether the ambient/reactive loop should be running given the
+     * current power-save/animator gate, without changing [effectDef] itself.
+     * Called on attach and on power-save mode broadcasts.
+     */
+    private fun refreshGateVisibility() {
+        if (!hasActiveEffect()) return
+        if (canAnimate()) {
+            if (visibility != VISIBLE) visibility = VISIBLE
+            startLoop()
+        } else {
+            stopLoop()
+            if (visibility != GONE) visibility = GONE
+        }
+        invalidate()
+    }
+
+    private fun registerPowerSaveReceiver() {
+        if (powerSaveReceiverRegistered) return
+        ContextCompat.registerReceiver(
+            context,
+            powerSaveReceiver,
+            IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        powerSaveReceiverRegistered = true
+    }
+
+    private fun unregisterPowerSaveReceiver() {
+        if (!powerSaveReceiverRegistered) return
+        context.unregisterReceiver(powerSaveReceiver)
+        powerSaveReceiverRegistered = false
     }
 
     /**
@@ -220,6 +290,7 @@ class RgbChromaEffectView(
      */
     fun spawnReactiveKeyEffect(x: Float, y: Float) {
         val def = effectDef ?: return
+        if (!canAnimate()) return
         val reactiveMode = def.effectiveReactiveMode
         if (reactiveMode == "off") return
 
@@ -254,6 +325,7 @@ class RgbChromaEffectView(
     }
 
     private fun startLoop() {
+        if (!canAnimate()) return
         if (!isFrameCallbackPosted && isAttachedToWindow && visibility == VISIBLE) {
             lastFrameTimeMs = SystemClock.uptimeMillis()
             isFrameCallbackPosted = true
@@ -270,14 +342,14 @@ class RgbChromaEffectView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        val def = effectDef
-        if (def != null && (def.effectiveAmbientMode != "off" || def.effectiveReactiveMode != "off")) {
-            startLoop()
-        }
+        registerPowerSaveReceiver()
+        powerSaveMode = currentPowerSaveMode()
+        refreshGateVisibility()
     }
 
     override fun onDetachedFromWindow() {
         stopLoop()
+        unregisterPowerSaveReceiver()
         super.onDetachedFromWindow()
     }
 
@@ -297,7 +369,7 @@ class RgbChromaEffectView(
         val ambientMode = def?.effectiveAmbientMode ?: "off"
         val reactiveMode = def?.effectiveReactiveMode ?: "off"
 
-        if (def == null || (ambientMode == "off" && reactiveMode == "off" && reactiveEvents.isEmpty()) || visibility != VISIBLE || !isAttachedToWindow) {
+        if (def == null || (ambientMode == "off" && reactiveMode == "off" && reactiveEvents.isEmpty()) || visibility != VISIBLE || !isAttachedToWindow || !canAnimate()) {
             return
         }
 
@@ -334,7 +406,7 @@ class RgbChromaEffectView(
         invalidate()
 
         // Continue animation loop if active
-        if (isAttachedToWindow && visibility == VISIBLE && (ambientMode != "off" || reactiveEvents.isNotEmpty())) {
+        if (isAttachedToWindow && visibility == VISIBLE && canAnimate() && (ambientMode != "off" || reactiveEvents.isNotEmpty())) {
             isFrameCallbackPosted = true
             Choreographer.getInstance().postFrameCallback(this)
         }
@@ -458,7 +530,7 @@ class RgbChromaEffectView(
                 ColorUtils.setAlphaComponent(blendedColor, (currentAlpha * 0.6f).toInt()),
                 ColorUtils.setAlphaComponent(blendedColor, 0)
             ),
-            floatArrayOf(0f, 0.5f, 1f),
+            BREATHING_STOPS,
             Shader.TileMode.CLAMP
         )
 
@@ -503,8 +575,8 @@ class RgbChromaEffectView(
 
             val grad = LinearGradient(
                 cx, tailY, cx, headY,
-                intArrayOf(Color.TRANSPARENT, Color.parseColor("#00CC55"), Color.parseColor("#00FF88"), Color.WHITE),
-                floatArrayOf(0f, 0.6f, 0.9f, 1f),
+                MATRIX_GRADIENT_COLORS,
+                MATRIX_GRADIENT_STOPS,
                 Shader.TileMode.CLAMP
             )
             strokePaint.shader = grad
@@ -532,7 +604,7 @@ class RgbChromaEffectView(
         val shader = LinearGradient(
             pulseX - beamWidth, 0f, pulseX + beamWidth, 0f,
             intArrayOf(Color.TRANSPARENT, color1, color2, Color.WHITE, color2, color1, Color.TRANSPARENT),
-            floatArrayOf(0f, 0.22f, 0.44f, 0.5f, 0.56f, 0.78f, 1f),
+            NEON_PULSE_STOPS,
             Shader.TileMode.CLAMP
         )
         fillPaint.shader = shader
@@ -797,5 +869,17 @@ class RgbChromaEffectView(
         }
         starPath.close()
         canvas.drawPath(starPath, fillPaint)
+    }
+
+    companion object {
+        val BREATHING_STOPS: FloatArray = floatArrayOf(0f, 0.5f, 1f)
+        val MATRIX_GRADIENT_STOPS: FloatArray = floatArrayOf(0f, 0.6f, 0.9f, 1f)
+        val MATRIX_GRADIENT_COLORS: IntArray = intArrayOf(
+            Color.TRANSPARENT,
+            Color.parseColor("#00CC55"),
+            Color.parseColor("#00FF88"),
+            Color.WHITE
+        )
+        val NEON_PULSE_STOPS: FloatArray = floatArrayOf(0f, 0.22f, 0.44f, 0.5f, 0.56f, 0.78f, 1f)
     }
 }

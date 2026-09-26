@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.bar
 
+import android.app.AlertDialog
 import android.graphics.Color
 import android.os.Build
 import android.util.Size
@@ -50,13 +51,17 @@ import org.fcitx.fcitx5.android.input.bar.ui.IdleUi
 import org.fcitx.fcitx5.android.input.bar.ui.TitleUi
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
-import org.fcitx.fcitx5.android.input.ai.AiAssistantWindow
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionIndicator
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceContextCompletionRuntime
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceContextCompletionWindow
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceFailureText
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.FlexboxExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.GridExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.BufferedHangulWindow
 import org.fcitx.fcitx5.android.input.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.OneHandMode
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
@@ -133,6 +138,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var toolbarNeedsSecondRow: Boolean = false
     private var lastPreeditEmpty: Boolean = true
     private var lastCandidateListEmpty: Boolean = true
+    private var automaticSuggestionIndicator: OnDeviceAutomaticSuggestionIndicator =
+        OnDeviceAutomaticSuggestionIndicator.Hidden
+    private val onDeviceContextCompletionRuntime by lazy { OnDeviceContextCompletionRuntime(context) }
 
     // Suggestion row (candidateUi.root) visibility, latched to avoid flicker when preedit
     // momentarily empties out mid-composition. See onCandidatesVisibilityChanged().
@@ -212,6 +220,27 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         val isEnabled = bufferedHangulInputPref.getValue()
         val color = if (isEnabled) theme.accentKeyBackgroundColor else theme.altKeyTextColor
         idleUi.buttonsUi.bufferedHangulButton.setIconTint(color)
+    }
+
+    private val oneHandModePref = prefs.keyboard.oneHandMode
+
+    // Remembers which side to restore when toggling one-hand mode back on from the toolbar.
+    private var oneHandModeLastSide: OneHandMode =
+        oneHandModePref.getValue().takeIf { it != OneHandMode.Off } ?: OneHandMode.Right
+
+    @Keep
+    private val onOneHandModeChangeListener =
+        ManagedPreference.OnChangeListener<OneHandMode> { _, value ->
+            if (value != OneHandMode.Off) {
+                oneHandModeLastSide = value
+            }
+            updateOneHandModeButtonVisual()
+        }
+
+    private fun updateOneHandModeButtonVisual() {
+        val isEnabled = oneHandModePref.getValue() != OneHandMode.Off
+        val color = if (isEnabled) theme.accentKeyBackgroundColor else theme.altKeyTextColor
+        idleUi.buttonsUi.oneHandModeButton.setIconTint(color)
     }
 
     private fun launchClipboardTimeoutJob() {
@@ -367,6 +396,30 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 swipeThresholdX = swipeThresholdY
                 onGestureListener = swipeHideKeyboardCallback
             }
+            automaticSuggestionWarmupButton.setOnClickListener {
+                val indicator = automaticSuggestionIndicator
+                val dialog = if (indicator is OnDeviceAutomaticSuggestionIndicator.Blocked) {
+                    val message = OnDeviceFailureText.of(indicator.code, context.resources) +
+                        "\n\n" + context.getString(R.string.gemma_automatic_blocked_hint)
+                    AlertDialog.Builder(context)
+                        .setTitle(R.string.gemma_automatic_blocked_title)
+                        .setMessage(message)
+                        .setPositiveButton(R.string.ai_retry) { _, _ ->
+                            service.retryAutomaticSuggestionWarmup()
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setCancelable(true)
+                        .create()
+                } else {
+                    AlertDialog.Builder(context)
+                        .setTitle(R.string.gemma_automatic_warmup_title)
+                        .setMessage(R.string.gemma_automatic_warmup_message)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .setCancelable(true)
+                        .create()
+                }
+                service.showDialog(dialog.apply { setCanceledOnTouchOutside(true) })
+            }
             buttonsUi.apply {
                 fun canOpenEditorTool() = !service.isInternalPromptInputOwned
 
@@ -452,9 +505,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     if (!canOpenEditorTool()) return@setOnClickListener
                     windowManager.attachWindow(TypoRecoveryWindow())
                 }
-                aiAssistantButton.setOnClickListener {
+                continueWritingButton.setOnClickListener {
                     if (!canOpenEditorTool()) return@setOnClickListener
-                    windowManager.attachWindow(AiAssistantWindow())
+                    windowManager.attachWindow(OnDeviceContextCompletionWindow())
                 }
                 precisionDictationButton.setOnClickListener {
                     if (!canOpenEditorTool()) return@setOnClickListener
@@ -481,6 +534,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     if (!canOpenEditorTool()) return@setOnLongClickListener true
                     windowManager.attachWindow(org.fcitx.fcitx5.android.tab.UnifiedTabExtensionWindow(org.fcitx.fcitx5.android.tab.TabId.SETTINGS))
                     true
+                }
+                oneHandModeButton.setOnClickListener {
+                    val current = oneHandModePref.getValue()
+                    oneHandModePref.setValue(
+                        if (current == OneHandMode.Off) oneHandModeLastSide else OneHandMode.Off
+                    )
                 }
             }
             clipboardUi.suggestionView.apply {
@@ -639,6 +698,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         bufferedHangulInputPref.registerOnChangeListener(onBufferedHangulInputChangeListener)
         bufferedHangulTransportPref.registerOnChangeListener(onBufferedHangulTransportChangeListener)
         updateBufferedHangulButtonVisual()
+        oneHandModePref.registerOnChangeListener(onOneHandModeChangeListener)
+        updateOneHandModeButtonVisual()
     }
 
     override fun onStartInput(
@@ -655,7 +716,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             toolbarNumRowOnPassword && !showNumberRow && capFlags.has(CapabilityFlag.Password)
         val allowsTextInspection = service.allowsTextInspectionFeatures()
         val allowsNetwork = service.allowsNetworkInputFeatures()
-        val allowsAi = service.allowsAiInputFeatures()
+        val allowsContinueWriting = service.allowsOnDeviceContextCompletionFeatures()
         val previouslyRequested = isToolbarRequested()
         if (!restarting || !hasStartedInput) {
             // Every new editor starts compact. A same-editor Android restart preserves the user's
@@ -693,8 +754,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             isEnabled = allowsNetwork
             alpha = if (isEnabled) 1f else 0.35f
         }
-        idleUi.buttonsUi.aiAssistantButton.apply {
-            isEnabled = allowsAi
+        idleUi.buttonsUi.continueWritingButton.apply {
+            visibility = if (onDeviceContextCompletionRuntime.supported) View.VISIBLE else View.GONE
+            isEnabled = allowsContinueWriting
             alpha = if (isEnabled) 1f else 0.35f
         }
         idleUi.buttonsUi.precisionDictationButton.apply {
@@ -727,6 +789,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             if (shouldShowVoiceInput) switchToVoiceInputCallback else hideKeyboardCallback
         )
         evalIdleUiState()
+    }
+
+    fun updateAutomaticSuggestionIndicator(indicator: OnDeviceAutomaticSuggestionIndicator) {
+        automaticSuggestionIndicator = indicator
+        idleUi.setAutomaticSuggestionIndicator(indicator)
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
@@ -877,7 +944,35 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
 
+    var hasAutomaticCandidates: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                updateBarHeight()
+            }
+        }
+
     var candidateConnectionHintVisible: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                updateBarHeight()
+            }
+        }
+
+    var candidateStatusRowVisible: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                updateBarHeight()
+            }
+        }
+
+    // Set by HorizontalCandidateComponent when it renders the always-two-row candidate bar
+    // (twoRowCandidateBar enabled and not restricted by editor privacy/type). In that mode the
+    // candidate row height never changes with candidate/hint/status content, since an empty row
+    // always shows a placeholder chip instead of collapsing.
+    var candidateRowFixedHeight: Boolean = false
         set(value) {
             if (field != value) {
                 field = value
@@ -903,7 +998,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         )
         val toolRowHeightDp = toolbarHeightSession.heightDp
         val candidateRowHeightDp = when {
-            candidateConnectionHintVisible -> 77
+            candidateRowFixedHeight -> HEIGHT * 2 + 1
+            isCandidateTwoRow && hasAutomaticCandidates -> HEIGHT * 2 + 1
+            candidateConnectionHintVisible || candidateStatusRowVisible -> 77
             isCandidateTwoRow -> CANDIDATE_TWO_ROW_HEIGHT_DP
             else -> HEIGHT
         }

@@ -7,4 +7,6 @@
     <string name="graph_enrichment_failure_network">Could not connect to your AI provider. Check the network and gateway.</string>
     <string name="graph_enrichment_failure_provider_error">Your AI provider could not process the request. Please try again shortly.</string>
     <string name="graph_enrichment_failure_storage">Could not save the enrichment result on this device.</string>
+    <string name="graph_enrichment_failure_model_unavailable">The Saegeul AI model is not ready yet. Please download it first.</string>
+    <string name="graph_enrichment_failure_device_busy">Saegeul AI is busy with another task (like preparing sentence material). Enrichment will continue once it finishes.</string>
 </resources>

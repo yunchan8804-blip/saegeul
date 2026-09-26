@@ -10,7 +10,7 @@ import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.debug.gemma.GemmaMaterialGenerator
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaMaterialGenerator
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBankFormatException
 import org.json.JSONArray

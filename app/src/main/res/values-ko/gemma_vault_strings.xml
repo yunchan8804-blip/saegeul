@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_vault_title">언어 금고 보강</string>
+    <string name="gemma_vault_description">개인 입력을 반영하고, Gemma가 공개 문장을 기기 안에서 준비합니다.</string>
+    <string name="gemma_vault_private_boundary">공개 문장 재료는 개인 언어 금고의 원문을 사용하지 않습니다.</string>
+    <string name="gemma_vault_count">공개 문장 재료 %1$d개</string>
+    <string name="gemma_vault_last_run">마지막 작업 %1$s</string>
+    <string name="gemma_vault_last_run_none">아직 작업 기록이 없습니다.</string>
+    <string name="gemma_vault_automatic">백그라운드 자동 보강</string>
+    <string name="gemma_vault_automatic_notice">끄면 진행 중인 준비와 예약도 중지합니다.</string>
+    <string name="gemma_vault_guard_notice" formatted="false">자동 보강은 배터리 30% 이상, 수동 보강은 20% 이상에서 준비합니다. 입력 중이거나 절전·심한 발열·메모리 부족 상태면 멈춥니다. 실행 시점은 Android 일정에 따라 늦어질 수 있습니다.</string>
+    <string name="gemma_vault_generate">언어 금고 보강</string>
+    <string name="gemma_vault_manual_description">자동 보강보다 많은 문장을 한 번에 준비합니다. 기기 상태에 따라 일찍 멈출 수 있습니다.</string>
+    <string name="gemma_vault_stop">보강 중지</string>
+    <string name="gemma_vault_stop_notice">자동 보강도 함께 꺼집니다.</string>
+    <string name="gemma_vault_model_prepare">Gemma 모델 준비</string>
+    <string name="gemma_vault_model">모델 관리</string>
+    <string name="gemma_vault_manual_scheduled">Gemma 문장 보강을 예약했습니다.</string>
+    <string name="gemma_vault_manual_status">문장 보강이 예약되었습니다. %1$s</string>
+    <string name="gemma_vault_state_read_failed">Gemma 준비 상태를 읽지 못했습니다. 잠시 뒤 다시 확인하세요.</string>
+    <string name="gemma_vault_action_failed">Gemma 문장 보강 요청을 완료하지 못했습니다. 다시 시도하세요.</string>
+    <string name="gemma_vault_personal_sync_running">개인 입력을 반영하는 중입니다.</string>
+    <string name="gemma_vault_personal_sync_completed">개인 입력을 반영했습니다. 분석 문장 %1$d개</string>
+    <string name="gemma_vault_personal_sync_no_new">새로 반영할 개인 입력이 없습니다. 분석 문장 %1$d개</string>
+    <string name="gemma_vault_personal_sync_failed">개인 입력을 반영하지 못했습니다. 다시 시도하세요.</string>
+    <string name="gemma_vault_personal_graph_title">개인 그래프</string>
+    <string name="gemma_vault_personal_graph_description">기기에 반영한 개인 입력의 통계를 보여줍니다.</string>
+</resources>

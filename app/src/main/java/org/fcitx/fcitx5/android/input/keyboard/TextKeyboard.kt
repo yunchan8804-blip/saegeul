@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.popup.AlphabetPopupLegends
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import splitties.views.imageResource
 
@@ -237,23 +238,52 @@ class TextKeyboard(
         val newAction = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.content))
             is PopupAction.PreviewUpdateAction -> action.copy(content = transformPopupPreview(action.content))
-            is PopupAction.ShowKeyboardAction -> {
-                when (action.keyboard) {
-                    is KeyDef.Popup.Keyboard.Preset -> {
-                        val label = action.keyboard.label
-                        if (label.length == 1 && label[0].isLetter())
-                            action.copy(
-                                keyboard = action.keyboard.copy(label = transformAlphabetLegend(label))
-                            )
-                        else action
-                    }
-                    is KeyDef.Popup.Keyboard.Explicit -> action
-                }
-            }
+            is PopupAction.ShowKeyboardAction -> resolveShowKeyboardAction(action)
             else -> action
         }
         super.onPopupAction(newAction)
     }
+
+    /**
+     * The alphabet key long-press popup's first entry must always match the alt legend printed
+     * under the key, and in Hangul input its second entry (when any) is the key's Shift jamo,
+     * sent as the Latin letter fcitx5-hangul already composes that jamo from. See
+     * [AlphabetPopupLegends].
+     *
+     * [KeyDef.Popup.Keyboard.Preset.label] is the key's constant, always upper-case letter — not
+     * the case the key is currently displaying — so when there is no override the label is still
+     * replaced with the caps-cased letter, exactly as this used to work before the popup could
+     * carry its own keys/labels: otherwise the default preset lookup would show the wrong case's
+     * accented letters (e.g. Shift-less "e" long-press showing the "E" set's accents).
+     */
+    private fun resolveShowKeyboardAction(
+        action: PopupAction.ShowKeyboardAction
+    ): PopupAction.ShowKeyboardAction {
+        val keyboard = action.keyboard
+        if (keyboard !is KeyDef.Popup.Keyboard.Preset) return action
+        val label = keyboard.label
+        if (label.length != 1 || !label[0].isLetter()) return action
+        val casedChar = transformAlphabet(label)[0]
+        val entries = AlphabetPopupLegends.resolve(
+            rawChar = label[0],
+            casedChar = casedChar,
+            altLegend = alphabetAltLegend(label),
+            hangulActive = hangulInputMethodActive,
+            hangulLayout = hangulKeyboardLayout
+        )
+        return if (entries != null) {
+            action.copy(keysOverride = entries.keys, labelsOverride = entries.labels)
+        } else {
+            action.copy(keyboard = keyboard.copy(label = casedChar.toString()))
+        }
+    }
+
+    /** The alt legend (swipe/long-press hint) currently printed under the alphabet key [label]. */
+    private fun alphabetAltLegend(label: String): String? =
+        textKeys.asSequence()
+            .mapNotNull { it.def as? KeyDef.Appearance.AltText }
+            .firstOrNull { it.displayText == label }
+            ?.altText
 
     private fun switchCapsState(lock: Boolean = false) {
         capsState =

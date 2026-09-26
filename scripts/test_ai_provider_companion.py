@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 
@@ -516,6 +517,34 @@ class CliBoundaryTest(unittest.TestCase):
                 )
                 self.assertEqual('{"suggestions":["오늘 점심 뭐 먹을래?"]}', result)
 
+    def test_generate_recreates_cli_sandbox_removed_by_temp_cleanup(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            root = Path(sandbox) / "cli-sandbox"
+            root.mkdir()
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = root
+            runner.codex = None
+            runner.claude = None
+            runner.agy = "agy.exe"
+            runner.available = {companion.CliBackendRunner.MODEL_AGY}
+            runner._slot = companion.threading.BoundedSemaphore(1)
+            root.rmdir()
+            self.assertFalse(root.exists())
+
+            with mock.patch.object(
+                runner, "_run_agy", return_value='{"suggestions":["오늘 점심 뭐 먹을래?"]}'
+            ) as mocked:
+                result = runner.generate(
+                    companion.CliBackendRunner.MODEL_AGY,
+                    "Return exactly 1 suggestion(s).",
+                    "오눌 점심 머먹을래?",
+                    1,
+                )
+
+            self.assertEqual('{"suggestions":["오늘 점심 뭐 먹을래?"]}', result)
+            self.assertTrue(mocked.called)
+            self.assertTrue(root.is_dir())
+
     def test_agy_generate_allows_an_empty_continuation_abstention_response(self):
         with tempfile.TemporaryDirectory() as sandbox:
             runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
@@ -566,18 +595,96 @@ class CliBoundaryTest(unittest.TestCase):
                 self.assertEqual(Path(sandbox), mocked.call_args.kwargs["cwd"])
                 self.assertEqual(companion.CLI_TIMEOUT_SECONDS, mocked.call_args.kwargs["timeout"])
 
+    def test_windows_npm_codex_uses_node_entry_for_login_and_generation(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            root = Path(sandbox)
+            shim_parent = root / "npm shim"
+            shim_parent.mkdir()
+            shim = shim_parent / "codex.cmd"
+            shim.touch()
+            entry = shim_parent / "node_modules" / "@openai" / "codex" / "bin" / "codex.js"
+            entry.parent.mkdir(parents=True)
+            entry.touch()
+            node = shim_parent / "node.exe"
+            node.touch()
+            prefix = [str(node), str(entry)]
+
+            self.assertEqual(prefix, companion.codex_command_prefix(str(shim)))
+
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = root
+            runner.codex = str(shim)
+            runner.codex_command = prefix
+            runner.claude = None
+            runner.agy = None
+            runner.codex_model = companion.DEFAULT_CODEX_MODEL
+            runner.codex_effort = companion.DEFAULT_CODEX_EFFORT
+            completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="hello", stderr="")
+            prompt = "한글 입력 원문"
+
+            with mock.patch.object(companion, "run_quiet", return_value=completed) as mocked:
+                self.assertEqual({companion.CliBackendRunner.MODEL_CODEX}, runner._detect_available())
+                self.assertEqual("hello", runner._run_codex(prompt))
+
+            login_command = mocked.call_args_list[0].args[0]
+            generation_command = mocked.call_args_list[1].args[0]
+            self.assertEqual([*prefix, "login", "status"], login_command)
+            self.assertEqual(prefix, generation_command[:2])
+            self.assertNotIn(prompt, generation_command)
+            self.assertEqual(prompt, mocked.call_args_list[1].kwargs["input_text"])
+
+    def test_codex_command_prefix_preserves_native_and_missing_entry_fallbacks(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            root = Path(sandbox)
+            native = root / "codex.exe"
+            native.touch()
+            shim_parent = root / "npm shim"
+            shim_parent.mkdir()
+            shim = shim_parent / "codex.cmd"
+            shim.touch()
+
+            self.assertEqual([str(native)], companion.codex_command_prefix(str(native)))
+            self.assertEqual([str(shim)], companion.codex_command_prefix(str(shim)))
+
+    def test_codex_command_prefix_uses_discovered_node_or_fails_when_missing(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            root = Path(sandbox)
+            shim_parent = root / "npm shim"
+            shim_parent.mkdir()
+            shim = shim_parent / "codex.cmd"
+            shim.touch()
+            entry = shim_parent / "node_modules" / "@openai" / "codex" / "bin" / "codex.js"
+            entry.parent.mkdir(parents=True)
+            entry.touch()
+            discovered_node = root / "Node.js" / "node.exe"
+            discovered_node.parent.mkdir()
+            discovered_node.touch()
+
+            with mock.patch.object(companion, "find_executable", return_value=str(discovered_node)):
+                self.assertEqual(
+                    [str(discovered_node), str(entry)], companion.codex_command_prefix(str(shim))
+                )
+            with mock.patch.object(companion, "find_executable", return_value=None):
+                with self.assertRaisesRegex(ValueError, "requires a Node.js executable"):
+                    companion.codex_command_prefix(str(shim))
+
     def test_run_codex_uses_yolo_without_read_only_conflicts(self):
         with tempfile.TemporaryDirectory() as sandbox:
             runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
             runner.sandbox_dir = Path(sandbox)
             runner.codex = "codex.cmd"
+            runner.codex_command = [runner.codex]
+            runner.codex_model = companion.DEFAULT_CODEX_MODEL
+            runner.codex_effort = companion.DEFAULT_CODEX_EFFORT
+            prompt = "한글 입력 원문"
 
             completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="hello", stderr="")
             with mock.patch.object(companion, "run_quiet", return_value=completed) as mocked:
-                result = runner._run_codex("prompt text")
+                result = runner._run_codex(prompt)
 
             self.assertEqual("hello", result)
             command = mocked.call_args.args[0]
+            self.assertEqual(companion.DEFAULT_CODEX_MODEL, command[command.index("--model") + 1])
             self.assertEqual(1, command.count("--yolo"))
             self.assertNotIn("--sandbox", command)
             self.assertNotIn("read-only", command)
@@ -587,11 +694,64 @@ class CliBoundaryTest(unittest.TestCase):
             self.assertIn("--ignore-user-config", command)
             self.assertIn("--ignore-rules", command)
             self.assertIn('web_search="disabled"', command)
+            self.assertIn(
+                'model_reasoning_effort="low"', command
+            )
             self.assertEqual("never", command[command.index("--color") + 1])
             self.assertEqual(str(Path(sandbox)), command[command.index("-C") + 1])
-            self.assertEqual("-", command[-1])
-            self.assertEqual("prompt text", mocked.call_args.kwargs["input_text"])
+            self.assertEqual(str(Path(sandbox)), command[-1])
+            self.assertNotIn("-", command)
+            self.assertNotIn(prompt, command)
+            self.assertEqual(prompt, mocked.call_args.kwargs["input_text"])
             self.assertEqual(companion.CLI_TIMEOUT_SECONDS, mocked.call_args.kwargs["timeout"])
+
+    def test_run_codex_uses_configured_model_and_effort(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.codex = "codex.cmd"
+            runner.codex_command = [runner.codex]
+            runner.codex_model = "rollback-model"
+            runner.codex_effort = "xhigh"
+
+            completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="hello", stderr="")
+            with mock.patch.object(companion, "run_quiet", return_value=completed) as mocked:
+                runner._run_codex("prompt text")
+
+            command = mocked.call_args.args[0]
+            self.assertEqual("rollback-model", command[command.index("--model") + 1])
+            self.assertIn('model_reasoning_effort="xhigh"', command)
+
+    def test_run_codex_nonzero_result_does_not_retry(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.codex = "codex.cmd"
+            runner.codex_command = [runner.codex]
+            runner.codex_model = companion.DEFAULT_CODEX_MODEL
+            runner.codex_effort = companion.DEFAULT_CODEX_EFFORT
+
+            failed = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="failure")
+            with mock.patch.object(companion, "run_quiet", return_value=failed) as mocked:
+                with self.assertRaisesRegex(RuntimeError, "Codex non-interactive request failed"):
+                    runner._run_codex("prompt text")
+
+            mocked.assert_called_once()
+
+    def test_run_codex_timeout_does_not_retry(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.codex = "codex.cmd"
+            runner.codex_command = [runner.codex]
+            runner.codex_model = companion.DEFAULT_CODEX_MODEL
+            runner.codex_effort = companion.DEFAULT_CODEX_EFFORT
+
+            with mock.patch.object(companion, "run_quiet", return_value=None) as mocked:
+                with self.assertRaisesRegex(RuntimeError, "Codex non-interactive request failed"):
+                    runner._run_codex("prompt text")
+
+            mocked.assert_called_once()
 
     def test_run_claude_uses_skip_permissions_without_safe_mode_conflicts(self):
         with tempfile.TemporaryDirectory() as sandbox:
@@ -618,6 +778,48 @@ class CliBoundaryTest(unittest.TestCase):
             self.assertEqual(Path(sandbox), mocked.call_args.kwargs["cwd"])
             self.assertEqual("prompt text", mocked.call_args.kwargs["input_text"])
             self.assertEqual(companion.CLI_TIMEOUT_SECONDS, mocked.call_args.kwargs["timeout"])
+
+    def test_run_claude_reads_the_result_event_from_a_streamed_event_array(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.claude = "claude.exe"
+
+            stdout = companion.json.dumps(
+                [
+                    {"type": "system", "subtype": "init"},
+                    {"type": "assistant", "message": {"content": []}},
+                    {"type": "result", "subtype": "success", "is_error": False, "result": "hello"},
+                ]
+            )
+            completed = subprocess.CompletedProcess(args=[], returncode=0, stdout=stdout, stderr="")
+            with mock.patch.object(companion, "run_quiet", return_value=completed):
+                self.assertEqual("hello", runner._run_claude("prompt text"))
+
+    def test_run_claude_rejects_a_streamed_error_result_event(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.claude = "claude.exe"
+
+            stdout = companion.json.dumps(
+                [{"type": "result", "subtype": "error_max_turns", "is_error": True, "result": ""}]
+            )
+            completed = subprocess.CompletedProcess(args=[], returncode=0, stdout=stdout, stderr="")
+            with mock.patch.object(companion, "run_quiet", return_value=completed):
+                with self.assertRaises(RuntimeError):
+                    runner._run_claude("prompt text")
+
+    def test_run_claude_rejects_a_payload_without_result_events(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            runner = companion.CliBackendRunner.__new__(companion.CliBackendRunner)
+            runner.sandbox_dir = Path(sandbox)
+            runner.claude = "claude.exe"
+
+            completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="[]", stderr="")
+            with mock.patch.object(companion, "run_quiet", return_value=completed):
+                with self.assertRaises(RuntimeError):
+                    runner._run_claude("prompt text")
 
     def test_run_agy_uses_configured_model_and_effort(self):
         with tempfile.TemporaryDirectory() as sandbox:
@@ -652,6 +854,70 @@ class CliBoundaryTest(unittest.TestCase):
                 self.assertEqual(companion.DEFAULT_AGY_MODEL, runner.agy_model)
                 self.assertEqual(companion.DEFAULT_AGY_EFFORT, runner.agy_effort)
 
+    def test_cli_backend_runner_init_accepts_codex_model_and_effort(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            with mock.patch.object(companion, "find_executable", return_value=None), mock.patch.object(
+                companion.CliBackendRunner, "_detect_available", return_value={companion.CliBackendRunner.MODEL_AGY}
+            ):
+                runner = companion.CliBackendRunner(
+                    Path(sandbox),
+                    codex_model="provider/gpt-6-astra:rollback_v1.0",
+                    codex_effort="medium",
+                )
+
+            self.assertEqual("provider/gpt-6-astra:rollback_v1.0", runner.codex_model)
+            self.assertEqual("medium", runner.codex_effort)
+
+    def test_cli_backend_runner_rejects_invalid_codex_options_before_cli_detection(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            with mock.patch.object(companion.CliBackendRunner, "_detect_available") as detect:
+                with self.assertRaisesRegex(ValueError, "Codex model"):
+                    companion.CliBackendRunner(Path(sandbox), codex_model="gpt 6")
+                detect.assert_not_called()
+
+            with mock.patch.object(companion.CliBackendRunner, "_detect_available") as detect:
+                with self.assertRaisesRegex(ValueError, "reasoning effort"):
+                    companion.CliBackendRunner(Path(sandbox), codex_effort="ultra")
+                detect.assert_not_called()
+
+    def test_run_cli_gateway_passes_codex_model_and_effort_to_runner(self):
+        with tempfile.TemporaryDirectory() as sandbox:
+            args = SimpleNamespace(
+                sandbox_dir=sandbox,
+                agy_model=companion.DEFAULT_AGY_MODEL,
+                agy_effort=companion.DEFAULT_AGY_EFFORT,
+                codex_model="rollback-model",
+                codex_effort="xhigh",
+                public_origin="https://computer.example:8840",
+                tailscale_https_port=companion.DEFAULT_TAILSCALE_HTTPS_PORT,
+                oauth_state_path=str(Path(sandbox) / "oauth.bin"),
+                display_name="Computer AI",
+                redirect_uri=companion.DEFAULT_REDIRECT_URI,
+                gateway_port=companion.DEFAULT_GATEWAY_PORT,
+                name="computer",
+                address="192.168.0.2",
+            )
+            runner = mock.Mock()
+            runner.available = {companion.CliBackendRunner.MODEL_CODEX}
+            runner.codex_model = args.codex_model
+            runner.codex_effort = args.codex_effort
+            server = mock.Mock()
+            thread = mock.Mock()
+            with mock.patch.object(companion, "CliBackendRunner", return_value=runner) as factory, mock.patch.object(
+                companion.http.server, "ThreadingHTTPServer", return_value=server
+            ), mock.patch.object(companion.threading, "Thread", return_value=thread), mock.patch.object(
+                companion, "verify_public_manifest_with_retry", return_value={"display_name": "Computer AI"}
+            ), mock.patch.object(companion, "advertise"), mock.patch("builtins.print"):
+                companion.run_cli_gateway(args)
+
+            factory.assert_called_once_with(
+                Path(sandbox).resolve(),
+                agy_model=args.agy_model,
+                agy_effort=args.agy_effort,
+                codex_model="rollback-model",
+                codex_effort="xhigh",
+            )
+
 
 class ParseArgsAgyOptionsTest(unittest.TestCase):
     def parse(self, argv: list[str]) -> "companion.argparse.Namespace":
@@ -672,6 +938,73 @@ class ParseArgsAgyOptionsTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             with mock.patch.object(sys, "stderr"):
                 self.parse(["--agy-effort", "ultra"])
+
+
+class ParseArgsCodexOptionsTest(unittest.TestCase):
+    def setUp(self):
+        self.codex_environment = mock.patch.dict(
+            os.environ,
+            {
+                "FCITX_AI_CODEX_MODEL": companion.DEFAULT_CODEX_MODEL,
+                "FCITX_AI_CODEX_EFFORT": companion.DEFAULT_CODEX_EFFORT,
+            },
+        )
+        self.codex_environment.start()
+        self.addCleanup(self.codex_environment.stop)
+
+    def parse(self, argv: list[str]) -> "companion.argparse.Namespace":
+        with mock.patch.object(sys, "argv", ["ai-provider-companion.py", *argv]):
+            return companion.parse_args()
+
+    def test_codex_model_and_effort_defaults(self):
+        args = self.parse([])
+        self.assertEqual(companion.DEFAULT_CODEX_MODEL, args.codex_model)
+        self.assertEqual(companion.DEFAULT_CODEX_EFFORT, args.codex_effort)
+
+    def test_codex_cli_options_override_environment(self):
+        with mock.patch.dict(
+            os.environ,
+            {"FCITX_AI_CODEX_MODEL": "env-model", "FCITX_AI_CODEX_EFFORT": "medium"},
+        ):
+            args = self.parse(["--codex-model", "rollback-model", "--codex-effort", "xhigh"])
+
+        self.assertEqual("rollback-model", args.codex_model)
+        self.assertEqual("xhigh", args.codex_effort)
+
+    def test_codex_environment_options_are_used_when_cli_options_are_absent(self):
+        with mock.patch.dict(
+            os.environ,
+            {"FCITX_AI_CODEX_MODEL": "rollback-model", "FCITX_AI_CODEX_EFFORT": "medium"},
+        ):
+            args = self.parse([])
+
+        self.assertEqual("rollback-model", args.codex_model)
+        self.assertEqual("medium", args.codex_effort)
+
+    def test_invalid_codex_effort_from_cli_or_environment_is_rejected(self):
+        with self.assertRaises(SystemExit):
+            with mock.patch.object(sys, "stderr"):
+                self.parse(["--codex-effort", "ultra"])
+
+        with mock.patch.dict(os.environ, {"FCITX_AI_CODEX_EFFORT": "ultra"}):
+            with self.assertRaises(SystemExit):
+                with mock.patch.object(sys, "stderr"):
+                    self.parse([])
+
+    def test_invalid_codex_model_is_rejected(self):
+        for model in (
+            "", " ", "gpt 6", "gpt\n6", "x" * 121, "gpt&6", "gpt|6", "gpt%6", 'gpt"6', "gpt;6"
+        ):
+            with self.subTest(model=model):
+                with self.assertRaises(SystemExit):
+                    with mock.patch.object(sys, "stderr"):
+                        self.parse(["--codex-model", model])
+
+    def test_invalid_codex_model_from_environment_is_rejected(self):
+        with mock.patch.dict(os.environ, {"FCITX_AI_CODEX_MODEL": "gpt 6"}):
+            with self.assertRaises(SystemExit):
+                with mock.patch.object(sys, "stderr"):
+                    self.parse([])
 
 
 if __name__ == "__main__":

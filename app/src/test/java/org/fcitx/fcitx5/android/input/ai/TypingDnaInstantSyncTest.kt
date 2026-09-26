@@ -28,7 +28,7 @@ class TypingDnaInstantSyncTest {
         val staging = tempFolder.newFile("typing_dna_pending.json")
         val repoFile = tempFolder.newFile("typing_dna.json")
         val vault = TypingDnaVault(
-            thresholdPerCategory = 15,
+            thresholdPerCategory = 20,
             stagingFile = staging
         )
         val collector = UserTypingContextCollector(
@@ -54,7 +54,7 @@ class TypingDnaInstantSyncTest {
 
         // IME service is gone; a new vault instance is what the dashboard process would open.
         val vaultAfterImeDeath = TypingDnaVault(
-            thresholdPerCategory = 15,
+            thresholdPerCategory = 20,
             stagingFile = staging
         )
         assertEquals(
@@ -101,7 +101,7 @@ class TypingDnaInstantSyncTest {
 
     @Test
     fun koreanEndingFromPasteTransportIsCollectedWithoutSubmit() {
-        val vault = TypingDnaVault(thresholdPerCategory = 15)
+        val vault = TypingDnaVault(thresholdPerCategory = 20)
         val sink = TypingDnaCommitSink(
             UserTypingContextCollector(
                 onSentenceCommitted = { pkg, sentence -> vault.recordSentence(pkg, sentence) }
@@ -138,7 +138,7 @@ class TypingDnaInstantSyncTest {
 
     @Test
     fun syncNowUsesOnlyOnDeviceProfiling() {
-        val vault = TypingDnaVault(thresholdPerCategory = 15)
+        val vault = TypingDnaVault(thresholdPerCategory = 20)
         val repository = TypingDnaRepository(tempFolder.newFile("typing_dna_on_device.json"))
         val compiler = TypingDnaCompiler(
             collocationModel = KoreanCollocationModel(),

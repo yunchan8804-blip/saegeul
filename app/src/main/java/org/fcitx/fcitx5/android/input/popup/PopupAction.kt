@@ -30,7 +30,20 @@ sealed class PopupAction {
     data class ShowKeyboardAction(
         override val viewId: Int,
         val keyboard: KeyDef.Popup.Keyboard,
-        val bounds: Rect
+        val bounds: Rect,
+        /**
+         * When set, replaces the [KeyDef.Popup.Keyboard.Preset] lookup as the popup's key
+         * values (what gets committed). Lets a keyboard correct or replace a preset's entries
+         * without needing a matching [PopupPreset] table entry.
+         */
+        val keysOverride: Array<String>? = null,
+        /**
+         * When set, used as the popup's displayed labels as-is, bypassing punctuation
+         * transformation. Needed whenever a label must differ from what it commits, e.g. a
+         * Hangul jamo label whose key value is the Latin letter fcitx expects for that shift
+         * state.
+         */
+        val labelsOverride: Array<String>? = null
     ) : PopupAction()
 
     data class ShowMenuAction(

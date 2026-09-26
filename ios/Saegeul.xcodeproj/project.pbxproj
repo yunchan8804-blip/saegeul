@@ -1,0 +1,625 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		8A0E0000000000000000000D /* SaegeulApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000006 /* SaegeulApp.swift */; };
+		8A0E0000000000000000000E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000007 /* ContentView.swift */; };
+		8A0E0000000000000000000F /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000009 /* KeyboardViewController.swift */; };
+		8A0E00000000000000000010 /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E0000000000000000000A /* KeyboardView.swift */; };
+		8A0E00000000000000000011 /* DocumentProxyAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E0000000000000000000B /* DocumentProxyAdapter.swift */; };
+		8A0E00000000000000000012 /* HangulCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8A0E0000000000000000002C /* HangulCore */; };
+		8A0E00000000000000000013 /* HangulCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8A0E0000000000000000002D /* HangulCore */; };
+		8A0E00000000000000000014 /* SaegeulKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000005 /* SaegeulKeyboard.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		8A0E00000000000000000030 /* KeyboardSpikeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E0000000000000000002E /* KeyboardSpikeUITests.swift */; };
+		8A0E0000000000000000003B /* SaegeulPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000040 /* SaegeulPalette.swift */; };
+		8A0E0000000000000000003C /* OnboardingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000041 /* OnboardingModel.swift */; };
+		8A0E0000000000000000003D /* HangulProbeField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000042 /* HangulProbeField.swift */; };
+		8A0E0000000000000000003E /* StepIllustrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000043 /* StepIllustrations.swift */; };
+		8A0E0000000000000000003F /* OnboardingChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0E00000000000000000044 /* OnboardingChecklistView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8A0E00000000000000000021 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8A0E00000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8A0E00000000000000000003;
+			remoteInfo = SaegeulKeyboard;
+		};
+		8A0E00000000000000000033 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8A0E00000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8A0E00000000000000000002;
+			remoteInfo = Saegeul;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8A0E0000000000000000001B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8A0E00000000000000000014 /* SaegeulKeyboard.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		8A0E00000000000000000004 /* Saegeul.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Saegeul.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A0E00000000000000000005 /* SaegeulKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SaegeulKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A0E00000000000000000006 /* SaegeulApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaegeulApp.swift; sourceTree = "<group>"; };
+		8A0E00000000000000000007 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		8A0E00000000000000000008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		8A0E00000000000000000009 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		8A0E0000000000000000000A /* KeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardView.swift; sourceTree = "<group>"; };
+		8A0E0000000000000000000B /* DocumentProxyAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentProxyAdapter.swift; sourceTree = "<group>"; };
+		8A0E0000000000000000000C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		8A0E0000000000000000002E /* KeyboardSpikeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardSpikeUITests.swift; sourceTree = "<group>"; };
+		8A0E0000000000000000002F /* SaegeulUITests.xctest */ = {isa = PBXFileReference; explicitFileType = "wrapper.cfbundle"; includeInIndex = 0; path = SaegeulUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A0E00000000000000000040 /* SaegeulPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaegeulPalette.swift; sourceTree = "<group>"; };
+		8A0E00000000000000000041 /* OnboardingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModel.swift; sourceTree = "<group>"; };
+		8A0E00000000000000000042 /* HangulProbeField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HangulProbeField.swift; sourceTree = "<group>"; };
+		8A0E00000000000000000043 /* StepIllustrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepIllustrations.swift; sourceTree = "<group>"; };
+		8A0E00000000000000000044 /* OnboardingChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingChecklistView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8A0E00000000000000000015 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A0E00000000000000000012 /* HangulCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0E00000000000000000016 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A0E00000000000000000013 /* HangulCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0E00000000000000000036 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		8A0E0000000000000000001C = {
+			isa = PBXGroup;
+			children = (
+				8A0E0000000000000000001D /* App */,
+				8A0E0000000000000000001E /* Keyboard */,
+				8A0E00000000000000000031 /* SaegeulUITests */,
+				8A0E0000000000000000001F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		8A0E0000000000000000001D /* App */ = {
+			isa = PBXGroup;
+			children = (
+				8A0E00000000000000000006 /* SaegeulApp.swift */,
+				8A0E00000000000000000007 /* ContentView.swift */,
+				8A0E00000000000000000008 /* Info.plist */,
+				8A0E00000000000000000045 /* Theme */,
+				8A0E00000000000000000046 /* Onboarding */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		8A0E00000000000000000045 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				8A0E00000000000000000040 /* SaegeulPalette.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		8A0E00000000000000000046 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				8A0E00000000000000000041 /* OnboardingModel.swift */,
+				8A0E00000000000000000042 /* HangulProbeField.swift */,
+				8A0E00000000000000000043 /* StepIllustrations.swift */,
+				8A0E00000000000000000044 /* OnboardingChecklistView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		8A0E0000000000000000001E /* Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				8A0E00000000000000000009 /* KeyboardViewController.swift */,
+				8A0E0000000000000000000A /* KeyboardView.swift */,
+				8A0E0000000000000000000B /* DocumentProxyAdapter.swift */,
+				8A0E0000000000000000000C /* Info.plist */,
+			);
+			path = Keyboard;
+			sourceTree = "<group>";
+		};
+		8A0E00000000000000000031 /* SaegeulUITests */ = {
+			isa = PBXGroup;
+			children = (
+				8A0E0000000000000000002E /* KeyboardSpikeUITests.swift */,
+			);
+			path = SaegeulUITests;
+			sourceTree = "<group>";
+		};
+		8A0E0000000000000000001F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8A0E00000000000000000004 /* Saegeul.app */,
+				8A0E00000000000000000005 /* SaegeulKeyboard.appex */,
+				8A0E0000000000000000002F /* SaegeulUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8A0E00000000000000000002 /* Saegeul */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A0E00000000000000000029 /* Build configuration list for PBXNativeTarget "Saegeul" */;
+			buildPhases = (
+				8A0E00000000000000000017 /* Sources */,
+				8A0E00000000000000000015 /* Frameworks */,
+				8A0E00000000000000000019 /* Resources */,
+				8A0E0000000000000000001B /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8A0E00000000000000000020 /* PBXTargetDependency */,
+			);
+			name = Saegeul;
+			packageProductDependencies = (
+				8A0E0000000000000000002C /* HangulCore */,
+			);
+			productName = Saegeul;
+			productReference = 8A0E00000000000000000004 /* Saegeul.app */;
+			productType = "com.apple.product-type.application";
+		};
+		8A0E00000000000000000003 /* SaegeulKeyboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A0E0000000000000000002A /* Build configuration list for PBXNativeTarget "SaegeulKeyboard" */;
+			buildPhases = (
+				8A0E00000000000000000018 /* Sources */,
+				8A0E00000000000000000016 /* Frameworks */,
+				8A0E0000000000000000001A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SaegeulKeyboard;
+			packageProductDependencies = (
+				8A0E0000000000000000002D /* HangulCore */,
+			);
+			productName = SaegeulKeyboard;
+			productReference = 8A0E00000000000000000005 /* SaegeulKeyboard.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		8A0E00000000000000000032 /* SaegeulUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A0E0000000000000000003A /* Build configuration list for PBXNativeTarget "SaegeulUITests" */;
+			buildPhases = (
+				8A0E00000000000000000035 /* Sources */,
+				8A0E00000000000000000036 /* Frameworks */,
+				8A0E00000000000000000037 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8A0E00000000000000000034 /* PBXTargetDependency */,
+			);
+			name = SaegeulUITests;
+			productName = SaegeulUITests;
+			productReference = 8A0E0000000000000000002F /* SaegeulUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		8A0E00000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					8A0E00000000000000000002 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					8A0E00000000000000000003 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					8A0E00000000000000000032 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 8A0E00000000000000000002;
+					};
+				};
+			};
+			buildConfigurationList = 8A0E00000000000000000028 /* Build configuration list for PBXProject "Saegeul" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = ko;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				ko,
+				Base,
+			);
+			mainGroup = 8A0E0000000000000000001C;
+			packageReferences = (
+				8A0E0000000000000000002B /* XCLocalSwiftPackageReference "HangulCore" */,
+			);
+			productRefGroup = 8A0E0000000000000000001F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8A0E00000000000000000002 /* Saegeul */,
+				8A0E00000000000000000003 /* SaegeulKeyboard */,
+				8A0E00000000000000000032 /* SaegeulUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8A0E00000000000000000019 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0E0000000000000000001A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0E00000000000000000037 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8A0E00000000000000000017 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A0E0000000000000000000D /* SaegeulApp.swift in Sources */,
+				8A0E0000000000000000000E /* ContentView.swift in Sources */,
+				8A0E0000000000000000003B /* SaegeulPalette.swift in Sources */,
+				8A0E0000000000000000003C /* OnboardingModel.swift in Sources */,
+				8A0E0000000000000000003D /* HangulProbeField.swift in Sources */,
+				8A0E0000000000000000003E /* StepIllustrations.swift in Sources */,
+				8A0E0000000000000000003F /* OnboardingChecklistView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0E00000000000000000018 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A0E0000000000000000000F /* KeyboardViewController.swift in Sources */,
+				8A0E00000000000000000010 /* KeyboardView.swift in Sources */,
+				8A0E00000000000000000011 /* DocumentProxyAdapter.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0E00000000000000000035 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A0E00000000000000000030 /* KeyboardSpikeUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8A0E00000000000000000020 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8A0E00000000000000000003 /* SaegeulKeyboard */;
+			targetProxy = 8A0E00000000000000000021 /* PBXContainerItemProxy */;
+		};
+		8A0E00000000000000000034 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8A0E00000000000000000002 /* Saegeul */;
+			targetProxy = 8A0E00000000000000000033 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		8A0E00000000000000000022 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		8A0E00000000000000000023 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		8A0E00000000000000000024 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6BZF5NB99;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "새글";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.chanpaca.saegeul.ios;
+				PRODUCT_NAME = Saegeul;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8A0E00000000000000000025 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6BZF5NB99;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "새글";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.chanpaca.saegeul.ios;
+				PRODUCT_NAME = Saegeul;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8A0E00000000000000000026 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6BZF5NB99;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Keyboard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "새글";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.chanpaca.saegeul.ios.keyboard;
+				PRODUCT_NAME = SaegeulKeyboard;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8A0E00000000000000000027 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6BZF5NB99;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Keyboard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "새글";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.chanpaca.saegeul.ios.keyboard;
+				PRODUCT_NAME = SaegeulKeyboard;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8A0E00000000000000000038 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6BZF5NB99;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.chanpaca.saegeul.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Saegeul;
+			};
+			name = Debug;
+		};
+		8A0E00000000000000000039 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6BZF5NB99;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.chanpaca.saegeul.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Saegeul;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8A0E00000000000000000028 /* Build configuration list for PBXProject "Saegeul" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A0E00000000000000000022 /* Debug */,
+				8A0E00000000000000000023 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A0E00000000000000000029 /* Build configuration list for PBXNativeTarget "Saegeul" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A0E00000000000000000024 /* Debug */,
+				8A0E00000000000000000025 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A0E0000000000000000002A /* Build configuration list for PBXNativeTarget "SaegeulKeyboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A0E00000000000000000026 /* Debug */,
+				8A0E00000000000000000027 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A0E0000000000000000003A /* Build configuration list for PBXNativeTarget "SaegeulUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A0E00000000000000000038 /* Debug */,
+				8A0E00000000000000000039 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		8A0E0000000000000000002B /* XCLocalSwiftPackageReference "HangulCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = HangulCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8A0E0000000000000000002C /* HangulCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8A0E0000000000000000002B /* XCLocalSwiftPackageReference "HangulCore" */;
+			productName = HangulCore;
+		};
+		8A0E0000000000000000002D /* HangulCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8A0E0000000000000000002B /* XCLocalSwiftPackageReference "HangulCore" */;
+			productName = HangulCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 8A0E00000000000000000001 /* Project object */;
+}

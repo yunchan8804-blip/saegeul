@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_automatic_enable">AI sentence suggestions</string>
+    <string name="gemma_automatic_enable_description">Suggests on-device using the current app and the text you\'re typing. Neither the text nor the suggestions are saved to a file, and they\'re cleared when you close the keyboard. This setting persists across keyboard restarts, and suggestions pause when battery, heat, or memory conditions aren\'t met.</string>
+    <string name="gemma_automatic_cpu_compatibility">CPU compatibility mode</string>
+    <string name="gemma_automatic_cpu_compatibility_description">Uses the CPU instead of the GPU. Suggestions may be slower depending on your device.</string>
+    <string name="gemma_automatic_backend_fallback_notice">GPU isn\'t available, so CPU compatibility mode is on.</string>
+    <string name="gemma_automatic_generated">Gemma Generated</string>
+    <string name="gemma_automatic_continuation">Gemma Continuation</string>
+    <string name="gemma_automatic_warmup_content_description">Loading AI engine</string>
+    <string name="gemma_automatic_warmup_title">Loading AI engine</string>
+    <string name="gemma_automatic_warmup_message">What you type isn\'t sent to the model while it\'s still loading. Loading stops if you close the keyboard or if battery, heat, or memory conditions change.</string>
+    <string name="gemma_automatic_generating">Generating AI sentence…</string>
+    <string name="gemma_automatic_no_candidate">No sentence suggestions</string>
+    <string name="gemma_automatic_blocked_battery">Battery below 20% · AI suggestions paused</string>
+    <string name="gemma_automatic_blocked_thermal">Device overheating · AI suggestions paused</string>
+    <string name="gemma_automatic_blocked_memory">Low memory · AI suggestions paused</string>
+    <string name="gemma_automatic_blocked_power_save">Power saving mode · AI suggestions paused</string>
+    <string name="gemma_automatic_blocked_busy">Waiting for another AI task to finish</string>
+    <string name="gemma_automatic_blocked_not_allowed">AI isn\'t available on this screen</string>
+    <string name="gemma_automatic_blocked_model_missing">Model setup needed</string>
+    <string name="gemma_automatic_blocked_unrecoverable">AI engine error · restart the keyboard</string>
+    <string name="gemma_automatic_blocked_restarting">Restarting the AI engine</string>
+    <string name="gemma_automatic_blocked_engine_init_failed">AI engine initialization failed</string>
+    <string name="gemma_automatic_blocked_generation_timeout">AI response timed out</string>
+    <string name="gemma_automatic_blocked_preparation_timeout">AI setup timed out</string>
+    <string name="gemma_automatic_blocked_empty_response">No AI response</string>
+    <string name="gemma_automatic_blocked_output_too_long">AI response was too long</string>
+    <string name="gemma_automatic_blocked_generic">AI setup failed (%1$s)</string>
+    <string name="gemma_automatic_blocked_title">AI suggestions paused</string>
+    <string name="gemma_automatic_blocked_hint">Once conditions clear, it retries automatically the next time you open the keyboard.</string>
+</resources>

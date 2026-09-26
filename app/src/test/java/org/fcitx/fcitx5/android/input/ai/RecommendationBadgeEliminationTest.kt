@@ -27,7 +27,6 @@ class RecommendationBadgeEliminationTest {
         predictor = AiContextualPredictor(
             morphology = morphology,
             semanticPredictor = KoreanSemanticSentencePredictor(),
-            prefetcher = null,
             personalizedStore = null,
             ngram = ngram
         )

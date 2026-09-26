@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.fcitx.fcitx5.android.input.ai.sentencepack.MatchEvidence
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 
@@ -19,12 +20,40 @@ object ImmediateContextualPredictions {
     fun collect(
         input: Input,
         sentencePackLookup: ((String, Int) -> List<SentencePackMatch>)?,
-        prefetcher: AiSentenceCompletionPrefetcher?,
-        generatedSentenceLookup: ((String, Int) -> List<SentencePackMatch>)? = null
+        generatedSentenceLookup: ((String, Int) -> List<SentencePackMatch>)? = null,
+        generatedSpacingLookup: ((String) -> String?)? = null
     ): List<AiPrediction> {
         if (input.rawContext.isBlank()) return emptyList()
 
         val predictions = mutableListOf<AiPrediction>()
+        KoreanDiscourseContinuation.suggest(input.rawContext).forEachIndexed { index, word ->
+            predictions += AiPrediction(
+                text = word,
+                confidenceScore = 0.60f - index * 0.01f,
+                source = "discourse_continuation",
+                badge = "이어쓰기",
+                append = ContextualAppend(input.rawContext, word)
+            )
+        }
+        val trimmedContext = input.rawContext.trim(' ')
+        generatedSpacingLookup?.invoke(trimmedContext)
+            ?.takeIf { target -> trimmedContext.isNotBlank() && target.isNotBlank() && target != trimmedContext }
+            ?.let { target ->
+                val leadingSpaces = input.rawContext.takeWhile { it == ' ' }
+                val trailingSpaces = input.rawContext.takeLastWhile { it == ' ' }
+                val replacement = "$leadingSpaces$target$trailingSpaces"
+                predictions += AiPrediction(
+                    text = replacement,
+                    confidenceScore = 0.84f,
+                    isSentenceCompletion = true,
+                    source = "ondevice_generated_spacing",
+                    badge = "기기 AI 띄어쓰기",
+                    replacement = ContextualReplacement(
+                        expectedContext = input.rawContext,
+                        replacement = replacement
+                    )
+                )
+            }
         sentencePackLookup?.invoke(input.rawContext, input.limit)?.forEach { match ->
             predictions += AiPrediction(
                 text = match.suffix,
@@ -36,42 +65,20 @@ object ImmediateContextualPredictions {
             )
         }
 
-        generatedSentenceLookup?.invoke(input.rawContext, input.limit)
-            ?.filter { it.evidence == MatchEvidence.PREFIX || it.evidence == MatchEvidence.CONTEXT_SUFFIX }
-            ?.forEach { match ->
-                predictions += AiPrediction(
-                    text = match.suffix,
-                    confidenceScore = 0.82f,
-                    isSentenceCompletion = true,
-                    source = "ondevice_generated",
-                    badge = "기기 AI 재료",
-                    append = ContextualAppend(input.rawContext, match.suffix, match.joinMode)
-                )
-            }
-
-        val scope = AiSentenceCompletionPrefetcher.Scope(input.packageName, input.inputSessionEpoch)
-        PrefetchedContinuation.parse(
-            prefetcher?.getCachedPredictions(input.rawContext, scope).orEmpty(),
-            input.rawContext
-        ).forEach { proposal ->
-            if (
-                proposal.kind == PrefetchedContinuation.Kind.CONTINUATION_ATTACH &&
-                input.rawContext.lastOrNull()?.isWhitespace() == true
-            ) return@forEach
-            val isSentence = proposal.kind != PrefetchedContinuation.Kind.WORD
-            val joinMode = if (proposal.kind == PrefetchedContinuation.Kind.CONTINUATION_ATTACH) {
-                ContextualAppend.JoinMode.ATTACH
-            } else {
-                ContextualAppend.JoinMode.NEXT_WORD
-            }
-            predictions += AiPrediction(
-                text = proposal.text,
-                confidenceScore = if (isSentence) 0.980f else 0.985f,
-                isSentenceCompletion = isSentence,
-                source = "llm_cached",
-                badge = if (isSentence) "✨ AI완성" else "✨ AI단어",
-                append = ContextualAppend(input.rawContext, proposal.text, joinMode)
-            )
+        val persona = PersonaRegistry.classify(input.packageName)
+        if (persona != "browser" && persona != "commerce") {
+            generatedSentenceLookup?.invoke(input.rawContext, input.limit)
+                ?.filter { it.evidence == MatchEvidence.PREFIX || it.evidence == MatchEvidence.CONTEXT_SUFFIX }
+                ?.forEach { match ->
+                    predictions += AiPrediction(
+                        text = match.suffix,
+                        confidenceScore = 0.70f,
+                        isSentenceCompletion = true,
+                        source = "ondevice_generated",
+                        badge = "기기 AI 재료",
+                        append = ContextualAppend(input.rawContext, match.suffix, match.joinMode)
+                    )
+                }
         }
 
         val seen = mutableSetOf<String>()

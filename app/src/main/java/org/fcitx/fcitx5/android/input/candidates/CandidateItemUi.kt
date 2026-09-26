@@ -6,14 +6,21 @@
 package org.fcitx.fcitx5.android.input.candidates
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
+import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
@@ -27,13 +34,23 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.view
 import splitties.views.dsl.core.wrapContent
 import splitties.views.gravityCenter
+import kotlin.math.max
 
 /**
  * Clean, compact, utilitarian candidate item view.
  * Borderless cells with standard native tactile press feedback, avoiding bulky containers,
  * heavy card borders, or nested badge backgrounds in accordance with minimalist UI principles.
+ *
+ * When [isSentenceRow] is true and the candidate carries an AI badge (see [CandidateBadge]), the
+ * chip renders as a pill (bordered, rounded, floating within the row) instead of the flat
+ * borderless style, so the sentence row's automatic AI candidates read as tappable chips. Word
+ * row candidates, and sentence-row candidates without a badge, keep the flat style.
  */
-class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
+class CandidateItemUi(
+    override val ctx: Context,
+    val theme: Theme,
+    private val isSentenceRow: Boolean = false
+) : Ui {
 
     private val nativeText = view(::AutoScaleTextView) {
         scaleMode = AutoScaleTextView.Mode.Proportional
@@ -72,6 +89,28 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
         add(nativeText, lParams(wrapContent, wrapContent))
     }
 
+    // Pill background/ripple for sentence-row AI badge chips. Radius is a fixed 12dp per spec,
+    // not ThemePrefs.clipboardEntryRadius (that's a user-tunable clipboard-only setting).
+    private val pillCornerRadius = ctx.dp(12).toFloat()
+
+    private val pillBackground: GradientDrawable by lazy {
+        GradientDrawable().apply {
+            cornerRadius = pillCornerRadius
+            setColor(theme.keyBackgroundColor)
+            setStroke(max(1, ctx.dp(1)), theme.dividerColor)
+        }
+    }
+
+    private val pillRipple: RippleDrawable by lazy {
+        RippleDrawable(
+            ColorStateList.valueOf(theme.keyPressHighlightColor), null,
+            GradientDrawable().apply {
+                cornerRadius = pillCornerRadius
+                setColor(Color.WHITE)
+            }
+        )
+    }
+
     override val root = view(::CustomGestureView) {
         background = pressHighlightDrawable(theme.keyPressHighlightColor)
 
@@ -87,47 +126,69 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
     }
 
     companion object {
-        fun resolveBadgeIcon(badgeText: String): String {
-            val clean = badgeText.trim()
-            return when {
-                clean == "기본문장" -> "📖"
-                clean.contains("일정") || clean.contains("시간") -> "📅"
-                clean.contains("업무") || clean.contains("보고") || clean.contains("비즈니스") || clean.contains("개발") -> "💼"
-                clean.contains("양해") || clean.contains("안심") || clean.contains("지연") -> "⏳"
-                clean.contains("감사") || clean.contains("응원") || clean.contains("축하") || clean.contains("존댓말") -> "🙏"
-                clean.contains("제안") || clean.contains("방안") || clean.contains("아이디어") -> "💡"
-                clean.contains("이메일") || clean.contains("📧") -> "📧"
-                clean.contains("교정") || clean.contains("✏️") -> "✏️"
-                clean.contains("답변") || clean.contains("대화") || clean.contains("친근") || clean.contains("구문") || clean.contains("자주") || clean.contains("일상") -> "💬"
-                clean.contains("맞춤") || clean.contains("AI") || clean.contains("스타일") || clean.contains("✨") -> "✨"
-                clean.contains("웹") || clean.contains("🌐") -> "🌐"
-                else -> ""
-            }
-        }
+        /**
+         * Kept for callers outside this packet's scope (e.g. `input/ai` and `androidTest`
+         * helpers) that still depend on the old signature. Delegates to [CandidateBadge.iconFor].
+         */
+        fun resolveBadgeIcon(badgeText: String): String = CandidateBadge.iconFor(badgeText) ?: ""
+
+        /**
+         * Sentence-row automatic candidates (SENTENCE mode, AI badge) render as a pill chip; word
+         * row candidates and sentence-row candidates without a badge keep the flat borderless
+         * style. Exposed standalone so it can be unit tested without an Android/Theme dependency.
+         */
+        internal fun shouldRenderPill(isSentenceRow: Boolean, comment: String?): Boolean =
+            isSentenceRow && CandidateBadge.isBadge(comment)
     }
 
     fun updateCandidate(candidate: CandidateWord, isFeatured: Boolean = false) {
         val fg = theme.candidateTextColor
         val altFg = theme.candidateCommentColor
 
-        val icon = resolveBadgeIcon(candidate.comment)
-        val isAiBadge = candidate.comment.isNotBlank() && icon.isNotEmpty()
+        val icon = CandidateBadge.iconFor(candidate.comment)
+        val isAiBadge = icon != null
+        val showPill = isSentenceRow && isAiBadge
 
-        // Flat, borderless native cell with press ripple (strip containers/borders)
-        root.background = pressHighlightDrawable(theme.keyPressHighlightColor)
-        chipContainer.background = null
-        chipContainer.setPadding(0, 0, 0, 0)
+        if (showPill) {
+            // Pill chip: bordered, rounded, floating within the row's fixed height. The ripple is
+            // confined to the pill's own shape via foreground, so root itself stays background-free.
+            root.background = null
+            root.setPadding(0, 0, 0, 0)
+            root.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                marginStart = ctx.dp(8)
+                marginEnd = ctx.dp(8)
+            }
+            chipContainer.background = pillBackground
+            chipContainer.foreground = pillRipple
+            chipContainer.setPadding(ctx.dp(12), 0, ctx.dp(12), 0)
+            chipContainer.minimumHeight = ctx.dp(40)
+            chipContainer.updateLayoutParams<FrameLayout.LayoutParams> {
+                height = FrameLayout.LayoutParams.WRAP_CONTENT
+            }
+        } else {
+            // Flat, borderless native cell with press ripple (strip containers/borders)
+            root.background = pressHighlightDrawable(theme.keyPressHighlightColor)
+            root.setPadding(ctx.dp(6), 0, ctx.dp(6), 0)
+            if (isSentenceRow) {
+                root.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    marginStart = 0
+                    marginEnd = 0
+                }
+            }
+            chipContainer.background = null
+            chipContainer.foreground = null
+            chipContainer.setPadding(0, 0, 0, 0)
+            chipContainer.minimumHeight = 0
+            chipContainer.updateLayoutParams<FrameLayout.LayoutParams> {
+                height = FrameLayout.LayoutParams.MATCH_PARENT
+            }
+        }
 
         if (isAiBadge) {
-            val icon = resolveBadgeIcon(candidate.comment)
-            if (icon.isNotEmpty()) {
-                aiBadge.text = icon
-                aiBadge.background = null
-                aiBadge.setPadding(0, 0, 0, 0)
-                aiBadge.visibility = View.VISIBLE
-            } else {
-                aiBadge.visibility = View.GONE
-            }
+            aiBadge.text = icon
+            aiBadge.background = null
+            aiBadge.setPadding(0, 0, 0, 0)
+            aiBadge.visibility = View.VISIBLE
 
             aiText.text = candidate.text
             aiText.typeface = if (isFeatured) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
@@ -138,7 +199,10 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
             }
             aiText.visibility = View.VISIBLE
             nativeText.visibility = View.GONE
+            // Screen readers and UI automation see one label per chip: the text plus its source.
+            root.contentDescription = "${candidate.text} ${candidate.comment.trim()}"
         } else {
+            root.contentDescription = null
             aiBadge.visibility = View.GONE
             aiText.visibility = View.GONE
             nativeText.visibility = View.VISIBLE
@@ -146,7 +210,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
                 color(fg) {
                     append(candidate.text)
                 }
-                if (candidate.comment.isNotBlank() && candidate.comment != "추천" && !candidate.comment.contains("추천") && !candidate.comment.contains("🌐")) {
+                if (candidate.comment.isNotBlank() && candidate.comment != "추천" && !candidate.comment.contains("추천") && !candidate.comment.contains("🌐") && !CandidateBadge.isNextWordMarker(candidate.comment)) {
                     if (candidate.spaceBetweenComment) {
                         append(" ")
                     }

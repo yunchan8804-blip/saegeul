@@ -133,6 +133,12 @@ class TypingDnaRepository(
             personas = currentPersonas
         )
         saveLocked(updatedProfile)
+        if (analyzedSentenceCount > 0) {
+            onSentencesAnalyzed?.invoke(
+                analyzedSentenceCount,
+                TypingDnaLevelCurve.levelFor(updatedProfile.totalAnalyzedSentences)
+            )
+        }
     }
 
     @Synchronized
@@ -178,19 +184,22 @@ class TypingDnaRepository(
         var bigramsCount = 0
         var phrasesCount = 0
         val allBigrams = mutableListOf<DynamicBigram>()
+        val allEndings = mutableListOf<String>()
 
         var honorificCount = 0
         var informalCount = 0
 
-        var messengerCount = 0
-        var workCount = 0
-        var generalCount = 0
+        // Registry id (lowercased) -> weighted count, generalized from the old fixed
+        // messenger/work/general buckets so newer personas get their own bucket instead of
+        // being folded into "general".
+        val categoryCounts = mutableMapOf<String, Int>()
 
         profile.personas.values.forEach { p ->
             endingsCount += p.habitualEndings.size
             bigramsCount += p.frequentBigrams.size
             phrasesCount += p.cannedPhrases.size
             allBigrams.addAll(p.frequentBigrams)
+            allEndings.addAll(p.habitualEndings)
 
             if (p.dominantTone.equals("Honorific", ignoreCase = true)) {
                 honorificCount += p.frequentBigrams.size + p.habitualEndings.size + 1
@@ -198,18 +207,18 @@ class TypingDnaRepository(
                 informalCount += p.frequentBigrams.size + p.habitualEndings.size + 1
             }
 
-            when (p.category.lowercase()) {
-                "messenger" -> messengerCount += p.frequentBigrams.size + 1
-                "work" -> workCount += p.frequentBigrams.size + 1
-                else -> generalCount += p.frequentBigrams.size + 1
-            }
+            val categoryKey = p.category.lowercase()
+            categoryCounts[categoryKey] = (categoryCounts[categoryKey] ?: 0) + p.frequentBigrams.size + 1
         }
 
         val totalTone = (honorificCount + informalCount).coerceAtLeast(1)
         val honorificRatio = honorificCount.toFloat() / totalTone
         val informalRatio = informalCount.toFloat() / totalTone
 
-        val totalCat = (messengerCount + workCount + generalCount).coerceAtLeast(1)
+        val messengerCount = categoryCounts[TypingDnaVault.CATEGORY_MESSENGER] ?: 0
+        val workCount = categoryCounts[TypingDnaVault.CATEGORY_WORK] ?: 0
+        val generalCount = categoryCounts[TypingDnaVault.CATEGORY_GENERAL] ?: 0
+        val totalCat = categoryCounts.values.sum().coerceAtLeast(1)
         val messengerRatio = messengerCount.toFloat() / totalCat
         val workRatio = workCount.toFloat() / totalCat
         val generalRatio = generalCount.toFloat() / totalCat
@@ -221,19 +230,26 @@ class TypingDnaRepository(
             .sortedByDescending { it.weight }
             .take(6)
 
+        // Endings carry no per-persona weight (unlike bigrams), so an ending seen across more
+        // personas - i.e. mentioned more often overall - ranks higher; ties keep first-seen order.
+        val topEndings = allEndings
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(6)
+            .map { it.key }
+
         val totalSentences = profile.totalAnalyzedSentences
         val hasLearnedData = totalSentences > 0 || profile.personas.isNotEmpty()
-        val (level, levelTitle, target, progress) = when {
-            totalSentences <= 0 -> Tuple4(1, "새싹 학습자", 15, 0)
-            totalSentences < 15 -> Tuple4(1, "새싹 학습자", 15, (totalSentences * 100 / 15).coerceIn(1, 99))
-            totalSentences < 45 -> Tuple4(2, "성장하는 AI 파트너", 45, ((totalSentences - 15) * 100 / 30).coerceIn(0, 99))
-            totalSentences < 100 -> Tuple4(3, "어휘 습관 형성", 100, ((totalSentences - 45) * 100 / 55).coerceIn(0, 99))
-            totalSentences < 200 -> Tuple4(4, "정밀 문체 동기화", 200, ((totalSentences - 100) * 100 / 100).coerceIn(0, 99))
-            else -> Tuple4(5, "언어 지문 마스터", totalSentences, 100)
-        }
+        val levelProgress = TypingDnaLevelCurve.describe(totalSentences)
+        val level = levelProgress.level
+        val levelTitle = levelProgress.title
+        val target = levelProgress.nextTargetSentences
+        val progress = levelProgress.progressPercent
 
         val emptyTone = honorificCount == 0 && informalCount == 0
-        val emptyCat = messengerCount == 0 && workCount == 0 && generalCount == 0
+        val emptyCat = categoryCounts.values.all { it == 0 }
 
         val stats = TypingDnaStats(
             level = level,
@@ -245,11 +261,13 @@ class TypingDnaRepository(
             endingsCount = endingsCount,
             phrasesCount = phrasesCount,
             topBigrams = topBigrams,
+            topEndings = topEndings,
             honorificRatio = if (emptyTone) 0f else honorificRatio,
             informalRatio = if (emptyTone) 0f else informalRatio,
             messengerSentencesRatio = if (emptyCat) 0f else messengerRatio,
             workSentencesRatio = if (emptyCat) 0f else workRatio,
             generalSentencesRatio = if (emptyCat) 0f else generalRatio,
+            categoryCounts = categoryCounts.toMap(),
             lastUpdatedTimestamp = profile.updatedAt,
             privacyOnDevicePercent = 100,
             cloudBytesExported = 0,
@@ -279,6 +297,15 @@ class TypingDnaRepository(
     )
 
     private data class Tuple4<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
+
+    companion object {
+        /**
+         * Set by the app on startup so this class stays free of Android
+         * dependencies; carries analyzed sentence counts and the new level
+         * to the habit tracker and level-up rewards.
+         */
+        var onSentencesAnalyzed: ((analyzed: Int, newLevel: Int) -> Unit)? = null
+    }
 }
 
 data class TopBigramStat(
@@ -297,6 +324,8 @@ data class TypingDnaStats(
     val endingsCount: Int,
     val phrasesCount: Int,
     val topBigrams: List<TopBigramStat>,
+    /** Habitual sentence endings ranked by how many personas share them, most common first (max 6). */
+    val topEndings: List<String> = emptyList(),
     val honorificRatio: Float,
     val informalRatio: Float,
     val messengerSentencesRatio: Float,
@@ -305,7 +334,9 @@ data class TypingDnaStats(
     val lastUpdatedTimestamp: Long,
     val privacyOnDevicePercent: Int = 100,
     val cloudBytesExported: Int = 0,
-    val hasLearnedData: Boolean = totalSentences > 0
+    val hasLearnedData: Boolean = totalSentences > 0,
+    /** Registry persona id -> weighted analyzed-sentence count. Source of the ratio fields above. */
+    val categoryCounts: Map<String, Int> = emptyMap()
 )
 
 data class TypingDnaSummary(

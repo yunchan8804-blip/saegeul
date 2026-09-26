@@ -19,4 +19,5 @@
     <string name="sentence_packs_retry">Retry</string>
     <string name="sentence_packs_latest">Latest version</string>
     <string name="sentence_packs_progress">%1$s / %2$s</string>
+    <string name="sentence_packs_download_done">Sentence pack installed · %1$d extra examples</string>
 </resources>

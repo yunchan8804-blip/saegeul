@@ -6,19 +6,14 @@ package org.fcitx.fcitx5.android.input
 
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.ai.AiAction
 
 /** Identifies the policy boundary that owns an internally captured keyboard prompt. */
 enum class InternalPromptFeature {
-    Ai,
     GifSearch
 }
 
 /**
  * Immutable contract for text captured by the real Fcitx keyboard instead of the target editor.
- *
- * [allowBlankSubmission] is deliberately feature-specific: AI keeps an empty instruction open,
- * while an empty GIF query means the provider's trending search.
  */
 data class InternalPromptSpec(
     val feature: InternalPromptFeature,
@@ -33,14 +28,6 @@ data class InternalPromptSpec(
 }
 
 object InternalPromptSpecs {
-    val Ai = InternalPromptSpec(
-        feature = InternalPromptFeature.Ai,
-        maxCharacters = AiAction.MAX_CUSTOM_INSTRUCTION_CHARACTERS,
-        allowBlankSubmission = false,
-        hintRes = R.string.ai_direct_prompt_hint,
-        submitRes = R.string.ai_direct_prompt_run
-    )
-
     fun gifSearch(maxCharacters: Int) = InternalPromptSpec(
         feature = InternalPromptFeature.GifSearch,
         maxCharacters = maxCharacters,
@@ -69,7 +56,7 @@ internal sealed interface InternalPromptFinishResult {
  *
  * Package, field metadata, and selection alone are not enough: two fields in the same app can
  * legitimately share all three. [inputSessionEpoch] advances for every Android input session, so
- * a queued prompt callback cannot reopen an AI/GIF surface against a later field.
+ * a queued prompt callback cannot reopen a GIF surface against a later field.
  */
 internal data class InternalPromptEditorTarget(
     val packageName: String?,

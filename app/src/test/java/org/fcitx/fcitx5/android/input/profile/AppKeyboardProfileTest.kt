@@ -141,6 +141,37 @@ class AppKeyboardProfileTest {
     }
 
     @Test
+    fun `persona override round trips through json`() {
+        val profiles = listOf(
+            AppKeyboardProfile(
+                packageName = "com.example.chat",
+                persona = "work"
+            )
+        )
+
+        val encoded = encodeAppKeyboardProfiles(profiles)
+        val decoded = decodeAppKeyboardProfiles(encoded)
+
+        assertEquals(profiles, decoded)
+        assertEquals("work", decoded.single().persona)
+    }
+
+    @Test
+    fun `profile without a persona key decodes to auto`() {
+        val decoded = decodeAppKeyboardProfiles(
+            """{
+                "profiles":[{
+                    "package":"com.example.legacy",
+                    "network":"Block"
+                }]
+            }""".trimIndent().toByteArray()
+        )
+
+        assertEquals(1, decoded.size)
+        assertNull(decoded.single().persona)
+    }
+
+    @Test
     fun `legacy unversioned profile migrates and unknown values inherit`() {
         val decoded = decodeAppKeyboardProfiles(
             """{

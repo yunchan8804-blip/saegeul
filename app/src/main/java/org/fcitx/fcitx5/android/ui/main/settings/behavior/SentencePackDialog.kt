@@ -72,6 +72,7 @@ class SentencePackDialog private constructor(
     }
     private lateinit var dialog: AlertDialog
     private var statusJob: Job? = null
+    private var sawDownloading = false
     private val lifecycleObserver = object : DefaultLifecycleObserver {
         override fun onDestroy(owner: LifecycleOwner) {
             statusJob?.cancel()
@@ -116,6 +117,18 @@ class SentencePackDialog private constructor(
 
     private fun render(status: SentencePackStatus) {
         if (!dialog.isShowing) return
+        if (status.isDownloading) sawDownloading = true
+        if (sawDownloading && !status.isDownloading && status.installedCount > 0 && status.error == null) {
+            // The download the user started from this dialog just finished: close instead of turning
+            // the same window into the "installed / remove pack" management view.
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.sentence_packs_download_done, status.installedCount),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            dialog.dismiss()
+            return
+        }
         val offline = isOfflineMode()
         val actionButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
         val closeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)

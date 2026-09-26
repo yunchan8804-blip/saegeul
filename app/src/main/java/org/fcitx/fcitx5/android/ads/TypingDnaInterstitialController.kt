@@ -24,18 +24,20 @@ import java.util.concurrent.atomic.AtomicBoolean
 class TypingDnaInterstitialController(
     private val activity: Activity
 ) {
+    private val frequencyStore = AvenueFrequencyStore(activity.applicationContext)
     private var interstitialAd: InterstitialAd? = null
     private val loading = AtomicBoolean(false)
     private val initialized = AtomicBoolean(false)
     private val showWhenLoaded = AtomicBoolean(false)
 
     fun prepare() {
-        if (!TypingDnaAdGate.shouldShowInterstitial(offlineMode = isOffline())) return
+        if (!gateAllows()) return
         ensureInitialized { loadAd() }
     }
 
     fun showAfterAction() {
-        if (!TypingDnaAdGate.shouldShowInterstitial(offlineMode = isOffline())) return
+        frequencyStore.recordAction(LocalAvenueCatalog.TYPING_DNA_SYNC_COMPLETE)
+        if (!gateAllows()) return
         val ad = interstitialAd
         if (ad == null) {
             showWhenLoaded.set(true)
@@ -43,6 +45,15 @@ class TypingDnaInterstitialController(
             return
         }
         present(ad)
+    }
+
+    private fun gateAllows(): Boolean {
+        val now = System.currentTimeMillis()
+        return TypingDnaAdGate.shouldShowInterstitial(
+            offlineMode = isOffline(),
+            frequency = frequencyStore.state(LocalAvenueCatalog.TYPING_DNA_SYNC_COMPLETE),
+            nowEpochMs = now
+        )
     }
 
     private fun ensureInitialized(onReady: () -> Unit) {
@@ -89,6 +100,13 @@ class TypingDnaInterstitialController(
     private fun present(ad: InterstitialAd) {
         interstitialAd = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdShowedFullScreenContent() {
+                frequencyStore.recordExposure(
+                    LocalAvenueCatalog.TYPING_DNA_SYNC_COMPLETE,
+                    System.currentTimeMillis()
+                )
+            }
+
             override fun onAdDismissedFullScreenContent() {
                 prepare()
             }

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_automatic_enable">AI 문장 추천</string>
+    <string name="gemma_automatic_enable_description">현재 앱과 입력 중인 글로 기기 안에서 추천합니다. 원문과 추천은 파일로 저장하지 않으며 키보드를 닫으면 지웁니다. 이 설정은 입력기를 다시 시작해도 유지되며, 배터리·발열·메모리 조건이 맞지 않으면 추천을 멈춥니다.</string>
+    <string name="gemma_automatic_cpu_compatibility">CPU 호환 모드</string>
+    <string name="gemma_automatic_cpu_compatibility_description">GPU 대신 CPU를 사용합니다. 기기에 따라 추천이 더 느릴 수 있습니다.</string>
+    <string name="gemma_automatic_backend_fallback_notice">GPU를 쓸 수 없어 CPU 호환 모드로 전환했습니다.</string>
+    <string name="gemma_automatic_generated">Gemma 생성</string>
+    <string name="gemma_automatic_continuation">Gemma 이어쓰기</string>
+    <string name="gemma_automatic_warmup_content_description">AI 엔진 불러오는 중</string>
+    <string name="gemma_automatic_warmup_title">AI 엔진 불러오는 중</string>
+    <string name="gemma_automatic_warmup_message">입력한 내용은 준비 중인 모델에 전달되지 않습니다. 키보드를 닫거나 배터리·발열·메모리 조건이 바뀌면 준비를 멈춥니다.</string>
+    <string name="gemma_automatic_generating">AI 문장 생성 중…</string>
+    <string name="gemma_automatic_no_candidate">추천 문장 없음</string>
+    <string name="gemma_automatic_blocked_battery">배터리 20% 미만 · AI 추천 대기</string>
+    <string name="gemma_automatic_blocked_thermal">기기 발열 · AI 추천 대기</string>
+    <string name="gemma_automatic_blocked_memory">메모리 부족 · AI 추천 대기</string>
+    <string name="gemma_automatic_blocked_power_save">절전 모드 · AI 추천 대기</string>
+    <string name="gemma_automatic_blocked_busy">다른 AI 작업이 끝나길 기다리는 중</string>
+    <string name="gemma_automatic_blocked_not_allowed">이 화면에서는 AI를 쓸 수 없음</string>
+    <string name="gemma_automatic_blocked_model_missing">모델 준비 필요</string>
+    <string name="gemma_automatic_blocked_unrecoverable">AI 엔진 오류 · 입력기 재시작 필요</string>
+    <string name="gemma_automatic_blocked_restarting">AI 엔진 재시작 중</string>
+    <string name="gemma_automatic_blocked_engine_init_failed">AI 엔진 초기화 실패</string>
+    <string name="gemma_automatic_blocked_generation_timeout">AI 응답 시간 초과</string>
+    <string name="gemma_automatic_blocked_preparation_timeout">AI 준비 시간 초과</string>
+    <string name="gemma_automatic_blocked_empty_response">AI 응답 없음</string>
+    <string name="gemma_automatic_blocked_output_too_long">AI 응답이 너무 김</string>
+    <string name="gemma_automatic_blocked_generic">AI 준비 실패 (%1$s)</string>
+    <string name="gemma_automatic_blocked_title">AI 추천 대기 중</string>
+    <string name="gemma_automatic_blocked_hint">조건이 풀리면 키보드를 다시 열 때 자동으로 다시 시도합니다.</string>
+</resources>

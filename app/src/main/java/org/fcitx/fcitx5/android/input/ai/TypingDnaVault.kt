@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
@@ -19,49 +20,23 @@ import java.util.concurrent.ConcurrentHashMap
  * Pending sentences are removed only after their processor returns normally.
  */
 class TypingDnaVault(
-    private val thresholdPerCategory: Int = 15,
+    val thresholdPerCategory: Int = 10,
     private val maxCapacityPerCategory: Int = 50,
     private val stagingFile: File? = null,
     onBatchReady: ((category: String, sentences: List<String>) -> Unit)? = null,
-    private val cipher: VaultCipher = PlainVaultCipher
+    private val cipher: VaultCipher = PlainVaultCipher,
+    private val diagnostics: CollectionDiagnostics? = null
 ) {
 
     companion object {
+        // Aliases kept for source compatibility; the registry id is the source of truth.
         const val CATEGORY_MESSENGER = "messenger"
         const val CATEGORY_WORK = "work"
         const val CATEGORY_GENERAL = "general"
 
-        private val MESSENGER_PACKAGES = setOf(
-            "com.kakao.talk",
-            "org.telegram.messenger",
-            "com.instagram.android",
-            "com.facebook.orca",
-            "jp.naver.line.android",
-            "com.samsung.android.messaging",
-            "com.google.android.apps.messaging"
-        )
-
-        private val WORK_PACKAGES = setOf(
-            "com.slack",
-            "com.google.android.gm",
-            "com.microsoft.office.outlook",
-            "com.microsoft.teams",
-            "com.jandi.android",
-            "com.notion.id",
-            "com.atlassian.jira",
-            "com.github.android"
-        )
-
-        fun categorizePackage(packageName: String): String {
-            val lower = packageName.lowercase()
-            return when {
-                MESSENGER_PACKAGES.any { lower.contains(it) } -> CATEGORY_MESSENGER
-                WORK_PACKAGES.any { lower.contains(it) } -> CATEGORY_WORK
-                lower.contains("talk") || lower.contains("chat") || lower.contains("message") -> CATEGORY_MESSENGER
-                lower.contains("mail") || lower.contains("work") || lower.contains("team") -> CATEGORY_WORK
-                else -> CATEGORY_GENERAL
-            }
-        }
+        /** [personaOverride] is a per-app persona chosen by the user; null defers to auto-detection. */
+        fun categorizePackage(packageName: String, personaOverride: String? = null): String =
+            PersonaRegistry.classify(packageName, personaOverride)
     }
 
     // Category -> Deque of scrubbed sentences
@@ -82,22 +57,29 @@ class TypingDnaVault(
 
     /**
      * Records a committed sentence into the vault after scrubbing all PII.
+     * [personaOverride] is a per-app persona chosen by the user; null defers to auto-detection.
      * Returns true if a batch threshold was reached and callback was dispatched.
      */
     @Synchronized
-    fun recordSentence(packageName: String, sentence: String): Boolean {
+    fun recordSentence(packageName: String, sentence: String, personaOverride: String? = null): Boolean {
         val clean = sentence.trim()
-        if (clean.length < 4) return false
+        if (clean.length < 4) {
+            diagnostics?.dropped("short")
+            return false
+        }
 
         // Zero-leak: Scrub PII immediately before buffering
         val scrubbed = KoreanPiiScrubber.scrub(clean)
 
-        val category = categorizePackage(packageName)
+        val category = categorizePackage(packageName, personaOverride)
         val deque = categoryBuffers.getOrPut(category) { ArrayDeque() }
 
         // Deduplicate recent consecutive identical sentences
         if (deque.lastOrNull() != scrubbed) {
             deque.addLast(scrubbed)
+            diagnostics?.emitted(category, scrubbed.length)
+        } else {
+            diagnostics?.dropped("duplicate")
         }
 
         while (deque.size > maxCapacityPerCategory) {
@@ -129,6 +111,17 @@ class TypingDnaVault(
     @Synchronized
     fun totalBufferedCount(): Int {
         return categoryBuffers.values.sumOf { it.size }
+    }
+
+    /**
+     * Returns the number of sentences currently waiting per category. Categories with an
+     * empty (or absent) buffer are omitted.
+     */
+    @Synchronized
+    fun pendingByCategory(): Map<String, Int> {
+        return categoryBuffers
+            .filterValues { it.isNotEmpty() }
+            .mapValues { it.value.size }
     }
 
     /**

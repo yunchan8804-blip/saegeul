@@ -40,6 +40,17 @@ class KoreanTypoCorrectionEngineTest {
     }
 
     @Test
+    fun `numeric and symbol tokens produce no Korean typo corrections`() {
+        assertTrue(typoEngine.correct("2026-09-10").isEmpty())
+        assertTrue(typoEngine.correct("!@#\$%^&*").isEmpty())
+    }
+
+    @Test
+    fun `mixed Korean and numeric typo retains Korean correction`() {
+        assertTrue(typoEngine.correct("오눌1").contains("오늘"))
+    }
+
+    @Test
     fun `correct colloquial and incomplete ending typos`() {
         // ~세여 -> ~세요
         val corrections1 = typoEngine.correct("안녕하세여")
@@ -116,6 +127,24 @@ class KoreanTypoCorrectionEngineTest {
         // 6. Sentence with trailing space: '오늘 ' -> '오늘 일정 공유드립니다' (delete '오늘 ' = 3 chars)
         val overlap6 = typoEngine.calculateReplacementOverlap("오늘 ", "오늘 일정 공유드립니다")
         assertEquals(3, overlap6)
+    }
+
+    @Test
+    fun `calculateReplacementOverlap replaces only a matching incomplete jamo token`() {
+        assertEquals(1, typoEngine.calculateReplacementOverlap("ㅅ", "선생님"))
+        assertEquals(1, typoEngine.calculateReplacementOverlap("ㄱ", "그게"))
+        assertEquals(1, typoEngine.calculateReplacementOverlap("ㅇ", "있어"))
+        assertEquals(1, typoEngine.calculateReplacementOverlap("오늘 ㅅ", "선생님"))
+        assertEquals(2, typoEngine.calculateReplacementOverlap("가ㅅ", "가세요"))
+        assertEquals(0, typoEngine.calculateReplacementOverlap("가ㅅ", "고생"))
+    }
+
+    @Test
+    fun `calculateReplacementOverlap rejects nonmatching or separated incomplete jamo tokens`() {
+        assertEquals(0, typoEngine.calculateReplacementOverlap("ㅅ", "가세요"))
+        assertEquals(0, typoEngine.calculateReplacementOverlap("ㅅ ", "선생님"))
+        assertEquals(0, typoEngine.calculateReplacementOverlap("12ㅅ", "선생님"))
+        assertEquals(0, typoEngine.calculateReplacementOverlap("!ㅅ", "선생님"))
     }
 
     @Test

@@ -13,7 +13,6 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
@@ -29,36 +28,9 @@ class InternalPromptInputBar(
     var onCancel: (() -> Unit)? = null
     var onSubmit: (() -> Unit)? = null
 
-    private var spec = InternalPromptSpecs.Ai
+    private var spec = InternalPromptSpecs.gifSearch(1)
     private var submitPending = false
     private var hasInput = false
-
-    /**
-     * An AI request transforms the captured editor text, so the strip says that before taking an
-     * instruction. GIF search deliberately stays a compact standalone search field.
-     */
-    private val aiContextLabel = TextView(context).apply {
-        setText(R.string.ai_direct_prompt_context)
-        setTextColor(theme.keyTextColor)
-        alpha = PanelStyle.HINT_ALPHA
-        textSize = PanelStyle.TEXT_CAPTION
-        maxLines = 1
-        ellipsize = TextUtils.TruncateAt.END
-    }
-
-    private val aiContext = LinearLayout(context).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        addView(TextView(context).apply {
-            setText(R.string.ai_direct_prompt_title)
-            setTextColor(theme.keyTextColor)
-            textSize = PanelStyle.TEXT_CAPTION
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        }, LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(AI_CONTEXT_HEIGHT_DP)))
-        addView(aiContextLabel, LayoutParams(0, dp(AI_CONTEXT_HEIGHT_DP), 1f).apply {
-            marginStart = dp(PanelStyle.GAP_S_DP)
-        })
-    }
 
     private val prompt = TextView(context).apply {
         gravity = Gravity.CENTER_VERTICAL
@@ -106,27 +78,20 @@ class InternalPromptInputBar(
         )
         setBackgroundColor(theme.barColor)
         visibility = View.GONE
-        addView(aiContext, LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(AI_CONTEXT_HEIGHT_DP)))
         addView(promptRow, LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(PanelStyle.BUTTON_HEIGHT_DP)
         ))
     }
 
-    fun configure(spec: InternalPromptSpec, contextLabel: CharSequence? = null) {
+    fun configure(spec: InternalPromptSpec) {
         this.spec = spec
-        val isAi = spec.feature == InternalPromptFeature.Ai
-        aiContext.visibility = if (isAi) View.VISIBLE else View.GONE
-        aiContextLabel.text = contextLabel ?: context.getString(R.string.ai_direct_prompt_context)
         submit.setText(spec.submitRes)
         render(committed = "", preedit = "")
     }
 
-    /** Height changes only for the AI header; GIF search keeps its compact strip. */
     val preferredHeightPx: Int
-        get() = dp(
-            if (spec.feature == InternalPromptFeature.Ai) AI_PROMPT_HEIGHT_DP else GIF_PROMPT_HEIGHT_DP
-        )
+        get() = dp(GIF_PROMPT_HEIGHT_DP)
 
     fun render(committed: String, preedit: String) {
         val combined = committed + preedit
@@ -173,14 +138,10 @@ class InternalPromptInputBar(
     }
 
     private companion object {
-        const val AI_CONTEXT_HEIGHT_DP = 16
         const val MIN_CONTROL_WIDTH_DP = 64
-        // Strip heights are the sum of their parts:
-        // GIF = controls (48) + vertical padding (8 + 8) = 64
-        // AI  = context row (16) + GIF strip (64) = 80
+        // Strip height is the sum of its parts: controls (48) + vertical padding (8 + 8) = 64
         const val GIF_PROMPT_HEIGHT_DP =
             PanelStyle.BUTTON_HEIGHT_DP + 2 * PanelStyle.PANEL_PADDING_V_DP
-        const val AI_PROMPT_HEIGHT_DP = AI_CONTEXT_HEIGHT_DP + GIF_PROMPT_HEIGHT_DP
-        const val CARET = "\u200A│"
+        const val CARET = " │"
     }
 }

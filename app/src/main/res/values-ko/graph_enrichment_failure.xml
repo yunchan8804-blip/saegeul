@@ -7,4 +7,6 @@
     <string name="graph_enrichment_failure_network">AI 공급자에 연결하지 못했어요. 네트워크와 게이트웨이를 확인해 주세요.</string>
     <string name="graph_enrichment_failure_provider_error">AI 공급자가 요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.</string>
     <string name="graph_enrichment_failure_storage">강화 결과를 기기에 저장하지 못했어요.</string>
+    <string name="graph_enrichment_failure_model_unavailable">새글 AI 모델이 준비되지 않았어요. 모델을 먼저 받아 주세요.</string>
+    <string name="graph_enrichment_failure_device_busy">새글 AI가 다른 작업(문장 재료 만들기 등)을 오래 하고 있어요. 끝나면 이어서 만들어요.</string>
 </resources>

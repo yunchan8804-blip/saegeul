@@ -136,7 +136,8 @@
 ### 9.1 이 저장소에서 "설계"로 간주하는 것 — 오케스트레이터가 직접 결정한다
 
 - **한글 조합 엔진 경계**: `:app` ↔ `:plugin:hangul` 사이의 fcitx5 addon 계약, libhangul 호출 방식, 한글 버퍼 호환 모드의 상태 머신. 기준 문서는 `docs/korean-smart-input-ssot.md`, `docs/hangul-buffered-input*.md`.
-- **AI 컴패니언 프로토콜**: 앱 ↔ `companion/{windows,macos,linux}` ↔ `scripts/ai-provider-companion.py` 사이의 요청·응답 계약, 인증, Tailscale HTTPS 경로. 매니페스트 예시는 `docs/examples/saegeul-ai-provider-manifest.debug.json`.
+- **온디바이스 AI 경계**: 새글의 AI는 기기 안 Gemma(LiteRT-LM)만 쓴다. 외부 글쓰기 AI(API 키·OAuth·컴패니언)는 2026-09-24 앱에서 제거했다. 프롬프트에 넣는 개인 신호, 모델 다운로드 경로, 생성 작업 간 lease 우선순위(`OnDeviceGenerationControl`), 배경 작업 실행 조건.
+- **개인 언어 금고 백업**: `.saegeulbackup` 암호화 포맷(`data/backup/**`), 포함·제외 대상(코퍼스/파생/공개 코퍼스, 포인트 제외), 향후 유료 클라우드 백업과의 계약.
 - **개인정보·데이터 경계**: 온디바이스 저장(Typing DNA vault 등), 완전 오프라인 모드의 네트워크 차단, `docs/independent-fork/privacy-data-safety.md`와 `play-data-safety-declaration.json`에 선언한 내용. 이 선언과 어긋나는 코드 변경은 곧 설계 변경이다.
 - **광고·수익화**: `docs/ad-monetization-avenue-operations.md`의 게이트. 광고 표시 시점·조건 변경, SDK 추가·교체.
 - **릴리스 계약**: `build-logic/convention/src/main/kotlin/Versions.kt`의 버전 범프, `ProductIdentity.kt`의 제품 식별자, `scripts/verify-release-*.ps1` 게이트, `.github/workflows/*`.
@@ -175,3 +176,45 @@
 3. 작업 패킷(5절)을 쓰고 구현 워커에 위임한다. 독립 모듈은 병렬, 겹치는 모듈은 순차로 돌린다.
 4. 워커 보고가 오면 즉시 6절 게이트로 평가한다. diff를 직접 읽고, 검증 원문이 의심되면 검증 워커로 재실행한다.
 5. 수용한 변경만 통합한다. 커밋은 사용자가 요청한 경우에만, 버전 범프·릴리스는 사용자 확인 후 오케스트레이터가 직접 한다.
+
+<!-- graft:start -->
+## Graft — repo context graph
+
+This repo is indexed in `graft/`: small linked markdown nodes that explain each
+system and carry exact file:line spans, kept in sync with the code through git.
+
+For ANY task here — understanding how something works, finding where code lives,
+or scoping a change — get context from the graph before grepping or opening
+source files. Re-ask freely (it's cheap) and reuse literal identifiers you
+already have (symbol, error string, file name) as the query. New to this repo?
+Run `graft map` first — a token-budgeted orientation (dir clusters, hubs,
+hotspots), no LLM, no key.
+
+- Run `graft ask "<your question>" --source` → ranked nodes with the relevant
+  code spans inlined (each hit's ≤8-line crux by default; `--full` for whole
+  definitions when the crux isn't enough). Match the tool to the task shape:
+  for understanding or editing, the top node IS the answer — cite its
+  `covers:` file:line spans and edit straight from `--source`. For
+  exhaustive tasks ("every occurrence / every caller of this pattern"), ranked
+  results are top-N, not complete — run `graft grep "<literal>"` instead
+  (exhaustive over indexed files, grouped by enclosing symbol), falling back
+  to raw `grep -rn` only for unindexed files.
+- `graft skeleton <file>` → every definition's signature + span, ~10× cheaper
+  than reading the file; use it to skim an API surface.
+- `graft callers <symbol>` gives precomputed, exact edges — who calls this.
+  Add `--direction out` for what it calls, or `--depth N` to walk
+  transitively for the full blast radius. For structural questions, skip
+  ranking and use this directly.
+- Or browse: `graft/INDEX.md` lists every node; follow the links.
+- Monorepos and folders of multiple repos rank fairly across sub-projects —
+  hits carry `[scope/]` labels naming which one they're from. Narrow with
+  `graft ask "<task>" --in <scope>/` once you know where you're working.
+
+If a returned span is truncated ("+N more lines"), open the file at that exact
+range before finalizing. Only open source files when a node genuinely lacks a
+needed detail, and then at the exact file:line the node points to — never
+re-read whole files.
+
+After big code changes, refresh the graph with `graft build` (deterministic,
+no API key, $0).
+<!-- graft:end -->

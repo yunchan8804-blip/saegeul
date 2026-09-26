@@ -150,14 +150,16 @@ class PopupComponent :
         showingEntryUi[viewId]?.setText(content)
     }
 
-    private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
+    private fun showKeyboard(action: PopupAction.ShowKeyboardAction) {
+        val viewId = action.viewId
+        val keyboard = action.keyboard
+        val bounds = action.bounds
         var keys: Array<String>
         var labels: Array<String>
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
-                val preset = PopupPreset[keyboard.label] ?: return
-                keys = preset
-                labels = if (keyboard.transformPunctuation && punctuation.enabled) {
+                keys = action.keysOverride ?: (PopupPreset[keyboard.label] ?: return)
+                labels = action.labelsOverride ?: if (keyboard.transformPunctuation && punctuation.enabled) {
                     Array(keys.size) { punctuation.transform(keys[it]) }
                 } else keys
             }
@@ -273,7 +275,7 @@ class PopupComponent :
                 is PopupAction.DismissAction -> dismissPopup(viewId)
                 is PopupAction.PreviewAction -> showPopup(viewId, content, bounds)
                 is PopupAction.PreviewUpdateAction -> updatePopup(viewId, content)
-                is PopupAction.ShowKeyboardAction -> showKeyboard(viewId, keyboard, bounds)
+                is PopupAction.ShowKeyboardAction -> showKeyboard(this)
                 is PopupAction.ShowMenuAction -> showMenu(viewId, menu, bounds)
                 is PopupAction.TriggerAction -> outAction = triggerFocused(viewId)
             }

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/gemma_vault_card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="16dp"
+    app:cardBackgroundColor="@color/saegeul_surface"
+    app:cardCornerRadius="@dimen/saegeul_card_radius"
+    app:cardElevation="0dp"
+    app:strokeColor="@color/saegeul_outline"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/gemma_vault_title"
+            android:textColor="@color/saegeul_ink"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/gemma_vault_description"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/gemma_vault_private_boundary"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/gemma_vault_count"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:accessibilityLiveRegion="polite"
+            android:textColor="@color/saegeul_ink"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/gemma_vault_last_run"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/gemma_vault_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:accessibilityLiveRegion="polite"
+            android:textColor="@color/saegeul_ink"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/gemma_vault_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="?attr/colorError"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/gemma_vault_auto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:minHeight="@dimen/saegeul_touch_target"
+            android:text="@string/gemma_vault_automatic"
+            android:textColor="@color/saegeul_ink"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/gemma_vault_automatic_notice"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/gemma_vault_guard_notice"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="16sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/gemma_vault_generate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:minHeight="@dimen/saegeul_touch_target"
+            android:text="@string/gemma_vault_generate"
+            android:textColor="@color/saegeul_on_action"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:backgroundTint="@color/saegeul_action"
+            app:cornerRadius="@dimen/saegeul_button_radius" />
+
+        <TextView
+            android:id="@+id/gemma_vault_personal_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:accessibilityLiveRegion="polite"
+            android:textColor="@color/saegeul_ink"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/gemma_vault_manual_description"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="16sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/gemma_vault_stop"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="@dimen/saegeul_touch_target"
+            android:text="@string/gemma_vault_stop"
+            android:textColor="?attr/colorError"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/gemma_vault_stop_notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/gemma_vault_stop_notice"
+            android:textColor="@color/saegeul_secondary"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/gemma_vault_model"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="@dimen/saegeul_touch_target"
+            android:text="@string/gemma_vault_model"
+            android:textColor="@color/saegeul_action"
+            android:textSize="16sp"
+            app:cornerRadius="@dimen/saegeul_button_radius"
+            app:strokeColor="@color/saegeul_action" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

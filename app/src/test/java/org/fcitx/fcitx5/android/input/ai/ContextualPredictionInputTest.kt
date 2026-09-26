@@ -69,4 +69,27 @@ class ContextualPredictionInputTest {
     fun rawFullContextUsesStrokeForBlankContext() {
         assertEquals("참석", ContextualPredictionInput.rawFullContext("참석", ""))
     }
+
+    @Test
+    fun activePreeditUsesClientPreeditWhenItIsAvailable() {
+        assertEquals("ㅅ", ContextualPredictionInput.activePreedit("", "ㅅ", "ㄱ"))
+    }
+
+    @Test
+    fun activePreeditUsesEnginePreeditForEachSingleChoseongWhenClientPreeditIsBlank() {
+        listOf("ㅅ", "ㄱ", "ㅇ").forEach { choseong ->
+            assertEquals(choseong, ContextualPredictionInput.activePreedit("", "", choseong))
+        }
+    }
+
+    @Test
+    fun activePreeditDoesNotDuplicateMatchingClientAndEnginePreedit() {
+        assertEquals("ㅅ", ContextualPredictionInput.activePreedit("", "ㅅ", "ㅅ"))
+    }
+
+    @Test
+    fun activePreeditRetainsBufferedHangulPrefixBeforeTheCurrentPreedit() {
+        assertEquals("가ㅅ", ContextualPredictionInput.activePreedit("가", "", "ㅅ"))
+        assertEquals("가ㅅ", ContextualPredictionInput.activePreedit("가", "ㅅ", "ㄱ"))
+    }
 }

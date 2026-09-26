@@ -19,7 +19,8 @@ data class AiPrediction(
     val source: String = "local_ai",
     val badge: String = "✨ AI완성",
     val replaceLength: Int = 0,
-    val append: ContextualAppend? = null
+    val append: ContextualAppend? = null,
+    val replacement: ContextualReplacement? = null
 )
 
 /**
@@ -30,7 +31,6 @@ data class AiPrediction(
 class AiContextualPredictor(
     private val morphology: ChoseongMorphologyEngine,
     val semanticPredictor: KoreanSemanticSentencePredictor = KoreanSemanticSentencePredictor(),
-    val prefetcher: AiSentenceCompletionPrefetcher? = null,
     val personalizedStore: PersonalizedSentenceStore? = null,
     val typoEngine: KoreanTypoCorrectionEngine = KoreanTypoCorrectionEngine(),
     val collocationModel: KoreanCollocationModel = KoreanCollocationModel(),
@@ -41,7 +41,6 @@ class AiContextualPredictor(
     private val personalSentenceVault: PersonalSentenceVault? = null,
     private val personalGraphStore: PersonalGraphStore? = null,
     private val sentencePackLookup: ((String, Int) -> List<SentencePackMatch>)? = null,
-    private val schedulePrefetchOnPredict: Boolean = true,
     private val bundledNgram: () -> BundledKoreanNgram? = { null }
 ) {
 
@@ -51,6 +50,23 @@ class AiContextualPredictor(
         // rag_personal, llm_cached continuation results, and verified sentence-pack continuations.
         // Only hardcoded-content sources are blocked from the sentence line at the end of predict().
         private val SENTENCE_LINE_SOURCE_BLOCKLIST = setOf("collocation_next_word", "base_lexicon")
+
+        // Leading/trailing punctuation stripped off the typed fragment before keyboard-aware
+        // typo correction runs, so a trailing "???" or similar does not blow the key-distance
+        // cost budget and suppress an otherwise-valid correction.
+        private val HEAD_PUNCTUATION = "([{«\"'".toSet()
+        private val TAIL_PUNCTUATION = ".,!?~…:;)]}»\"'".toSet()
+
+        // Common bound-ending suffixes (조사/어미) tried, longest-first, when the typed fragment
+        // itself has no direct keyboard-aware correction: the stem before the ending is corrected
+        // instead so an inflected form like "걸림건가" (stem "걸림" + ending "건가") still resolves.
+        private val BOUND_ENDINGS = listOf(
+            "건가요", "건데요", "거든요", "잖아요", "인가요", "이라고",
+            "건가", "건데", "건지", "거야", "거지", "거든", "거임", "네요", "세요", "어요", "아요",
+            "는데", "은데", "을까", "를까", "니까", "지만", "다고", "라고", "잖아", "인가", "인데",
+            "이야", "이지", "까지", "부터", "에서", "으로", "한테", "에게", "처럼", "보다", "마다",
+            "조차", "마저", "밖에", "이나", "든지", "는지"
+        )
     }
 
     private val baseKoreanLexicon = listOf(
@@ -137,14 +153,18 @@ class AiContextualPredictor(
         var newEngineHandledTyped: String? = null
         if (typoCorrector != null && typoTarget != null) {
             val (typed, replaceLen) = typoTarget
-            if (DubeolsikKeyMap.keySequence(typed).length >= 3) {
-                val personalHits = correctionStore?.lookup(typed, 2).orEmpty()
+            val head = typed.takeWhile { it in HEAD_PUNCTUATION }
+            val afterHead = typed.substring(head.length)
+            val tail = afterHead.takeLastWhile { it in TAIL_PUNCTUATION }
+            val core = afterHead.substring(0, afterHead.length - tail.length)
+            if (DubeolsikKeyMap.keySequence(core).length >= 3) {
+                val personalHits = correctionStore?.lookup(core, 2).orEmpty()
                 if (personalHits.isNotEmpty()) {
                     newEngineHandledTyped = typed
                     personalHits.forEachIndexed { idx, hit ->
                         addPrediction(
                             AiPrediction(
-                                text = hit.corrected,
+                                text = "$head${hit.corrected}$tail",
                                 confidenceScore = 0.998f - idx * 0.001f,
                                 isSentenceCompletion = false,
                                 source = "typo_personal",
@@ -153,24 +173,27 @@ class AiContextualPredictor(
                             )
                         )
                     }
-                } else {
-                    val isKnownWord = baseVocabulary?.containsWithinTop(typed, BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) == true || ngram.unigramCount(typed) >= 2f
-                    if (!isKnownWord) {
+                } else if (core.any(Char::isLetter)) {
+                    val isBaseKnown = baseVocabulary?.containsWithinTop(core, BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) == true
+                    if (!isBaseKnown) {
+                        val isPersonalKnownOnly = ngram.unigramCount(core) >= 2f
                         val ctxProb = ngram.predictNext(contextBeforeCursor, packageName, 20)
                             .associate { it.word to it.probability }
+                        val contextBoost: (String) -> Float = { w -> 1.5f * (ctxProb[w] ?: 0f) }
                         val corrections = typoCorrector.correct(
-                            typed,
-                            limit = 2,
-                            contextBoost = { w -> 1.5f * (ctxProb[w] ?: 0f) }
+                            core,
+                            limit = if (isPersonalKnownOnly) 1 else 2,
+                            contextBoost = contextBoost
                         )
                         if (corrections.isNotEmpty()) {
                             newEngineHandledTyped = typed
                         }
                         corrections.forEachIndexed { idx, correction ->
-                            val confidence = if (correction.cost <= 0.6f) 0.996f else 0.994f - idx * 0.002f
+                            var confidence = if (correction.cost <= 0.6f) 0.996f else 0.994f - idx * 0.002f
+                            if (isPersonalKnownOnly) confidence -= 0.006f
                             addPrediction(
                                 AiPrediction(
-                                    text = correction.word,
+                                    text = "$head${correction.word}$tail",
                                     confidenceScore = confidence,
                                     isSentenceCompletion = false,
                                     source = "typo_keyboard",
@@ -178,6 +201,34 @@ class AiContextualPredictor(
                                     replaceLength = replaceLen
                                 )
                             )
+                        }
+                        if (corrections.isEmpty()) {
+                            val ending = BOUND_ENDINGS.firstOrNull { core.endsWith(it) }
+                            if (ending != null) {
+                                val stem = core.dropLast(ending.length)
+                                if (DubeolsikKeyMap.keySequence(stem).length >= 3 &&
+                                    baseVocabulary?.containsWithinTop(stem, BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) != true
+                                ) {
+                                    val stemCorrection = typoCorrector.correct(
+                                        stem,
+                                        limit = 1,
+                                        contextBoost = contextBoost
+                                    ).firstOrNull()
+                                    if (stemCorrection != null && stemCorrection.cost <= 1.0f) {
+                                        newEngineHandledTyped = typed
+                                        addPrediction(
+                                            AiPrediction(
+                                                text = "$head${stemCorrection.word}$ending$tail",
+                                                confidenceScore = 0.993f,
+                                                isSentenceCompletion = false,
+                                                source = "typo_keyboard_stem",
+                                                badge = "✏️",
+                                                replaceLength = replaceLen
+                                            )
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -283,10 +334,6 @@ class AiContextualPredictor(
             currentStroke,
             contextBeforeCursor
         )
-        val prefetchScope = AiSentenceCompletionPrefetcher.Scope(
-            packageName,
-            inputSessionEpoch
-        )
 
         // Context normalization for typos in the current sentence
         val correctedLastWord = if (lastWordInContext.isNotBlank()) {
@@ -354,19 +401,20 @@ class AiContextualPredictor(
             }
         }
 
-        ImmediateContextualPredictions.collect(
+        val immediatePredictions = ImmediateContextualPredictions.collect(
             input = ImmediateContextualPredictions.Input(
                 rawContext = rawFullContext,
                 packageName = packageName,
                 inputSessionEpoch = inputSessionEpoch,
                 limit = limit
             ),
-            sentencePackLookup = sentencePackLookup,
-            prefetcher = prefetcher
-        ).forEach(::addPrediction)
-        if (schedulePrefetchOnPredict && rawFullContext.isNotBlank() && prefetcher != null) {
-            prefetcher.schedulePrefetch(rawFullContext, scope = prefetchScope)
-        }
+            sentencePackLookup = sentencePackLookup
+        )
+        immediatePredictions
+            .filterNot { it.source == "discourse_continuation" }
+            .forEach(::addPrediction)
+        val deferredDiscoursePredictions = immediatePredictions
+            .filter { it.source == "discourse_continuation" }
 
         // 2. semantic_sentence is intentionally NOT consumed here: KoreanSemanticSentencePredictor's
         // intent-classified proposals are fixed content templates unrelated to what the user typed,
@@ -500,25 +548,28 @@ class AiContextualPredictor(
         // 3-B. Base Korean Vocabulary Completion (bundled TSV, right after personal n-gram)
         if (cleanStroke.isNotBlank() && baseVocabulary != null) {
             val personalWords = ngramCandidates.map { it.word }.toSet()
-            val baseCtxProb = ngram.predictContextualNext(contextBeforeCursor, packageName, 20)
-                .associate { it.word to it.probability }
-            val vocabCandidates = baseVocabulary.completions(cleanStroke, 8)
+            val completions = baseVocabulary.completions(cleanStroke, 8)
                 .filter { (word, _) -> word !in personalWords }
-                .map { (word, prior) -> Triple(word, prior, prior * (1f + 3f * (baseCtxProb[word] ?: 0f))) }
-                .sortedByDescending { it.third }
-                .take(4)
-            vocabCandidates.forEachIndexed { idx, (word, _, _) ->
-                val ctxP = baseCtxProb[word] ?: 0f
-                val confidence = if (ctxP > 0f) 0.955f - idx * 0.005f else 0.93f - idx * 0.005f
-                addPrediction(
-                    AiPrediction(
-                        text = word,
-                        confidenceScore = confidence,
-                        isSentenceCompletion = false,
-                        source = "base_vocab",
-                        badge = ""
+            if (completions.isNotEmpty()) {
+                val baseCtxProb = ngram.predictContextualNext(contextBeforeCursor, packageName, 20)
+                    .associate { it.word to it.probability }
+                val vocabCandidates = completions
+                    .map { (word, prior) -> Triple(word, prior, prior * (1f + 3f * (baseCtxProb[word] ?: 0f))) }
+                    .sortedByDescending { it.third }
+                    .take(4)
+                vocabCandidates.forEachIndexed { idx, (word, _, _) ->
+                    val ctxP = baseCtxProb[word] ?: 0f
+                    val confidence = if (ctxP > 0f) 0.955f - idx * 0.005f else 0.93f - idx * 0.005f
+                    addPrediction(
+                        AiPrediction(
+                            text = word,
+                            confidenceScore = confidence,
+                            isSentenceCompletion = false,
+                            source = "base_vocab",
+                            badge = ""
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -543,6 +594,8 @@ class AiContextualPredictor(
                 }
             }
         }
+
+        deferredDiscoursePredictions.forEach(::addPrediction)
 
         // Sentence-line whitelist: only sources backed by the user's own data, model output,
         // or a verified on-device sentence-pack continuation may appear as a full-sentence

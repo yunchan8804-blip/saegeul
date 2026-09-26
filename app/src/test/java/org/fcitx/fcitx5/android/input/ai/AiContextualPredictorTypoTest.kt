@@ -55,7 +55,6 @@ class AiContextualPredictorTypoTest {
         predictor = AiContextualPredictor(
             morphology = ChoseongMorphologyEngine(),
             semanticPredictor = KoreanSemanticSentencePredictor(),
-            prefetcher = null,
             personalizedStore = null,
             ngram = ngram,
             typoCorrector = typoCorrector,
@@ -96,6 +95,42 @@ class AiContextualPredictorTypoTest {
     }
 
     @Test
+    fun `numeric and symbol input produces no Korean typo corrections`() {
+        val numericResults = predictor.predict(
+            currentStroke = "2026-09-10",
+            contextBeforeCursor = "",
+            packageName = "com.test.app",
+            limit = 5
+        )
+        val symbolResults = predictor.predict(
+            currentStroke = "!@#\$%^&*",
+            contextBeforeCursor = "",
+            packageName = "com.test.app",
+            limit = 5
+        )
+
+        assertFalse(numericResults.any { it.source == "typo_keyboard" })
+        assertFalse(symbolResults.any { it.source == "typo_keyboard" })
+    }
+
+    @Test
+    fun `numeric input retains an explicit personal correction`() {
+        assertTrue(correctionStore.recordCorrection("123", "124"))
+
+        val results = predictor.predict(
+            currentStroke = "123",
+            contextBeforeCursor = "",
+            packageName = "com.test.app",
+            limit = 5
+        )
+
+        val hit = results.firstOrNull { it.source == "typo_personal" }
+        assertTrue("explicit personal correction must be retained: ${results.map { it.text to it.source }}", hit != null)
+        assertEquals("124", hit!!.text)
+        assertEquals(3, hit.replaceLength)
+    }
+
+    @Test
     fun `a single learned occurrence of a typo does not yet suppress the keyboard-aware correction`() {
         // A user typing a typo once and moving on (space) feeds it into the personal n-gram as a
         // unigram. One occurrence must not be enough to mark it "known" and skip correction.
@@ -115,7 +150,10 @@ class AiContextualPredictorTypoTest {
     }
 
     @Test
-    fun `two learned occurrences of a typo mark it as a known word and suppress the correction`() {
+    fun `two learned occurrences of a typo still surface a single lower-confidence keyboard correction`() {
+        // Known only through the user's own n-gram (not the bundled base vocabulary), the typo is
+        // no longer fully suppressed: it still surfaces, but capped to a single, lower-confidence
+        // candidate so a genuinely-known personal word keeps its lead over a plausible typo read.
         ngram.learn("사묘ㅏ함니다", "com.test.app")
         ngram.learn("사묘ㅏ함니다", "com.test.app")
 
@@ -126,7 +164,9 @@ class AiContextualPredictorTypoTest {
             limit = 5
         )
 
-        assertFalse(results.any { it.source == "typo_keyboard" })
+        val keyboardHits = results.filter { it.source == "typo_keyboard" }
+        assertEquals(1, keyboardHits.size)
+        assertEquals("감사합니다", keyboardHits.first().text)
     }
 
     @Test
@@ -186,5 +226,68 @@ class AiContextualPredictorTypoTest {
         assertTrue("참석합니다 candidate must be present: ${results.map { it.text }}", hit != null)
         assertEquals("✏️", hit!!.badge)
         assertEquals(6, hit.replaceLength)
+    }
+
+    @Test
+    fun `corrects adjacent final consonant with trailing punctuation`() {
+        typoCorrector.addWord("걸린", 111f)
+        typoCorrector.addWord("건가", 324f)
+        typoCorrector.addWord("감기", 500f)
+
+        val results = predictor.predict(
+            currentStroke = "걸림건가???",
+            contextBeforeCursor = "감기 ",
+            packageName = "com.test.app",
+            limit = 5
+        )
+
+        val hit = results.firstOrNull { it.text == "걸린건가???" }
+        assertTrue(
+            "걸린건가??? candidate must be present: ${results.map { it.text to it.source }}",
+            hit != null
+        )
+        assertEquals(7, hit!!.replaceLength)
+        assertTrue(
+            "source must be typo_keyboard_stem or typo_keyboard: ${hit.source}",
+            hit.source == "typo_keyboard_stem" || hit.source == "typo_keyboard"
+        )
+    }
+
+    @Test
+    fun `keeps correcting when only personal ngram knows the typo`() {
+        typoCorrector.addWord("오늘", 1000f)
+
+        ngram.learn("오눌", "com.test.app")
+        ngram.learn("오눌", "com.test.app")
+
+        val results = predictor.predict(
+            currentStroke = "오눌",
+            contextBeforeCursor = "",
+            packageName = "com.test.app",
+            limit = 5
+        )
+
+        val hit = results.firstOrNull { it.text == "오늘" }
+        assertTrue(
+            "오늘 correction must still be surfaced: ${results.map { it.text to it.source }}",
+            hit != null
+        )
+    }
+
+    @Test
+    fun `skips correction for base vocabulary word`() {
+        typoCorrector.addWord("감사합니다", 1000f)
+
+        val results = predictor.predict(
+            currentStroke = "감사합니다",
+            contextBeforeCursor = "",
+            packageName = "com.test.app",
+            limit = 5
+        )
+
+        assertFalse(
+            "no typo correction expected for a base-vocabulary word: ${results.map { it.text to it.source }}",
+            results.any { it.source == "typo_keyboard" || it.source == "typo_keyboard_stem" }
+        )
     }
 }

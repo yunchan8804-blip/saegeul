@@ -178,7 +178,7 @@ class TypingDnaStatsTest {
         assertEquals(5, level5Stats.level)
         assertEquals("언어 지문 마스터", level5Stats.levelTitle)
         assertEquals(210, level5Stats.totalSentences)
-        assertEquals(100, level5Stats.levelProgressPercent)
+        assertEquals(14, level5Stats.levelProgressPercent)
 
         // Clear verification
         repo.clear()

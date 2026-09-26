@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 1,
+  "frozenAt": "2026-09-12T07:45:40Z",
+  "provenance": {
+    "kind": "public_synthetic_korean_contexts",
+    "authoredFor": "held_out_automatic_suggestion_evaluation",
+    "exclusions": [
+      "real_user_text",
+      "stored_sentence_bank",
+      "model_output",
+      "private_typing_history"
+    ],
+    "reuseProhibited": [
+      "model_training",
+      "public_material_generation",
+      "prompt_examples"
+    ]
+  },
+  "evaluationMeaning": "각 입력은 앞 문맥에 맞는 다음 단어 또는 다음 문장을 제시하는지를 평가한다. 후보 존재, 문맥 영향, 한국어 품질, 지연 시간은 별도로 측정하며 이 fixture는 정답이나 권장 접미부를 포함하지 않는다.",
+  "rows": [
+    {
+      "id": "a01-word",
+      "scenarioId": "commute-meeting",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "회의 장소가 처음 가는 동네다. 지하철 환승 시간을 확인했다. 그래서 출발 전에 ",
+      "contrastPair": "contrast-01",
+      "domain": "commute"
+    },
+    {
+      "id": "a02-sentence",
+      "scenarioId": "commute-meeting",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "회의 장소가 처음 가는 동네다. 지하철 환승 시간을 확인했다. 그래서 출발 전에 ",
+      "contrastPair": "contrast-01",
+      "domain": "commute"
+    },
+    {
+      "id": "a03-word",
+      "scenarioId": "commute-rain",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "비가 와서 버스 대신 지하철을 타기로 했다. 약속 시간보다 조금 일찍 나갈 계획이다. 그래서 출발 전에 ",
+      "contrastPair": "contrast-01",
+      "domain": "commute"
+    },
+    {
+      "id": "a04-sentence",
+      "scenarioId": "commute-rain",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "비가 와서 버스 대신 지하철을 타기로 했다. 약속 시간보다 조금 일찍 나갈 계획이다. 그래서 출발 전에 ",
+      "contrastPair": "contrast-01",
+      "domain": "commute"
+    },
+    {
+      "id": "a05-word",
+      "scenarioId": "meal-sibling",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "동생이 매운 음식을 잘 못 먹는다. 오늘 저녁에는 함께 먹을 메뉴를 고른다. 식탁에 앉기 전에 ",
+      "contrastPair": "contrast-02",
+      "domain": "meal"
+    },
+    {
+      "id": "a06-sentence",
+      "scenarioId": "meal-sibling",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "동생이 매운 음식을 잘 못 먹는다. 오늘 저녁에는 함께 먹을 메뉴를 고른다. 식탁에 앉기 전에 ",
+      "contrastPair": "contrast-02",
+      "domain": "meal"
+    },
+    {
+      "id": "a07-word",
+      "scenarioId": "meal-allergy",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "손님이 견과류 알레르기가 있다고 알려 왔다. 재료를 다시 살펴보는 중이다. 식탁에 앉기 전에 ",
+      "contrastPair": "contrast-02",
+      "domain": "meal"
+    },
+    {
+      "id": "a08-sentence",
+      "scenarioId": "meal-allergy",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "손님이 견과류 알레르기가 있다고 알려 왔다. 재료를 다시 살펴보는 중이다. 식탁에 앉기 전에 ",
+      "contrastPair": "contrast-02",
+      "domain": "meal"
+    },
+    {
+      "id": "a09-word",
+      "scenarioId": "housework",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "창문을 열어 두었더니 바닥에 먼지가 쌓였다. 오후에 청소할 시간을 비워 두었다. 청소기를 꺼내서 ",
+      "contrastPair": null,
+      "domain": "housework"
+    },
+    {
+      "id": "a10-sentence",
+      "scenarioId": "housework",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "창문을 열어 두었더니 바닥에 먼지가 쌓였다. 오후에 청소할 시간을 비워 두었다. 청소기를 꺼내서 ",
+      "contrastPair": null,
+      "domain": "housework"
+    },
+    {
+      "id": "a11-word",
+      "scenarioId": "wellness",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "어제 늦게까지 화면을 봐서 눈이 피곤하다. 잠깐 쉬었다가 다시 일을 시작하려 한다. 책상에 앉기 전에 ",
+      "contrastPair": null,
+      "domain": "wellness"
+    },
+    {
+      "id": "a12-sentence",
+      "scenarioId": "wellness",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "어제 늦게까지 화면을 봐서 눈이 피곤하다. 잠깐 쉬었다가 다시 일을 시작하려 한다. 책상에 앉기 전에 ",
+      "contrastPair": null,
+      "domain": "wellness"
+    },
+    {
+      "id": "a13-word",
+      "scenarioId": "purchase",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "필요한 생활용품을 목록으로 적었다. 할인 기간이 오늘까지라는 알림을 받았다. 주문하기 전에 ",
+      "contrastPair": null,
+      "domain": "purchase"
+    },
+    {
+      "id": "a14-sentence",
+      "scenarioId": "purchase",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "필요한 생활용품을 목록으로 적었다. 할인 기간이 오늘까지라는 알림을 받았다. 주문하기 전에 ",
+      "contrastPair": null,
+      "domain": "purchase"
+    },
+    {
+      "id": "a15-word",
+      "scenarioId": "hobby",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "주말에 동네 공원에서 사진을 찍었다. 마음에 드는 장면을 골라 보정하려 한다. 사진을 정리하면서 ",
+      "contrastPair": null,
+      "domain": "hobby"
+    },
+    {
+      "id": "a16-sentence",
+      "scenarioId": "hobby",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "주말에 동네 공원에서 사진을 찍었다. 마음에 드는 장면을 골라 보정하려 한다. 사진을 정리하면서 ",
+      "contrastPair": null,
+      "domain": "hobby"
+    },
+    {
+      "id": "a17-word",
+      "scenarioId": "finance",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "이번 달 지출 내역을 가계부에 옮겼다. 다음 주 자동이체 금액도 확인했다. 예산을 정하기 전에 ",
+      "contrastPair": null,
+      "domain": "finance"
+    },
+    {
+      "id": "a18-sentence",
+      "scenarioId": "finance",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "이번 달 지출 내역을 가계부에 옮겼다. 다음 주 자동이체 금액도 확인했다. 예산을 정하기 전에 ",
+      "contrastPair": null,
+      "domain": "finance"
+    },
+    {
+      "id": "a19-word",
+      "scenarioId": "family",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "가족 모임 날짜를 단체 대화방에서 맞추고 있다. 먼 곳에 사는 친척도 참석할 수 있는지 물었다. 답장을 보내기 전에 ",
+      "contrastPair": null,
+      "domain": "family"
+    },
+    {
+      "id": "a20-sentence",
+      "scenarioId": "family",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "가족 모임 날짜를 단체 대화방에서 맞추고 있다. 먼 곳에 사는 친척도 참석할 수 있는지 물었다. 답장을 보내기 전에 ",
+      "contrastPair": null,
+      "domain": "family"
+    },
+    {
+      "id": "a21-word",
+      "scenarioId": "neighborhood",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "동네 도서관에서 독서 모임 안내를 봤다. 처음 오는 사람도 참여할 수 있다고 적혀 있었다. 신청서를 작성하기 전에 ",
+      "contrastPair": null,
+      "domain": "neighborhood"
+    },
+    {
+      "id": "a22-sentence",
+      "scenarioId": "neighborhood",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "동네 도서관에서 독서 모임 안내를 봤다. 처음 오는 사람도 참여할 수 있다고 적혀 있었다. 신청서를 작성하기 전에 ",
+      "contrastPair": null,
+      "domain": "neighborhood"
+    },
+    {
+      "id": "a23-word",
+      "scenarioId": "writing",
+      "mode": "WORD",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "새 글의 첫 문단을 여러 번 고쳤다. 제목과 본문이 같은 방향을 가리키는지 살폈다. 게시하기 전에 ",
+      "contrastPair": null,
+      "domain": "writing"
+    },
+    {
+      "id": "a24-sentence",
+      "scenarioId": "writing",
+      "mode": "SENTENCE",
+      "packageName": "net.chanpaca.saegeul.debug",
+      "inputType": 1,
+      "imeAction": 4,
+      "textBeforeCursor": "새 글의 첫 문단을 여러 번 고쳤다. 제목과 본문이 같은 방향을 가리키는지 살폈다. 게시하기 전에 ",
+      "contrastPair": null,
+      "domain": "writing"
+    }
+  ]
+}

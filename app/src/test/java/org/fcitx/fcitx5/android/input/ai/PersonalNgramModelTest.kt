@@ -79,6 +79,25 @@ class PersonalNgramModelTest {
     }
 
     @Test
+    fun completeReturnsEmptyWhenNoFirstCharacterIndexMatches() {
+        val model = PersonalNgramModel(clock = { 1_000_000_000L })
+        model.learn("오늘 회의 참석합니다", defaultPackage)
+
+        assertTrue(model.complete("123", "오늘", defaultPackage, 5).isEmpty())
+        assertTrue(model.complete("!@#", "오늘", defaultPackage, 5).isEmpty())
+    }
+
+    @Test
+    fun completeWithEmptyStrokeStillConsidersTheWholeVocabulary() {
+        val model = PersonalNgramModel(clock = { 1_000_000_000L })
+        model.learn("오늘 회의 참석합니다", defaultPackage)
+
+        val words = model.complete("", "오늘", defaultPackage, 5).map { it.word }
+
+        assertTrue(words.contains("회의"))
+    }
+
+    @Test
     fun decayPrefersRecentOverStaleLearning() {
         val time = longArrayOf(0L)
         val model = PersonalNgramModel(clock = { time[0] })
@@ -240,5 +259,18 @@ class PersonalNgramModelTest {
         assertTrue(counts.containsKey(TypingDnaVault.CATEGORY_MESSENGER))
         assertTrue(counts[TypingDnaVault.CATEGORY_WORK]!! > 0f)
         assertTrue(counts[TypingDnaVault.CATEGORY_MESSENGER]!! > 0f)
+    }
+
+    @Test
+    fun personaOverrideChangesCategoryBucketRegardlessOfPackageName() {
+        val model = PersonalNgramModel(clock = { 1_000_000_000L })
+        // defaultPackage matches no registry package or token, so without an override it lands
+        // in "general"; the override should redirect it to "work" instead.
+        model.learn("오늘 회의 참석합니다", defaultPackage, personaOverride = TypingDnaVault.CATEGORY_WORK)
+
+        val counts = model.categoryCounts()
+
+        assertTrue(counts.containsKey(TypingDnaVault.CATEGORY_WORK))
+        assertFalse(counts.containsKey(TypingDnaVault.CATEGORY_GENERAL))
     }
 }

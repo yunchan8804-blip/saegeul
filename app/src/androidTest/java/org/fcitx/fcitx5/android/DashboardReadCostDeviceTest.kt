@@ -121,7 +121,7 @@ class DashboardReadCostDeviceTest {
             dashboard.enrichment.graphNodes,
             dashboard.enrichment.graphEdges,
             dashboard.enrichment.graphTopics,
-            dashboard.enrichment.graphBuiltMs
+            dashboard.enrichment.lastAppliedMs
         ).joinToString(separator = "|")
         return MessageDigest.getInstance("SHA-256")
             .digest(material.toByteArray(Charsets.UTF_8))

@@ -1,0 +1,949 @@
+{
+  "schema": "saegeul-ios-backlog/v1",
+  "updated": "2026-09-13",
+  "ssot": [
+    "docs/HANDOFF-ios-port.md",
+    "docs/ios-dual-platform-plan.md",
+    "docs/ios-port-backlog.md",
+    "docs/korean-smart-input-ssot.md"
+  ],
+  "locked": [
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6",
+    "D7",
+    "D8",
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5"
+  ],
+  "env": {
+    "ssh": "vd-mac",
+    "mac_path": "/Users/yunchan/workspace/saegeul-ios",
+    "windows_ios_path": "ios/",
+    "team": "L6BZF5NB99",
+    "device_id": "8364243E-3479-5C43-B825-E11EED1A4A37",
+    "udid": "00008120-000E09462238C01E",
+    "simulator": "F800E1B5-5A65-4E5C-B916-682EF3372C31",
+    "host_bundle": "net.chanpaca.saegeul.ios",
+    "keyboard_bundle": "net.chanpaca.saegeul.ios.keyboard"
+  },
+  "next_agent": "Read docs/HANDOFF-ios-port.md. Pick smallest phase pending items whose blocked_by are all done. Do not change locked design. Update this json and ios-port-backlog.md together.",
+  "items": [
+    {
+      "id": "IOS-0-00",
+      "phase": 0,
+      "status": "done",
+      "title": "백로그·인수인계 문서",
+      "blocked_by": [],
+      "files": [
+        "docs/HANDOFF-ios-port.md",
+        "docs/ios-port-backlog.md",
+        "docs/ios-port-backlog.json"
+      ]
+    },
+    {
+      "id": "IOS-0-01",
+      "phase": 0,
+      "status": "done",
+      "title": "맥 미니·아이폰 환경 실측",
+      "blocked_by": [],
+      "files": [
+        "docs/HANDOFF-ios-port.md"
+      ]
+    },
+    {
+      "id": "IOS-0-02",
+      "phase": 0,
+      "status": "done",
+      "title": "서명 주체·LGPL 메모",
+      "blocked_by": [],
+      "files": [
+        "docs/ios-port-legal-notes.md"
+      ]
+    },
+    {
+      "id": "IOS-0-03",
+      "phase": 0,
+      "status": "done",
+      "title": "맥 saegeul-ios 트리 동기화",
+      "blocked_by": [
+        "IOS-0-01"
+      ],
+      "files": [
+        "ios/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-04",
+      "phase": 0,
+      "status": "done",
+      "title": "HangulCore 두벌식 조합기",
+      "blocked_by": [],
+      "files": [
+        "ios/HangulCore/Sources/HangulCore/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-05",
+      "phase": 0,
+      "status": "done",
+      "title": "HangulCore golden 테스트",
+      "blocked_by": [
+        "IOS-0-04"
+      ],
+      "files": [
+        "ios/HangulCore/Tests/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-06",
+      "phase": 0,
+      "status": "done",
+      "title": "Xcode 호스트+키보드 확장",
+      "blocked_by": [
+        "IOS-0-03"
+      ],
+      "files": [
+        "ios/Saegeul.xcodeproj/",
+        "ios/App/",
+        "ios/Keyboard/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-07",
+      "phase": 0,
+      "status": "done",
+      "title": "두벌식 키면 UI + Globe",
+      "blocked_by": [
+        "IOS-0-06",
+        "IOS-0-04"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-08",
+      "phase": 0,
+      "status": "done",
+      "title": "setMarkedText 어댑터",
+      "blocked_by": [
+        "IOS-0-07"
+      ],
+      "files": [
+        "ios/Keyboard/DocumentProxyAdapter.swift"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-09",
+      "phase": 0,
+      "status": "done",
+      "title": "RequestsOpenAccess=false 네트워크 0",
+      "blocked_by": [
+        "IOS-0-06"
+      ],
+      "files": [
+        "ios/Keyboard/Info.plist"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-10",
+      "phase": 0,
+      "status": "done",
+      "title": "시뮬레이터 두벌식 입력",
+      "blocked_by": [
+        "IOS-0-08",
+        "IOS-0-05"
+      ],
+      "files": [
+        "outputs/ios-spike/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-11",
+      "phase": 0,
+      "status": "done",
+      "title": "아이폰 14 Pro Max Notes ㄱ+ㅏ=가",
+      "blocked_by": [
+        "IOS-0-10"
+      ],
+      "files": [
+        "outputs/ios-spike/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-12",
+      "phase": 0,
+      "status": "done",
+      "title": "비밀번호 필드 시스템 키보드",
+      "blocked_by": [
+        "IOS-0-11"
+      ],
+      "files": [
+        "outputs/ios-spike/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-0-13",
+      "phase": 0,
+      "status": "pending",
+      "title": "확장 메모리 베이스라인",
+      "blocked_by": [
+        "IOS-0-11"
+      ],
+      "files": [
+        "docs/HANDOFF-ios-port.md"
+      ]
+    },
+    {
+      "id": "IOS-0-14",
+      "phase": 0,
+      "status": "pending",
+      "title": "libhangul xcframework 실험(비필수)",
+      "blocked_by": [
+        "IOS-0-03"
+      ],
+      "files": []
+    },
+    {
+      "id": "IOS-0-GO",
+      "phase": 0,
+      "status": "pending",
+      "title": "go/no-go 판정",
+      "blocked_by": [
+        "IOS-0-11",
+        "IOS-0-12",
+        "IOS-0-13"
+      ],
+      "files": [
+        "docs/ios-dual-platform-plan.md"
+      ]
+    },
+    {
+      "id": "IOS-1-01",
+      "phase": 1,
+      "status": "done",
+      "title": "온보딩 키보드 추가 안내",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/App/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-1-02",
+      "phase": 1,
+      "status": "pending",
+      "title": "앱 안 개인정보 안내",
+      "blocked_by": [
+        "IOS-1-01"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-1-03",
+      "phase": 1,
+      "status": "in_progress",
+      "title": "이메일/URL/숫자 키면",
+      "blocked_by": [
+        "IOS-0-07"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-1-04",
+      "phase": 1,
+      "status": "done",
+      "title": "높이 constraint 단일 진실",
+      "blocked_by": [
+        "IOS-0-07"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-1-05",
+      "phase": 1,
+      "status": "pending",
+      "title": "비행기 모드 입력",
+      "blocked_by": [
+        "IOS-0-09"
+      ],
+      "files": [
+        "outputs/ios-spike/"
+      ]
+    },
+    {
+      "id": "IOS-1-06",
+      "phase": 1,
+      "status": "pending",
+      "title": "마킹 ON/OFF 설정",
+      "blocked_by": [
+        "IOS-0-08"
+      ],
+      "files": [
+        "ios/App/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-1-07",
+      "phase": 1,
+      "status": "pending",
+      "title": "호스트 두벌식 미리보기",
+      "blocked_by": [
+        "IOS-1-01"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-1-08",
+      "phase": 1,
+      "status": "pending",
+      "title": "확장 광고 SDK·StoreKit 링크 0",
+      "blocked_by": [
+        "IOS-0-06"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-2-01",
+      "phase": 2,
+      "status": "done",
+      "title": "천지인",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-2-02",
+      "phase": 2,
+      "status": "pending",
+      "title": "천지인+",
+      "blocked_by": [
+        "IOS-2-01"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-2-03",
+      "phase": 2,
+      "status": "done",
+      "title": "나랏글",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-2-04",
+      "phase": 2,
+      "status": "pending",
+      "title": "나랏글 중앙",
+      "blocked_by": [
+        "IOS-2-03"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-2-05",
+      "phase": 2,
+      "status": "pending",
+      "title": "베가",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-2-06",
+      "phase": 2,
+      "status": "pending",
+      "title": "베가 중앙",
+      "blocked_by": [
+        "IOS-2-05"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-2-07",
+      "phase": 2,
+      "status": "done",
+      "title": "단모음",
+      "blocked_by": [
+        "IOS-0-04"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-2-08",
+      "phase": 2,
+      "status": "pending",
+      "title": "두벌식 옛글",
+      "blocked_by": [
+        "IOS-0-04"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-2-09",
+      "phase": 2,
+      "status": "pending",
+      "title": "세벌식 390",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-2-10",
+      "phase": 2,
+      "status": "pending",
+      "title": "세벌식 최종",
+      "blocked_by": [
+        "IOS-2-09"
+      ],
+      "files": [
+        "ios/HangulCore/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-2-11",
+      "phase": 2,
+      "status": "pending",
+      "title": "세벌식 순이",
+      "blocked_by": [
+        "IOS-2-09"
+      ],
+      "files": [
+        "ios/HangulCore/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-2-12",
+      "phase": 2,
+      "status": "pending",
+      "title": "세벌식 옛글",
+      "blocked_by": [
+        "IOS-2-09"
+      ],
+      "files": [
+        "ios/HangulCore/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-2-13",
+      "phase": 2,
+      "status": "pending",
+      "title": "세벌식 두벌 배치",
+      "blocked_by": [
+        "IOS-2-09"
+      ],
+      "files": [
+        "ios/HangulCore/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-2-14",
+      "phase": 2,
+      "status": "pending",
+      "title": "안마태",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-2-15",
+      "phase": 2,
+      "status": "done",
+      "title": "스페이스 롱프레스 자판 전환",
+      "blocked_by": [
+        "IOS-2-01",
+        "IOS-2-03"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "IOS-2-16",
+      "phase": 2,
+      "status": "pending",
+      "title": "자판별 golden 시퀀스",
+      "blocked_by": [
+        "IOS-2-01",
+        "IOS-2-07",
+        "IOS-2-09",
+        "IOS-2-14"
+      ],
+      "files": [
+        "ios/HangulCore/Tests/"
+      ]
+    },
+    {
+      "id": "IOS-2-MOA",
+      "phase": 2,
+      "status": "blocked",
+      "title": "모아키 (특허 게이트)",
+      "blocked_by": [],
+      "files": [],
+      "note": "KR 1020110078022 법률 검토 전 코드 금지"
+    },
+    {
+      "id": "IOS-3-01",
+      "phase": 3,
+      "status": "pending",
+      "title": "한/영 오타 복구",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-3-02",
+      "phase": 3,
+      "status": "pending",
+      "title": "초성 검색",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-3-03",
+      "phase": 3,
+      "status": "pending",
+      "title": "조사 후보",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-3-04",
+      "phase": 3,
+      "status": "pending",
+      "title": "어절 자동완성 사전",
+      "blocked_by": [
+        "IOS-0-GO"
+      ],
+      "files": [
+        "ios/HangulCore/Resources/"
+      ]
+    },
+    {
+      "id": "IOS-3-05",
+      "phase": 3,
+      "status": "pending",
+      "title": "개인 단어장 백업 제외",
+      "blocked_by": [
+        "IOS-1-01"
+      ],
+      "files": [
+        "ios/App/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-3-06",
+      "phase": 3,
+      "status": "pending",
+      "title": "후보 가로바",
+      "blocked_by": [
+        "IOS-3-01",
+        "IOS-3-04"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-3-07",
+      "phase": 3,
+      "status": "pending",
+      "title": "보안 필드 후보 0",
+      "blocked_by": [
+        "IOS-3-06"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-3-08",
+      "phase": 3,
+      "status": "pending",
+      "title": "한자 음훈 1회 변환",
+      "blocked_by": [
+        "IOS-3-06"
+      ],
+      "files": [
+        "ios/HangulCore/"
+      ]
+    },
+    {
+      "id": "IOS-3-09",
+      "phase": 3,
+      "status": "pending",
+      "title": "명시 선택 1회 삽입",
+      "blocked_by": [
+        "IOS-3-06"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-4-01",
+      "phase": 4,
+      "status": "pending",
+      "title": "테마 JSON 3.0 서브셋",
+      "blocked_by": [
+        "IOS-1-01"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-4-02",
+      "phase": 4,
+      "status": "pending",
+      "title": "테마 목록·적용",
+      "blocked_by": [
+        "IOS-4-01"
+      ],
+      "files": [
+        "ios/App/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-4-03",
+      "phase": 4,
+      "status": "pending",
+      "title": "Typing DNA 대시보드",
+      "blocked_by": [
+        "IOS-1-01"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-4-04",
+      "phase": 4,
+      "status": "pending",
+      "title": "Secure Enclave envelope",
+      "blocked_by": [
+        "IOS-4-03"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-4-05",
+      "phase": 4,
+      "status": "pending",
+      "title": "백업 제외 Keychain ThisDeviceOnly",
+      "blocked_by": [
+        "IOS-4-04"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-4-06",
+      "phase": 4,
+      "status": "pending",
+      "title": "WidgetKit 집계만",
+      "blocked_by": [
+        "IOS-4-03"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-4-07",
+      "phase": 4,
+      "status": "pending",
+      "title": "앱 프로필 bundle id",
+      "blocked_by": [
+        "IOS-1-01"
+      ],
+      "files": [
+        "ios/App/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-5-01",
+      "phase": 5,
+      "status": "pending",
+      "title": "Full Access 목적 문자열",
+      "blocked_by": [
+        "IOS-1-02"
+      ],
+      "files": [
+        "ios/Keyboard/Info.plist"
+      ]
+    },
+    {
+      "id": "IOS-5-02",
+      "phase": 5,
+      "status": "pending",
+      "title": "컴패니언 iOS redirect URI",
+      "blocked_by": [
+        "IOS-5-01"
+      ],
+      "files": [
+        "scripts/ai-provider-companion.py"
+      ]
+    },
+    {
+      "id": "IOS-5-03",
+      "phase": 5,
+      "status": "pending",
+      "title": "호스트 BYOK/OAuth",
+      "blocked_by": [
+        "IOS-5-01"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-5-04",
+      "phase": 5,
+      "status": "pending",
+      "title": "store=false 강제",
+      "blocked_by": [
+        "IOS-5-03"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-5-05",
+      "phase": 5,
+      "status": "pending",
+      "title": "오프라인 모드 선행 차단",
+      "blocked_by": [
+        "IOS-5-03"
+      ],
+      "files": [
+        "ios/App/",
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-5-06",
+      "phase": 5,
+      "status": "pending",
+      "title": "OCR 호스트 Vision",
+      "blocked_by": [
+        "IOS-5-01"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-5-07",
+      "phase": 5,
+      "status": "pending",
+      "title": "STT 호스트",
+      "blocked_by": [
+        "IOS-5-01"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-5-08",
+      "phase": 5,
+      "status": "pending",
+      "title": "GIF Noto 로컬 후보",
+      "blocked_by": [
+        "IOS-5-01"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-6-01",
+      "phase": 6,
+      "status": "pending",
+      "title": "호스트 LiteRT-LM 또는 Foundation Models",
+      "blocked_by": [
+        "IOS-4-03"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-6-02",
+      "phase": 6,
+      "status": "pending",
+      "title": "확장은 재료 조회만",
+      "blocked_by": [
+        "IOS-6-01"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-6-03",
+      "phase": 6,
+      "status": "pending",
+      "title": "입력 중 문맥 완성 기본 끔",
+      "blocked_by": [
+        "IOS-6-02"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ]
+    },
+    {
+      "id": "IOS-7-01",
+      "phase": 7,
+      "status": "pending",
+      "title": "StoreKit 테마 (광고 포인트 금지)",
+      "blocked_by": [
+        "IOS-4-02"
+      ],
+      "files": [
+        "ios/App/"
+      ]
+    },
+    {
+      "id": "IOS-7-02",
+      "phase": 7,
+      "status": "pending",
+      "title": "Privacy Nutrition Label",
+      "blocked_by": [
+        "IOS-1-02"
+      ],
+      "files": []
+    },
+    {
+      "id": "IOS-7-03",
+      "phase": 7,
+      "status": "pending",
+      "title": "한국 전자상거래 표시",
+      "blocked_by": [
+        "IOS-7-02"
+      ],
+      "files": []
+    },
+    {
+      "id": "IOS-7-SIGN",
+      "phase": 7,
+      "status": "pending",
+      "title": "게시자 Yun Chan vs 팀 YONGSEOK LEE",
+      "blocked_by": [
+        "IOS-0-02"
+      ],
+      "files": [
+        "docs/ios-port-legal-notes.md"
+      ]
+    },
+    {
+      "id": "IOS-7-04",
+      "phase": 7,
+      "status": "pending",
+      "title": "4.4.1 리뷰 노트",
+      "blocked_by": [
+        "IOS-1-08"
+      ],
+      "files": []
+    },
+    {
+      "id": "IOS-7-05",
+      "phase": 7,
+      "status": "pending",
+      "title": "Apple emoji 미포함",
+      "blocked_by": [
+        "IOS-0-07"
+      ],
+      "files": [
+        "ios/Keyboard/"
+      ]
+    }
+  ]
+}

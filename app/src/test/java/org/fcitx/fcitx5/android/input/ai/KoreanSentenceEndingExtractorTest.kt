@@ -55,7 +55,7 @@ class KoreanSentenceEndingExtractorTest {
         assertEquals("Informal", informal.dominantTone)
         assertEquals(listOf("할까"), informal.habitualEndings)
         assertEquals("Honorific", politeWithoutListedEnding.dominantTone)
-        assertTrue(politeWithoutListedEnding.habitualEndings.isEmpty())
+        assertEquals(listOf("나요"), politeWithoutListedEnding.habitualEndings)
     }
 
     @Test

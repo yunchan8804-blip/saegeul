@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vault_category_row_empty">Not yet</string>
+    <string name="vault_category_row_value_with_pending">%1$d%% · %2$d/%3$d pending</string>
+    <string name="vault_category_chart_empty_hint">Your tone will be split by app category here.</string>
+</resources>

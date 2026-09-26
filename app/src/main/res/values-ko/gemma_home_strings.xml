@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_home_eyebrow">Gemma</string>
+    <string name="gemma_home_title">AI 문장 준비</string>
+    <string name="gemma_home_summary">기기에서 문장을 미리 준비해 입력할 때 바로 제안해요</string>
+    <string name="gemma_home_open">준비 화면 열기</string>
+    <string name="gemma_home_vault_title">내 언어 금고</string>
+</resources>

@@ -42,6 +42,9 @@ object AppUtil {
     fun launchMainToThemeList(context: Context) =
         launchMainToDest(context, SettingsRoute.Theme)
 
+    fun launchMainToLicenseList(context: Context) =
+        launchMainToDest(context, SettingsRoute.License)
+
     fun launchMainToInputMethodConfig(context: Context, uniqueName: String, displayName: String) =
         launchMainToDest(context, SettingsRoute.InputMethodConfig(displayName, uniqueName))
 

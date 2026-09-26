@@ -587,6 +587,7 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
     fcitx::registerDomain("fcitx5", locale_dir_char);
     fcitx::registerDomain("fcitx5-lua", locale_dir_char);
     fcitx::registerDomain("fcitx5-android", locale_dir_char);
+    fcitx::registerDomain("fcitx5-hangul", locale_dir_char);
 
     const int extDomainsSize = env->GetArrayLength(extDomains);
     for (int i = 0; i < extDomainsSize; i++) {

@@ -97,11 +97,10 @@ $expectedProviders = @(
     "github-raw-content",
     "google-fonts",
     "klipy",
-    "oauth-provider",
-    "openai-compatible-ai",
     "openai-compatible-speech",
     "wikimedia-commons",
-    "google-admob"
+    "google-admob",
+    "huggingface-model-download"
 )
 $actualProviders = @($contract.releaseProviderSet.id | Sort-Object)
 if (($actualProviders -join "`n") -ne (($expectedProviders | Sort-Object) -join "`n")) {
@@ -111,11 +110,6 @@ if (($actualProviders -join "`n") -ne (($expectedProviders | Sort-Object) -join 
 $expectedDataTypes = [ordered]@{
     approximate_location = @("Location", "Approximate location", "App functionality", "Advertising")
     in_app_search_history = @("App activity", "In-app search history", "App functionality")
-    other_user_generated_content = @(
-        "App activity",
-        "Other user-generated content",
-        "App functionality"
-    )
     voice_or_sound_recordings = @("Audio files", "Voice or sound recordings", "App functionality")
     app_interactions = @("App activity", "App interactions", "App functionality", "Analytics", "Advertising")
     device_or_other_ids = @(
@@ -185,7 +179,6 @@ Assert-ContainsAll -Text $publicPolicy -Label "Public privacy policy" -Needles @
     "IP 주소",
     "대략적 위치",
     "앱 내 검색 기록",
-    "기타 사용자 생성 콘텐츠",
     "음성 또는 소리 녹음",
     "GIPHY"
 )

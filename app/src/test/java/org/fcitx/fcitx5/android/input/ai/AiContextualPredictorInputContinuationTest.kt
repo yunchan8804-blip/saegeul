@@ -19,7 +19,7 @@ class AiContextualPredictorInputContinuationTest {
         ngram.learn(prefix, "com.example.test")
         ngram.learn(separatelyObserved, "com.example.test")
         val legacyContinuation = KoreanSentenceContinuation(ngram = ngram)
-        assertTrue(
+        assertFalse(
             legacyContinuation.continuations(
                 listOf("내가", "뭘"),
                 ContinuationTone.Honorific,

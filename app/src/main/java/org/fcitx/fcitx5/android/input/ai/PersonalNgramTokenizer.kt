@@ -22,13 +22,18 @@ object PersonalNgramTokenizer {
         "은", "는", "이", "가", "을", "를", "도", "의", "에", "로", "와", "과", "랑", "께", "만", "요"
     )
 
+    private val PARTICLES_REQUIRING_BATCHIM = setOf("이", "을", "과", "은")
+    private val PARTICLES_FORBIDDING_BATCHIM = setOf("가", "를", "와", "는")
+    private val PII_KEYWORDS = setOf("이메일", "주민번호", "카드번호", "전화번호", "계좌번호", "인증코드")
+
     fun tokenize(sentence: String): List<String> {
         if (sentence.isBlank()) return emptyList()
         val result = mutableListOf<String>()
         for (raw in sentence.trim().split(WHITESPACE)) {
             if (raw.isEmpty()) continue
-            if (raw.startsWith("[") && raw.endsWith("]")) continue
+            if (raw.startsWith("[") && raw.contains("]")) continue
             val trimmed = trimPunctuation(raw)
+            if (trimmed.contains("[") || trimmed.contains("]")) continue
             if (isDroppable(trimmed)) continue
             result.add(trimmed)
         }
@@ -39,7 +44,15 @@ object PersonalNgramTokenizer {
         for (particle in PARTICLES) {
             if (word.endsWith(particle)) {
                 val remainder = word.length - particle.length
-                return if (remainder >= 1) word.substring(0, remainder) else null
+                if (remainder < 1) continue
+                val stemCandidate = word.substring(0, remainder)
+                val lastChar = stemCandidate.last()
+                if (morphology.isHangulSyllable(lastChar)) {
+                    val hasBatchim = ((lastChar.code - 0xAC00) % 28) > 0
+                    if (particle in PARTICLES_REQUIRING_BATCHIM && !hasBatchim) continue
+                    if (particle in PARTICLES_FORBIDDING_BATCHIM && hasBatchim) continue
+                }
+                return stemCandidate
             }
         }
         return null

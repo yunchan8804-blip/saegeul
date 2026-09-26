@@ -100,3 +100,41 @@ Fold6 `SM-F956N` / `R3CX70NE9VH` 유선 ADB에서 arm64 insets 빌드(`BUILD SUC
 boundary-regression은 최초 잘못된 runner 패키지의 instrumentation 오류 뒤 패키지를 정정해 재실행했다. 기존 기기 계약 8건은 `OK`(118.985초, retry exit 0)이며, B23의 외부 커서 이동·physical delete pending 경계 2건과 B26의 exact/stale/reject·attach 경계 6건을 포함한다. 이 제한된 계약 증거는 전체 편집 품질이나 실제 한글 타이핑 E2E를 뜻하지 않는다.
 
 다음 순서는 B19 coldstart 일반 엔진 제품 통합·품질 평가, B20 실패·중복·재시작 전체 경로, B22 실제 수집→추천, OAuth 자동 prefetch다. 유선 reverse `29443`과 이 실행 소유 임시 XML은 제거했으며 기존 다른 reverse는 보존했다. run4 시험 서버는 정상 종료했고 커밋·push·배포는 하지 않았다.
+
+
+## 2026-09-21 컴패니언 게이트웨이 중단 RCA · 개인화 실측 신
+
+사용자 보고는 ''에러 로그를 보고 왜 계속 LLM 그래프 강화가 실패하는지''(개인화 부진 포함)였다. Fold6 `SM-F956N` / `R3CX70NE9VH` 유선 ADB + 이 PC의 컴패니언 상태를 함께 확인했다.
+
+- **강화 실패 원인은 앱이 아니라 PC 컴패니언 게이트웨이 중단이었다.** 기기 prefs `shared_prefs/graph_enrichment_status.xml`(debug, uid 10894)은 `phase=FAILED · failure=PROVIDER_ERROR · started_ms 1789983486523 → finished_ms 1789983501842`(2026-09-21 18:38:06 → 18:38:21, 15.3초)를 남겼고 마지막 성공 반영은 09-19 19:41(node 28·edge 19·topic 7)이었다. 같은 시각 PC에서는 `Get-NetTCPConnection -LocalPort 9211`이 0건이었고 `https://alpaca-home.taile93291.ts.net:9210/health`가 502였다(tailscaled serve → 127.0.0.1:9211 upstream 없음). 즉 앱 분류 `PROVIDER_ERROR`는 5xx/timeout으로 떨어진 요청이었고, 강화·프리페치 양쪽이 같은 이유로 실패한다.
+- **복구**: 예약 작업 `Saegeul AI Companion`(트레이 `SaegeulAiCompanionTray.exe`)이 `State=Ready`(미실행)였다. 작업을 시작하고, 설치본 `%LOCALAPPDATA%\Saegeul\companion\ai-provider-companion.py`(56,544 B)를 저장소 최신본(61,889 B, `bccc3c5d` mDNS 수정 포함)으로 교체한 뒤 트레이를 재시작했다. `http://127.0.0.1:9211/health`와 `https://alpaca-home.taile93291.ts.net:9210/health` 모두 `{"status":"ok","provider":"computer-cli","backends":["agy","claude","codex"]}`다. 설치본이 저장소보다 낡았다는 점은 이번 실패의 2차 요인이며, `companion/windows/install.ps1`은 `-BuildWpfTray` 없이 실행하면 실행 대상을 트레이가 아닌 `pythonw`로 바꾸므로 재설치 시 주의가 필요하다.
+- **강화 재현 성공**: 대시보드 `언어 금고 보강` 카드의 `gemma_vault_generate`(= sync 후 `continueWithEnrichment`)를 눌러 `phase=RUNNING`을 확인한 뒤 151초에 `phase=SUCCEEDED · nodes 30 · edges 18 · topics 10 · last_applied 23:07:15`로 끝났고 `files/personal_graph.json`이 3,480 B로 갱신됐다. logcat(uid 10894)에는 `background enrichment chunk: outcome=VALID` 3건(23:05:33·23:06:24·23:07:15)만 남고 실패 로그는 없었다. 이로써 `PROVIDER_ERROR`의 원인과 해소를 실기기에서 확인했다.
+- **개인화 실측(같은 시각, debug 앱)**: `표시한 추천 65,356개 중 321개 선택` = 수락률 0.49%(화면 표기는 반올림 0%), 개인 기록 활용 비율 38%, 오타 교정 71. `절약한 타자`는 계속 `측정 준비 중`인데 이는 지표 배선 문제다 — `TypingDnaDashboardActivity.kt:814`가 `metricsSummary.keystrokesSaved`를 쓰지 않고 문자열을 고정 출력하고, `FcitxInputMethodService.kt:4084`가 `savedKeystrokes = 0`으로만 기록한다.
+- **수집·생성 품질 신호**: 오늘 `학습 56문장 · 건너 104(백스페이스 77 · 편집기 전환 4 · 짧음 16 · 중복 1 · 공백 5 · 개인정보 1)`로 65%가 버려졌고, 실시간 로그도 `CollectionDiagnostics: SaegeulCollect dropped reason=backspace`가 연속으로 찍힌다(수정 입력이 학습에서 배제된다). Gemma 누적 상태는 `added 1405 · duplicates 1671 · rejected 190 · stored 1507 · consecutive_unproductive 5`로 중복률 54%다.
+- **한계**: 이 증거는 게이트웨이 복구와 1회 강화 성공, 지표 실측에 한정한다. 수락률 0.49%가 UI 노출 계측 과대인지 실제 후보 품질 문제인지는 별도 검증이 필요하고(수락률·개인화 품질의 원인 단정 없음), 백그라운드 강화가 앱 종료 후에도 완료되는지, 재부팅·로그온 후 예약 작업이 다시 살아나는지는 미검증이다.
+
+### 신규 백로그
+
+- **B27 (P1) — 컴패니언 게이트웨이 무감시 중단**: 예약 작업이 `Ready`인데도(트레이 종료 등) 앱은 `PROVIDER_ERROR`만 기록하고 사용자에게 원인을 알리지 않는다. 앱의 상태 화면이 `/health` 실패를 ''내 컴퓨터의 AI 공급자 프로그램이 꺼져 있음''으로 구분해 안내하고, 예약 작업에 재시작·감시(주기 health 확인)를 붙이는 방향 검토. | `graph_enrichment_status.xml`, `companion/windows/install.ps1`, `GraphEnrichmentRunner` | 중 |
+- **B28 (P2) — `절약한 타자` 지표 미배선**: 화면은 ''측정 준비 중'' 고정, 기록은 항상 0. | `TypingDnaDashboardActivity.kt:814`, `FcitxInputMethodService.kt:4084` | 소 |
+- **B29 (P2) — 백스페이스로 끝난 입력이 전부 학습 배제**: 오늘 dropped의 74%가 `backspace`다. 교정 전 문장을 통째로 버리는 대신 교정 결과(오타 쌍)만이라도 학습하는 경로 검토. | `CollectionDiagnostics` drop 사유, 수집 파이프라인 | 중 |
+- **B30 (P2) — Gemma 누적 중복률 54%**: `duplicates 1671 / added 1405`. 시드·프롬프트 구성과 중복 판정 임계 재점검. | `GemmaAccumulationStore`·`GemmaMaterialGenerator` | 중 |
+
+## 2026-09-22 무선 재검증 — 컴패니언 CLI 샌드박스 소실 · Claude 응답 형식
+
+전날 복구 뒤 무선 adb(`100.109.125.97:38981`, tailnet `z-fold6`)로 강화를 다시 트리거했더니 세 번 연속 `PROVIDER_ERROR httpStatus=502 elapsedMillis=240/97/88`로 즉시 실패했다. 컴패니언 게이트웨이는 정상(9211 listen, 9210 health `ok`, 잘못된 토큰으로 401 응답)이었으므로 게이트웨이 중단이 아니었다.
+
+- **확정 원인(샌드박스 소실)**: 컴패니언의 CLI 샌드박스 기본값은 `%TEMP%\saegeul-ai-cli-sandbox`이고 `CliBackendRunner.__init__`에서 한 번만 생성한다. 장수 게이트웨이가 떠 있는 동안 temp 정리로 이 디렉터리가 사라지면 모든 CLI 호출이 즉시 실패한다. 실측(디렉터리 삭제 상태): `agy` 1ms, `codex` 708ms → `RuntimeError` → `run_responses`가 502 `cli_failed` → 앱 `PROVIDER_ERROR`. 100ms 미만 실패와 정확히 일치한다.
+- **수정 1**: `CliBackendRunner.generate`가 매 요청 전 `sandbox_dir.mkdir(parents=True, exist_ok=True)`로 샌드박스를 재생성한다. 수정 뒤 디렉터리 삭제 상태에서 `codex` 8.9초 성공(수정 전 708ms 실패). 단위 테스트 `test_generate_recreates_cli_sandbox_removed_by_temp_cleanup` 추가.
+- **확정 결함 2(Claude 응답 형식)**: 설치된 Claude Code `-p --output-format json`은 단일 객체가 아니라 `system/assistant/result` 이벤트 JSON 배열을 출력한다. `_run_claude`가 dict를 가정해 `AttributeError: 'list' object has no attribute 'get'`이 발생했고, 이는 `except RuntimeError`에 걸리지 않아 핸들러 밖으로 전파됐다(balanced 티어 전체 실패). 실측 stdout 첫 요소 키 `type/subtype/cwd/session_id/...`, 마지막 요소 `type=result, subtype=success, result="OK"`.
+- **수정 2**: 배열이면 마지막 `type=result` 이벤트를 골라 검사하고, dict가 아니면 `Claude Code returned invalid JSON`으로 거절한다. 수정 뒤 실제 CLI로 `{"suggestions":["오늘 회의는 오후 2시에 시작해요!"]}` 12.9초 반환(수정 전 AttributeError). 테스트 3건 추가.
+- **agy(Fast 티어=강화) 재확인**: `GraphEnrich` 실제 지시문과 8문장 청크로 47.8초에 `nodes/edges/topics` 그래프 JSON을 반환했다. 전날 성공 3청크(151초)와 같은 자릿수다. 즉 Fast 티어 자체는 정상이고 실패는 위 두 결함으로 설명된다.
+- **배포·상태**: 저장소 `scripts/ai-provider-companion.py`(62,806 B, sha256 `80aaab59574b5101`)를 `%LOCALAPPDATA%\Saegeul\companion`에 반영하고 트레이(예약 작업)를 재시작했다. 이전 실행의 고아 python 프로세스가 9211을 잡고 있어 함께 정리한 뒤 재바인드했고, `%TEMP%\saegeul-ai-cli-sandbox` 재생성과 9211 listen·트레이 실행을 확인했다. 컴패니언 테스트는 43→47건 `OK`.
+- **미검증**: 기기 쪽 강화 E2E 재확인. 무선 adb 연결이 끊겨(`adb devices`에 z-fold6 없음) 대시보드 트리거와 `GraphEnrichmentCompletionDeviceTest`를 아직 돌리지 못했다. `emulator-5554`에는 새글 debug 패키지가 설치돼 있지 않다.
+- **원인 구분**: 09-21 18:38 실패는 게이트웨이 중단(전날 복구), 09-22 08:18~08:23 실패는 샌드박스 소실이다. 같은 `PROVIDER_ERROR`지만 원인이 다르다.
+
+### 신규·갱신 백로그
+
+- **B31 (P1, 완료) — temp 정리로 사라진 CLI 샌드박스**: 매 CLI 실행 전 재생성. 증거: 삭제 상태 agy 1ms·codex 708ms 실패 → 수정 후 codex 8.9초 성공, 단위 테스트 1건. | `CliBackendRunner.generate` | 소 |
+- **B32 (P1, 완료) — Claude Code JSON 배열 응답 미처리**: 마지막 `result` 이벤트 선택과 비-dict 거절. 증거: 실제 CLI 12.9초 성공, 단위 테스트 3건. | `CliBackendRunner._run_claude` | 소 |
+- **B33 (P2) — 컴패니언 오류 가시성 부족**: 502 `cli_failed`에 원인 문자열이 없고 stdout/stderr 로그도 남지 않아 앱·트레이만으로는 CLI 실패를 알 수 없다(이번 RCA가 오래 걸린 이유). 응답에 원인 요약을 담고 컴패니언 로그를 남기는 방향 검토. | `run_responses` 502 경로, 트레이 로그 | 중 |

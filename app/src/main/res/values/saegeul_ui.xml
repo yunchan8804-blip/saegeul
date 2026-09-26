@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="saegeul_canvas">#FFF9ED</color>
+    <color name="saegeul_surface">#FFFFFF</color>
+    <color name="saegeul_ink">#101827</color>
+    <color name="saegeul_secondary">#52605D</color>
+    <color name="saegeul_action">#176B50</color>
+    <color name="saegeul_on_action">#FFFFFF</color>
+    <color name="saegeul_subtle">#EAF4EE</color>
+    <color name="saegeul_outline">#D2DED7</color>
+    <color name="widget_glow_color">#FF2E8B6A</color>
+
+    <dimen name="saegeul_screen_inset">24dp</dimen>
+    <dimen name="saegeul_card_radius">20dp</dimen>
+    <dimen name="saegeul_button_radius">12dp</dimen>
+    <dimen name="saegeul_touch_target">48dp</dimen>
+
+    <string name="saegeul_setup_title">새글 키보드 설정</string>
+    <string name="saegeul_setup_summary">키보드를 켜고 기본 입력기로 선택해 주세요.</string>
+</resources>

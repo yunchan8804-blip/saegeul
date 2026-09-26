@@ -5,4 +5,26 @@
     <string name="privacy_ai_typing_dna_sync_summary">Update your writing style and vocabulary habits using recent typing data.</string>
     <string name="privacy_ai_typing_dna_sync_busy">Analyzing and syncing your language profile…</string>
     <string name="privacy_ai_typing_dna_sync_failed">Couldn\'t analyze and sync your language profile. Please try again.</string>
+    <string name="privacy_ai_vault_category">Language Vault</string>
+    <string name="privacy_ai_vault_dashboard_title">Language Vault Dashboard</string>
+    <string name="privacy_ai_vault_dashboard_summary">Manage Gemma sentence preparation and your personal language fingerprint on this device.</string>
+    <string name="privacy_ai_automatic_release_summary">On-device suggestions aren\'t supported in this build.</string>
+    <string name="privacy_ai_gpu_acceleration_title">GPU acceleration</string>
+    <string name="privacy_ai_gpu_acceleration_summary">Takes effect the next time you open the keyboard.</string>
+    <string name="privacy_ai_background_notifications_title">Background progress notifications</string>
+    <string name="privacy_ai_background_notifications_summary">Show notifications for background AI work such as sentence preparation and graph enrichment.</string>
+    <string name="privacy_ai_collection_feedback_title">Keyboard collection feedback</string>
+    <string name="privacy_ai_collection_feedback_summary">Briefly show learning progress on the keyboard\'s status row while you type.</string>
+    <string name="privacy_ai_open_notification_settings_title">Open notification permission</string>
+    <string name="privacy_ai_open_notification_settings_summary">Notifications are off, so progress can\'t be reported. Allow them in system settings.</string>
+    <string name="privacy_ai_typing_dna_report_title">My language fingerprint report</string>
+    <string name="privacy_ai_typing_dna_sync_title">Analyze and sync language fingerprint now</string>
+    <string name="privacy_ai_typing_dna_clear_title">Reset language fingerprint entirely (Zero-Knowledge)</string>
+    <string name="privacy_ai_typing_dna_clear_summary">Permanently delete all learned tone, sentence endings, and personal expressions from this device.</string>
+    <string name="privacy_ai_typing_dna_clear_dialog_title">Reset language fingerprint</string>
+    <string name="privacy_ai_typing_dna_clear_dialog_message">Completely delete the learned tone, sentence endings, and personal expressions from this device?</string>
+    <string name="privacy_ai_typing_dna_cleared_toast">Language fingerprint has been safely reset.</string>
+    <string name="privacy_ai_typing_dna_no_data_summary">No language fingerprint has been learned yet. It\'s learned automatically as you use the keyboard.</string>
+    <string name="privacy_ai_typing_dna_stats_summary">Lv.%1$d %2$s · %3$d sentences · %4$d word pairs · %5$d endings</string>
+    <string name="privacy_ai_typing_dna_sync_done_toast">Language fingerprint analysis complete (%1$d sentences analyzed)</string>
 </resources>

@@ -573,3 +573,68 @@ CREATE TABLE audit_log (
 - [AdMob 빈도 제한](https://support.google.com/admob/answer/6244508?hl=ko)
 - [AdMob 미디에이션 행동 정책](https://support.google.com/admob/answer/2753860?hl=ko)
 - [Google Play Data Safety와 SDK](https://support.google.com/googleplay/android-developer/answer/10787469?hl=ko)
+
+## 13. 수익 극대화 로드맵 (2026-09-11 조사 반영)
+
+> 조사 방법: 키보드 앱 수익화 사례, 광고 로드 대비 이탈 연구, AdMob 공식 배치 가이드를 병렬 조사. 출처는 각 항목에 표기.
+
+### 13.1 조사가 확정한 금지선 (변경 없음)
+
+- **IME 표면 광고는 영구 금지**다. 근거: Play 광고 정책의 Disruptive Ads 조항("다른 기능을 탭하는 영역에 갑자기 나타나는 광고" 금지)은 키 입력 영역 광고에 정면으로 걸리고, Kika·Cheetah Keyboard는 입력 내용을 이용한 광고 사기로 Play에서 퇴출됐다([The Verge 2018](https://www.theverge.com/2018/11/26/18113415/android-apps-google-play-cheetah-mobile-kika-tech), [Google Security Blog 2020](https://security.googleblog.com/2020/02/disruptive-ads-enforcement-and-our-new.html)).
+- 국내 선례도 같다. 알키보드는 2020년 키보드 광고를 도입했다가 반발로 철회·환불했고, 디자인키보드의 상단바 광고는 지속 불만 대상이다.
+- 키보드 앱은 "타이핑 작업 중"이 늘어 자연스러운 전환점이 없어 전면 광고 자체가 우발 클릭 제재 리스크다([AdMob 인터스티셜 가이드](https://support.google.com/admob/answer/6201362?hl=ko)).
+
+### 13.2 수익 레버 우선순위 (eCPM과 이탈 비용의 합)
+
+업계 벤치마크(2024~2026) 기준 형식별 eCPM 순위는 리워드($14~22) > 인터스티셜($9~14) > 네이티브($3~5) > 배너($0.4~0.8, US)이고 이탈 비용은 정반대다. 따라서 수익 극대화는 노출량이 아니라 **레버를 순서대로 켜는 일**이다([RevenueLab 2026](https://www.revenuelab.fyi/blog/admob-ecpm-benchmarks-2026)).
+
+1. **동의 흐름(UMP)을 먼저 완성한다.** 비개인화 광고로 강등되면 eCPM이 60~80% 내려간다. 배치 실험보다 큰 수익 레버고 이미 4.3절 설계가 있다. GDPR ad partner 목록은 "commonly used set"을 유지해 수요를 보전한다.
+2. **보상형 opt-in을 주력으로 만든다.** 최고 eCPM에 리텐션 손상이 가장 적다. 이 문서 4.4절의 개발자 응원 흐름이 그 진입점이다.
+3. **보상형의 창의적 변형: 테마 체험 해제.** "광고 1편 시청 → 프리미엄 테마 24시간 체험"은 자발적 opt-in이라 이탈이 없고, 새글의 테마 엔진 자산을 그대로 쓴다. Facemoji가 "유료 대신 광고 시청"으로 테마·구독 매출을 내는 선례가 있다([Adapty](https://adapty.io/paywall-library/facemoji-ai-emoji-keyboard/)). 보상은 비화폐성·비양도성이어야 한다(7313578).
+4. **앱 표면 배너는 앵커 적응형으로만.** 고정 320×50 대비 eCPM 20~40% 우위, 콘텐츠 오버랩 없이 고정 공간 할당이 정책상 필수다([권장 배너 구현](https://support.google.com/admob/answer/6275335?hl=ko)). 2026-09 기준 대시보드 하단에 구현돼 있다.
+5. **네이티브는 전용 후원 화면에만.** 잘 통합된 네이티브는 CTR이 디스플레이 대비 약 9배다([Setupad](https://setupad.com/blog/native-ads-vs-display-ads/)). 설정 행처럼 위장하면 신뢰가 즉시 무너진다.
+6. **미디에이션 bidding으로 수요를 모은다.** 단일 네트워크 대비 ARPDAU 18~22% 상승 벤치마크. 5.1절 구조를 유지한다.
+
+### 13.3 이탈 방지 가드레일 (숫자로 고정)
+
+- 강제 인터스티셜은 세션당 1회 하드캡, 2~3세션당 1회 이하로 운영한다("강제 인터스티셜 1회 추가마다 D7 리텐션 하락", [RevenueLab](https://www.revenuelab.fyi/blog/admob-ecpm-benchmarks-2026)).
+- **앱 로컬 빈도 게이트가 구현돼 있다**(`ads/AvenueFrequencyPolicy.kt`, `ads/AvenueFrequencyStore.kt`). venue별 `dailyCap`·`cooldownMinutes`·`minActions`를 온디바이스 카운터로 강제하고, 시계가 되돌아가면 상한을 초기화하지 않고 차단한다. `typing-dna-sync-complete` 전면광고는 일 1회, 24시간 쿨다운, 해당 기능 3회 사용 이후에만 노출된다.
+- **신규 사용자 유예 기간**: 첫 3~5세션은 모든 형식의 광고를 금지한다. 첫 산출물이 만들어지기 전 광고는 삭제 사유가 된다.
+- "광고 과다"는 2026년 기준 앱 삭제 사유 1위다([Unstar](https://unstar.app/blog/why-users-uninstall-apps-top-reasons-2026)). 광고를 늘리기 전에 트리거·캡을 먼저 조정한다.
+- 배너·네이티브는 대시보드·후원 화면 등 **비핵심 화면**에만 둔다. 유틸리티 앱에서 충성 사용자 1명의 손실이 단기 노출 수익보다 크다([Business of Apps 2026](https://www.businessofapps.com/insights/ad-quality-is-hurting-retention-and-app-revenue/)).
+- 모든 venue는 AVENUE의 `dailyCap`·`cooldownMinutes`·`minSessions`를 반드시 세팅한다. 정책 엔진 불변식(3.2절)이 이 숫자들을 강제한다.
+
+### 13.4 검증 실험 원칙
+
+- 형식·배치 추가는 모두 홀드아웃 비교로 출시한다(4.5절 조건 재사용).
+- 중단 지표: D1/D7 잔존율, 앱 제거 프록시, 별점, "광고" 포함 리뷰 비율.
+- 위치별 성과는 AdMob Placements 리포트로 분해한다([Placements](https://support.google.com/admob/answer/16837672?hl=ko)).
+
+### 13.5 추가 출처
+
+- [Google Play 광고 정책](https://support.google.com/googleplay/android-developer/answer/9857753?hl=ko)
+- [AdMob 리워드 정책](https://support.google.com/admob/answer/7313578?hl=ko)
+- [AdMob 앱 오픈 가이드](https://support.google.com/admob/answer/9341964?hl=ko)
+- [UMP 동의 흐름](https://developers.google.com/admob/android/privacy?hl=ko)
+- [Cheetah Mobile/Kika 광고 사기 보도](https://www.xda-developers.com/cheetah-mobile-ad-fraud-android-apps/)
+- [무효 트래픽 방지](https://support.google.com/admob/answer/3342099?hl=ko)
+
+## 14. 포인트 경제 (2026-09-11 설계 확정)
+
+사용자 제안을 채택해 테마 시간 체험이 아니라 **앱 내 유료 재화(포인트)** 모델로 간다. 광고 1편 완시청 → 포인트 1점, 테마 상점에서 포인트로 외장재를 구매한다.
+
+### 14.1 확정 파라미터
+
+- 보상형 venue `theme-point-earn`: 형식 REWARDED, **일 3회, 20분 쿨다운**(3.1절 `support-rewarded` 상한과 동일). 동의 필수, 오프라인 모드·킬 스위치 시 차단.
+- 적립: 광고 1편당 1점 + 레벨 보너스(`TypingDnaLevelCurve.rewardBonusPoints`, 25레벨부터 +1, 100레벨부터 +2, 1000레벨부터 +3).
+- 가격(초기값, 운영하며 조정): 일반 테마 10점, 프리미엄 테마 50점. 미국 리워드 eCPM $14~22 기준 프리미엄 테마 1회 판매 ≈ 50노출 ≈ $0.7~1.1로, 결제 마진(스토어 수수료 15~30%)을 감안하면 유료 테마 판매와 수익성이 비슷하면서 결제 마찰이 없다.
+- 구현: 원장 `data/points/PointLedger.kt`(append-only JSONL, 감사 가능), 가격 `PointPricing`, 컨트롤러 `ads/ThemePointRewardedController.kt`(완시청 보상 콜백에서만 적립).
+
+### 14.2 정책 가드레일 (변경 금지)
+
+- 포인트는 **현금 등가물이 아니다**. 현금·암호화폐·양도 가능한 가치로 환전하면 AdMob 리워드 정책 위반이다. 양도·판매 기능을 만들지 않는다.
+- 포인트 획득은 **항상 사용자의 명시적 opt-in**이다. 핵심 기능(키보드, 사전, 학습)을 포인트 뒤에 잠그지 않는다. 외장재(테마 등)만 포인트로 판다.
+- 노출 확률이 있는 랜덤 요소(확률형 뽑기 등)를 나중에 넣으면 **확률 공개 의무**가 붙는다.
+- 포인트를 **실제 결제로 팔기 시작하면** Play Billing 소모성 인앱결제로 구현해야 하고, 개인정보·Data Safety 갱신을 같은 변경 집합에 포함한다.
+- 온디바이스 원장은 조작 가능하므로 서버 검증(SSV) 도입 전까지 고액 아이템은 두지 않는다.
+

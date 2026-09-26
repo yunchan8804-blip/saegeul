@@ -12,6 +12,7 @@ import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.candidates.CandidateBadge
 import splitties.views.backgroundColor
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.textView
@@ -37,7 +38,7 @@ class LabeledCandidateItemUi(
             color(fg) {
                 append(candidate.text)
             }
-            if (candidate.comment.isNotBlank()) {
+            if (candidate.comment.isNotBlank() && !CandidateBadge.isBadge(candidate.comment) && !CandidateBadge.isNextWordMarker(candidate.comment)) {
                 if (candidate.spaceBetweenComment) {
                     append(" ")
                 }

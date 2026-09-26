@@ -24,6 +24,8 @@ object ThemeManager {
     }
 
     val BuiltinThemes = listOf(
+        ThemePreset.SaegeulIvory,
+        ThemePreset.SaegeulNavy,
         ThemePreset.HanjiLight,
         ThemePreset.DancheongDark,
         ThemePreset.BaegjaLight,
@@ -41,7 +43,7 @@ object ThemeManager {
         ThemePreset.AMOLEDBlack,
     )
 
-    val DefaultTheme = ThemePreset.PixelDark
+    val DefaultTheme = ThemePreset.SaegeulNavy
 
     private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
 
@@ -49,8 +51,9 @@ object ThemeManager {
 
     fun getTheme(name: String) =
         customThemes.find { it.name == name } ?: BuiltinThemes.find { it.name == name }
+            ?: ThemeShopCatalog.find(name)?.theme
 
-    fun getAllThemes() = customThemes + monetThemes + BuiltinThemes
+    fun getAllThemes() = customThemes + monetThemes + BuiltinThemes + ThemeShopCatalog.allThemes()
 
     fun refreshThemes() {
         customThemes.clear()

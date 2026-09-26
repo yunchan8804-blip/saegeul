@@ -1,0 +1,6 @@
+xcuserdata/
+DerivedData/
+.build/
+*.xcuserstate
+outputs/
+xcodebuild-*.log

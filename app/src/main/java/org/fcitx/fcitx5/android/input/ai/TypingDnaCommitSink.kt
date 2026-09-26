@@ -11,15 +11,29 @@ package org.fcitx.fcitx5.android.input.ai
 class TypingDnaCommitSink(
     private val collector: UserTypingContextCollector
 ) {
-    /** New editor metadata never proves continuity with an earlier text field. */
-    fun onEditorSessionStarted() {
-        collector.discardPending()
+    /**
+     * A new editor session started for [packageName]/[fieldId]. Pending text is discarded
+     * unless this is a same-field restart (see [UserTypingContextCollector.onEditorSessionStarted]).
+     * A missing/blank package cannot be tied to a prior session, so it always discards everything.
+     */
+    fun onEditorSessionStarted(packageName: String?, fieldId: Int, restarting: Boolean) {
+        val pkg = packageName?.takeIf { it.isNotBlank() }
+        if (pkg == null) {
+            collector.discardPending()
+            return
+        }
+        collector.onEditorSessionStarted(pkg, fieldId, restarting)
     }
 
-    fun onEditorContinuityLost(packageName: String?, inspectionAllowed: Boolean) {
+    /**
+     * A backspace/Delete or an unpredicted cursor move broke continuity with the pending
+     * buffer. [removedText], when known, lets only the actually-removed suffix be cut; otherwise
+     * only the last whitespace-separated token is dropped.
+     */
+    fun onEditorContinuityLost(packageName: String?, removedText: String? = null, inspectionAllowed: Boolean) {
         if (!inspectionAllowed) return
         val pkg = packageName?.takeIf { it.isNotBlank() } ?: return
-        collector.discardPending(pkg)
+        collector.onBackspaceContinuityLost(pkg, removedText)
     }
 
     fun onEditorSuffixDeleted(

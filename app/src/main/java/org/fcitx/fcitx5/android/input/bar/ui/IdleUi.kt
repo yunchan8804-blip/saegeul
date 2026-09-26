@@ -12,12 +12,15 @@ import android.view.View
 import android.view.Gravity
 import android.view.animation.AlphaAnimation
 import android.view.animation.AnimationSet
+import android.view.animation.LinearInterpolator
 import android.view.animation.TranslateAnimation
 import android.widget.Space
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionIndicator
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceFailureText
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.idle.ButtonsBarUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.ClipboardSuggestionUi
@@ -30,6 +33,7 @@ import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.endOfParent
+import splitties.views.dsl.constraintlayout.endToStartOf
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
@@ -53,10 +57,16 @@ class IdleUi(
         Empty, Toolbar, Clipboard, NumberRow, InlineSuggestion
     }
 
+    private companion object {
+        const val AUTOMATIC_SUGGESTION_WARMUP_ANIMATION_MS = 1_000L
+    }
+
     var currentState = State.Empty
         private set
 
     private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
+
+    private var automaticSuggestionWarmupAnimationGeneration = 0
 
     private var inPrivate = false
 
@@ -73,9 +83,16 @@ class IdleUi(
 
     val menuButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
         iconRotation = menuButtonRotation
+        contentDescription = ctx.getString(R.string.expand_toolbar)
     }
 
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme)
+
+    val automaticSuggestionWarmupButton =
+        ToolButton(ctx, R.drawable.ic_baseline_auto_awesome_24, theme).apply {
+            contentDescription = ctx.getString(R.string.gemma_automatic_warmup_content_description)
+            visibility = View.GONE
+        }
 
     val emptyBar = Space(ctx)
 
@@ -123,9 +140,13 @@ class IdleUi(
             endOfParent()
             topOfParent()
         })
+        add(automaticSuggestionWarmupButton, lParams(size, size) {
+            endToStartOf(hideKeyboardButton)
+            topOfParent()
+        })
         add(animator, lParams(matchConstraints, matchParent) {
             after(menuButton)
-            before(hideKeyboardButton)
+            before(automaticSuggestionWarmupButton)
             topOfParent()
         })
     }
@@ -182,6 +203,54 @@ class IdleUi(
         hideKeyboardButton.setOnClickListener(callback)
     }
 
+    fun setAutomaticSuggestionIndicator(indicator: OnDeviceAutomaticSuggestionIndicator?) {
+        when (indicator) {
+            null, OnDeviceAutomaticSuggestionIndicator.Hidden -> {
+                if (automaticSuggestionWarmupButton.visibility == View.GONE) return
+                automaticSuggestionWarmupAnimationGeneration += 1
+                automaticSuggestionWarmupButton.iconAnimate().cancel()
+                automaticSuggestionWarmupButton.iconRotation = 0f
+                automaticSuggestionWarmupButton.alpha = 1f
+                automaticSuggestionWarmupButton.visibility = View.GONE
+            }
+            OnDeviceAutomaticSuggestionIndicator.Preparing -> {
+                automaticSuggestionWarmupAnimationGeneration += 1
+                automaticSuggestionWarmupButton.iconAnimate().cancel()
+                automaticSuggestionWarmupButton.iconRotation = 0f
+                automaticSuggestionWarmupButton.alpha = 1f
+                automaticSuggestionWarmupButton.contentDescription =
+                    ctx.getString(R.string.gemma_automatic_warmup_content_description)
+                automaticSuggestionWarmupButton.visibility = View.VISIBLE
+                if (!disableAnimation) {
+                    startAutomaticSuggestionWarmupAnimation(automaticSuggestionWarmupAnimationGeneration)
+                }
+            }
+            is OnDeviceAutomaticSuggestionIndicator.Blocked -> {
+                automaticSuggestionWarmupAnimationGeneration += 1
+                automaticSuggestionWarmupButton.iconAnimate().cancel()
+                automaticSuggestionWarmupButton.iconRotation = 0f
+                automaticSuggestionWarmupButton.alpha = 0.45f
+                automaticSuggestionWarmupButton.contentDescription =
+                    OnDeviceFailureText.of(indicator.code, ctx.resources)
+                automaticSuggestionWarmupButton.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun startAutomaticSuggestionWarmupAnimation(generation: Int) {
+        automaticSuggestionWarmupButton.iconAnimate()
+            .rotationBy(360f)
+            .setDuration(AUTOMATIC_SUGGESTION_WARMUP_ANIMATION_MS)
+            .setInterpolator(LinearInterpolator())
+            .withEndAction {
+                if (generation != automaticSuggestionWarmupAnimationGeneration ||
+                    automaticSuggestionWarmupButton.visibility != View.VISIBLE
+                ) return@withEndAction
+                automaticSuggestionWarmupButton.iconRotation = 0f
+                startAutomaticSuggestionWarmupAnimation(generation)
+            }
+            .start()
+    }
     private fun clearAnimation() {
         animator.inAnimation = null
         animator.outAnimation = null

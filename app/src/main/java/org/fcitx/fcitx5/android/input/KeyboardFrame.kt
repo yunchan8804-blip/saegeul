@@ -1,0 +1,96 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input
+
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
+import kotlin.math.roundToInt
+
+/** One-hand keyboard docking: keeps the keyboard within thumb reach on one side of the screen. */
+enum class OneHandMode(override val stringRes: Int) : ManagedPreferenceEnum {
+    Off(R.string.disabled),
+    Left(R.string.one_hand_mode_left),
+    Right(R.string.one_hand_mode_right)
+}
+
+/**
+ * Computes the keyboard's left/right insets from the user's side padding, one-hand mode, and
+ * screen shape. Pure function: no Android view or resource lookups, so it stays unit-testable.
+ */
+object KeyboardFrame {
+
+    /** Left ([startPx]) and right ([endPx]) inset in pixels, applied to the keyboard, kawaii bar and preedit. */
+    data class Insets(val startPx: Int, val endPx: Int)
+
+    /** One-hand keyboard width as a fraction of the space left after the user's side padding. */
+    private const val ONE_HAND_WIDTH_RATIO = 0.84f
+
+    /** Landscape keyboard max width, matching the app's max reading-area width. */
+    private const val LANDSCAPE_MAX_WIDTH_DP = 640
+
+    fun compute(
+        windowWidthPx: Int,
+        density: Float,
+        isLandscape: Boolean,
+        userSidePaddingPx: Int,
+        oneHandMode: OneHandMode,
+        isSplitActive: Boolean
+    ): Insets {
+        // A split keyboard already claims the width between its two halves; one-hand mode and the
+        // landscape max-width centering would fight it over the same space, so both are skipped.
+        if (isSplitActive) {
+            return Insets(userSidePaddingPx, userSidePaddingPx)
+        }
+        if (oneHandMode != OneHandMode.Off) {
+            return oneHandInsets(windowWidthPx, userSidePaddingPx, oneHandMode)
+        }
+        if (isLandscape) {
+            return landscapeMaxWidthInsets(windowWidthPx, density, userSidePaddingPx)
+        }
+        return Insets(userSidePaddingPx, userSidePaddingPx)
+    }
+
+    private fun landscapeMaxWidthInsets(
+        windowWidthPx: Int,
+        density: Float,
+        userSidePaddingPx: Int
+    ): Insets {
+        val available = (windowWidthPx - userSidePaddingPx * 2).coerceAtLeast(0)
+        val maxWidthPx = (LANDSCAPE_MAX_WIDTH_DP * density).roundToInt()
+        if (available <= maxWidthPx) {
+            // The user's own margin already keeps the keyboard under the max width; don't add more.
+            return Insets(userSidePaddingPx, userSidePaddingPx)
+        }
+        val extra = (available - maxWidthPx) / 2
+        return Insets(userSidePaddingPx + extra, userSidePaddingPx + extra)
+    }
+
+    private fun oneHandInsets(
+        windowWidthPx: Int,
+        userSidePaddingPx: Int,
+        mode: OneHandMode
+    ): Insets {
+        val available = (windowWidthPx - userSidePaddingPx * 2).coerceAtLeast(0)
+        val keyboardWidth = (available * ONE_HAND_WIDTH_RATIO).roundToInt()
+        val empty = available - keyboardWidth
+        return when (mode) {
+            OneHandMode.Left -> Insets(userSidePaddingPx, userSidePaddingPx + empty)
+            OneHandMode.Right -> Insets(userSidePaddingPx + empty, userSidePaddingPx)
+            OneHandMode.Off -> Insets(userSidePaddingPx, userSidePaddingPx)
+        }
+    }
+}
+
+/** Multiplies a key's base text size (dp) by the user's [AppPrefs.Keyboard.keyTextScale] percentage. */
+object KeyTextScale {
+    const val MIN_PERCENT = 80
+    const val MAX_PERCENT = 140
+    const val DEFAULT_PERCENT = 100
+    const val STEP_PERCENT = 5
+
+    fun factor(percent: Int): Float = percent.coerceIn(MIN_PERCENT, MAX_PERCENT) / 100f
+
+    fun scale(baseSizeDp: Float, percent: Int): Float = baseSizeDp * factor(percent)
+}

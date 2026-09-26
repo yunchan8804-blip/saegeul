@@ -23,7 +23,7 @@ class TypingDnaSessionBoundaryTest {
         committed.clear()
         sink.onEditorTextCommitted("com.example.chat", "내가 뭘 ", inspectionAllowed = true)
 
-        sink.onEditorSessionStarted()
+        sink.onEditorSessionStarted("com.example.chat", fieldId = 1, restarting = false)
         sink.onEditorTextCommitted("com.example.chat", "감사합니다.", inspectionAllowed = true)
 
         assertEquals(listOf("감사합니다."), committed)
@@ -48,7 +48,7 @@ class TypingDnaSessionBoundaryTest {
     }
 
     @Test
-    fun `same app restart discards every package pending context`() {
+    fun `new editor session discards only the newly focused package pending context`() {
         val committed = mutableListOf<Pair<String, String>>()
         val collector = UserTypingContextCollector(
             onSentenceCommitted = { packageName, sentence -> committed.add(packageName to sentence) }
@@ -57,13 +57,28 @@ class TypingDnaSessionBoundaryTest {
 
         sink.onEditorTextCommitted("com.example.chat", "내가 뭘 ", inspectionAllowed = true)
         sink.onEditorTextCommitted("com.example.work", "회의를 ", inspectionAllowed = true)
-        sink.onEditorSessionStarted()
+        sink.onEditorSessionStarted("com.example.chat", fieldId = 1, restarting = false)
 
         assertFalse(collector.hasPending("com.example.chat"))
-        assertFalse(collector.hasPending("com.example.work"))
+        assertTrue(collector.hasPending("com.example.work"))
         sink.onEditorTextCommitted("com.example.chat", "감사합니다.", inspectionAllowed = true)
 
         assertEquals(listOf("com.example.chat" to "감사합니다."), committed)
+    }
+
+    @Test
+    fun `restarting the same field preserves pending context, a different field discards it`() {
+        val collector = UserTypingContextCollector()
+        val sink = TypingDnaCommitSink(collector)
+
+        sink.onEditorSessionStarted("com.example.chat", fieldId = 1, restarting = false)
+        sink.onEditorTextCommitted("com.example.chat", "내가 뭘 ", inspectionAllowed = true)
+
+        sink.onEditorSessionStarted("com.example.chat", fieldId = 1, restarting = true)
+        assertTrue(collector.hasPending("com.example.chat"))
+
+        sink.onEditorSessionStarted("com.example.chat", fieldId = 2, restarting = true)
+        assertFalse(collector.hasPending("com.example.chat"))
     }
 
     @Test

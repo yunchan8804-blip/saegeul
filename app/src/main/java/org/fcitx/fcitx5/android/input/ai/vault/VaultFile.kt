@@ -111,10 +111,9 @@ class VaultFile internal constructor(
     }
 
     private fun decodeRaw(raw: ByteArray): String {
-        if (!hasMagic(raw)) return String(raw, Charsets.UTF_8)
+        val storedId = storedCipherId(raw) ?: return String(raw, Charsets.UTF_8)
         val idLength = raw[MAGIC.size].toInt() and 0xFF
         val idStart = MAGIC.size + 1
-        val storedId = String(raw, idStart, idLength, Charsets.US_ASCII)
         val blob = raw.copyOfRange(idStart + idLength, raw.size)
         val readCipher = when (storedId) {
             cipher.id -> cipher
@@ -239,11 +238,13 @@ class VaultFile internal constructor(
         return true
     }
 
-    /** Returns the cipher id recorded in [raw], or null if it has no `SGV1` header. */
+    /** Returns the cipher id recorded in [raw], or null if it has no `SGV1` header or is truncated. */
     private fun storedCipherId(raw: ByteArray): String? {
         if (!hasMagic(raw)) return null
+        if (raw.size < MAGIC.size + 1) return null
         val idLength = raw[MAGIC.size].toInt() and 0xFF
         val idStart = MAGIC.size + 1
+        if (raw.size < idStart + idLength) return null
         return String(raw, idStart, idLength, Charsets.US_ASCII)
     }
 

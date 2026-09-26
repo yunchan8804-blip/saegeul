@@ -15,13 +15,16 @@ import androidx.work.WorkManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.debug.gemma.GemmaAccumulationScheduler
-import org.fcitx.fcitx5.android.debug.gemma.GemmaAccumulationState
-import org.fcitx.fcitx5.android.debug.gemma.GemmaAccumulationStore
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationScheduler
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationState
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationStore
 import org.fcitx.fcitx5.android.debug.gemma.GemmaExperimentActivity
-import org.fcitx.fcitx5.android.debug.gemma.GemmaModelFiles
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationEligibility
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationSnapshot
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaModelFiles
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedMaterialPolicy
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,6 +48,7 @@ class GemmaAccumulationDeviceTest {
         var launchedActivity: GemmaExperimentActivity? = null
 
         try {
+            val eligibilityAtStart = GemmaGenerationEligibility.snapshot(context)
             val model = GemmaModelFiles.modelFile(context)
             assertTrue("Gemma model is missing: ${model.absolutePath}", model.isFile)
             assertEquals("Gemma model size mismatch", GemmaModelFiles.MODEL_BYTES, model.length())
@@ -58,10 +62,12 @@ class GemmaAccumulationDeviceTest {
             priorEnabled = beforeState.enabled
             bank.load()
             val beforeCount = bank.sentenceCount
-            val beforeCounts = GeneratedMaterialPolicy.PREFIXES.associateWith(bank::exactPrefixCount)
+            val beforeRecentPublicStarts = bank.recentPublicStarts().toSet()
             val before = stateJson(beforeState, beforeCount)
 
             GemmaAccumulationScheduler.setEnabled(context, true)
+            val workAfterEnable = workSnapshot(context)
+            assertAccumulationConstraints(workAfterEnable)
             openHomeAndWaitForBackground(requireNotNull(launchedActivity))
             instrumentation.sendStatus(
                 0,
@@ -73,6 +79,8 @@ class GemmaAccumulationDeviceTest {
                             .put("enabled", store.state.value.enabled)
                             .put("keyboardActive", OnDeviceGenerationControl.isKeyboardActive)
                             .put("work", workJson(workSnapshot(context)))
+                            .put("eligibilityAtStart", eligibilityJson(eligibilityAtStart))
+                            .put("workConstraintsAfterEnable", workConstraintsJson(workAfterEnable))
                             .toString()
                     )
                 }
@@ -83,7 +91,8 @@ class GemmaAccumulationDeviceTest {
                 store = store,
                 bank = bank,
                 beforeCount = beforeCount,
-                beforeCounts = beforeCounts,
+                beforeOpenSequence = beforeState.openSequence,
+                beforeRecentPublicStarts = beforeRecentPublicStarts,
                 startedAt = startedAt
             )
             val afterState = after.state
@@ -97,15 +106,30 @@ class GemmaAccumulationDeviceTest {
             assertFalse("Accumulation must be disabled after pause", pausedState.enabled)
             val pausedCount = bank.sentenceCount
             val pausedAttempts = pausedState.attempts.toMap()
+            val pausedOpenSequence = pausedState.openSequence
+            val pausedConsecutiveUnproductive = pausedState.consecutiveUnproductive
 
             bank.load()
             assertEquals("Pause must preserve generated materials after reload", pausedCount, bank.sentenceCount)
+            val reloadedState = store.load()
+            assertEquals("Pause must preserve open sequence after reload", pausedOpenSequence, reloadedState.openSequence)
+            assertEquals(
+                "Pause must preserve consecutive-unproductive state after reload",
+                pausedConsecutiveUnproductive,
+                reloadedState.consecutiveUnproductive
+            )
             delay(STABLE_WAIT_MS)
             bank.load()
             val stableCount = bank.sentenceCount
             val stableState = store.load()
             assertEquals("Disabled accumulation must not add materials", pausedCount, stableCount)
             assertEquals("Disabled accumulation must not add attempts", pausedAttempts, stableState.attempts)
+            assertEquals("Disabled accumulation must not advance open sequence", pausedOpenSequence, stableState.openSequence)
+            assertEquals(
+                "Disabled accumulation must not change consecutive-unproductive state",
+                pausedConsecutiveUnproductive,
+                stableState.consecutiveUnproductive
+            )
 
             GemmaAccumulationScheduler.requestNow(context)
             waitUntil("Disabled accumulation has no incomplete work", STOP_TIMEOUT_MS) {
@@ -113,19 +137,34 @@ class GemmaAccumulationDeviceTest {
             }
             bank.load()
             assertEquals("Disabled request must not add materials", stableCount, bank.sentenceCount)
-            assertEquals("Disabled request must not add attempts", pausedAttempts, store.load().attempts)
+            val disabledRequestState = store.load()
+            assertEquals("Disabled request must not add attempts", pausedAttempts, disabledRequestState.attempts)
+            assertEquals("Disabled request must not advance open sequence", pausedOpenSequence, disabledRequestState.openSequence)
+            assertEquals(
+                "Disabled request must not change consecutive-unproductive state",
+                pausedConsecutiveUnproductive,
+                disabledRequestState.consecutiveUnproductive
+            )
 
             val evidence = JSONObject()
                 .put("before", before)
                 .put("after", stateJson(afterState, afterCount))
                 .put("stateAdded", afterState.added)
-                .put("increasedPrefixCount", after.increasedPrefixCount)
+                .put("addedOpenContext", after.addedOpenContext)
                 .put("covered", afterState.covered)
                 .put("rejected", afterState.rejected)
                 .put("duplicates", afterState.duplicates)
                 .put("pausedNoNative", !OnDeviceGenerationControl.isGenerating)
                 .put("reloaded", bank.sentenceCount == pausedCount)
-                .put("stable", bank.sentenceCount == stableCount && store.state.value.attempts == pausedAttempts)
+                .put(
+                    "stable",
+                    bank.sentenceCount == stableCount &&
+                        store.state.value.attempts == pausedAttempts &&
+                        store.state.value.openSequence == pausedOpenSequence &&
+                        store.state.value.consecutiveUnproductive == pausedConsecutiveUnproductive
+                )
+                .put("eligibilityAtStart", eligibilityJson(eligibilityAtStart))
+                .put("workConstraintsAfterEnable", workConstraintsJson(workAfterEnable))
             reportEvidence(evidence)
 
             launchedActivity?.let { activity ->
@@ -153,7 +192,8 @@ class GemmaAccumulationDeviceTest {
         store: GemmaAccumulationStore,
         bank: org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank,
         beforeCount: Int,
-        beforeCounts: Map<String, Int>,
+        beforeOpenSequence: Long,
+        beforeRecentPublicStarts: Set<String>,
         startedAt: Long
     ): AccumulationResult {
         val deadline = SystemClock.elapsedRealtime() + ACCUMULATION_TIMEOUT_MS
@@ -168,11 +208,9 @@ class GemmaAccumulationDeviceTest {
                 reportFailure(lastState, lastCount, "stateError")
                 fail("Gemma accumulation reported an error: ${lastState.error}")
             }
-            val increasedPrefixCount = GeneratedMaterialPolicy.PREFIXES.count { prefix ->
-                bank.exactPrefixCount(prefix) > requireNotNull(beforeCounts[prefix])
-            }
-            if (lastCount > beforeCount && increasedPrefixCount > 0) {
-                return AccumulationResult(lastState, lastCount, increasedPrefixCount)
+            val addedOpenContext = bank.recentPublicStarts().any { it !in beforeRecentPublicStarts }
+            if (lastCount > beforeCount && lastState.openSequence > beforeOpenSequence && addedOpenContext) {
+                return AccumulationResult(lastState, lastCount, addedOpenContext)
             }
             if (SystemClock.elapsedRealtime() >= nextProgressAt) {
                 InstrumentationRegistry.getInstrumentation().sendStatus(
@@ -187,6 +225,9 @@ class GemmaAccumulationDeviceTest {
                                 .put("added", lastState.added)
                                 .put("rejected", lastState.rejected)
                                 .put("duplicates", lastState.duplicates)
+                                .put("openSequence", lastState.openSequence)
+                                .put("consecutiveUnproductive", lastState.consecutiveUnproductive)
+                                .put("newRecentPublicStart", addedOpenContext)
                                 .put("status", lastState.status)
                                 .put("work", workJson(workSnapshot(context)))
                                 .toString()
@@ -199,9 +240,9 @@ class GemmaAccumulationDeviceTest {
         }
         reportFailure(lastState, lastCount, "timeout")
         throw AssertionError(
-            "Gemma accumulation did not create material for a new prefix within " +
+            "Gemma accumulation did not create material for a new public context within " +
                 "$ACCUMULATION_TIMEOUT_MS ms: count=$lastCount, covered=${lastState.covered}, " +
-                "status=${lastState.status}"
+                "openSequence=${lastState.openSequence}, status=${lastState.status}"
         )
     }
 
@@ -262,6 +303,38 @@ class GemmaAccumulationDeviceTest {
         .put("oneTime", JSONObject().put("active", snapshot.oneTimeActive).put("terminal", snapshot.oneTimeTerminal))
         .put("periodic", JSONObject().put("active", snapshot.periodicActive).put("terminal", snapshot.periodicTerminal))
 
+    private fun workConstraintsJson(snapshot: WorkSnapshot): JSONArray = JSONArray().apply {
+        snapshot.unfinished.forEach { entry ->
+            put(
+                JSONObject()
+                    .put("uniqueWorkName", entry.uniqueWorkName)
+                    .put("state", entry.workInfo.state.name)
+                    .put("requiresCharging", entry.workInfo.constraints.requiresCharging())
+                    .put("requiresBatteryNotLow", entry.workInfo.constraints.requiresBatteryNotLow())
+            )
+        }
+    }
+
+    private fun assertAccumulationConstraints(snapshot: WorkSnapshot) {
+        assertTrue("Gemma accumulation must have unfinished scheduled work after enabling", snapshot.unfinished.isNotEmpty())
+        snapshot.unfinished.forEach { entry ->
+            assertFalse(
+                "${entry.uniqueWorkName} must not require charging",
+                entry.workInfo.constraints.requiresCharging()
+            )
+            assertTrue(
+                "${entry.uniqueWorkName} must require battery-not-low",
+                entry.workInfo.constraints.requiresBatteryNotLow()
+            )
+        }
+    }
+
+    private fun eligibilityJson(snapshot: GemmaGenerationSnapshot): JSONObject = JSONObject()
+        .put("isCharging", snapshot.isCharging)
+        .put("batteryPercent", snapshot.batteryPercent ?: JSONObject.NULL)
+        .put("powerSaveMode", snapshot.powerSaveMode)
+        .put("thermalStatus", snapshot.thermalStatus ?: JSONObject.NULL)
+
     private fun stateJson(state: GemmaAccumulationState, count: Int): JSONObject = JSONObject()
         .put("enabled", state.enabled)
         .put("stored", count)
@@ -270,6 +343,8 @@ class GemmaAccumulationDeviceTest {
         .put("rejected", state.rejected)
         .put("duplicates", state.duplicates)
         .put("attemptTotal", state.attempts.values.sum())
+        .put("openSequence", state.openSequence)
+        .put("consecutiveUnproductive", state.consecutiveUnproductive)
         .put("error", state.error ?: JSONObject.NULL)
 
     private fun reportFailure(state: GemmaAccumulationState, count: Int, reason: String) {
@@ -326,19 +401,24 @@ class GemmaAccumulationDeviceTest {
     private data class AccumulationResult(
         val state: GemmaAccumulationState,
         val bankCount: Int,
-        val increasedPrefixCount: Int
+        val addedOpenContext: Boolean
     )
 
     private class WorkSnapshot(
         oneTime: List<WorkInfo>,
         periodic: List<WorkInfo>
     ) {
+        val unfinished = (oneTime.map { NamedWorkInfo(ONE_TIME_WORK_NAME, it) } +
+            periodic.map { NamedWorkInfo(PERIODIC_WORK_NAME, it) })
+            .filter { !it.workInfo.state.isFinished }
         val oneTimeActive = oneTime.count { !it.state.isFinished }
         val oneTimeTerminal = oneTime.count { it.state.isFinished }
         val periodicActive = periodic.count { !it.state.isFinished }
         val periodicTerminal = periodic.count { it.state.isFinished }
         val incompleteCount = oneTimeActive + periodicActive
     }
+
+    private data class NamedWorkInfo(val uniqueWorkName: String, val workInfo: WorkInfo)
 
     private companion object {
         const val ONE_TIME_WORK_NAME = "gemma-accumulation-now"

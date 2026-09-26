@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gemma_context_title">기기에서 문맥 완성</string>
+    <string name="gemma_context_source_label">현재 문맥</string>
+    <string name="gemma_context_complete">문맥 완성</string>
+    <string name="gemma_context_cancel">취소</string>
+    <string name="gemma_context_candidate_label">완성 후보</string>
+    <string name="gemma_context_apply">이어 붙이기</string>
+    <string name="gemma_context_back">키보드로 돌아가기</string>
+    <string name="gemma_context_running">기기에서 문맥을 완성하는 중…</string>
+    <string name="gemma_context_preparing">기기에서 모델을 준비하는 중…</string>
+    <string name="gemma_context_ready">완성 후보를 준비했고 기기 내 처리가 끝났어.</string>
+    <string name="gemma_context_timing">첫 응답 %1$dms · 총 %2$dms · 기기 내 처리 종료 확인</string>
+    <string name="gemma_context_timing_no_first">첫 응답 미관측 · 총 %1$dms · 기기 내 처리 종료 확인</string>
+    <string name="gemma_context_applied">문맥 완성을 이어 붙였어.</string>
+    <string name="gemma_context_model_missing">기기 내 Gemma 모델을 찾을 수 없어.</string>
+    <string name="gemma_context_unsupported">이 기기에서는 문맥 완성을 사용할 수 없어.</string>
+    <string name="gemma_context_private_disabled">비밀번호, 민감 입력, 개인화 학습 금지 입력에서는 문맥 완성을 사용할 수 없어.</string>
+    <string name="gemma_context_ai_blocked">이 앱의 키보드 프로필에서 AI 입력을 막고 있어.</string>
+    <string name="gemma_context_no_text">완성할 수 있는 문맥이 없습니다.</string>
+    <string name="gemma_context_too_long">문맥은 2,048자 이하에서만 완성할 수 있어.</string>
+    <string name="gemma_context_cursor_required">편집기 문맥을 확인할 수 없어. 선택 없이 원문 끝에 커서를 두고 지원하는 입력칸에서 다시 시도해.</string>
+    <string name="gemma_context_terminal">문장이 이미 끝났어. 문장부호 뒤에는 완성을 만들지 않아.</string>
+    <string name="gemma_context_unsupported_context">이 문맥 형식은 아직 지원하지 않아. 줄바꿈과 앞 공백을 빼고 2,048자 이하의 한 줄 문맥을 사용해줘.</string>
+    <string name="gemma_context_editor_changed">앱, 원문 또는 커서가 바뀌어서 문맥 완성을 취소했어.</string>
+    <string name="gemma_context_cancel_draining">취소했고 기기 내 처리가 끝나기를 기다리는 중…</string>
+    <string name="gemma_context_cancelled">문맥 완성을 취소했어.</string>
+    <string name="gemma_context_failed">기기 내 문맥 완성에 실패했어.</string>
+    <string name="gemma_context_no_candidate">원문을 유지한 완성 후보를 만들지 못했어.</string>
+    <string name="gemma_context_resource_limited">배터리, 절전, 메모리 또는 발열 상태 때문에 문맥 완성을 시작할 수 없어.</string>
+    <string name="gemma_context_timed_out">기기 내 문맥 완성 시간이 초과됐어.</string>
+    <string name="gemma_context_apply_failed">문맥을 이어 붙이지 못했어. 다시 입력 내용을 확인해줘.</string>
+</resources>

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rag
 
+import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.vault.AesGcmVaultCipher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -83,6 +84,23 @@ class PersonalSentenceVaultTest {
     fun retrieveBoostsSameCategoryOverOtherCategory() {
         val vault = PersonalSentenceVault(clock = { 1000L })
         vault.record("프로젝트 회의 일정 공유합니다", "com.slack") // work
+        vault.record("프로젝트 회의 자료 올렸어요", "com.kakao.talk") // messenger
+
+        val results = vault.retrieve("프로젝트 회의", "com.slack")
+
+        assertEquals("프로젝트 회의 일정 공유합니다", results.first().sentence)
+    }
+
+    @Test
+    fun personaOverrideAppliesCategoryForRetrievalBoost() {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        // "com.example.test" matches no registry package or token; without the override it would
+        // land in "general" and lose the same-category boost against a "com.slack" (work) query.
+        vault.record(
+            "프로젝트 회의 일정 공유합니다",
+            "com.example.test",
+            personaOverride = TypingDnaVault.CATEGORY_WORK
+        )
         vault.record("프로젝트 회의 자료 올렸어요", "com.kakao.talk") // messenger
 
         val results = vault.retrieve("프로젝트 회의", "com.slack")
@@ -216,5 +234,60 @@ class PersonalSentenceVaultTest {
         val exported = vault.exportForEnrichment(2)
 
         assertEquals(2, exported.size)
+    }
+
+    @Test
+    fun exportSinceReturnsEmptyListForEmptyVault() {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+
+        assertTrue(vault.exportSince(0L, 10).isEmpty())
+    }
+
+    @Test
+    fun exportSinceOnlyIncludesSentencesLastSeenStrictlyAfterTheCutoff() {
+        var now = 0L
+        val vault = PersonalSentenceVault(clock = { now })
+        now = 1000L; vault.record("이전 문장 입니다", "com.android.chrome")
+        now = 2000L; vault.record("경계 문장 입니다", "com.android.chrome")
+        now = 3000L; vault.record("이후 문장 입니다", "com.android.chrome")
+
+        val exported = vault.exportSince(2000L, 10)
+
+        assertEquals(listOf("이후 문장 입니다"), exported)
+    }
+
+    @Test
+    fun exportSinceOrdersMostRecentFirstAndRespectsLimit() {
+        var now = 0L
+        val vault = PersonalSentenceVault(clock = { now })
+        now = 100L; vault.record("첫 문장 입니다", "com.android.chrome")
+        now = 200L; vault.record("둘째 문장 입니다", "com.android.chrome")
+        now = 300L; vault.record("셋째 문장 입니다", "com.android.chrome")
+
+        val exported = vault.exportSince(0L, 2)
+
+        assertEquals(listOf("셋째 문장 입니다", "둘째 문장 입니다"), exported)
+    }
+
+    @Test
+    fun categoryCountsTalliesActualStoredSentencesPerCategory() {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+        vault.record("오늘 점심 뭐 먹지", "com.kakao.talk")
+        vault.record("내일 회의 자료 준비", "com.kakao.talk")
+        vault.record("분기 보고서 작성 중입니다", "com.Slack")
+        vault.record("이 문장은 분류가 안 됩니다", "com.unknown.random.app")
+
+        val counts = vault.categoryCounts()
+
+        assertEquals(2, counts[TypingDnaVault.CATEGORY_MESSENGER])
+        assertEquals(1, counts[TypingDnaVault.CATEGORY_WORK])
+        assertEquals(1, counts[TypingDnaVault.CATEGORY_GENERAL])
+    }
+
+    @Test
+    fun categoryCountsIsEmptyWhenNothingRecordedYet() {
+        val vault = PersonalSentenceVault(clock = { 1000L })
+
+        assertTrue(vault.categoryCounts().isEmpty())
     }
 }

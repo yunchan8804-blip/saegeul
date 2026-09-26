@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_status_card_title">지금 상태</string>
+    <string name="dashboard_status_engine_label">AI 추천 엔진</string>
+    <string name="dashboard_status_engine_not_attempted">아직 시도 안 함</string>
+    <string name="dashboard_status_engine_ready">준비됨 · %1$s · %2$s</string>
+    <string name="dashboard_status_engine_failed">실패 · %1$s · %2$s</string>
+    <string name="dashboard_status_engine_recovery_suffix"> · 복구 %1$d회</string>
+    <string name="dashboard_status_engine_hint">키보드를 열면 다시 시도합니다.</string>
+    <string name="dashboard_status_enrichment_label">그래프 강화</string>
+    <string name="dashboard_status_notification_label">알림</string>
+    <string name="dashboard_status_notification_blocked">알림이 꺼져 있어 진행 상황을 보낼 수 없습니다.</string>
+    <string name="dashboard_status_notification_action">권한 열기</string>
+    <string name="dashboard_status_collection_label">수집</string>
+    <string name="dashboard_status_collection_learned">오늘 학습 %1$d문장</string>
+    <string name="dashboard_status_collection_dropped_count">건너뜀 %1$d</string>
+    <string name="dashboard_status_collection_recent_show">최근 활동 보기</string>
+    <string name="dashboard_status_collection_recent_hide">최근 활동 숨기기</string>
+    <string name="dashboard_status_collection_recent_empty">최근 활동 없음</string>
+    <string name="collection_drop_reason_privacy">개인정보</string>
+    <string name="collection_drop_reason_short">짧음</string>
+    <string name="collection_drop_reason_backspace">백스페이스</string>
+    <string name="collection_drop_reason_editor_switch">편집기 전환</string>
+    <string name="collection_drop_reason_duplicate">중복</string>
+    <string name="collection_drop_reason_blank">공백</string>
+    <string name="collection_drop_reason_unknown">기타</string>
+    <string name="collection_event_kind_emitted">학습됨</string>
+    <string name="collection_event_kind_dropped">건너뜀</string>
+    <string name="collection_event_kind_batch_ready">배치 준비</string>
+    <string name="collection_event_kind_compiled">컴파일</string>
+</resources>

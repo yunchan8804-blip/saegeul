@@ -4,7 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.effects
 
+import android.animation.ValueAnimator
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -12,8 +16,10 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
+import android.os.PowerManager
 import android.view.Choreographer
 import android.view.View
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
 import java.util.concurrent.CopyOnWriteArrayList
@@ -40,6 +46,20 @@ class ParticleTouchOverlayView(
 
     private val particles = CopyOnWriteArrayList<Particle>()
     private var isAnimating = false
+
+    private var powerSaveMode = false
+    private var powerSaveReceiverRegistered = false
+
+    private val powerSaveReceiver = object : BroadcastReceiver() {
+        override fun onReceive(receivedContext: Context, intent: Intent) {
+            powerSaveMode = currentPowerSaveMode()
+            if (!canAnimate()) {
+                particles.clear()
+                isAnimating = false
+                invalidate()
+            }
+        }
+    }
 
     private val particleRainbowPalette = intArrayOf(
         Color.parseColor("#FFE600"), // Gold Star
@@ -73,12 +93,50 @@ class ParticleTouchOverlayView(
         isFocusable = false
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        registerPowerSaveReceiver()
+        powerSaveMode = currentPowerSaveMode()
+    }
+
+    override fun onDetachedFromWindow() {
+        unregisterPowerSaveReceiver()
+        super.onDetachedFromWindow()
+    }
+
+    private fun currentPowerSaveMode(): Boolean =
+        (context.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isPowerSaveMode ?: false
+
+    private fun canAnimate(): Boolean =
+        EffectGate.shouldAnimate(powerSaveMode, ValueAnimator.areAnimatorsEnabled())
+
+    private fun registerPowerSaveReceiver() {
+        if (powerSaveReceiverRegistered) return
+        ContextCompat.registerReceiver(
+            context,
+            powerSaveReceiver,
+            IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        powerSaveReceiverRegistered = true
+    }
+
+    private fun unregisterPowerSaveReceiver() {
+        if (!powerSaveReceiverRegistered) return
+        context.unregisterReceiver(powerSaveReceiver)
+        powerSaveReceiverRegistered = false
+    }
+
     fun spawnTouchBurst(x: Float, y: Float) {
         val def = effectDef ?: return
         val type = def.type
         if (type == "off") return
+        if (!canAnimate()) return
 
-        val count = def.particleCount.coerceIn(3, 28)
+        val requestedCount = def.particleCount.coerceIn(3, 28)
+        val availableSlots = (MAX_LIVE_PARTICLES - particles.size).coerceAtLeast(0)
+        val count = minOf(requestedCount, availableSlots)
+        if (count <= 0) return
         val lifetime = def.lifetimeMs.coerceIn(200L, 1200L)
         val speedMult = def.speed.coerceIn(0.3f, 3.0f)
         val customColor = def.color
@@ -117,7 +175,8 @@ class ParticleTouchOverlayView(
     }
 
     override fun doFrame(frameTimeNanos: Long) {
-        if (particles.isEmpty() || !isAttachedToWindow) {
+        if (particles.isEmpty() || !isAttachedToWindow || !canAnimate()) {
+            if (!canAnimate()) particles.clear()
             isAnimating = false
             invalidate()
             return
@@ -188,7 +247,7 @@ class ParticleTouchOverlayView(
                     val shader = RadialGradient(
                         p.x, p.y, curSize * 1.5f,
                         intArrayOf(ColorUtils.setAlphaComponent(p.color, alphaInt), ColorUtils.setAlphaComponent(p.color, (alphaInt * 0.3f).toInt()), Color.TRANSPARENT),
-                        floatArrayOf(0f, 0.5f, 1f),
+                        DUST_GRADIENT_STOPS,
                         Shader.TileMode.CLAMP
                     )
                     paint.shader = shader
@@ -201,7 +260,7 @@ class ParticleTouchOverlayView(
                     val grad = LinearGradient(
                         p.x, p.y, tailX, tailY,
                         intArrayOf(ColorUtils.setAlphaComponent(p.color, alphaInt), Color.TRANSPARENT),
-                        floatArrayOf(0f, 1f),
+                        NEON_BURST_STOPS,
                         Shader.TileMode.CLAMP
                     )
                     strokePaint.shader = grad
@@ -270,6 +329,14 @@ class ParticleTouchOverlayView(
         }
         starPath.close()
         canvas.drawPath(starPath, paint)
+    }
+
+    companion object {
+        val DUST_GRADIENT_STOPS: FloatArray = floatArrayOf(0f, 0.5f, 1f)
+        val NEON_BURST_STOPS: FloatArray = floatArrayOf(0f, 1f)
+
+        /** Upper bound on concurrently-live particles across all bursts. */
+        const val MAX_LIVE_PARTICLES = 120
     }
 }
 

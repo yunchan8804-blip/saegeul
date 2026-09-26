@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.input.ai.AiHttpStatusException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

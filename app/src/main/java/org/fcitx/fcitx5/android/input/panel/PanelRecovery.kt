@@ -52,11 +52,6 @@ internal object PanelRecoveries {
         InputFeatureBlock.AppPolicy -> R.string.blocked_app_network_policy
     }
 
-    fun writingSetup(service: FcitxInputMethodService) =
-        PanelRecovery(R.string.cta_open_writing_setup) {
-            openSettings(service, AiSettingsNavigator::openWritingSetup)
-        }
-
     fun voiceSetup(service: FcitxInputMethodService) =
         PanelRecovery(R.string.cta_open_voice_setup) {
             openSettings(service, AiSettingsNavigator::openVoiceSetup)

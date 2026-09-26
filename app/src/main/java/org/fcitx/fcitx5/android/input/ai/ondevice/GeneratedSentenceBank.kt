@@ -23,7 +23,13 @@ class GeneratedSentenceBank(
     private var loaded = false
 
     @Volatile
-    private var snapshot = Snapshot(emptyList(), SentencePackIndex.build(emptyList()), 0, 0)
+    private var snapshot = Snapshot(
+        emptyList(),
+        SentencePackIndex.build(emptyList()),
+        GeneratedSpacingIndex.build(emptyList()),
+        0,
+        0
+    )
 
     val revision: Long
         get() = snapshot.revision
@@ -42,6 +48,28 @@ class GeneratedSentenceBank(
     fun addGeneratedForPrefix(response: String, prefix: String, modelId: String, modelSha256: String): IngestionReport {
         require(prefix in GeneratedMaterialPolicy.PREFIXES) { "Unknown generated-material prefix" }
         val source = Source(modelId.requireModelId(), modelSha256.requireSha256())
+        return addGeneratedValidated(response, source) { generatedCandidateRejectionReason(it, prefix) }
+    }
+
+    fun addGeneratedOpen(response: String, modelId: String, modelSha256: String): IngestionReport {
+        val source = Source(modelId.requireModelId(), modelSha256.requireSha256())
+        return addGeneratedValidated(response, source) { generatedCandidateRejectionReason(it) }
+    }
+
+    fun recentPublicStarts(limit: Int = 12): List<String> {
+        require(limit in 1..12) { "limit must be in 1..12" }
+        return snapshot.entries.asReversed().asSequence()
+            .mapNotNull(::publicStart)
+            .distinct()
+            .take(limit)
+            .toList()
+    }
+
+    private fun addGeneratedValidated(
+        response: String,
+        source: Source,
+        candidateRejectionReason: (String) -> IngestionRejectionReason?
+    ): IngestionReport {
         require(response.toByteArray(Charsets.UTF_8).size <= MAX_RESPONSE_BYTES) {
             "Generated response exceeds 64 KiB"
         }
@@ -50,18 +78,30 @@ class GeneratedSentenceBank(
         }
         if (array.length() !in 1..8) throw GeneratedSentenceBankFormatException("Generated response must contain 1..8 sentences")
         val accepted = mutableListOf<String>()
-        var rejected = 0
+        val rejectionReasons = mutableMapOf<IngestionRejectionReason, Int>()
         for (index in 0 until array.length()) {
             val raw = array.opt(index) as? String
-            if (raw == null) { rejected++; continue }
-            val candidate = try {
-                decodeGenerated(JSONArray().put(raw).toString()).single()
-            } catch (_: GeneratedSentenceBankFormatException) {
-                rejected++
+            if (raw == null) {
+                rejectionReasons.increment(IngestionRejectionReason.NON_STRING)
                 continue
             }
-            if (isGeneratedCandidate(candidate, prefix)) accepted += candidate else rejected++
+            if (KoreanPiiScrubber.containsPii(raw)) {
+                rejectionReasons.increment(IngestionRejectionReason.PII)
+                continue
+            }
+            val candidate = SentencePackText.normalizeAccepted(raw)
+            if (candidate == null) {
+                rejectionReasons.increment(IngestionRejectionReason.INVALID_SENTENCE)
+                continue
+            }
+            if (!isTerminal(candidate)) {
+                rejectionReasons.increment(IngestionRejectionReason.MISSING_TERMINAL)
+                continue
+            }
+            val rejectionReason = candidateRejectionReason(candidate)
+            if (rejectionReason == null) accepted += candidate else rejectionReasons.increment(rejectionReason)
         }
+        val rejected = rejectionReasons.values.sum()
         synchronized(ioLock) {
             if (!loaded) loadLocked()
             val existing = snapshot.entries.map { it.text }.toSet()
@@ -72,9 +112,9 @@ class GeneratedSentenceBank(
                 val entries = retainEntries(snapshot.entries + additions)
                 vaultFile().writeText(encodeStored(entries))
                 snapshot = snapshotFor(entries, snapshot.revision + 1)
-                return IngestionReport(entries.count { it.text !in existing }, duplicates, rejected)
+                return IngestionReport(entries.count { it.text !in existing }, duplicates, rejected, rejectionReasons.toMap())
             }
-            return IngestionReport(0, duplicates, rejected)
+            return IngestionReport(0, duplicates, rejected, rejectionReasons.toMap())
         }
     }
 
@@ -125,6 +165,8 @@ class GeneratedSentenceBank(
     fun complete(rawContext: String, limit: Int): List<SentencePackMatch> =
         snapshot.index.complete(rawContext, limit).filter { it.evidence != MatchEvidence.LAST_WORD }
 
+    fun suggestSpacing(sentence: String): String? = snapshot.spacingIndex.suggestSpacing(sentence)
+
     fun clear() {
         synchronized(ioLock) {
             val next = snapshotFor(emptyList(), snapshot.revision + 1)
@@ -154,6 +196,7 @@ class GeneratedSentenceBank(
         return Snapshot(
             immutableEntries,
             SentencePackIndex.build(immutableEntries.map(StoredSentence::text)),
+            GeneratedSpacingIndex.build(immutableEntries.map(StoredSentence::text)),
             sourceCount,
             revision
         )
@@ -251,14 +294,35 @@ class GeneratedSentenceBank(
         return encoded
     }
 
-    private fun isGeneratedCandidate(text: String, prefix: String): Boolean {
-        if (!text.startsWith(prefix) || text.substring(prefix.length).trim().isEmpty()) return false
-        if (text.substring(prefix.length).trim().startsWith(prefix.trim())) return false
-        if (text.dropLast(1).any { it == '.' || it == '?' || it == '!' }) return false
+    private fun generatedCandidateRejectionReason(text: String, prefix: String? = null): IngestionRejectionReason? {
+        if (prefix != null) {
+            if (!text.startsWith(prefix)) return IngestionRejectionReason.PREFIX_MISMATCH
+            val continuation = text.substring(prefix.length).trim()
+            if (continuation.isEmpty()) return IngestionRejectionReason.EMPTY_CONTINUATION
+            if (continuation.startsWith(prefix.trim())) return IngestionRejectionReason.REPEATED_PREFIX
+        }
+        if (text.dropLast(1).any { it == '.' || it == '?' || it == '!' }) {
+            return IngestionRejectionReason.MULTIPLE_SENTENCES
+        }
         val words = text.split(' ').filter(String::isNotBlank)
-        if (words.size !in 3..12) return false
-        if (words.size >= 3 && words.windowed(3).toSet().size != words.size - 2) return false
-        return true
+        if (words.size !in 3..12) return IngestionRejectionReason.WORD_COUNT
+        if (words.size >= 3 && words.windowed(3).toSet().size != words.size - 2) {
+            return IngestionRejectionReason.REPETITION
+        }
+        return null
+    }
+
+    private fun publicStart(entry: StoredSentence): String? {
+        if (KoreanPiiScrubber.containsPii(entry.text)) return null
+        val words = entry.text.split(' ').filter(String::isNotBlank)
+        if (words.size < 2) return null
+        val start = words.take(2).joinToString(separator = " ", postfix = " ")
+        if (start.length > MAX_PUBLIC_START_LENGTH ||
+            start.none { it in '가'..'힣' } ||
+            start.any(Character::isISOControl) ||
+            KoreanPiiScrubber.containsPii(start)
+        ) return null
+        return start
     }
 
     private fun retainEntries(entries: List<StoredSentence>): List<StoredSentence> {
@@ -303,6 +367,7 @@ class GeneratedSentenceBank(
     private data class Snapshot(
         val entries: List<StoredSentence>,
         val index: SentencePackIndex,
+        val spacingIndex: GeneratedSpacingIndex,
         val sourceCount: Int,
         val revision: Long
     )
@@ -317,12 +382,35 @@ class GeneratedSentenceBank(
         const val MAX_JSON_BYTES = 1024 * 1024
         const val MAX_RESPONSE_BYTES = 64 * 1024
         const val MAX_MODEL_ID_LENGTH = 128
+        const val MAX_PUBLIC_START_LENGTH = 64
         val SHA256 = Regex("^[0-9a-fA-F]{64}$")
         val TERMINALS = setOf('.', '?', '!')
     }
 }
 
-data class IngestionReport(val added: Int, val duplicate: Int, val rejected: Int)
+enum class IngestionRejectionReason {
+    NON_STRING,
+    PII,
+    INVALID_SENTENCE,
+    MISSING_TERMINAL,
+    PREFIX_MISMATCH,
+    EMPTY_CONTINUATION,
+    REPEATED_PREFIX,
+    MULTIPLE_SENTENCES,
+    WORD_COUNT,
+    REPETITION
+}
+
+data class IngestionReport(
+    val added: Int,
+    val duplicate: Int,
+    val rejected: Int,
+    val rejectionReasons: Map<IngestionRejectionReason, Int> = emptyMap()
+)
+
+private fun MutableMap<IngestionRejectionReason, Int>.increment(reason: IngestionRejectionReason) {
+    this[reason] = (this[reason] ?: 0) + 1
+}
 
 private fun saturatingIncrement(value: Long): Long = if (value == Long.MAX_VALUE) value else value + 1L
 
