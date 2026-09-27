@@ -241,15 +241,13 @@ class RedTeamHangulEngineAutomataTest {
      * In Chunjiin:
      * Step 1: ㆍ + ㅡ = ㅗ -> Output: Keys("h") [Backend: "h"]
      * Step 2: ㅣ      = ㅚ -> Output: Backspace, Keys("hl") [Backend: "hl"]
-     * Step 3: ㆍ      = ㅘ -> Composer outputs: Backspace, Keys("hk")
+     * Step 3: ㆍ      = ㅘ -> Composer outputs: Backspace, Backspace, Keys("hk")
      *
-     * Desynchronization Vulnerability:
-     * Because Backend holds "hl" (length 2), a single Backspace deletes only 'l', leaving "h".
-     * Then appending "hk" produces "hhk" (ㅗ + ㅗ + ㅏ)!
+     * Regression guard: the backend holds "hl" (length 2), so a single Backspace would delete
+     * only 'l' and appending "hk" would produce "hhk" (ㅗ + ㅗ + ㅏ). The composer erases one
+     * Backspace per Dubeolsik key of the replaced vowel (Option B below).
      *
-     * Red team test proves:
-     * - A single backspace with "hk" yields "hhk" (Excess Redundant Input bug).
-     * - The correct sequence must be EITHER:
+     * The correct sequence must be EITHER:
      *   Option A (Precision single replacement): Backspace 1 time + Keys("k") -> "h" + "k" = "hk" (ㅘ)
      *   Option B (Full compound replacement): Backspace 2 times + Keys("hk") -> "" + "hk" = "hk" (ㅘ)
      */
@@ -276,24 +274,18 @@ class RedTeamHangulEngineAutomataTest {
         // Step 3: ㆍ -> transforms ㅚ into ㅘ
         val step3Dot = composer.press(Token.VowelDot)
 
-        // Check the actual outputs produced by MobileHangulComposer:
+        // ㅚ is two Dubeolsik keys ("hl"), so the composer must erase both before typing ㅘ.
         assertEquals(
-            "Current composer produces [Backspace, Keys('hk')]",
-            listOf(backspace, keys("hk")),
+            "ㅚ -> ㅘ must erase both keys of ㅚ before typing 'hk'",
+            listOf(backspace, backspace, keys("hk")),
             step3Dot
         )
 
-        // Apply current outputs to backend to prove the desync bug:
-        val desyncBackend = VirtualDubeolsikBuffer()
-        desyncBackend.applyAll(listOf(keys("hl"))) // starting from ㅚ
-        desyncBackend.applyAll(step3Dot)           // apply [bs, "hk"]
-
-        // "hl" - bs -> "h" + "hk" = "hhk" !
-        assertEquals(
-            "Proving attack vector: Single Backspace with 'hk' creates redundant duplicate 'hhk'!",
-            "hhk",
-            desyncBackend.content()
-        )
+        // Apply the outputs to the backend: it must hold exactly ㅘ, not the old "hhk" desync.
+        val composedBackend = VirtualDubeolsikBuffer()
+        composedBackend.applyAll(listOf(keys("hl"))) // starting from ㅚ
+        composedBackend.applyAll(step3Dot)
+        assertEquals("Backend must hold exactly 'hk' (ㅘ)", "hk", composedBackend.content())
 
         // Verify the two valid mathematical solutions that preserve backend coherence:
         // Option A: Single backspace deleting 'l', followed by 'k'
