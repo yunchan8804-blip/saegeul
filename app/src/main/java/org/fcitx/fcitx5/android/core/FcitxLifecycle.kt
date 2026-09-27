@@ -118,6 +118,3 @@ suspend inline fun <T> FcitxLifecycle.whenStopped(noinline block: suspend Corout
 
 fun <T> FcitxLifecycle.launchWhenReady(block: suspend CoroutineScope.() -> T) =
     lifecycleScope.launch { whenReady(block) }
-
-fun <T> FcitxLifecycle.launchWhenStopped(block: suspend CoroutineScope.() -> T) =
-    lifecycleScope.launch { whenStopped(block) }

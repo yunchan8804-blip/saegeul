@@ -764,8 +764,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .setNegativeButton(android.R.string.cancel, null)
             .create()
         dialog.setOnShowListener {
-            // Keep the save button reachable while the soft keyboard is up, matching the
-            // OpenAI credential dialog.
+            // Keep the save button reachable while the soft keyboard is up.
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val key = apiKey.text.toString().trim().ifEmpty { configured?.apiKey.orEmpty() }
@@ -891,7 +890,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .create()
         dialog.setOnShowListener {
             // Keep the save button reachable while the soft keyboard is up, matching the
-            // OpenAI credential dialog.
+            // voice OpenAI credential dialog.
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val key = apiKey.text.toString().trim()
@@ -964,7 +963,7 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             .create()
         dialog.setOnShowListener {
             // Keep the save button reachable while the soft keyboard is up, matching the
-            // OpenAI credential dialog.
+            // voice OpenAI credential dialog.
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val key = apiKey.text.toString().trim().ifEmpty { configured?.apiKey.orEmpty() }

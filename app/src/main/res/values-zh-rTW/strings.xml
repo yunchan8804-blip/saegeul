@@ -4,11 +4,8 @@
     <string name="app_name_debug">Saegeul (除錯)</string>
     <string name="save">儲存</string>
     <string name="input_methods">輸入法</string>
-    <string name="add_input_method">新增輸入法</string>
     <string name="addons">附加元件</string>
-    <string name="conf">設定</string>
     <string name="global_options">全域選項</string>
-    <string name="behavior">行為</string>
     <string name="advanced">進階</string>
     <string name="ignore_sys_cursor">忽略系統游標位置</string>
     <string name="hide_key_config">隱藏快捷鍵設定</string>
@@ -40,7 +37,6 @@
     <string name="dict_already_exists">词库已存在</string>
     <string name="invalid_dict">字典類型無效</string>
     <string name="whether_import_dict">您想要匯入此词库嗎？</string>
-    <string name="import_">匯入</string>
     <string name="synced">已同步！</string>
     <string name="loading">正在載入</string>
     <string name="clipboard_listening">監聽剪貼簿</string>
@@ -72,7 +68,6 @@
     <string name="license">授權條款</string>
     <string name="open_source_licenses">開放原始碼授權條款</string>
     <string name="licenses_of_third_party_libraries">第三方函式庫的授權條款</string>
-    <string name="github_repo">GitHub 倉庫</string>
     <string name="expanded_candidate_grid_span_count">表格樣式展開候選詞列數</string>
     <string name="no_config_options">目前沒有可用的設定選項</string>
     <string name="unimplemented_type">⛔ 未實作類型</string>
@@ -86,7 +81,6 @@
     <string name="app_crash_message">抱歉，但我們為您帶來了一些紀錄檔以供調查。</string>
     <string name="crash_logs">當機紀錄檔</string>
     <string name="verbose_log">詳細記錄</string>
-    <string name="verbose_log_summary">需要重新啟動</string>
     <string name="removed_x">已移除 %1$s</string>
     <string name="added_x">已新增%1$s</string>
     <string name="edited_x">已編輯%1$s</string>
@@ -94,7 +88,6 @@
     <string name="keyboard_long_press_delay">長按延遲</string>
     <string name="quickphrase_editor">快速片語編輯器</string>
     <string name="quickphrase_already_exists">快速片語已存在</string>
-    <string name="invalid_quickphrase">快速片語類型無效</string>
     <string name="create_new">新增</string>
     <string name="name">名稱</string>
     <string name="reset">重設</string>
@@ -113,7 +106,6 @@
     <string name="key_vertical_margin">按鍵垂直邊距</string>
     <string name="configure">配置</string>
     <string name="choose_image">選擇圖片…</string>
-    <string name="dark_keys">深色按鍵</string>
     <string name="recrop_image">重新裁剪圖片</string>
     <string name="navbar_background">導航列背景</string>
     <string name="navbar_bkg_none">無背景</string>
@@ -132,7 +124,6 @@
     <string name="exception_quickphrase_parse">剖析快速片語失敗：%1$s</string>
     <string name="exception_quickphrase_filename">%1$s 副檔名並不是快速片語</string>
     <string name="exception_theme_filename">%1$s 的副檔名並不是主題</string>
-    <string name="exception_theme_unknown">%1$s 是未知主題</string>
     <string name="exception_libime_dict_filename">%1$s 的副檔名並不是 libime 詞庫</string>
     <string name="exception_text_dict_filename">%1$s的副檔名並不是純文字詞庫</string>
     <string name="exception_sougou_dict_filename">%1$s的副檔名並不是搜狗細胞詞庫</string>
@@ -147,7 +138,6 @@
     <string name="dark_mode_theme">夜間模式主題</string>
     <string name="new_theme">新主題</string>
     <string name="skip">跳過</string>
-    <string name="horizontal_candidate_growth">拉伸橫向候選詞以填充寬度</string>
     <string name="none">無</string>
     <string name="theme_migrated">主題已遷移至目前版本</string>
     <string name="keep_keyboard_letters_uppercase">鍵盤字母保持大寫</string>
@@ -256,12 +246,9 @@
     <string name="table_dict_replace_message">碼表字典 \"%1$s\" 已存在。您可以匯入新字典並覆蓋原字典。</string>
     <string name="lang_switch_key_behavior">語言切換鍵行為</string>
     <string name="lang_switch_behavior_next_ime_app">切換至下一個輸入法</string>
-    <string name="cannot_be_empty">不能為空</string>
     <string name="_cannot_be_empty">%1$s不能為空</string>
-    <string name="action_forget_candidate_word">忘記詞彙</string>
     <string name="clipboard_mask_sensitive">隱藏敏感訊息（如密碼）</string>
     <string name="open_rime_user_data_dir">即將開啓應用資料目錄。RIME 用户資料目錄位於 “data/rime”。</string>
-    <string name="restart_to_apply_settings">應用程式將重新啓動以應用新設定。是否繼續？</string>
     <string name="space_swipe_move_cursor">划動空格以移動游標</string>
     <string name="please_wait">請稍候……</string>
     <string name="rotate">旋轉</string>

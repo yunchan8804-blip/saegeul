@@ -7,11 +7,9 @@ package org.fcitx.fcitx5.android.input.ai
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 
 /**
@@ -89,67 +87,6 @@ class SemanticSentenceRecommendationE2ETest {
         return editor.commitText(textToCommit)
     }
 
-    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
-    @Test
-    fun testE2E_WorkAndDeploymentFlow() {
-        val editor = MockEditor("서버 작업 마무리되었고 머지 요청드렸습니다. 배포 준비 중인데 ")
-        val candidates = getContextualCandidateWords(editor, limit = 4)
-
-        assertTrue("Work progress candidates must be generated", candidates.isNotEmpty())
-
-        val topCandidate = candidates.first()
-        assertNotNull(topCandidate)
-        assertTrue(
-            "Candidate should relate to work progress / deployment",
-            candidates.any { it.text.contains("배포") || it.text.contains("모니터링") || it.text.contains("승인") || it.text.contains("확인") }
-        )
-
-        // Simulate user clicking on candidate 0
-        val committed = commitCandidate(editor, topCandidate)
-        assertTrue(committed)
-
-        // Verify editor buffer now contains the chosen sentence followed by a clean space
-        assertTrue(editor.textBeforeCursor.endsWith(" "))
-        assertTrue(editor.textBeforeCursor.contains(topCandidate.text))
-    }
-
-    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
-    @Test
-    fun testE2E_SchedulingWithEntitySlotFilling() {
-        val editor = MockEditor("내일 판교에서 3시 회의")
-        val candidates = getContextualCandidateWords(editor, limit = 4)
-
-        assertTrue(candidates.isNotEmpty())
-
-        // Verify that extracted entities (판교, 3시, 회의) were synthesized into personalized suggestions
-        val customized = candidates.filter { it.comment.contains("맞춤AI") || it.text.contains("판교") || it.text.contains("3시") }
-        assertTrue("At least one synthesized slot-filled sentence should be present", customized.isNotEmpty())
-
-        val chosen = customized.first()
-        commitCandidate(editor, chosen)
-        assertTrue(editor.textBeforeCursor.contains(chosen.text))
-        assertTrue(editor.textBeforeCursor.endsWith(" "))
-    }
-
-    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
-    @Test
-    fun testE2E_NuancePolarityRejectionGuard() {
-        val editor = MockEditor("정말 죄송하지만 이번 주말에는 선약이 있어서 참석이 어렵습니다.")
-        val candidates = getContextualCandidateWords(editor, limit = 5)
-
-        assertTrue(candidates.isNotEmpty())
-
-        // Affirmative acceptance sentences must NEVER appear when user is declining
-        assertFalse("Must not suggest positive agreement when user is declining",
-            candidates.any { it.text.contains("그때 뵙겠습니다") || it.text.contains("그렇게 진행하시죠") }
-        )
-
-        // Must provide polite declining or alternative rescheduling
-        assertTrue("Must propose polite alternatives / rescheduling",
-            candidates.any { it.text.contains("다음") || it.text.contains("양해") || it.text.contains("조율") }
-        )
-    }
-
     @Test
     fun testE2E_ToneConsistencyAcrossStyles() {
         // Sentence-line tone consistency comes from observed personal sentences retrieved for
@@ -201,64 +138,6 @@ class SemanticSentenceRecommendationE2ETest {
         )
         assertTrue(strokePredictions.isNotEmpty())
         assertTrue(strokePredictions.any { it.text.contains("회의") })
-    }
-
-    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
-    @Test
-    fun testE2E_DesignpacaBadgeIntegrity() {
-        val editor = MockEditor("오후 3시에 회의 가능하실까요?")
-        val candidates = getContextualCandidateWords(editor, limit = 4)
-
-        assertTrue(candidates.isNotEmpty())
-        // Every contextual candidate must have a meaningful badge for Designpaca UI rendering
-        candidates.forEach { candidate ->
-            assertTrue(
-                "Comment badge must not be blank for Designpaca chip rendering",
-                candidate.comment.isNotBlank()
-            )
-            assertTrue(
-                "Comment badge must be a valid Designpaca category",
-                candidate.comment.contains("AI") ||
-                    candidate.comment.contains("일정") ||
-                    candidate.comment.contains("답변") ||
-                    candidate.comment.contains("업무") ||
-                    candidate.comment.contains("제안") ||
-                    candidate.comment.contains("구문") ||
-                    candidate.comment.contains("내스타일") ||
-                    candidate.comment.contains("맞춤") ||
-                    candidate.comment.contains("동의") ||
-                    candidate.comment.contains("응원") ||
-                    candidate.comment.contains("현황") ||
-                    candidate.comment.contains("요청") ||
-                    candidate.comment.contains("감사") ||
-                    candidate.comment.contains("안심") ||
-                    candidate.comment.contains("안부") ||
-                    candidate.comment.contains("인사") ||
-                    candidate.comment.contains("⚡")
-            )
-        }
-    }
-
-    @Ignore("고정 템플릿·엔티티 합성 문장 제거: 문장 줄은 학습·입력 기반으로 전환")
-    @Test
-    fun testE2E_CompositeMultiEntityAndMealSynthesis() {
-        // 1. Time + Place + Topic
-        val tripleEditor = MockEditor("내일 판교에서 3시에 회의")
-        val tripleCandidates = getContextualCandidateWords(tripleEditor, limit = 5)
-        assertTrue(tripleCandidates.isNotEmpty())
-        assertTrue(
-            "Should synthesize composite sentences with time, place, and topic",
-            tripleCandidates.any { it.text.contains("판교") && (it.text.contains("회의") || it.text.contains("3시")) }
-        )
-
-        // 2. Place + Meal
-        val mealEditor = MockEditor("오늘 저녁 강남에서 점심 ")
-        val mealCandidates = getContextualCandidateWords(mealEditor, limit = 4)
-        assertTrue(mealCandidates.isNotEmpty())
-        assertTrue(
-            "Should synthesize meal recommendation near place",
-            mealCandidates.any { it.text.contains("강남") || it.text.contains("식사") || it.text.contains("점심") }
-        )
     }
 
     @Test

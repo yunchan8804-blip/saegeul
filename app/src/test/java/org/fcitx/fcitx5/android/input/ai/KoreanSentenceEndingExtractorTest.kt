@@ -57,26 +57,4 @@ class KoreanSentenceEndingExtractorTest {
         assertEquals("Honorific", politeWithoutListedEnding.dominantTone)
         assertEquals(listOf("나요"), politeWithoutListedEnding.habitualEndings)
     }
-
-    @Test
-    fun `empty llm ending list is supplemented from observed fragments`() {
-        val profiler = TypingDnaProfiler {
-            """{"dominantTone":"Honorific","habitualEndings":[],"frequentBigrams":[],"cannedPhrases":[]}"""
-        }
-
-        val persona = profiler.profile("work", listOf("감사합니다. 확인했습니다!"))
-
-        assertEquals(listOf("합니다", "했습니다"), persona.habitualEndings)
-    }
-
-    @Test
-    fun `nonempty llm ending list remains unchanged`() {
-        val profiler = TypingDnaProfiler {
-            """{"dominantTone":"Honorific","habitualEndings":["LLM 고유 표현"],"frequentBigrams":[],"cannedPhrases":[]}"""
-        }
-
-        val persona = profiler.profile("work", listOf("감사합니다."))
-
-        assertEquals(listOf("LLM 고유 표현"), persona.habitualEndings)
-    }
 }

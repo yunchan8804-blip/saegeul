@@ -598,12 +598,6 @@ class InputView(
         requestLayout()
     }
 
-    /** Returns to the source tool if a prompt could not cross its Fcitx start fence. */
-    fun rejectInternalPromptStart(token: Long) {
-        if (promptCaptureToken != token) return
-        finishInternalPromptInput(null)
-    }
-
     /** Fcitx restarted, so this prompt can no longer receive its ordered completion marker. */
     fun abortInternalPromptInput() {
         if (promptCaptureToken != null) finishInternalPromptInput(null)

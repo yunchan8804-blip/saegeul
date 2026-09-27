@@ -24,11 +24,8 @@
     <string name="settings_summary_app_profiles">앱마다 다른 자판과 설정</string>
     <string name="settings_summary_personal_dictionary">직접 추가한 낱말</string>
     <string name="input_methods">입력기</string>
-    <string name="add_input_method">입력기 추가</string>
     <string name="addons">애드온</string>
-    <string name="conf">구성</string>
     <string name="global_options">전역 옵션</string>
-    <string name="behavior">동작</string>
     <string name="advanced">고급</string>
     <string name="ignore_sys_cursor">시스템 커서 위치 무시</string>
     <string name="hide_key_config">단축키 구성 숨김</string>
@@ -42,8 +39,6 @@
     <string name="enable_ime_hint">언어 및 입력 설정에서 &lt;b>%1$s&lt;/b> 활성화</string>
     <string name="select_ime">입력기 선택</string>
     <string name="select_ime_hint">기본 입력 방법으로 &lt;b>%1$s&lt;/b> 선택</string>
-    <string name="setup_ai_suggestion_hint">Gemma 모델(약 2.6GB)을 기기에 받아 두면 입력을 멈출 때마다 다음 문장을 제안합니다. 모든 처리는 기기 안에서만 이뤄지고 글은 밖으로 나가지 않습니다. Wi-Fi에서 받는 것을 권장합니다.</string>
-    <string name="setup_ai_suggestion_button">모델 준비하기</string>
     <string name="next">다음</string>
     <string name="prev">이전</string>
     <string name="done">완료</string>
@@ -56,7 +51,6 @@
     <string name="dict_already_exists">사전이 이미 존재합니다</string>
     <string name="invalid_dict">잘못된 사전 유형</string>
     <string name="whether_import_dict">이 사전을 가져오시겠습니까?</string>
-    <string name="import_">가져오기</string>
     <string name="synced">동기화되었습니다!</string>
     <string name="loading">불러오는 중</string>
     <string name="clipboard_listening">클립보드 수신 대기</string>
@@ -106,7 +100,6 @@
     <string name="source_code_summary">이 빌드의 정확한 소스 태그·저장소·전체 소스 아카이브</string>
     <string name="source_not_configured">이 빌드에 설정되지 않음 — 공개 릴리스 차단 상태</string>
     <string name="source_document">이 빌드의 소스 코드\n\n저장소:\n%1$s\n\n정확한 소스 태그 또는 ref:\n%2$s\n\n재귀 서브모듈과 빌드 스크립트를 포함한 전체 소스 아카이브:\n%3$s\n\n빌드 Git 해시:\n%4$s\n\n공개 바이너리 릴리스는 정확히 같은 태그의 전체 소스 아카이브, SHA-256 체크섬, SBOM을 같은 다운로드 위치에 제공해야 합니다.</string>
-    <string name="github_repo">GitHub 저장소</string>
     <string name="no_config_options">현재 사용 가능한 구성 옵션이 없습니다</string>
     <string name="unimplemented_type">⛔ 구현되지 않은 유형</string>
     <string name="select">선택</string>
@@ -126,7 +119,6 @@
     <string name="keyboard_long_press_delay">키 길게 누름 지연</string>
     <string name="quickphrase_editor">상용구 편집기</string>
     <string name="quickphrase_already_exists">상용구가 이미 존재합니다</string>
-    <string name="invalid_quickphrase">상용구의 잘못된 유형</string>
     <string name="name">이름</string>
     <string name="reset">재설정</string>
     <string name="quickphrase_keyword">키워드</string>
@@ -165,7 +157,6 @@
     <string name="faq">자주 묻는 질문</string>
     <string name="clipboard_suggestion_timeout">클립보드 추천 표시 시간</string>
     <string name="expanded_candidate_grid_span_count">격자형 확장 후보의 열 수</string>
-    <string name="verbose_log_summary">다시 시작해야 합니다</string>
     <string name="create_new">새로 만들기</string>
     <string name="theme">테마</string>
     <string name="key_ripple_effect">키 물결 효과 활성화</string>
@@ -178,7 +169,6 @@
     <string name="key_vertical_margin">키 세로 여백</string>
     <string name="configure">구성</string>
     <string name="choose_image">이미지 선택…</string>
-    <string name="dark_keys">어두운 키</string>
     <string name="recrop_image">이미지 다시 자르기</string>
     <string name="navbar_background">탐색 모음 배경</string>
     <string name="navbar_bkg_none">배경 없음</string>
@@ -197,7 +187,6 @@
     <string name="exception_quickphrase_parse">상용구 줄을 해석하지 못했습니다: %1$s</string>
     <string name="exception_quickphrase_filename">%1$s의 파일 확장자가 상용구 파일을 나타내지 않습니다</string>
     <string name="exception_theme_filename">%1$s의 파일 확장자가 테마 파일을 나타내지 않습니다</string>
-    <string name="exception_theme_unknown">알 수 없는 테마입니다: %1$s</string>
     <string name="exception_libime_dict_filename">%1$s의 파일 확장자가 libime 사전 파일을 나타내지 않습니다</string>
     <string name="exception_text_dict_filename">%1$s의 파일 확장자가 텍스트 사전 파일을 나타내지 않습니다</string>
     <string name="exception_sougou_dict_filename">%1$s의 파일 확장자가 Sogou 사전 파일을 나타내지 않습니다</string>
@@ -211,16 +200,6 @@
     <string name="light_mode_theme">라이트 모드 테마</string>
     <string name="dark_mode_theme">다크 모드 테마</string>
     <string name="new_theme">새 테마</string>
-    <string name="theme_preset_hanji">한지 라이트 (닥나무 한지 &amp; 먹빛)</string>
-    <string name="theme_preset_dancheong">단청 다크 (깊은 밤하늘 &amp; 비취)</string>
-    <string name="theme_preset_baegja">백자 라이트 (조선 백자 &amp; 청화 코발트)</string>
-    <string name="theme_preset_cheongja">청자 다크 (고려 비색 &amp; 황동 상감)</string>
-    <string name="theme_preset_midnight_oled">자정 OLED 블랙 (순수 블랙 &amp; 네온 제이드)</string>
-    <string name="theme_preset_seoul_mist">안개 글래스 (반투명 슬레이트 &amp; 스카이)</string>
-    <string name="theme_style_palette">추천 팔레트 프리셋</string>
-    <string name="theme_color_customization">세부 색상 및 스타일</string>
-    <string name="theme_accent_key_color">엔터/강조키 색상</string>
-    <string name="theme_keyboard_bg_color">키보드 바탕색</string>
     <string name="theme_key_bg_color">키캡 배경색</string>
     <string name="theme_key_text_color">키캡 글자색</string>
     <string name="theme_background_image">배경 이미지</string>
@@ -348,7 +327,6 @@
     <string name="theme_target_backspace">백스페이스 (Backspace)</string>
     <string name="theme_target_shift">쉬프트 (Shift)</string>
     <string name="skip">건너뛰기</string>
-    <string name="horizontal_candidate_growth">가로 후보를 남은 너비까지 늘리기</string>
     <string name="none">없음</string>
     <string name="theme_migrated">테마가 현재 버전으로 이전되었습니다</string>
     <string name="keep_keyboard_letters_uppercase">키보드 글자를 대문자로 유지</string>
@@ -477,12 +455,9 @@
     <string name="table_dict_replace_message">테이블 기반 입력기 \"%1$s\"의 사전이 이미 있습니다. 새 사전을 가져와 교체할 수 있습니다.</string>
     <string name="lang_switch_key_behavior">언어 전환 키 동작</string>
     <string name="lang_switch_behavior_next_ime_app">다음 입력기 앱으로 전환</string>
-    <string name="cannot_be_empty">비워 둘 수 없음</string>
     <string name="_cannot_be_empty">%1$s은(는) 비워 둘 수 없습니다</string>
-    <string name="action_forget_candidate_word">단어 삭제</string>
     <string name="clipboard_mask_sensitive">민감한 데이터(예: 비밀번호) 가리기</string>
     <string name="open_rime_user_data_dir">앱 데이터 디렉터리를 엽니다. RIME 사용자 데이터 디렉터리는 \"data/rime\"에 있습니다.</string>
-    <string name="restart_to_apply_settings">새 설정을 적용하기 위해 앱을 다시 시작합니다. 계속할까요?</string>
     <string name="space_swipe_move_cursor">스페이스 키를 밀어 커서 이동</string>
     <string name="please_wait">잠시 기다려 주세요…</string>
     <string name="rotate">회전</string>
@@ -564,7 +539,6 @@
     <string name="hide_unsupported_emojis">지원되지 않는 이모지 숨기기</string>
     <string name="key_border_stroke">키 테두리 선 표시</string>
     <string name="preferred_voice_input">선호하는 음성 입력</string>
-    <string name="edit_text_playground">텍스트 편집 테스트 공간</string>
     <string name="gif_search">GIF 검색</string>
     <string name="gif_recommended">추천 GIF</string>
     <string name="gif_link_insert">링크 넣기</string>
@@ -586,7 +560,6 @@
     <string name="gif_private_disabled">비밀번호·민감 입력란에서는 GIF 검색을 사용할 수 없습니다</string>
     <string name="gif_editor_changed">입력란이 변경되었습니다. GIF를 다시 선택해 주세요.</string>
     <string name="gif_query_inline_hint">검색어를 입력하세요</string>
-    <string name="gif_query_clear">지우기</string>
     <string name="gif_search_action">검색</string>
     <string name="gif_disclosure_noto">목록과 미디어를 Google Fonts에서 내려받습니다. 검색어 비교는 이 기기에서만 처리하지만 IP 주소 같은 연결 정보는 Google Fonts에 전달됩니다.</string>
     <string name="gif_disclosure_klipy">검색어와 IP 주소 같은 연결 정보가 KLIPY에 전송되고 선택한 미디어는 공급자 미디어 호스트에서 내려받습니다.</string>
@@ -604,9 +577,7 @@
     <string name="gif_keyword_celebrate">축하</string>
     <string name="gif_keyword_laugh">웃음</string>
     <string name="gif_keyword_love">사랑</string>
-    <string name="gif_keyword_applause">박수</string>
     <string name="gif_keyword_thanks">감사</string>
-    <string name="gif_keyword_surprise">놀람</string>
     <string name="gif_keyword_angry">화남</string>
     <string name="gif_keyword_sad">슬픔</string>
     <string name="typo_recovery">한/영 오타 복구</string>
@@ -684,9 +655,6 @@
     <string name="ai_setup_action">설정하기</string>
     <string name="privacy_ai">개인정보·AI</string>
     <string name="privacy_network_controls">네트워크 제어</string>
-    <plurals name="ai_setup_computers_found">
-        <item quantity="other">컴퓨터 %1$d대를 찾았습니다.</item>
-    </plurals>
     <string name="privacy_local_data">기기 내 데이터</string>
     <string name="gif_provider_settings">GIF 공급자</string>
     <string name="gif_provider_selection_title">GIF 소스</string>
@@ -918,7 +886,6 @@
     <string name="ocr_commit_failed">입력하지 못했습니다. 다시 입력하거나 클립보드로 대체하지 않았습니다.</string>
     <string name="blocked_offline_mode">완전 오프라인 모드가 켜져 있어 이 기능을 사용할 수 없습니다.</string>
     <string name="blocked_app_network_policy">이 앱의 키보드 프로필이 네트워크 기능을 차단하고 있습니다.</string>
-    <string name="blocked_app_ai_policy">이 앱의 키보드 프로필이 AI 글쓰기를 차단하고 있습니다.</string>
     <string name="cta_open_offline_mode">오프라인 모드 설정 열기</string>
     <string name="cta_open_app_profile">앱 프로필 설정 열기</string>
     <string name="cta_open_voice_setup">음성 연결 설정 열기</string>
@@ -929,11 +896,8 @@
     <string name="typing_dna_last_learned">마지막 학습 %1$s</string>
     <string name="typing_dna_card_ngram_suffix"> · 학습 어절 %1$d개</string>
     <string name="typing_dna_card_pending_suffix"> · 대기 %1$d개</string>
-    <string name="typing_dna_card_title">AI 내 언어 금고 학습 현황</string>
     <string name="typing_dna_card_hardware_suffix"> · 🔒 하드웨어 암호화</string>
     <string name="vault_title">내 언어 금고</string>
-    <string name="vault_level_title">Lv.%1$d | AI와 공존하는 사용자</string>
-    <string name="vault_level_description">입력한 문장을 바탕으로 단어 연결과 말투를 기기에 기록합니다. 레벨은 분석한 문장 수를 기준으로 올라갑니다.</string>
     <string name="vault_level_number">Lv.%1$d</string>
     <string name="vault_level_content_description">학습 레벨 %1$d</string>
     <string name="vault_level_progress_max">최고 레벨이에요 · 계속 배우고 있어요</string>
@@ -961,9 +925,6 @@
     <string name="vault_timeline_summary_preview">최근 30일 0문장 · 하루 최대 0문장</string>
     <string name="vault_timeline_empty">아직 배운 문장이 없어요. 키보드로 문장을 쓰면 여기에 쌓여요.</string>
     <string name="vault_category_title">앱 카테고리 분포</string>
-    <string name="vault_category_messenger">메신저</string>
-    <string name="vault_category_work">업무</string>
-    <string name="vault_category_general">일반</string>
     <string name="persona_label_messenger">메신저</string>
     <string name="persona_label_work">업무</string>
     <string name="persona_label_email">이메일</string>
@@ -1003,6 +964,7 @@
     <string name="vault_feedback_personal_line">그중 %1$d%%는 내 기록에서 나왔어요</string>
     <string name="vault_style_title">내 말투</string>
     <string name="vault_style_categories_line">주로 쓰는 곳: %1$s</string>
+    <string name="vault_style_report_row">내 말투 리포트 보기</string>
     <string name="vault_storage_title">보관과 백업</string>
     <string name="vault_storage_lock_line">🔒 이 휴대폰 안에만 암호화해 보관해요</string>
     <string name="vault_storage_info_content_description">자세히 보기</string>
@@ -1044,7 +1006,6 @@
     <string name="typing_dna_chart_accessibility_privacy">온디바이스 개인정보 보호 %1$d퍼센트.</string>
 
     <string name="style_report_title">내 말투 리포트</string>
-    <string name="vault_style_report_row">내 말투 리포트 보기</string>
     <string name="style_report_empty_message">문장을 몇 개 쓰면 여기에 내 말투가 보여요</string>
     <string name="style_report_accumulation_footer">문장을 쓸수록 새글이 더 정확해져요</string>
     <string name="style_report_recent_title">최근 30일</string>
@@ -1055,17 +1016,9 @@
     <string name="style_report_endings_title">자주 쓰는 말끝</string>
     <string name="style_report_footer_privacy">이 리포트는 이 휴대폰 안에서만 만들어져요</string>
 
-    <string name="enrich_now_button">지금 강화</string>
-    <string name="dashboard_graph_stats_line">지식 그래프: 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
     <string name="enrichment_card_title">LLM 강화</string>
     <string name="enrichment_card_description">저장된 표현의 관계와 주제를 정리해 추천 순위에 반영해요.</string>
     <string name="enrichment_action">분석하고 LLM 강화</string>
-    <string name="enrichment_status_never">아직 LLM 강화 전</string>
-    <string name="enrichment_status_legacy">이전 강화 결과 있음 · 최근 실행 기록 없음</string>
-    <string name="enrichment_status_running">LLM 강화 중…</string>
-    <string name="enrichment_status_queued">곧 관계 그래프를 만들기 시작해요</string>
-    <string name="enrichment_status_running_chunk">%1$d/%2$d 묶음 처리 중…</string>
-    <string name="enrichment_status_waiting_lease">새글 AI가 문장 재료를 만드는 중이라 끝나길 기다리고 있어요…</string>
 
     <string name="enrichment_state_queued_title">시작 준비 중</string>
     <string name="enrichment_state_running_title">관계 그래프 만드는 중</string>
@@ -1101,30 +1054,17 @@
     <string name="enrichment_pause_reason_screen_on">화면이 켜져 있어요</string>
     <string name="enrichment_pause_reason_user_stopped">사용자가 중지했어요</string>
     <string name="enrichment_pause_reason_lease_wait_timeout">기다리다 시간이 초과됐어요</string>
-    <string name="enrichment_pause_reason_unknown">알 수 없는 이유로 멈췄어요</string>
     <string name="enrichment_pause_reason_app_terminated">앱이 다시 시작돼서 멈췄어요. [지금 반영하기]를 누르면 이어서 해요.</string>
 
     <string name="enrichment_action_stop">중지</string>
     <string name="enrichment_action_apply_now">지금 반영하기</string>
     <string name="enrichment_action_prioritize_graph">그래프 먼저 만들기</string>
-    <string name="enrichment_action_resume">이어서 만들기</string>
-    <string name="enrichment_action_create">만들기</string>
     <string name="enrichment_action_open_model_management">모델 관리 열기</string>
-    <string name="enrichment_action_retry">다시 만들기</string>
 
     <string name="enrichment_applied_today">오늘 %1$s 반영</string>
     <string name="enrichment_applied_yesterday">어제 %1$s 반영</string>
     <string name="enrichment_applied_date">%1$d월 %2$d일 반영</string>
-    <string name="enrichment_status_succeeded">LLM 강화 완료</string>
-    <string name="enrichment_status_partial">일부만 강화됐어요 · 다시 실행할 수 있어요</string>
-    <string name="enrichment_status_no_data">강화할 문장이 아직 없어요</string>
     <string name="enrichment_status_failed">최근 강화 실패 · 다시 시도할 수 있어요</string>
-    <string name="enrichment_status_interrupted">강화가 중단됐어요 · 다시 시도해 주세요</string>
-    <string name="enrichment_graph_stats_last_applied">마지막 반영 %1$s\n현재 그래프: 노드 %2$d · 관계 %3$d · 주제 %4$d</string>
-    <string name="enrichment_graph_stats_legacy">기존 그래프 저장 시각 %1$s\n현재 그래프: 노드 %2$d · 관계 %3$d · 주제 %4$d</string>
-    <string name="enrichment_unavailable_offline">오프라인 모드에서는 LLM 강화를 실행할 수 없어요</string>
-    <string name="enrichment_unavailable_provider">문장 추천과 LLM 강화를 쓰려면 API 키 또는 OAuth로 AI 공급자를 연결해 주세요.</string>
-    <string name="enrichment_unavailable_oauth">AI 공급자에 다시 로그인해야 LLM 강화를 실행할 수 있어요.</string>
     <string name="enrichment_unavailable_release_build">이 빌드에서는 새글 AI로 그래프를 만들 수 없어요.</string>
     <string name="enrichment_setup_action">AI 연결 설정</string>
     <string name="dashboard_loading_message">언어 금고를 불러오는 중…</string>
@@ -1132,33 +1072,13 @@
     <string name="dashboard_loading_retry">다시 시도</string>
     <string name="dashboard_sync_busy_message">기기에 저장된 문장을 분석하는 중…</string>
     <string name="dashboard_sync_failed">분석 내용을 저장하지 못했어요. 다시 시도해 주세요.</string>
-    <string name="enrich_offline_blocked">오프라인 모드에서는 강화할 수 없습니다</string>
-    <string name="enrich_no_provider">먼저 개인정보·AI 설정에서 내 컴퓨터(AI 공급자)를 연결하세요</string>
-    <string name="enrich_confirm_title">개인 지식 그래프 강화</string>
-    <string name="enrich_confirm_message">기기에 쌓인 (개인정보 치환된) 문장을 설정한 AI 공급자(본인 컴퓨터 컴패니언)로 보내 개인 지식 그래프를 만듭니다. 요청은 store=false로 보관되지 않습니다. 계속할까요?</string>
-    <string name="enrich_confirm_positive">강화</string>
-    <string name="enrich_running">강화 중…</string>
-    <string name="enrich_failed">강화에 실패했습니다</string>
-    <string name="enrich_done">강화 완료: 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
-    <string name="enrich_no_data">아직 학습된 문장이 없습니다</string>
-    <string name="enrich_parse_failed">강화 결과를 해석하지 못했습니다</string>
-    <string name="enrich_partial">일부만 강화됨: 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
     <string name="enrich_bg_title">분석 및 동기화 완료</string>
     <string name="enrich_bg_message">AI 강화는 백그라운드에서 진행됩니다. 수십 초 걸릴 수 있어요. 이 화면을 나가셔도 되고, 완료되면 알림으로 알려드립니다.</string>
-    <string name="enrich_notify_running">언어 금고를 강화하는 중…</string>
     <string name="enrich_notify_done">언어 금고 강화 완료 · 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
     <string name="enrich_notify_partial">언어 금고 일부 강화 완료 · 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
     <string name="enrich_notify_no_data">아직 학습된 문장이 부족해 강화할 내용이 없어요</string>
-    <string name="enrich_notify_progress_chunk">조각 %1$d/%2$d 처리 중…</string>
     <string name="notify_channel_ai_progress">AI 백그라운드 진행</string>
     <string name="notify_channel_ai_alerts">AI 조치 필요</string>
     <string name="sync_done_title">분석 및 동기화 완료</string>
-    <string name="sync_llm_missing_message">LLM 서비스가 연결되어 있지 않아 분석과 동기화만 실행했습니다. 개인정보·AI 설정에서 내 컴퓨터를 연결하면 AI 강화까지 함께 실행됩니다.</string>
-    <string name="sync_offline_message">오프라인 모드라 AI 강화는 실행하지 않았습니다.</string>
-    <string name="sync_enriched_done">분석·동기화·AI 강화 완료: 노드 %1$d · 관계 %2$d · 주제 %3$d</string>
-    <string name="sync_done_prefix">분석·동기화 완료, %1$s</string>
-    <string name="sync_level_never">아직 분석 전</string>
-    <string name="sync_level_sync_only">마지막 실행: 분석·동기화까지 (AI 강화 없음)</string>
-    <string name="sync_level_enriched">마지막 실행: AI 강화까지 완료 · %1$s</string>
     <string name="typing_dna_persistence_failed">언어 지문을 저장하지 못했습니다. 다시 시도해 주세요.</string>
 </resources>

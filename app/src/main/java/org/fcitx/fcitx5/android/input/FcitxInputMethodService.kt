@@ -2253,23 +2253,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         org.fcitx.fcitx5.android.input.ai.ReinforcementTracker(store = personalizedStore)
     }
 
-    val personalizedAugmenter by lazy {
-        org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceAugmenter(
-            store = personalizedStore,
-            llmCaller = { _ -> null },
-            fallbackSynthesizer = { ctx ->
-                val intent = contextualPredictor.semanticPredictor.inferIntent(ctx)
-                contextualPredictor.semanticPredictor.predictNextSentences(ctx, limit = 3).map {
-                    org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceRecord(
-                        sentence = it.text,
-                        intent = intent,
-                        score = 1.0f
-                    )
-                }
-            }
-        )
-    }
-
     val typingDnaRepository: org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
         get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typingDnaRepository
 
@@ -2387,7 +2370,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return AiInputCaptureResult.EditorStateChanged
     }
 
-    /** Inserts one reviewed on-device suffix at the captured end cursor without changing cloud append behavior. */
+    /** Inserts one reviewed on-device suffix at the captured end cursor without disturbing the rest of the editor. */
     fun applyOnDeviceContextCompletion(
         snapshot: AiInputSnapshot,
         suffix: String
@@ -3436,7 +3419,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     val userTypingContextCollector by lazy {
         org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector(
-            onTriggerAugmentation = { _, _ -> },
             onSentenceCommitted = { pkg, sentence ->
                 val capturedPackageName = pkg
                 val capturedSentence = sentence

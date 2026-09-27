@@ -4,144 +4,22 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
-import org.json.JSONArray
-import org.json.JSONObject
-
 /**
- * Dual-Engine Typing DNA Profiler:
+ * Typing DNA Profiler:
  * Analyzes accumulated user sentences and extracts the user's distinct linguistic DNA
  * (dominant tone, habitual sentence endings, high-frequency collocations, and situational phrases).
  *
- * Supports high-accuracy LLM profiling (OpenAI/Gemini/Local LLM) and an instantaneous
- * on-device statistical fallback that requires zero network access.
+ * 100% on-device statistical analysis; requires zero network access.
  */
-class TypingDnaProfiler(
-    private val llmCaller: ((prompt: String) -> String?)? = null
-) {
-
-    companion object {
-        const val PROMPT_SYSTEM_TEMPLATE = """
-당신은 한국어 언어학 및 텍스트 문체 분석 전문가입니다.
-주어진 사용자의 실제 메신저/업무 대화 텍스트들을 분석하여, 이 사용자의 고유한 언어 습관(말투, 종결 어미, 자주 붙여 쓰는 단어 쌍, 단골 완성 문장)을 추출하세요.
-응답은 반드시 아래 JSON 스키마를 만족하는 순수 JSON 객체 하나만 출력해야 합니다. 마크다운 코드블록이나 다른 설명은 일절 포함하지 마세요.
-
-[JSON 스키마]
-{
-  "dominantTone": "Honorific" 또는 "Informal",
-  "habitualEndings": ["~네용", "ㅋㅋ", "~드리겠습니다", ...],
-  "frequentBigrams": [
-    {"prev": "앞단어", "next": "뒷단어", "weight": 0.95},
-    ...
-  ],
-  "cannedPhrases": [
-    "완전 고마워 덕분이야!",
-    "확인 후 공유드리겠습니다.",
-    ...
-  ]
-}
-"""
-
-        fun buildPrompt(category: String, sentences: List<String>): String {
-            val textSample = sentences.take(30).joinToString("\n") { "- $it" }
-            return """
-$PROMPT_SYSTEM_TEMPLATE
-
-[분석 대상 카테고리]: $category
-[사용자 입력 텍스트 샘플]
-$textSample
-
-[언어 DNA 분석 JSON]
-""".trimIndent()
-        }
-
-        fun parseLlmResponse(category: String, rawResponse: String): PersonaDna? {
-            val trimmed = rawResponse.trim()
-            val jsonStr = if (trimmed.contains("```json")) {
-                trimmed.substringAfter("```json").substringBefore("```").trim()
-            } else if (trimmed.contains("```")) {
-                trimmed.substringAfter("```").substringBefore("```").trim()
-            } else {
-                trimmed
-            }
-
-            val startIdx = jsonStr.indexOf('{')
-            val endIdx = jsonStr.lastIndexOf('}')
-            if (startIdx < 0 || endIdx <= startIdx) return null
-
-            return runCatching {
-                val clean = jsonStr.substring(startIdx, endIdx + 1)
-                val obj = JSONObject(clean)
-                val tone = obj.optString("dominantTone", "Honorific")
-
-                val endings = mutableListOf<String>()
-                val endingsArr = obj.optJSONArray("habitualEndings")
-                if (endingsArr != null) {
-                    for (i in 0 until endingsArr.length()) {
-                        val e = endingsArr.optString(i, "").trim()
-                        if (e.isNotEmpty()) endings.add(e)
-                    }
-                }
-
-                val bigrams = mutableListOf<DynamicBigram>()
-                val bigramsArr = obj.optJSONArray("frequentBigrams")
-                if (bigramsArr != null) {
-                    for (i in 0 until bigramsArr.length()) {
-                        val bObj = bigramsArr.optJSONObject(i) ?: continue
-                        val prev = bObj.optString("prev", "").trim()
-                        val next = bObj.optString("next", "").trim()
-                        val weight = bObj.optDouble("weight", 1.0).toFloat()
-                        if (prev.isNotEmpty() && next.isNotEmpty()) {
-                            bigrams.add(DynamicBigram(prev, next, weight))
-                        }
-                    }
-                }
-
-                val phrases = mutableListOf<String>()
-                val phrasesArr = obj.optJSONArray("cannedPhrases")
-                if (phrasesArr != null) {
-                    for (i in 0 until phrasesArr.length()) {
-                        val p = phrasesArr.optString(i, "").trim()
-                        if (p.isNotEmpty()) phrases.add(p)
-                    }
-                }
-
-                PersonaDna(
-                    category = category,
-                    dominantTone = tone,
-                    habitualEndings = endings,
-                    frequentBigrams = bigrams,
-                    cannedPhrases = phrases
-                )
-            }.getOrNull()
-        }
-    }
+class TypingDnaProfiler {
 
     /**
-     * Profiles the given sentences.
-     * Uses LLM if available and successful; otherwise seamlessly falls back to on-device statistical analysis.
+     * Profiles the given sentences using 100% on-device statistical analysis.
      */
     fun profile(category: String, sentences: List<String>): PersonaDna {
         if (sentences.isEmpty()) {
             return PersonaDna(category = category)
         }
-
-        if (llmCaller != null) {
-            val prompt = buildPrompt(category, sentences)
-            val response = runCatching { llmCaller?.invoke(prompt) }.getOrNull()
-            if (!response.isNullOrBlank()) {
-                val parsed = parseLlmResponse(category, response)
-                if (parsed != null) {
-                    val observed = profileOnDevice(category, sentences)
-                    return parsed.copy(
-                        habitualEndings = parsed.habitualEndings.ifEmpty { observed.habitualEndings },
-                        frequentBigrams = observed.frequentBigrams,
-                        cannedPhrases = observed.cannedPhrases
-                    )
-                }
-            }
-        }
-
-        // On-Device Statistical Fallback
         return profileOnDevice(category, sentences)
     }
 

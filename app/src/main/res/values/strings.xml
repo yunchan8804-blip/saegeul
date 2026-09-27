@@ -24,11 +24,8 @@
     <string name="settings_summary_app_profiles" tools:ignore="MissingTranslation">Per-app layouts and settings</string>
     <string name="settings_summary_personal_dictionary" tools:ignore="MissingTranslation">Words you added</string>
     <string name="input_methods">Input Methods</string>
-    <string name="add_input_method">Add Input Method</string>
     <string name="addons">Addons</string>
-    <string name="conf">Configuration</string>
     <string name="global_options">Global Options</string>
-    <string name="behavior">Behavior</string>
     <string name="advanced">Advanced</string>
     <string name="ignore_sys_cursor">Ignore system cursor position</string>
     <string name="hide_key_config">Hide hotkey configurations</string>
@@ -48,8 +45,6 @@
     <string name="enable_ime_hint">Enable &lt;b>%1$s&lt;/b> in Language and input settings</string>
     <string name="select_ime">Select Input Method</string>
     <string name="select_ime_hint">Select &lt;b>%1$s&lt;/b> as your default input method</string>
-    <string name="setup_ai_suggestion_hint">Downloading the Gemma model (about 2.6GB) to your device lets it suggest the next sentence whenever you pause typing. All processing stays on the device and your text never leaves it. We recommend downloading over Wi-Fi.</string>
-    <string name="setup_ai_suggestion_button">Prepare model</string>
     <string name="next">Next</string>
     <string name="prev">Prev</string>
     <string name="done">Done</string>
@@ -62,7 +57,6 @@
     <string name="dict_already_exists">Dictionary already exists</string>
     <string name="invalid_dict">Invalid dictionary type</string>
     <string name="whether_import_dict">Would you like to import this dictionary?</string>
-    <string name="import_">Import</string>
     <string name="synced">Synced!</string>
     <string name="loading">Loading</string>
     <string name="clipboard_listening">Clipboard listening</string>
@@ -114,7 +108,6 @@
     <string name="source_code_summary" tools:ignore="MissingTranslation">Exact source tag, repository, and source archive for this build</string>
     <string name="source_not_configured" tools:ignore="MissingTranslation">Not configured for this build; public release is blocked</string>
     <string name="source_document" tools:ignore="MissingTranslation">SOURCE CODE FOR THIS BUILD\n\nRepository:\n%1$s\n\nExact source tag or ref:\n%2$s\n\nComplete source archive (including recursive submodules and build scripts):\n%3$s\n\nBuild Git hash:\n%4$s\n\nA public binary release must publish the complete source archive, its SHA-256 checksum, and its SBOM at the same download location under the exact same tag.</string>
-    <string name="github_repo">GitHub repository</string>
     <string name="expanded_candidate_grid_span_count">Number of expanded candidate spans in grid style</string>
     <string name="no_config_options">Currently no configuration options are available</string>
     <string name="unimplemented_type">⛔ Unimplemented type</string>
@@ -128,7 +121,6 @@
     <string name="app_crash_message">Sorry, but we bring you some logs to investigate.</string>
     <string name="crash_logs">Crash logs</string>
     <string name="verbose_log">Verbose logging</string>
-    <string name="verbose_log_summary">Requires restart</string>
     <string name="removed_x">Removed %1$s</string>
     <string name="added_x">Added %1$s</string>
     <string name="edited_x">Edited %1$s</string>
@@ -136,7 +128,6 @@
     <string name="keyboard_long_press_delay">Key long press delay</string>
     <string name="quickphrase_editor">Quick Phrase Editor</string>
     <string name="quickphrase_already_exists">Quick phrase already exists</string>
-    <string name="invalid_quickphrase">Invalid quick phrase type</string>
     <string name="create_new">Create new</string>
     <string name="name">Name</string>
     <string name="reset">Reset</string>
@@ -155,7 +146,6 @@
     <string name="key_vertical_margin">Key vertical margin</string>
     <string name="configure">Configure</string>
     <string name="choose_image">Choose Image…</string>
-    <string name="dark_keys">Dark Keys</string>
     <string name="recrop_image">Re-Crop Image</string>
     <string name="navbar_background">Navigation bar background</string>
     <string name="navbar_bkg_none">No background</string>
@@ -174,7 +164,6 @@
     <string name="exception_quickphrase_parse">Failed to parse quick phrase line: %1$s</string>
     <string name="exception_quickphrase_filename">The filename extension of %1$s does not indicate a quick phrase</string>
     <string name="exception_theme_filename">The filename extension of %1$s does not indicate a theme</string>
-    <string name="exception_theme_unknown">Theme %1$s is unknown</string>
     <string name="exception_libime_dict_filename">The filename extension of %1$s does not indicate a libime dict</string>
     <string name="exception_text_dict_filename">The filename extension of %1$s does not indicate a text dict</string>
     <string name="exception_sougou_dict_filename">The filename extension of %1$s does not indicate a sogou dict</string>
@@ -188,16 +177,6 @@
     <string name="light_mode_theme">Light mode theme</string>
     <string name="dark_mode_theme">Dark mode theme</string>
     <string name="new_theme">New theme</string>
-    <string name="theme_preset_hanji">Hanji Light (Warm Paper &amp; Ink)</string>
-    <string name="theme_preset_dancheong">Dancheong Dark (Night Ink &amp; Jade)</string>
-    <string name="theme_preset_baegja">Baegja Light (White Porcelain &amp; Cobalt)</string>
-    <string name="theme_preset_cheongja">Cheongja Dark (Goryeo Celadon &amp; Gold)</string>
-    <string name="theme_preset_midnight_oled">Midnight OLED (Pure Black &amp; Neon Jade)</string>
-    <string name="theme_preset_seoul_mist">Seoul Mist (Frosted Slate Glass)</string>
-    <string name="theme_style_palette">Preset Palette</string>
-    <string name="theme_color_customization">Color &amp; Style Customization</string>
-    <string name="theme_accent_key_color">Accent / Enter Key Color</string>
-    <string name="theme_keyboard_bg_color">Keyboard Surface Color</string>
     <string name="theme_key_bg_color">Keycap Background Color</string>
     <string name="theme_key_text_color">Keycap Text Color</string>
     <string name="theme_background_image">Background Image</string>
@@ -330,7 +309,6 @@
     <string name="theme_target_backspace">Backspace</string>
     <string name="theme_target_shift">Shift</string>
     <string name="skip">Skip</string>
-    <string name="horizontal_candidate_growth">Stretch horizontal candidates to fill the remaining width</string>
     <string name="none">None</string>
     <string name="theme_migrated">Theme has been migrated to the current version</string>
     <string name="keep_keyboard_letters_uppercase">Keep keyboard letters uppercase</string>
@@ -482,12 +460,9 @@
     <string name="table_dict_replace_message">Dictionary of table-based input method \"%1$s\" exists. You may import a new dict and replace it.</string>
     <string name="lang_switch_key_behavior">Language switch key behavior</string>
     <string name="lang_switch_behavior_next_ime_app">Switch to next input method App</string>
-    <string name="cannot_be_empty">Cannot be empty</string>
     <string name="_cannot_be_empty">%1$s cannot be empty</string>
-    <string name="action_forget_candidate_word">Forget word</string>
     <string name="clipboard_mask_sensitive">Mask sensitive data (such as passwords)</string>
     <string name="open_rime_user_data_dir">Application data directory will be opened. RIME user data directory is located in \"data/rime\".</string>
-    <string name="restart_to_apply_settings">Application will restart to apply new settings. Proceed?</string>
     <string name="space_swipe_move_cursor">Swipe on space key to move cursor</string>
     <string name="please_wait">Please wait…</string>
     <string name="rotate">Rotate</string>
@@ -569,7 +544,6 @@
     <string name="hide_unsupported_emojis">Hide unsupported Emojis</string>
     <string name="key_border_stroke">Enable stroke for key border</string>
     <string name="preferred_voice_input">Preferred voice input</string>
-    <string name="edit_text_playground">EditText Playground</string>
     <!-- GIF MVP is localized for the product's Korean target and falls back to English elsewhere. -->
     <string name="gif_search" tools:ignore="MissingTranslation">GIF search</string>
     <string name="gif_recommended" tools:ignore="MissingTranslation">Recommended GIFs</string>
@@ -592,7 +566,6 @@
     <string name="gif_private_disabled" tools:ignore="MissingTranslation">GIF search is disabled in password and private fields</string>
     <string name="gif_editor_changed" tools:ignore="MissingTranslation">The input field changed. Select the GIF again.</string>
     <string name="gif_query_inline_hint" tools:ignore="MissingTranslation">Type a GIF search</string>
-    <string name="gif_query_clear" tools:ignore="MissingTranslation">Clear</string>
     <string name="gif_search_action" tools:ignore="MissingTranslation">Search</string>
     <string name="gif_disclosure_noto" tools:ignore="MissingTranslation">The catalog and media are downloaded from Google Fonts. Search terms are matched only on this device, but connection information such as your IP address is visible to Google Fonts.</string>
     <string name="gif_disclosure_klipy" tools:ignore="MissingTranslation">Your search term and connection information such as your IP address are sent to KLIPY; selected media is loaded from the provider’s media host.</string>
@@ -610,9 +583,7 @@
     <string name="gif_keyword_celebrate" tools:ignore="MissingTranslation">Celebrate</string>
     <string name="gif_keyword_laugh" tools:ignore="MissingTranslation">Laugh</string>
     <string name="gif_keyword_love" tools:ignore="MissingTranslation">Love</string>
-    <string name="gif_keyword_applause" tools:ignore="MissingTranslation">Applause</string>
     <string name="gif_keyword_thanks" tools:ignore="MissingTranslation">Thanks</string>
-    <string name="gif_keyword_surprise" tools:ignore="MissingTranslation">Surprise</string>
     <string name="gif_keyword_angry" tools:ignore="MissingTranslation">Angry</string>
     <string name="gif_keyword_sad" tools:ignore="MissingTranslation">Sad</string>
     <string name="typo_recovery" tools:ignore="MissingTranslation">Korean/English typo recovery</string>
@@ -690,10 +661,6 @@
     <string name="ai_setup_action" tools:ignore="MissingTranslation">Set up</string>
     <string name="privacy_ai" tools:ignore="MissingTranslation">Privacy &amp; AI</string>
     <string name="privacy_network_controls" tools:ignore="MissingTranslation">Network controls</string>
-    <plurals name="ai_setup_computers_found" tools:ignore="MissingTranslation">
-        <item quantity="one">%1$d computer found</item>
-        <item quantity="other">%1$d computers found</item>
-    </plurals>
     <string name="privacy_local_data" tools:ignore="MissingTranslation">Local data</string>
     <string name="gif_provider_settings" tools:ignore="MissingTranslation">GIF provider</string>
     <string name="gif_provider_selection_title" tools:ignore="MissingTranslation">GIF source</string>
@@ -925,7 +892,6 @@
     <string name="ocr_commit_failed" tools:ignore="MissingTranslation">Insertion failed. No second insertion or clipboard fallback was attempted.</string>
     <string name="blocked_offline_mode" tools:ignore="MissingTranslation">Full offline mode is on, so this feature is unavailable.</string>
     <string name="blocked_app_network_policy" tools:ignore="MissingTranslation">This app\'s keyboard profile blocks network features.</string>
-    <string name="blocked_app_ai_policy" tools:ignore="MissingTranslation">This app\'s keyboard profile blocks AI writing.</string>
     <string name="cta_open_offline_mode" tools:ignore="MissingTranslation">Open offline mode setting</string>
     <string name="cta_open_app_profile" tools:ignore="MissingTranslation">Open app profile settings</string>
     <string name="cta_open_voice_setup" tools:ignore="MissingTranslation">Open voice connection settings</string>
@@ -936,17 +902,11 @@
     <string name="typing_dna_last_learned" tools:ignore="MissingTranslation">Last learned %1$s</string>
     <string name="typing_dna_card_ngram_suffix" tools:ignore="MissingTranslation"> · Learned words %1$d</string>
     <string name="typing_dna_card_pending_suffix" tools:ignore="MissingTranslation"> · pending %1$d</string>
-    <string name="typing_dna_card_title" tools:ignore="MissingTranslation">AI My Language Vault Status</string>
     <string name="typing_dna_card_hardware_suffix" tools:ignore="MissingTranslation"> · 🔒 Hardware encrypted</string>
     <string name="vault_title" tools:ignore="MissingTranslation">My Language Vault</string>
-    <string name="vault_level_title" tools:ignore="MissingTranslation">Lv.%1$d | AI coexisting user</string>
-    <string name="vault_level_description" tools:ignore="MissingTranslation">The device records word connections and speaking style from the sentences you enter. Levels increase by analyzed sentence count.</string>
     <string name="vault_level_number" tools:ignore="MissingTranslation">Lv.%1$d</string>
     <string name="vault_level_content_description" tools:ignore="MissingTranslation">Learning level %1$d</string>
     <string name="vault_level_progress_max" tools:ignore="MissingTranslation">Maximum level reached · continuing to record analyzed sentences</string>
-    <string name="vault_widget_title" tools:ignore="MissingTranslation">내 언어 금고 위젯</string>
-    <string name="vault_widget_prompt" tools:ignore="MissingTranslation">홈 화면에서 레벨, 진행률, 분석 문장 수를 바로 볼 수 있는 위젯을 추가할까요?</string>
-    <string name="vault_widget_add" tools:ignore="MissingTranslation">추가</string>
     <string name="vault_level_progress_next" tools:ignore="MissingTranslation">%2$d more sentences to Lv.%1$d</string>
     <string name="vault_security_title" tools:ignore="MissingTranslation">Encrypted with this device\'s hardware key</string>
     <string name="vault_security_strongbox" tools:ignore="MissingTranslation">StrongBox secure chip</string>
@@ -971,9 +931,6 @@
     <string name="vault_timeline_summary_preview" tools:ignore="MissingTranslation">0 sentences in the last 30 days · daily maximum 0</string>
     <string name="vault_timeline_empty" tools:ignore="MissingTranslation">No learned sentences have been recorded yet. Enter and complete a sentence to add one.</string>
     <string name="vault_category_title" tools:ignore="MissingTranslation">By app category</string>
-    <string name="vault_category_messenger" tools:ignore="MissingTranslation">Messenger</string>
-    <string name="vault_category_work" tools:ignore="MissingTranslation">Work</string>
-    <string name="vault_category_general" tools:ignore="MissingTranslation">General</string>
     <string name="persona_label_messenger" tools:ignore="MissingTranslation">Messenger</string>
     <string name="persona_label_work" tools:ignore="MissingTranslation">Work</string>
     <string name="persona_label_email" tools:ignore="MissingTranslation">Email</string>
@@ -1013,6 +970,7 @@
     <string name="vault_feedback_personal_line" tools:ignore="MissingTranslation">%1$d%% of those came from your own writing</string>
     <string name="vault_style_title" tools:ignore="MissingTranslation">My style</string>
     <string name="vault_style_categories_line" tools:ignore="MissingTranslation">Mostly used in: %1$s</string>
+    <string name="vault_style_report_row" tools:ignore="MissingTranslation">View my style report</string>
     <string name="vault_storage_title" tools:ignore="MissingTranslation">Storage and backup</string>
     <string name="vault_storage_lock_line" tools:ignore="MissingTranslation">🔒 Kept encrypted on this phone only</string>
     <string name="vault_storage_info_content_description" tools:ignore="MissingTranslation">More details</string>
@@ -1054,7 +1012,6 @@
     <string name="typing_dna_chart_accessibility_privacy" tools:ignore="MissingTranslation">On-device privacy %1$d percent.</string>
 
     <string name="style_report_title" tools:ignore="MissingTranslation">My style report</string>
-    <string name="vault_style_report_row" tools:ignore="MissingTranslation">View my style report</string>
     <string name="style_report_empty_message" tools:ignore="MissingTranslation">Write a few more sentences and your style will show up here</string>
     <string name="style_report_accumulation_footer" tools:ignore="MissingTranslation">The more you write, the more accurate Saegeul gets</string>
     <string name="style_report_recent_title" tools:ignore="MissingTranslation">Last 30 days</string>
@@ -1065,17 +1022,9 @@
     <string name="style_report_endings_title" tools:ignore="MissingTranslation">Endings you often use</string>
     <string name="style_report_footer_privacy" tools:ignore="MissingTranslation">This report is only ever made on this phone</string>
 
-    <string name="enrich_now_button" tools:ignore="MissingTranslation">Enrich now</string>
-    <string name="dashboard_graph_stats_line" tools:ignore="MissingTranslation">Knowledge graph: %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="enrichment_card_title" tools:ignore="MissingTranslation">LLM enrichment</string>
     <string name="enrichment_card_description" tools:ignore="MissingTranslation">It organizes relationships and topics in saved expressions to affect recommendation ranking.</string>
     <string name="enrichment_action" tools:ignore="MissingTranslation">Analyze and enrich with LLM</string>
-    <string name="enrichment_status_never" tools:ignore="MissingTranslation">LLM enrichment has not run yet</string>
-    <string name="enrichment_status_legacy" tools:ignore="MissingTranslation">Earlier enrichment results exist · no recent run record</string>
-    <string name="enrichment_status_running" tools:ignore="MissingTranslation">LLM enrichment is running…</string>
-    <string name="enrichment_status_queued" tools:ignore="MissingTranslation">Starting to build your relationship graph soon</string>
-    <string name="enrichment_status_running_chunk" tools:ignore="MissingTranslation">Processing batch %1$d of %2$d…</string>
-    <string name="enrichment_status_waiting_lease" tools:ignore="MissingTranslation">Waiting for Saegeul AI to finish preparing sentence material…</string>
 
     <string name="enrichment_state_queued_title" tools:ignore="MissingTranslation">Getting ready to start</string>
     <string name="enrichment_state_running_title" tools:ignore="MissingTranslation">Building your relationship graph</string>
@@ -1111,30 +1060,17 @@
     <string name="enrichment_pause_reason_screen_on" tools:ignore="MissingTranslation">The screen is on</string>
     <string name="enrichment_pause_reason_user_stopped" tools:ignore="MissingTranslation">You stopped it</string>
     <string name="enrichment_pause_reason_lease_wait_timeout" tools:ignore="MissingTranslation">Waited too long for a turn</string>
-    <string name="enrichment_pause_reason_unknown" tools:ignore="MissingTranslation">Paused for an unknown reason</string>
     <string name="enrichment_pause_reason_app_terminated" tools:ignore="MissingTranslation">Paused because the app restarted. Tap [Apply now] to continue.</string>
 
     <string name="enrichment_action_stop" tools:ignore="MissingTranslation">Stop</string>
     <string name="enrichment_action_apply_now" tools:ignore="MissingTranslation">Apply now</string>
     <string name="enrichment_action_prioritize_graph" tools:ignore="MissingTranslation">Build graph first</string>
-    <string name="enrichment_action_resume" tools:ignore="MissingTranslation">Resume</string>
-    <string name="enrichment_action_create" tools:ignore="MissingTranslation">Create</string>
     <string name="enrichment_action_open_model_management" tools:ignore="MissingTranslation">Open model management</string>
-    <string name="enrichment_action_retry" tools:ignore="MissingTranslation">Rebuild</string>
 
     <string name="enrichment_applied_today" tools:ignore="MissingTranslation">Applied today %1$s</string>
     <string name="enrichment_applied_yesterday" tools:ignore="MissingTranslation">Applied yesterday %1$s</string>
     <string name="enrichment_applied_date" tools:ignore="MissingTranslation">Applied %1$d/%2$d</string>
-    <string name="enrichment_status_succeeded" tools:ignore="MissingTranslation">LLM enrichment complete</string>
-    <string name="enrichment_status_partial" tools:ignore="MissingTranslation">Partially enriched · you can run it again</string>
-    <string name="enrichment_status_no_data" tools:ignore="MissingTranslation">There are no sentences to enrich yet</string>
     <string name="enrichment_status_failed" tools:ignore="MissingTranslation">Recent enrichment failed · you can try again</string>
-    <string name="enrichment_status_interrupted" tools:ignore="MissingTranslation">Enrichment was interrupted · please try again</string>
-    <string name="enrichment_graph_stats_last_applied" tools:ignore="MissingTranslation">Last applied %1$s\nCurrent graph: %2$d nodes · %3$d relations · %4$d topics</string>
-    <string name="enrichment_graph_stats_legacy" tools:ignore="MissingTranslation">Legacy graph saved %1$s\nCurrent graph: %2$d nodes · %3$d relations · %4$d topics</string>
-    <string name="enrichment_unavailable_offline" tools:ignore="MissingTranslation">LLM enrichment is unavailable in offline mode</string>
-    <string name="enrichment_unavailable_provider" tools:ignore="MissingTranslation">Connect an AI provider with an API key or OAuth to use sentence recommendations and LLM enrichment.</string>
-    <string name="enrichment_unavailable_oauth" tools:ignore="MissingTranslation">Sign in to your AI provider again to run LLM enrichment.</string>
     <string name="enrichment_unavailable_release_build" tools:ignore="MissingTranslation">Saegeul AI graph enrichment is not available in this build.</string>
     <string name="enrichment_setup_action" tools:ignore="MissingTranslation">AI connection settings</string>
     <string name="dashboard_loading_message" tools:ignore="MissingTranslation">Loading your language vault…</string>
@@ -1142,33 +1078,13 @@
     <string name="dashboard_loading_retry" tools:ignore="MissingTranslation">Try again</string>
     <string name="dashboard_sync_busy_message" tools:ignore="MissingTranslation">Analyzing sentences saved on this device…</string>
     <string name="dashboard_sync_failed" tools:ignore="MissingTranslation">Couldn\'t save the analyzed content. Please try again.</string>
-    <string name="enrich_offline_blocked" tools:ignore="MissingTranslation">Enrichment is unavailable in offline mode</string>
-    <string name="enrich_no_provider" tools:ignore="MissingTranslation">Connect your computer (AI provider) in Privacy &amp; AI settings first</string>
-    <string name="enrich_confirm_title" tools:ignore="MissingTranslation">Enrich personal knowledge graph</string>
-    <string name="enrich_confirm_message" tools:ignore="MissingTranslation">This sends sentences accumulated on this device (with personal data scrubbed) to your configured AI provider (your computer companion) to build a personal knowledge graph. The request is sent with store=false and is not retained. Continue?</string>
-    <string name="enrich_confirm_positive" tools:ignore="MissingTranslation">Enrich</string>
-    <string name="enrich_running" tools:ignore="MissingTranslation">Enriching…</string>
-    <string name="enrich_failed" tools:ignore="MissingTranslation">Enrichment failed</string>
-    <string name="enrich_done" tools:ignore="MissingTranslation">Enrichment complete: %1$d nodes · %2$d relations · %3$d topics</string>
-    <string name="enrich_no_data" tools:ignore="MissingTranslation">No learned sentences yet</string>
-    <string name="enrich_parse_failed" tools:ignore="MissingTranslation">Could not parse the enrichment result</string>
-    <string name="enrich_partial" tools:ignore="MissingTranslation">Partially enriched: %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="enrich_bg_title" tools:ignore="MissingTranslation">Analysis &amp; sync complete</string>
     <string name="enrich_bg_message" tools:ignore="MissingTranslation">AI enrichment will continue in the background. It can take up to a minute. You can leave this screen — you\'ll get a notification when it\'s done.</string>
-    <string name="enrich_notify_running" tools:ignore="MissingTranslation">Enriching your language vault…</string>
     <string name="enrich_notify_done" tools:ignore="MissingTranslation">Language vault enrichment complete · %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="enrich_notify_partial" tools:ignore="MissingTranslation">Language vault partially enriched · %1$d nodes · %2$d relations · %3$d topics</string>
     <string name="enrich_notify_no_data" tools:ignore="MissingTranslation">Not enough learned sentences yet to enrich</string>
-    <string name="enrich_notify_progress_chunk" tools:ignore="MissingTranslation">Processing piece %1$d of %2$d…</string>
     <string name="notify_channel_ai_progress" tools:ignore="MissingTranslation">AI background progress</string>
     <string name="notify_channel_ai_alerts" tools:ignore="MissingTranslation">AI action needed</string>
     <string name="sync_done_title" tools:ignore="MissingTranslation">Analysis and sync complete</string>
-    <string name="sync_llm_missing_message" tools:ignore="MissingTranslation">No AI provider is connected, so only analysis and sync ran. Connect your computer in Privacy &amp; AI settings to also run AI enrichment.</string>
-    <string name="sync_offline_message" tools:ignore="MissingTranslation">Offline mode is on, so AI enrichment did not run.</string>
-    <string name="sync_enriched_done" tools:ignore="MissingTranslation">Analysis, sync, and AI enrichment complete: %1$d nodes · %2$d relations · %3$d topics</string>
-    <string name="sync_done_prefix" tools:ignore="MissingTranslation">Analysis and sync complete, %1$s</string>
-    <string name="sync_level_never" tools:ignore="MissingTranslation">Not analyzed yet</string>
-    <string name="sync_level_sync_only" tools:ignore="MissingTranslation">Last run: analysis and sync only (no AI enrichment)</string>
-    <string name="sync_level_enriched" tools:ignore="MissingTranslation">Last run: AI enrichment complete · %1$s</string>
     <string name="typing_dna_persistence_failed" tools:ignore="MissingTranslation">Couldn\'t save your language profile. Please try again.</string>
 </resources>

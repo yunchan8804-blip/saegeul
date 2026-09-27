@@ -8,7 +8,6 @@ class UserTypingContextCollector(
     private val maxSentencesPerPackage: Int = 5,
     private val maxCharLength: Int = 300,
     private val minTriggerChars: Int = 6,
-    private val onTriggerAugmentation: (packageName: String, context: String) -> Unit = { _, _ -> },
     private val onSentenceCommitted: ((packageName: String, sentence: String) -> Unit)? = null,
     private val diagnostics: CollectionDiagnostics? = null
 ) {
@@ -116,17 +115,6 @@ class UserTypingContextCollector(
     @Synchronized
     fun flushAllPending(): Int {
         return pendingBufferMap.keys.toList().count { flushPending(it) }
-    }
-
-    @Synchronized
-    fun triggerNow(packageName: String): Boolean {
-        if (flushPending(packageName)) return true
-        val context = getRecentContext(packageName)
-        if (context.length >= minTriggerChars) {
-            onTriggerAugmentation(packageName, context)
-            return true
-        }
-        return false
     }
 
     @Synchronized
@@ -263,9 +251,6 @@ class UserTypingContextCollector(
         deque.addLast(sentence)
         while (deque.size > maxSentencesPerPackage) {
             deque.removeFirst()
-        }
-        if (sentence.length >= minTriggerChars) {
-            onTriggerAugmentation(packageName, getRecentContext(packageName))
         }
     }
 

@@ -21,7 +21,7 @@ enum class AiSourceKind {
     SurroundingEditor
 }
 
-/** Describes the exact user-visible scope sent to the writing provider. */
+/** Describes the exact user-visible scope sent to the on-device Gemma editor. */
 enum class AiSourceScope {
     Selection,
     EntireEditor,

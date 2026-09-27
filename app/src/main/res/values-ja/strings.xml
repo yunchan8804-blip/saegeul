@@ -4,11 +4,8 @@
     <string name="app_name_debug">Saegeul (デバッグ)</string>
     <string name="save">保存</string>
     <string name="input_methods">インプットメソッド</string>
-    <string name="add_input_method">インプットメソッドの追加</string>
     <string name="addons">アドオン</string>
-    <string name="conf">設定</string>
     <string name="global_options">全般オプション</string>
-    <string name="behavior">ふるまい</string>
     <string name="advanced">高度な設定</string>
     <string name="ignore_sys_cursor">システムカーソル位置を無視する</string>
     <string name="hide_key_config">ホットキー設定を隠す</string>
@@ -39,7 +36,6 @@
     <string name="dict_already_exists">辞書はすでに存在します</string>
     <string name="invalid_dict">辞書の種類が無効です</string>
     <string name="whether_import_dict">この辞書をインポートしますか？</string>
-    <string name="import_">インポート</string>
     <string name="synced">同期完了!</string>
     <string name="loading">ロード中</string>
     <string name="clipboard_listening">クリップボードリスニング</string>
@@ -71,7 +67,6 @@
     <string name="license">ライセンス</string>
     <string name="open_source_licenses">オープンソースライセンス</string>
     <string name="licenses_of_third_party_libraries">サードパーティライブラリのライセンス</string>
-    <string name="github_repo">GitHub リポジトリ</string>
     <string name="expanded_candidate_grid_span_count">グリッドスタイル拡張候補スパン数</string>
     <string name="no_config_options">現在、利用可能な設定オプションはありません</string>
     <string name="unimplemented_type">⛔ 未実装タイプ</string>
@@ -85,7 +80,6 @@
     <string name="app_crash_message">申し訳ありませんが、調査のためにいくつかのログをお届けします。</string>
     <string name="crash_logs">クラッシュログ</string>
     <string name="verbose_log">詳細な記録</string>
-    <string name="verbose_log_summary">再起動が必要です</string>
     <string name="removed_x">%1$s を削除しました</string>
     <string name="added_x">%1$s を追加しました</string>
     <string name="edited_x">%1$s を編集しました</string>
@@ -93,7 +87,6 @@
     <string name="keyboard_long_press_delay">キーの長押しの期間</string>
     <string name="quickphrase_editor">クイックフレーズエディター</string>
     <string name="quickphrase_already_exists">クイックフレーズはすでに存在します</string>
-    <string name="invalid_quickphrase">無効な値のクイックフレーズ</string>
     <string name="create_new">新規作成</string>
     <string name="name">名前</string>
     <string name="reset">リセット</string>
@@ -110,7 +103,6 @@
     <string name="key_vertical_margin">キーの上下間隔</string>
     <string name="configure">設定</string>
     <string name="choose_image">画像を選択</string>
-    <string name="dark_keys">黒字のキー</string>
     <string name="recrop_image">画像を切り取り直す</string>
     <string name="navbar_background">ナビゲーションバーの背景</string>
     <string name="navbar_bkg_none">背景なし</string>
@@ -128,7 +120,6 @@
     <string name="exception_quickphrase_parse">クイックフレーズの行の解析に失敗しました: %1$s</string>
     <string name="exception_quickphrase_filename">%1$s のファイル拡張子はクイックフレーズを示していません</string>
     <string name="exception_theme_filename">%1$s のファイル拡張子はテーマを示していません</string>
-    <string name="exception_theme_unknown">テーマ %1$s が不明です</string>
     <string name="exception_libime_dict_filename">%1$s のファイル拡張子はlibime辞書を示していません</string>
     <string name="exception_text_dict_filename">%1$s のファイル拡張子はテキスト辞書を示していません</string>
     <string name="exception_sougou_dict_filename">%1$s のファイル拡張子はsogou辞書を示していません</string>
@@ -143,7 +134,6 @@
     <string name="dark_mode_theme">ダークモードテーマ</string>
     <string name="new_theme">新規テーマ</string>
     <string name="skip">スキップ</string>
-    <string name="horizontal_candidate_growth">残りの幅に合わせるため水平候補を引き伸ばす</string>
     <string name="none">なし</string>
     <string name="theme_migrated">テーマは現在のバージョンに以降されました</string>
     <string name="keep_keyboard_letters_uppercase">キーボードの文字を大文字にする</string>
@@ -247,7 +237,6 @@
     <string name="table_dict_replace_message">Tableの辞書\"%1$s\"は存在します。新しい辞書をインポートして置き換えることができます。</string>
     <string name="lang_switch_key_behavior">言語切り替えキーの動作</string>
     <string name="lang_switch_behavior_next_ime_app">次のインプットメゾッドアプリに切り替える</string>
-    <string name="cannot_be_empty">空にできません</string>
     <string name="_cannot_be_empty">%1$s を空にできません</string>
     <string name="rotate">右回転</string>
     <string name="flip">反転</string>

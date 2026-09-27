@@ -13,9 +13,7 @@
     <string name="gemma_vault_manual_description">자동 보강보다 많은 문장을 한 번에 준비합니다. 기기 상태에 따라 일찍 멈출 수 있습니다.</string>
     <string name="gemma_vault_stop">보강 중지</string>
     <string name="gemma_vault_stop_notice">자동 보강도 함께 꺼집니다.</string>
-    <string name="gemma_vault_model_prepare">Gemma 모델 준비</string>
     <string name="gemma_vault_model">모델 관리</string>
-    <string name="gemma_vault_manual_scheduled">Gemma 문장 보강을 예약했습니다.</string>
     <string name="gemma_vault_manual_status">문장 보강이 예약되었습니다. %1$s</string>
     <string name="gemma_vault_state_read_failed">Gemma 준비 상태를 읽지 못했습니다. 잠시 뒤 다시 확인하세요.</string>
     <string name="gemma_vault_action_failed">Gemma 문장 보강 요청을 완료하지 못했습니다. 다시 시도하세요.</string>
@@ -23,6 +21,4 @@
     <string name="gemma_vault_personal_sync_completed">개인 입력을 반영했습니다. 분석 문장 %1$d개</string>
     <string name="gemma_vault_personal_sync_no_new">새로 반영할 개인 입력이 없습니다. 분석 문장 %1$d개</string>
     <string name="gemma_vault_personal_sync_failed">개인 입력을 반영하지 못했습니다. 다시 시도하세요.</string>
-    <string name="gemma_vault_personal_graph_title">개인 그래프</string>
-    <string name="gemma_vault_personal_graph_description">기기에 반영한 개인 입력의 통계를 보여줍니다.</string>
 </resources>

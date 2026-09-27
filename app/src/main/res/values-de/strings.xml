@@ -4,11 +4,8 @@
     <string name="app_name_debug">Saegeul (Debug)</string>
     <string name="save">Speichern</string>
     <string name="input_methods">Eingabemethoden</string>
-    <string name="add_input_method">Eingabemethode hinzufügen</string>
     <string name="addons">Addons</string>
-    <string name="conf">Konfiguration</string>
     <string name="global_options">Globale Optionen</string>
-    <string name="behavior">Verhalten</string>
     <string name="advanced">Erweitert</string>
     <string name="ignore_sys_cursor">Position des Cursors ignorieren</string>
     <string name="_not_available_">(Nicht verfügbar)</string>
@@ -37,7 +34,6 @@
     <string name="dict_already_exists">Wörterbuch bereits vorhanden</string>
     <string name="invalid_dict">Ungültiger Typ des Wörterbuchs</string>
     <string name="whether_import_dict">Wollen Sie dieses Wörterbuch importieren?</string>
-    <string name="import_">Importieren</string>
     <string name="synced">Synchronisiert!</string>
     <string name="loading">Wird geladen</string>
     <string name="clipboard_listening">Clipboard zeigen</string>
@@ -64,7 +60,6 @@
     <string name="license">Lizenz</string>
     <string name="open_source_licenses">Open Source Lizenzen</string>
     <string name="licenses_of_third_party_libraries">Lizenzen für Bibliotheken von Drittanbietern</string>
-    <string name="github_repo">GitHub-Repositorium</string>
     <string name="no_config_options">Gegenwärtig keine Optionen zur Konfiguration verfügbar</string>
     <string name="unimplemented_type">⛔ Typ nicht implementiert</string>
     <string name="select">Auswählen</string>
@@ -76,7 +71,6 @@
     <string name="app_crash_message">Entschuldigung, bitte untersuche die Logs</string>
     <string name="crash_logs">Absturzprotokolle</string>
     <string name="verbose_log">Ausführliche Protokollierung</string>
-    <string name="verbose_log_summary">Erfordert Neustart</string>
     <string name="removed_x">%1$s entfernt</string>
     <string name="added_x">%1$s hinzugefügt</string>
     <string name="edited_x">%1$s bearbeitet</string>
@@ -95,7 +89,6 @@
     <string name="key_horizontal_margin">Horizontaler Tastenrand</string>
     <string name="key_vertical_margin">Vertikaler Tastenrand</string>
     <string name="choose_image">Bild wählen ...</string>
-    <string name="dark_keys">Dunkle Tasten</string>
     <string name="recrop_image">Bild neu zuschneiden</string>
     <string name="navbar_background">Hintergrund der Navigationsleiste</string>
     <string name="navbar_bkg_none">Kein Hintergrund</string>
@@ -103,7 +96,6 @@
     <string name="punctuation_pos_top_right">Oben rechts</string>
     <string name="disable_animation">Animation deaktivieren</string>
     <string name="import_from_file">Aus Dataei importieren ...</string>
-    <string name="exception_theme_unknown">Thema %1$s ist unbekannt</string>
     <string name="exception_theme_json">Kann json-Thema nicht finden</string>
     <string name="light_mode_theme">Thema für hellen Modus</string>
     <string name="dark_mode_theme">Thema für dunklen Modus</string>

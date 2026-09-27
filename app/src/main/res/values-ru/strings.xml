@@ -4,11 +4,8 @@
     <string name="app_name_debug">Saegeul (Отладка)</string>
     <string name="save">Сохранить</string>
     <string name="input_methods">Методы ввода</string>
-    <string name="add_input_method">Добавить метод ввода</string>
     <string name="addons">Дополнения</string>
-    <string name="conf">Конфигурация</string>
     <string name="global_options">Глобальные параметры</string>
-    <string name="behavior">Поведение</string>
     <string name="advanced">Расширенное</string>
     <string name="ignore_sys_cursor">Игнорировать позицию системного курсора</string>
     <string name="hide_key_config">Скрыть конфигурации горячих клавиш</string>
@@ -40,7 +37,6 @@
     <string name="dict_already_exists">Словарь уже существует</string>
     <string name="invalid_dict">Неверный тип словаря</string>
     <string name="whether_import_dict">Хотите импортировать этот словарь?</string>
-    <string name="import_">Импорт</string>
     <string name="synced">Синхронизировано!</string>
     <string name="loading">Загрузка</string>
     <string name="clipboard_listening">Прослушивание буфера обмена</string>
@@ -72,7 +68,6 @@
     <string name="license">Лицензия</string>
     <string name="open_source_licenses">Лицензии с открытым исходным кодом</string>
     <string name="licenses_of_third_party_libraries">Лицензии сторонних библиотек</string>
-    <string name="github_repo">Репозиторий GitHub</string>
     <string name="expanded_candidate_grid_span_count">Увеличение количества столбцов слов-кандидатов при использовании стиля таблицы</string>
     <string name="no_config_options">В настоящее время параметры конфигурации недоступны</string>
     <string name="unimplemented_type">⛔ Нереализованный тип</string>
@@ -86,7 +81,6 @@
     <string name="app_crash_message">Извините, но мы предоставляем вам несколько журналов для изучения.</string>
     <string name="crash_logs">Журналы сбоев</string>
     <string name="verbose_log">Подробное ведение журнала</string>
-    <string name="verbose_log_summary">Требуется перезапуск</string>
     <string name="removed_x">Удалено %1$s</string>
     <string name="added_x">Добавлено %1$s</string>
     <string name="edited_x">Отредактировано %1$s</string>
@@ -94,7 +88,6 @@
     <string name="keyboard_long_press_delay">Задержка при длительном нажатии клавиши</string>
     <string name="quickphrase_editor">Редактор быстрых фраз</string>
     <string name="quickphrase_already_exists">Быстрая фраза уже существует</string>
-    <string name="invalid_quickphrase">Неверный тип быстрой фразы</string>
     <string name="create_new">Создать новый</string>
     <string name="name">Имя</string>
     <string name="reset">Перезагрузить</string>
@@ -113,7 +106,6 @@
     <string name="key_vertical_margin">Вертикальное поле клавиш</string>
     <string name="configure">Настроить</string>
     <string name="choose_image">Выбрать изображение…</string>
-    <string name="dark_keys">Темные клавиши</string>
     <string name="recrop_image">Повторное кадрирование изображения</string>
     <string name="navbar_background">Фон панели навигации</string>
     <string name="navbar_bkg_none">Без фона</string>
@@ -132,7 +124,6 @@
     <string name="exception_quickphrase_parse">Не удалось разобрать строку быстрой фразы: %1$s</string>
     <string name="exception_quickphrase_filename">Расширение имени файла %1$s не указывает на быструю фразу</string>
     <string name="exception_theme_filename">Расширение имени файла %1$s не указывает на тему</string>
-    <string name="exception_theme_unknown">Тема %1$s неизвестна</string>
     <string name="exception_libime_dict_filename">Расширение имени файла %1$s не указывает на словарь libime</string>
     <string name="exception_text_dict_filename">Расширение имени файла %1$s не указывает на текстовый словарь</string>
     <string name="exception_sougou_dict_filename">Расширение имени файла %1$s не указывает на словарь sogou</string>
@@ -147,7 +138,6 @@
     <string name="dark_mode_theme">Темная тема</string>
     <string name="new_theme">Новая тема</string>
     <string name="skip">Пропустить</string>
-    <string name="horizontal_candidate_growth">Растянуть кандидаты по горизонтали, чтобы заполнить оставшуюся ширину</string>
     <string name="none">Нет</string>
     <string name="theme_migrated">Тема перенесена в текущую версию</string>
     <string name="keep_keyboard_letters_uppercase">Сохранять буквы клавиатуры прописными</string>
@@ -256,12 +246,9 @@
     <string name="table_dict_replace_message">Словарь кодовой таблицы \"%1$s\" существует. Вы можете импортировать новый словарь и заменить его.</string>
     <string name="lang_switch_key_behavior">Поведение клавиши переключения языка</string>
     <string name="lang_switch_behavior_next_ime_app">Переключиться на следующий метод ввода</string>
-    <string name="cannot_be_empty">Не может быть пустым</string>
     <string name="_cannot_be_empty">%1$s не может быть пустым</string>
-    <string name="action_forget_candidate_word">Забыть слово</string>
     <string name="clipboard_mask_sensitive">Маскировать конфиденциальные данные (например, пароли).</string>
     <string name="open_rime_user_data_dir">Будет открыт каталог данных приложения. Каталог пользовательских данных RIME находится в директории \"data/rime\".</string>
-    <string name="restart_to_apply_settings">Для применения новых настроек, приложение будет перезапущено. Продолжить?</string>
     <string name="space_swipe_move_cursor">Провести по клавише пробела, чтобы переместить курсор</string>
     <string name="please_wait">Пожалуйста, подождите…</string>
     <string name="rotate">Повернуть</string>
