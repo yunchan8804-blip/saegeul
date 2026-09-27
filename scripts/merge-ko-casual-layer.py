@@ -97,16 +97,38 @@ def read_web_pack(pack: Path):
     return uni, bi, tri
 
 
-def casual_counts(train_runs: list[list[str]], nextword_path: Path, web_uni: dict[str, int]):
+def nsmc_sentences(tsv_path: Path) -> list[list[str]]:
+    """NSMC (e9t/nsmc, CC0) review texts. Human-written casual Korean; movie-domain heavy."""
+    runs: list[list[str]] = []
+    with tsv_path.open(encoding="utf-8") as f:
+        next(f)
+        for line in f:
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) >= 2:
+                runs.extend(sentence_runs(parts[1]))
+    return runs
+
+
+def casual_counts(
+    train_runs: list[list[str]],
+    nextword_path: Path,
+    web_uni: dict[str, int],
+    extra_runs: list[list[str]] = (),
+    extra_weight: float = 0.0,
+):
     uni: Counter = Counter()
     bi: dict[str, Counter] = defaultdict(Counter)
     tri: dict[tuple[str, str], Counter] = defaultdict(Counter)
-    for run in train_runs:
-        uni.update(run)
+    weighted = [(run, 1.0) for run in train_runs]
+    if extra_weight > 0:
+        weighted += [(run, extra_weight) for run in extra_runs]
+    for run, w in weighted:
+        for word in run:
+            uni[word] += w
         for i in range(1, len(run)):
-            bi[run[i - 1]][run[i]] += 1
+            bi[run[i - 1]][run[i]] += w
         for i in range(2, len(run)):
-            tri[(run[i - 2], run[i - 1])][run[i]] += 1
+            tri[(run[i - 2], run[i - 1])][run[i]] += w
     known = set(sorted(web_uni, key=lambda w: -web_uni[w])[:CURATED_WEB_RANK_LIMIT])
     curated = 0
     for line in nextword_path.read_text(encoding="utf-8").splitlines():
@@ -264,16 +286,19 @@ def main() -> None:
     parser.add_argument("--k", type=float, default=0.0)
     parser.add_argument("--scale", type=float, default=0.0)
     parser.add_argument("--out-dir", type=Path)
+    parser.add_argument("--nsmc", type=Path, help="NSMC ratings_train.txt (CC0) as an extra casual source")
+    parser.add_argument("--nsmc-weight", type=float, default=0.0, help="count multiplier for NSMC sentences (0 = off)")
     args = parser.parse_args()
 
     web_uni, web_bi, web_tri = read_web_pack(args.web_pack)
     train = chatbot_sentences(args.chatbot_csv, holdout=False)
     holdout = chatbot_sentences(args.chatbot_csv, holdout=True)
-    c_uni, c_bi, c_tri, curated = casual_counts(train, args.nextword, web_uni)
+    extra = nsmc_sentences(args.nsmc) if args.nsmc and args.nsmc_weight > 0 else []
+    c_uni, c_bi, c_tri, curated = casual_counts(train, args.nextword, web_uni, extra, args.nsmc_weight)
     print(
         f"casual: train_sentences={len(train)} holdout_sentences={len(holdout)} "
         f"uni={len(c_uni)} bi_prev={len(c_bi)} bi_pairs={sum(len(v) for v in c_bi.values())} "
-        f"tri_pairs={len(c_tri)} curated_pairs={curated}",
+        f"tri_pairs={len(c_tri)} curated_pairs={curated} nsmc_sentences={len(extra)} nsmc_weight={args.nsmc_weight:g}",
         file=sys.stderr,
     )
 

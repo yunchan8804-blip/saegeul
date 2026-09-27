@@ -78,6 +78,9 @@ from typing import Iterator
 
 import pyarrow.parquet as pq
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ko_doc_quality import assess as assess_document  # noqa: E402
+
 try:
     import psutil
 except ImportError:  # pragma: no cover - psutil is installed in the scratchpad venv
@@ -440,6 +443,11 @@ def main() -> None:
     parser.add_argument("--max-tri-entries", type=int, default=6_000_000)
     parser.add_argument("--prune-check-interval-docs", type=int, default=5000)
     parser.add_argument("--sample-seed", type=int, default=20260924)
+    parser.add_argument(
+        "--no-doc-filter",
+        action="store_true",
+        help="count every document (skip the spam/contact/commercial/repetitive gate in ko_doc_quality.py)",
+    )
     args = parser.parse_args()
 
     t0 = time.time()
@@ -448,7 +456,13 @@ def main() -> None:
 
     counter = NgramCounter(args.max_bi_entries, args.max_tri_entries, args.prune_check_interval_docs)
     last_report = time.time()
+    doc_filter_counts: dict[str, int] = {}
     for text in iter_shard_texts(args.shard):
+        if not args.no_doc_filter:
+            verdict = assess_document(text)
+            doc_filter_counts[verdict.reason] = doc_filter_counts.get(verdict.reason, 0) + 1
+            if not verdict.keep:
+                continue
         counter.add_document(text)
         if counter.valid_words_seen >= args.target_words:
             break
@@ -503,6 +517,7 @@ def main() -> None:
         "shard_path": str(args.shard),
         "shard_sha256": shard_sha256,
         "docs_processed": counter.docs_seen,
+        "doc_filter": "off" if args.no_doc_filter else doc_filter_counts,
         "valid_words_counted": counter.valid_words_seen,
         "sentences_total": counter.sentences_total,
         "sentences_short_always_counted": counter.sentences_short,
