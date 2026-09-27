@@ -66,6 +66,14 @@ android {
     namespace = "org.fcitx.fcitx5.android"
     testBuildType = if (releaseDeviceGate.get()) "release" else "debug"
 
+    testOptions {
+        unitTests.all {
+            // VaultBackupTest builds a >64MB export in memory to prove the size gate; the default
+            // 512MB test JVM heap runs out on CI runners.
+            it.maxHeapSize = "2g"
+        }
+    }
+
     defaultConfig {
         applicationId = ProductIdentity.applicationId
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
