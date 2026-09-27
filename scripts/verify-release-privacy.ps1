@@ -80,7 +80,7 @@ $stringNames = Invoke-ApkAnalyzer -Arguments @(
     $resolvedApk
 )
 $requiredDisclosureResources = @(
-    "ai_transmission_disclosure",
+    "gemma_install_consent_message",
     "voice_microphone_disclosure_title",
     "voice_microphone_disclosure_message",
     "voice_meeting_disclosure_title",
@@ -112,7 +112,6 @@ foreach ($requiredText in @(
     "random app identifier",
     "approximate location",
     "in-app search history",
-    "other user-generated content",
     "voice or sound recordings",
     "device or other ID",
     "app interactions"
