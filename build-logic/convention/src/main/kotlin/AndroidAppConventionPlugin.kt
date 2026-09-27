@@ -16,7 +16,6 @@ import org.gradle.api.internal.provider.Providers
 import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.withType
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 /**
  * The prototype of an Android Application
@@ -69,7 +68,6 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
                 resources {
                     excludes += setOf(
                         "/META-INF/*.version",
-                        "/META-INF/*.kotlin_module",  // cannot be excluded actually
                         "/META-INF/androidx/**",
                         "/DebugProbesKt.bin",
                         "/kotlin-tooling-metadata.json"
@@ -89,21 +87,6 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             doFirst {
                 valueField.set(appMetadata, Providers.notDefined<RegularFile>())
                 allInputFilesWithNameOnlyPathSensitivity.removeAll { true }
-            }
-        }
-
-        // try to remove <pkg_name>-<version_name>.kotlin_module, but it does not work ¯\_(ツ)_/¯
-        target.tasks.withType<KotlinCompile> {
-            doLast f@{
-                val ktClass = outputs.files.files.filter { it.path.contains("kotlin-classes") }
-                if (ktClass.isEmpty()) return@f
-                val metaInf = ktClass.first().resolve("META-INF")
-                if (!metaInf.exists() || !metaInf.isDirectory) return@f
-                metaInf.listFiles()?.forEach {
-                    if (it.name.endsWith(".kotlin_module")) {
-                        it.delete()
-                    }
-                }
             }
         }
 

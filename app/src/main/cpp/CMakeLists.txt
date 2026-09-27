@@ -13,14 +13,6 @@ set(CMAKE_MODULE_PATH ${FCITX5_CMAKE_MODULES} ${CMAKE_MODULE_PATH})
 find_package(Fcitx5Core MODULE)
 find_package(Fcitx5Module MODULE)
 
-find_package(libime REQUIRED CONFIG)
-get_target_property(LIBIME_CMAKE_MODULES libime::cmake INTERFACE_INCLUDE_DIRECTORIES)
-set(CMAKE_MODULE_PATH ${LIBIME_CMAKE_MODULES} ${CMAKE_MODULE_PATH})
-
-find_package(LibIMECore MODULE)
-find_package(LibIMEPinyin MODULE)
-find_package(LibIMETable MODULE)
-
 find_package(fcitx5-lua REQUIRED CONFIG)
 
 include("${FCITX_INSTALL_CMAKECONFIG_DIR}/Fcitx5Utils/Fcitx5CompilerSettings.cmake")
@@ -50,8 +42,6 @@ target_link_libraries(native-lib
         Fcitx5::Module::Clipboard
         Boost::headers
         Boost::iostreams
-        LibIME::Pinyin
-        LibIME::Table
         )
 
 # copy module libraries from dependency lib
@@ -69,5 +59,3 @@ add_custom_target(copy-fcitx5-modules
 
 # install prebuilt assets
 install(FILES "${PREBUILT_DIR}/spell-dict/en_dict.fscd" DESTINATION "${FCITX_INSTALL_PKGDATADIR}/spell" COMPONENT prebuilt-assets)
-install(DIRECTORY "${PREBUILT_DIR}/libime/table" DESTINATION "${FCITX_INSTALL_PKGDATADIR}" COMPONENT prebuilt-assets)
-install(DIRECTORY "${PREBUILT_DIR}/libime/data/" DESTINATION "${FCITX_INSTALL_DATADIR}/libime" COMPONENT prebuilt-assets)

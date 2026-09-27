@@ -8,7 +8,7 @@
 - git 커밋 작성자는 Yun Chan(저장된 이름·이메일)이다. 커밋 메시지에 AI가 작성했다는 문구, Co-Authored-By, Claude·Codex 언급을 넣지 않는다. 메시지는 짧게 쓴다.
 - PR 대상 브랜치는 `main`이다. 작업은 `YunChan/<topic>` 형식의 브랜치에서 한다. 커밋·push는 사용자가 요청할 때만 한다.
 - `.env`, 키스토어·서명 인증서, Play 콘솔 세션·쿠키, 광고 계정 정보 등 비밀은 커밋하지 않고 워커 프롬프트에도 넣지 않는다.
-- `git submodule status`에 나오는 서브모듈(`lib/fcitx5/**`, `lib/libime/**`, `plugin/hangul/src/main/cpp/fcitx5-hangul` 등)은 이 저장소에서 직접 수정하지 않는다. 필요하면 해당 포크 저장소에서 고치고 포인터만 갱신한다.
+- `git submodule status`에 나오는 서브모듈(`lib/fcitx5/**`, `plugin/hangul/src/main/cpp/fcitx5-hangul` 등)은 이 저장소에서 직접 수정하지 않는다. 필요하면 해당 포크 저장소에서 고치고 포인터만 갱신한다.
 - 빌드·개발 환경과 릴리스 절차의 기준 문서는 `docs/wiki/09-Developer-and-Build-Guide.md`다.
 
 # AI 에이전트 오케스트레이션 바이블 (절대 규칙)

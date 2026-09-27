@@ -8,7 +8,6 @@
 
 #include <memory>
 #include <future>
-#include <fstream>
 
 #include <android/log.h>
 
@@ -32,9 +31,6 @@
 #include <quickphrase_public.h>
 #include <unicode_public.h>
 #include <clipboard_public.h>
-
-#include <libime/pinyin/pinyindictionary.h>
-#include <libime/table/tablebaseddictionary.h>
 
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
@@ -533,10 +529,6 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
     const std::string data_home = fcitx::stringutils::joinPath(*extData_, "data");
     const std::string usr_share = fcitx::stringutils::joinPath(*appData_, "usr", "share");
     const std::string locale_dir = fcitx::stringutils::joinPath(usr_share, "locale");
-    const std::string libime_data = fcitx::stringutils::concat(
-            fcitx::stringutils::joinPath(*extData_, "data", "libime"), ":",
-            fcitx::stringutils::joinPath(usr_share, "libime")
-    );
     const std::string lua_path = fcitx::stringutils::concat(
             fcitx::stringutils::joinPath(data_home, "lua", "?.lua"), ";",
             fcitx::stringutils::joinPath(data_home, "lua", "?", "init.lua"), ";",
@@ -567,8 +559,6 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
     setenv("FCITX_DATA_HOME", data_home.c_str(), 1);
     // system StandardPath::Type::Addon
     setenv("FCITX_ADDON_DIRS", appLib_, 1);
-    // libime language model dir
-    setenv("LIBIME_MODEL_DIRS", libime_data.c_str(), 1);
     // user StandardPath::Type::Data
     setenv("XDG_DATA_HOME", data_home.c_str(), 1);
     // user StandardPath::Type::Cache
@@ -1156,55 +1146,6 @@ Java_org_fcitx_fcitx5_android_core_Key_create(JNIEnv *env, jclass clazz, jint sy
             *JString(env, key.toString(fcitx::KeyStringFormat::Portable)),
             *JString(env, key.toString(fcitx::KeyStringFormat::Localized))
     );
-}
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_org_fcitx_fcitx5_android_data_pinyin_PinyinDictManager_pinyinDictConv(JNIEnv *env, jclass clazz, jstring src, jstring dest, jboolean mode) {
-    using namespace libime;
-    PinyinDictionary dict;
-    try {
-        dict.load(PinyinDictionary::SystemDict, *CString(env, src),
-                  mode == JNI_TRUE ? PinyinDictFormat::Binary : PinyinDictFormat::Text);
-        std::ofstream out;
-        out.open(*CString(env, dest), std::ios::out | std::ios::binary);
-        dict.save(PinyinDictionary::SystemDict, out,
-                  mode == JNI_TRUE ? PinyinDictFormat::Text : PinyinDictFormat::Binary);
-    } catch (const std::exception &e) {
-        throwJavaException(env, e.what());
-    }
-}
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_org_fcitx_fcitx5_android_data_table_TableManager_tableDictConv(JNIEnv *env, jclass clazz, jstring src, jstring dest, jboolean mode) {
-    using namespace libime;
-    TableBasedDictionary dict;
-    try {
-        dict.load(*CString(env, src), mode == JNI_TRUE ? TableFormat::Binary : TableFormat::Text);
-        std::ofstream out;
-        out.open(*CString(env, dest), std::ios::out | std::ios::binary);
-        dict.save(out, mode == JNI_TRUE ? TableFormat::Text : TableFormat::Binary);
-    } catch (const std::exception &e) {
-        throwJavaException(env, e.what());
-    }
-}
-
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_org_fcitx_fcitx5_android_data_table_TableManager_checkTableDictFormat(JNIEnv *env, jclass clazz, jstring src, jboolean user) {
-    using namespace libime;
-    TableBasedDictionary dict;
-    try {
-        if (user == JNI_TRUE) {
-            dict.loadUser(CString(env, src), TableFormat::Binary);
-        } else {
-            dict.load(*CString(env, src), TableFormat::Binary);
-        }
-    } catch (const std::exception &e) {
-        throwJavaException(env, e.what());
-    }
-    return JNI_TRUE;
 }
 
 extern "C"

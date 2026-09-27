@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.addon
 
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.ui.main.settings.FcitxPreferenceFragment
@@ -16,22 +15,7 @@ class AddonConfigFragment : FcitxPreferenceFragment() {
 
     override fun getPageTitle(): String = args.name
 
-    override suspend fun obtainConfig(fcitx: FcitxAPI): RawConfig {
-        val addon = args.uniqueName
-        val raw = fcitx.getAddonConfig(addon)
-        if (addon == "table") {
-            // append android specific "Manage Table Input Methods" to config of table addon
-            raw.findByName("desc")?.findByName("TableGlobalConfig")?.let {
-                it.subItems = (it.subItems ?: emptyArray()) + RawConfig(
-                    "AndroidTable", subItems = arrayOf(
-                        RawConfig("Type", "External"),
-                        RawConfig("Description", getString(R.string.manage_table_im))
-                    )
-                )
-            }
-        }
-        return raw
-    }
+    override suspend fun obtainConfig(fcitx: FcitxAPI): RawConfig = fcitx.getAddonConfig(args.uniqueName)
 
     override suspend fun saveConfig(fcitx: FcitxAPI, newConfig: RawConfig) {
         fcitx.setAddonConfig(args.uniqueName, newConfig)

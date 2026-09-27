@@ -1,8 +1,5 @@
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.gradle.internal.tasks.L8DexDesugarLibTask
-import org.gradle.api.tasks.Copy
-import org.gradle.kotlin.dsl.configure
-import org.gradle.kotlin.dsl.register
 
 plugins {
     id("org.fcitx.fcitx5.android.app-convention")
@@ -126,8 +123,6 @@ android {
     buildFeatures {
         viewBinding = true
         resValues = true
-        buildConfig = true
-        aidl = true
     }
 
     buildTypes {
@@ -174,6 +169,7 @@ extensions.configure<ApplicationAndroidComponentsExtension> {
     onVariants { variant ->
         val variantName = variant.name.replaceFirstChar { it.uppercase() }
         if (variant.name == "debug" || variant.name == "release") {
+            val hangulJniDest = layout.buildDirectory.dir("hangulEngine/${variant.name}/jniLibs")
             val hangulJni = tasks.register<Copy>("bundleHangulEngineJni$variantName") {
                 group = "build"
                 description =
@@ -185,7 +181,29 @@ extensions.configure<ApplicationAndroidComponentsExtension> {
                             "strip${variantName}DebugSymbols/out/lib"
                     )
                 )
-                into(layout.buildDirectory.dir("hangulEngine/${variant.name}/jniLibs"))
+                into(hangulJniDest)
+                doLast {
+                    // AGP has changed this stripped-libs intermediate path before without notice
+                    // (see the CI NO-SOURCE incident noted below), which would silently ship an
+                    // APK/AAB without the Korean input engine. Fail the build instead.
+                    val expectedAbis = buildAbiOverride
+                        ?.split(",")
+                        ?.map(String::trim)
+                        ?.filter(String::isNotEmpty)
+                        ?: Versions.supportedABIs
+                    val destDir = hangulJniDest.get().asFile
+                    val missing = expectedAbis.filter {
+                        !destDir.resolve(it).resolve("libhangul.so").isFile
+                    }
+                    if (missing.isNotEmpty()) {
+                        throw GradleException(
+                            "Hangul engine native library (libhangul.so) is missing for " +
+                                "ABI(s) $missing under $destDir. The :plugin:hangul stripped " +
+                                "native libs path may have moved; check AGP's " +
+                                "intermediates/stripped_native_libs layout."
+                        )
+                    }
+                }
             }
             tasks.matching {
                 it.name == "merge${variantName}JniLibFolders" ||
@@ -209,8 +227,7 @@ tasks.withType<L8DexDesugarLibTask>().configureEach {
 fcitxComponent {
     includeLibs = listOf(
         "fcitx5",
-        "fcitx5-lua",
-        "libime"
+        "fcitx5-lua"
     )
     // Keep the first independent release focused on Korean input. These exclusions also remove
     // stale generated assets after switching from an older build that included Chinese Addons.
@@ -252,8 +269,20 @@ val bundleHangulEngineAssets = tasks.register<Copy>("bundleHangulEngineAssets") 
     }
     into(layout.projectDirectory.dir("src/main/assets"))
     val staleNativeNextWord = layout.projectDirectory.file("src/main/assets/$nativeNextWordAsset").asFile
+    val hangulAddonConf =
+        layout.projectDirectory.file("src/main/assets/usr/share/fcitx5/addon/hangul.conf").asFile
     doLast {
         staleNativeNextWord.delete()
+        // Same NO-SOURCE risk as bundleHangulEngineJni*: if :plugin:hangul's CMake install
+        // layout changes, this Copy task can silently find nothing to copy and ship a build
+        // where fcitx5 never even registers the Korean input method addon.
+        if (!hangulAddonConf.isFile) {
+            throw GradleException(
+                "Hangul engine addon descriptor is missing at $hangulAddonConf after " +
+                    "bundleHangulEngineAssets. :plugin:hangul's CMake install output may " +
+                    "have changed or produced no assets."
+            )
+        }
     }
     mustRunAfter("installFcitxComponent")
     mustRunAfter("deleteFcitxComponentExcludeFiles")
@@ -274,7 +303,6 @@ dependencies {
     ksp(project(":codegen"))
     implementation(project(":lib:fcitx5"))
     implementation(project(":lib:fcitx5-lua"))
-    implementation(project(":lib:libime"))
     implementation(project(":lib:common"))
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)
@@ -289,7 +317,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.livedata)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.common)
-    implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.navigation.fragment)
     implementation(libs.androidx.navigation.ui)
     implementation(libs.androidx.paging)
@@ -321,10 +348,10 @@ dependencies {
     implementation(libs.splitties.views.dsl.recyclerview)
     implementation(libs.splitties.views.recyclerview)
     implementation(libs.aboutlibraries.core)
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.13.1")
-    implementation("androidx.work:work-runtime:2.10.5")
+    implementation(libs.litertlm.android)
+    implementation(libs.androidx.work.runtime)
     testImplementation(libs.junit)
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.json)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.lifecycle.testing)
