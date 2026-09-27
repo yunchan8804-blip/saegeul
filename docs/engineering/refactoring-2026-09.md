@@ -48,3 +48,9 @@ detekt 1.23.8과 PMD CPD 7.13.0으로 `app/src/main/java`를 측정한 결과(�
 
 K(자판 수정) → R0 → R8 → R9 → R1·R4·R7(서로 다른 영역, 순차 검증) → R2·R3·R5 → R6 → R10 → R11.
 각 단위 뒤에 `./gradlew :app:testDebugUnitTest`와 `:app:assembleDebug`를 통과해야 다음으로 간다. R9·R6 뒤에는 실기기 입력 확인을 한다.
+
+## 진행 상황 (2026-09-28)
+
+- 끝남: 자판 버그 수정(K1~K19, 실기기 A35 확인), 추천 품질 정리 — 말투 판정 정본 `KoreanToneClassifier`, 붙여쓰기 검사 정본 `KoreanSpacingLint`, 모든 추천이 거치는 정본 관문 `SuggestionQualityGate`, 이유절 문법 규칙(ACC-01) 오탐 수정, 오타 사전 보강. 대량 점검 하네스 `PredictionQualitySweepTest`·`PersonalizedPredictionSweepTest`.
+- 진단 도구: `MobileLayoutTypingCampaignTest`(자판별 단어 타이핑, `CAMPAIGN=true`일 때만). 2,000어절 기준 천지인 97.6%, 천지인 플러스·단모음 100%, 베가 96.6%, 나랏글 97.7%, 모아키 78.9%. 남은 실패는 계획기가 ㄵ→ㄶ 같은 중간 상태를 버리는 한계와 실제 자판 문제가 섞여 있어 아직 가르지 않았다. 다음 라운드 첫 과제.
+- 남음: R0~R11 전부.
