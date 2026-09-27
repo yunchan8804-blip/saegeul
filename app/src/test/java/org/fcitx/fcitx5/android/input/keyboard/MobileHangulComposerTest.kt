@@ -8,29 +8,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Accumulates a composer's raw Dubeolsik key stream the way the real engine's input buffer
- * would: [MobileHangulComposer.Output.Backspace] drops the last key, [MobileHangulComposer.Output.Keys]
- * appends. This is the same simple model [RedTeamHangulEngineAutomataTest]'s VirtualDubeolsikBuffer
- * uses, kept local to this file rather than shared.
- */
-private class DubeolsikBuffer {
-    private val buffer = StringBuilder()
-
-    fun applyAll(outputs: List<MobileHangulComposer.Output>) {
-        outputs.forEach { output ->
-            when (output) {
-                MobileHangulComposer.Output.Backspace ->
-                    if (buffer.isNotEmpty()) buffer.deleteCharAt(buffer.length - 1)
-                MobileHangulComposer.Output.Space -> buffer.append(' ')
-                is MobileHangulComposer.Output.Keys -> buffer.append(output.value)
-            }
-        }
-    }
-
-    fun content(): String = buffer.toString()
-}
-
 class MobileHangulComposerTest {
     private val backspace = MobileHangulComposer.Output.Backspace
     private val space = MobileHangulComposer.Output.Space
@@ -213,16 +190,16 @@ class MobileHangulComposerTest {
     @Test
     fun `K1 backspace absorbs a lone accidental dot and leaves the completed glyph intact`() {
         val c = MobileHangulComposer()
-        val buffer = DubeolsikBuffer()
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
-        buffer.applyAll(c.press(MobileHangulComposer.Token.VowelI))
-        buffer.applyAll(c.press(MobileHangulComposer.Token.VowelDot))
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅇ')))
-        assertEquals("강", "rkd", buffer.content())
+        val engine = DubeolsikEngineSimulator()
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        engine.apply(c.press(MobileHangulComposer.Token.VowelI))
+        engine.apply(c.press(MobileHangulComposer.Token.VowelDot))
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅇ')))
+        assertEquals("강", engine.content())
 
         assertTrue(c.press(MobileHangulComposer.Token.VowelDot).isEmpty())
         assertTrue("Backspace must cancel the pending dot locally", c.cancelPendingDot())
-        assertEquals("강 stays intact in the backend", "rkd", buffer.content())
+        assertEquals("강 stays intact in the backend", "강", engine.content())
     }
 
     @Test
@@ -253,42 +230,44 @@ class MobileHangulComposerTest {
     }
 
     @Test
-    fun `K3 naratgul cross-key vowel replace retypes the base vowel instead of doubling it`() {
+    fun `K3 naratgul cross-key vowel replace lets go of ㅗ once it stops combining`() {
         val c = MobileHangulComposer(MobileHangulFamily.Other)
-        val buffer = DubeolsikBuffer()
+        val engine = DubeolsikEngineSimulator()
         val oU = MobileHangulComposer.Token.Cycle("nr_o", listOf('ㅗ', 'ㅜ'), naratgulVowelPair = true)
         val aEo = MobileHangulComposer.Token.Cycle("nr_a", listOf('ㅏ', 'ㅓ'), naratgulVowelPair = true)
 
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
-        buffer.applyAll(c.press(oU, 0))
-        buffer.applyAll(c.press(aEo, 100))
-        assertEquals("과", "rhk", buffer.content())
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        engine.apply(c.press(oU, 0))
+        engine.apply(c.press(aEo, 100))
+        assertEquals("과", engine.content())
 
-        buffer.applyAll(c.press(aEo, 200))
-        assertEquals("고어 (ㅗ kept, ㅓ replaces ㅏ)", "rhj", buffer.content())
+        // ㅓ does not combine with ㅗ: libhangul commits 고 right here, so ㄱ can never be lost.
+        engine.apply(c.press(aEo, 200))
+        assertEquals("고 committed, open 어", "고어", engine.content())
 
-        buffer.applyAll(c.press(aEo, 300))
-        assertEquals("back to 과", "rhk", buffer.content())
+        // ㅏ is selected again, but P (ㅗ) was already let go: it must not re-combine into 과.
+        engine.apply(c.press(aEo, 300))
+        assertEquals("고 stays committed, open swaps to 아", "고아", engine.content())
     }
 
     @Test
     fun `K3 danmoum single-vowel cycle never touches the syllable's own front vowel`() {
         val c = MobileHangulComposer(MobileHangulFamily.Other)
-        val buffer = DubeolsikBuffer()
+        val engine = DubeolsikEngineSimulator()
         val ae = MobileHangulComposer.Token.Cycle(
             "dm_ae", listOf('ㅐ', 'ㅒ'), MobileHangulComposer.SINGLE_VOWEL_MULTITAP_TIMEOUT_MS
         )
 
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅙ')))
-        assertEquals("괘", "rho", buffer.content())
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅙ')))
+        assertEquals("괘", engine.content())
 
-        buffer.applyAll(c.press(ae, 0))
-        assertEquals("rhoo", buffer.content())
+        engine.apply(c.press(ae, 0))
+        assertEquals("괘 committed, open 애 (ㅐ doesn't combine with ㅙ)", "괘애", engine.content())
 
         // Fast second tap (well within the 300ms window): the leading 괘 must stay untouched.
-        buffer.applyAll(c.press(ae, 100))
-        assertEquals("front 괘 (rho) kept, only the trailing vowel cycled", "rhoO", buffer.content())
+        engine.apply(c.press(ae, 100))
+        assertEquals("front 괘 kept, only the trailing vowel cycled to 얘", "괘얘", engine.content())
     }
 
     @Test
@@ -340,21 +319,29 @@ class MobileHangulComposerTest {
     @Test
     fun `K9 two-hand moakey dot then eu forms ㅗ`() {
         val c = MobileHangulComposer(MobileHangulFamily.Other)
-        val buffer = DubeolsikBuffer()
+        val engine = DubeolsikEngineSimulator()
         assertTrue(c.press(MobileHangulComposer.Token.VowelDot).isEmpty())
-        buffer.applyAll(c.press(MobileHangulComposer.Token.VowelEu))
-        assertEquals("ㅗ", "h", buffer.content())
+        engine.apply(c.press(MobileHangulComposer.Token.VowelEu))
+        assertEquals("오", engine.content())
     }
 
     @Test
-    fun `K9 one-hand moakey vowel key's ㅣ push combines ㅑ and ㅕ into ㅒ and ㅖ`() {
+    fun `K9 one-hand moakey vowel key's ㅣ push combines ㅑ and ㅕ into 얘 and 예`() {
         val c = MobileHangulComposer(MobileHangulFamily.Other)
-        val buffer = DubeolsikBuffer()
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅇ')))
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅑ')))
-        assertEquals("야", "di", buffer.content())
-        buffer.applyAll(c.press(MobileHangulComposer.Token.VowelI))
-        assertEquals("얘", "dO", buffer.content())
+        val engine = DubeolsikEngineSimulator()
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅇ')))
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅑ')))
+        assertEquals("야", engine.content())
+        engine.apply(c.press(MobileHangulComposer.Token.VowelI))
+        assertEquals("얘", engine.content())
+
+        c.reset()
+        val engine2 = DubeolsikEngineSimulator()
+        engine2.apply(c.press(MobileHangulComposer.Token.Jamo('ㅇ')))
+        engine2.apply(c.press(MobileHangulComposer.Token.Jamo('ㅕ')))
+        assertEquals("여", engine2.content())
+        engine2.apply(c.press(MobileHangulComposer.Token.VowelI))
+        assertEquals("예", engine2.content())
     }
 
     @Test
@@ -394,5 +381,55 @@ class MobileHangulComposerTest {
             listOf(backspace, keys("P")),
             c.press(MobileHangulComposer.Token.AddStroke)
         )
+    }
+
+    // Representative real words, verified against a real Dubeolsik automaton (K3's "검증 기준").
+
+    @Test
+    fun `word chunjiin ㆍ toggles a full compound vowel to spell 괘`() {
+        val c = MobileHangulComposer()
+        val engine = DubeolsikEngineSimulator()
+        val dot = MobileHangulComposer.Token.VowelDot
+        val eu = MobileHangulComposer.Token.VowelEu
+        val i = MobileHangulComposer.Token.VowelI
+
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        engine.apply(c.press(dot)) // pending
+        engine.apply(c.press(eu)) // ㅗ
+        engine.apply(c.press(i)) // ㅚ
+        engine.apply(c.press(dot)) // ㅘ
+        engine.apply(c.press(i)) // ㅙ
+        assertEquals("괘", engine.content())
+    }
+
+    @Test
+    fun `word naratgul cross-key vowel then add-stroke and 도깨비불 spell 과자`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val engine = DubeolsikEngineSimulator()
+        val oU = MobileHangulComposer.Token.Cycle("nr_o", listOf('ㅗ', 'ㅜ'), naratgulVowelPair = true)
+        val aEo = MobileHangulComposer.Token.Cycle("nr_a", listOf('ㅏ', 'ㅓ'), naratgulVowelPair = true)
+
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        engine.apply(c.press(oU, 0)) // ㅗ
+        engine.apply(c.press(aEo, 100)) // ㅗ+ㅏ -> ㅘ (과)
+        assertEquals("과", engine.content())
+
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅅ'))) // tentative batchim
+        engine.apply(c.press(MobileHangulComposer.Token.AddStroke)) // ㅅ -> ㅈ
+        engine.apply(c.press(aEo, 10_000)) // fresh press, far past any timeout: ㅏ
+        assertEquals("과자", engine.content())
+    }
+
+    @Test
+    fun `word moakey-style consecutive jamo presses spell 뷁 via real automaton combining`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val engine = DubeolsikEngineSimulator()
+
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅂ')))
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅜ')))
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅔ'))) // ㅜ+ㅔ -> ㅞ, done by the engine
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄹ')))
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ'))) // ㄹ+ㄱ -> ㄺ
+        assertEquals("뷁", engine.content())
     }
 }

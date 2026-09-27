@@ -452,28 +452,16 @@ class MobileHangulKeyboard(
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
 
-    private val backspaceSym = KeySym(FcitxKeyMapping.FcitxKey_BackSpace)
+    private val router = MobileHangulActionRouter(composer)
     private var preeditEmpty = true
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
-        when (action) {
-            is KeyAction.MobileHangulAction -> composer.press(action.token).forEach {
-                dispatch(it, source)
-            }
-            is KeyAction.MobileHangulSequenceAction -> action.tokens.forEach { token ->
-                composer.press(token).forEach { dispatch(it, source) }
-            }
-            is KeyAction.SymAction ->
-                if (action.sym == backspaceSym && composer.cancelPendingDot()) {
-                    // A lone accidental ㆍ tap is absorbed locally, protecting the preceding
-                    // completed glyph from an unrelated Backspace reaching the Dubeolsik backend.
-                } else {
-                    composer.reset()
-                    super.onAction(action, source)
-                }
-            else -> {
-                composer.reset()
-                super.onAction(action, source)
+        router.route(action).forEach { routed ->
+            when (routed) {
+                is MobileHangulActionRouter.RoutedAction.ComposerOutputs ->
+                    routed.outputs.forEach { dispatch(it, source) }
+                is MobileHangulActionRouter.RoutedAction.Forward ->
+                    super.onAction(routed.action, source)
             }
         }
         updateDotLabel()
@@ -496,7 +484,11 @@ class MobileHangulKeyboard(
     }
 
     private fun updateDotLabel() {
-        dotKeyView?.mainText?.text = if (composer.pendingDotCount() == 2) "‥" else "ㆍ"
+        val pending = composer.pendingDotCount()
+        dotKeyView?.mainText?.apply {
+            text = if (pending == 2) "‥" else "ㆍ"
+            setTextColor(if (pending > 0) theme.accentKeyTextColor else theme.keyTextColor)
+        }
     }
 
     override fun onAttach() {
