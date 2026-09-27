@@ -9,7 +9,7 @@
 2. [ios-dual-platform-plan.md](ios-dual-platform-plan.md) — 잠근 설계 D1–D8, 제품 결정 P1–P5
 3. [ios-port-backlog.md](ios-port-backlog.md) — 사람용 상세 백로그
 4. [ios-port-backlog.json](ios-port-backlog.json) — 기계용 TODO 정본 (`status` 필드)
-5. [korean-smart-input-ssot.md](korean-smart-input-ssot.md) 3절 iOS 단락
+5. [korean-smart-input-ssot.md](../korean-input/korean-smart-input-ssot.md) 3절 iOS 단락
 
 ## 다음 할 일 고르는 법
 

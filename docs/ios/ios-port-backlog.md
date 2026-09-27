@@ -71,7 +71,7 @@ P5 AI/컴패니언/Gemma는 1차 밖.
 - 인증서 조직 `YONGSEOK LEE` vs 제품 게시자 `Yun Chan`.
 - libhangul LGPL 정적 링크 vs 동적 프레임워크 vs 유니코드 클린룸.
 - 스파이크는 클린룸 Swift 조합기를 쓴다. libhangul 링크는 IOS-0-14.
-완료: `docs/ios-port-legal-notes.md` 초안 1페이지. 법률 자문 아님을 명시.
+완료: `docs/ios/ios-port-legal-notes.md` 초안 1페이지. 법률 자문 아님을 명시.
 
 ### IOS-0-03 맥 트리
 

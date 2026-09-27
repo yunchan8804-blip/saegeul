@@ -2,10 +2,10 @@
   "schema": "saegeul-ios-backlog/v1",
   "updated": "2026-09-13",
   "ssot": [
-    "docs/HANDOFF-ios-port.md",
-    "docs/ios-dual-platform-plan.md",
-    "docs/ios-port-backlog.md",
-    "docs/korean-smart-input-ssot.md"
+    "docs/ios/HANDOFF-ios-port.md",
+    "docs/ios/ios-dual-platform-plan.md",
+    "docs/ios/ios-port-backlog.md",
+    "docs/korean-input/korean-smart-input-ssot.md"
   ],
   "locked": [
     "D1",
@@ -33,7 +33,7 @@
     "host_bundle": "net.chanpaca.saegeul.ios",
     "keyboard_bundle": "net.chanpaca.saegeul.ios.keyboard"
   },
-  "next_agent": "Read docs/HANDOFF-ios-port.md. Pick smallest phase pending items whose blocked_by are all done. Do not change locked design. Update this json and ios-port-backlog.md together.",
+  "next_agent": "Read docs/ios/HANDOFF-ios-port.md. Pick smallest phase pending items whose blocked_by are all done. Do not change locked design. Update this json and ios-port-backlog.md together.",
   "items": [
     {
       "id": "IOS-0-00",
@@ -42,9 +42,9 @@
       "title": "백로그·인수인계 문서",
       "blocked_by": [],
       "files": [
-        "docs/HANDOFF-ios-port.md",
-        "docs/ios-port-backlog.md",
-        "docs/ios-port-backlog.json"
+        "docs/ios/HANDOFF-ios-port.md",
+        "docs/ios/ios-port-backlog.md",
+        "docs/ios/ios-port-backlog.json"
       ]
     },
     {
@@ -54,7 +54,7 @@
       "title": "맥 미니·아이폰 환경 실측",
       "blocked_by": [],
       "files": [
-        "docs/HANDOFF-ios-port.md"
+        "docs/ios/HANDOFF-ios-port.md"
       ]
     },
     {
@@ -64,7 +64,7 @@
       "title": "서명 주체·LGPL 메모",
       "blocked_by": [],
       "files": [
-        "docs/ios-port-legal-notes.md"
+        "docs/ios/ios-port-legal-notes.md"
       ]
     },
     {
@@ -208,7 +208,7 @@
         "IOS-0-11"
       ],
       "files": [
-        "docs/HANDOFF-ios-port.md"
+        "docs/ios/HANDOFF-ios-port.md"
       ]
     },
     {
@@ -232,7 +232,7 @@
         "IOS-0-13"
       ],
       "files": [
-        "docs/ios-dual-platform-plan.md"
+        "docs/ios/ios-dual-platform-plan.md"
       ]
     },
     {
@@ -920,7 +920,7 @@
         "IOS-0-02"
       ],
       "files": [
-        "docs/ios-port-legal-notes.md"
+        "docs/ios/ios-port-legal-notes.md"
       ]
     },
     {

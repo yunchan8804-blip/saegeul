@@ -8,7 +8,7 @@ import android.content.Context
 
 /**
  * On-device record of shop themes bought with points.
- * Non-transferable by design (see docs/ad-monetization-avenue-operations.md 14.2).
+ * Non-transferable by design (see docs/business/ad-monetization-avenue-operations.md 14.2).
  */
 class ThemeOwnershipStore(context: Context) {
     private val prefs = context.getSharedPreferences("theme_shop", Context.MODE_PRIVATE)

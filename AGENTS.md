@@ -135,11 +135,11 @@
 
 ### 9.1 이 저장소에서 "설계"로 간주하는 것 — 오케스트레이터가 직접 결정한다
 
-- **한글 조합 엔진 경계**: `:app` ↔ `:plugin:hangul` 사이의 fcitx5 addon 계약, libhangul 호출 방식, 한글 버퍼 호환 모드의 상태 머신. 기준 문서는 `docs/korean-smart-input-ssot.md`, `docs/hangul-buffered-input*.md`.
+- **한글 조합 엔진 경계**: `:app` ↔ `:plugin:hangul` 사이의 fcitx5 addon 계약, libhangul 호출 방식, 한글 버퍼 호환 모드의 상태 머신. 기준 문서는 `docs/korean-input/korean-smart-input-ssot.md`, `docs/korean-input/hangul-buffered-input*.md`.
 - **온디바이스 AI 경계**: 새글의 AI는 기기 안 Gemma(LiteRT-LM)만 쓴다. 외부 글쓰기 AI(API 키·OAuth·컴패니언)는 2026-09-24 앱에서 제거했다. 프롬프트에 넣는 개인 신호, 모델 다운로드 경로, 생성 작업 간 lease 우선순위(`OnDeviceGenerationControl`), 배경 작업 실행 조건.
 - **개인 언어 금고 백업**: `.saegeulbackup` 암호화 포맷(`data/backup/**`), 포함·제외 대상(코퍼스/파생/공개 코퍼스, 포인트 제외), 향후 유료 클라우드 백업과의 계약.
 - **개인정보·데이터 경계**: 온디바이스 저장(Typing DNA vault 등), 완전 오프라인 모드의 네트워크 차단, `docs/independent-fork/privacy-data-safety.md`와 `play-data-safety-declaration.json`에 선언한 내용. 이 선언과 어긋나는 코드 변경은 곧 설계 변경이다.
-- **광고·수익화**: `docs/ad-monetization-avenue-operations.md`의 게이트. 광고 표시 시점·조건 변경, SDK 추가·교체.
+- **광고·수익화**: `docs/business/ad-monetization-avenue-operations.md`의 게이트. 광고 표시 시점·조건 변경, SDK 추가·교체.
 - **릴리스 계약**: `build-logic/convention/src/main/kotlin/Versions.kt`의 버전 범프, `ProductIdentity.kt`의 제품 식별자, `scripts/verify-release-*.ps1` 게이트, `.github/workflows/*`.
 - **사용자에게 보이는 구조**: 탭 시스템, 설정 화면 계층, 테마 엔진의 저장 스키마(직렬화 형식), 키보드 레이아웃 정의 형식.
 

@@ -6,7 +6,7 @@
 
 대상 독자: 이 브랜치를 이어서 개발·검증·배포할 작업자
 
-이 문서는 현재 구현을 다시 역추적하지 않고도 바로 이어서 작업할 수 있도록 만든 상세 인수인계다. 간단한 사용자 설명과 공개용 빌드 절차는 `docs/hangul-buffered-input.md`를 보고, 구현 의도·상태 전이·검증 근거·디버깅 절차는 이 문서를 기준으로 삼아라.
+이 문서는 현재 구현을 다시 역추적하지 않고도 바로 이어서 작업할 수 있도록 만든 상세 인수인계다. 간단한 사용자 설명과 공개용 빌드 절차는 `docs/korean-input/hangul-buffered-input.md`를 보고, 구현 의도·상태 전이·검증 근거·디버깅 절차는 이 문서를 기준으로 삼아라.
 
 관련 문서: [기능·빌드 개요](hangul-buffered-input.md), [우선순위 백로그](hangul-buffered-input-backlog.md)
 
@@ -378,8 +378,8 @@ Caps Lock을 normal label로 두는 이유는 앞서 설명한 것처럼 fcitx5-
 | `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedHangulModeTest.kt` | Hangul에서만 활성화, Preedit만 제거, Password/Sensitive clipboard 금지 |
 | `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedInputControllerTest.kt` | prefix+preedit 결합, Unicode code point 삭제, clear |
 | `app/src/test/java/org/fcitx/fcitx5/android/input/keyboard/HangulKeyLegendsTest.kt` | 두벌식 normal/Shift mapping, unsupported fallback, 언어·addon 판별 |
-| `docs/hangul-buffered-input.md` | 사용자·개발자용 요약, 빌드 절차, test matrix, 알려진 위험 |
-| `docs/hangul-buffered-input-handoff.md` | 현재 파일. 다음 작업자를 위한 상세 SSOT |
+| `docs/korean-input/hangul-buffered-input.md` | 사용자·개발자용 요약, 빌드 절차, test matrix, 알려진 위험 |
+| `docs/korean-input/hangul-buffered-input-handoff.md` | 현재 파일. 다음 작업자를 위한 상세 SSOT |
 
 ### 8.3 수정하지 않은 중요 영역
 

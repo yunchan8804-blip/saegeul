@@ -8,7 +8,7 @@ package org.fcitx.fcitx5.android.ads
  * Bundled AVENUE catalog used until a remotely signed config exists.
  * Only placements that pass [AdServingPolicy] are included.
  * Frequency limits follow the pilot rules in
- * docs/ad-monetization-avenue-operations.md 4.5 and section 13.3.
+ * docs/business/ad-monetization-avenue-operations.md 4.5 and section 13.3.
  */
 internal object LocalAvenueCatalog {
     const val TYPING_DNA_SYNC_COMPLETE = "typing-dna-sync-complete"

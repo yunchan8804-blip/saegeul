@@ -29,7 +29,7 @@
 | 기준 커밋 제목 | Add buffered Hangul compatibility mode |
 | 기준 커밋 작성자 | Yun Chan |
 | 작업 트리 | 기준선 확인 시 clean |
-| 주요 설계 문서 | docs/hangul-buffered-input.md |
+| 주요 설계 문서 | docs/korean-input/hangul-buffered-input.md |
 
 Windows clone의 Git symlink 설정은 현재 true이며, 대표적으로 build-logic/gradle/wrapper/gradle-wrapper.jar가 실제 심볼릭 링크로 복구된 상태다.
 
@@ -142,7 +142,7 @@ plugin assembly와 plugin lint를 같은 Gradle invocation에 넣으면 현재 t
 - 성공 transport는 10회 반복에서 중복 0회, 누락 0회, 문자 손상 0회다.
 - 실패 transport가 자동 fallback으로 중복을 만들지 않는다.
 - 선택해야 할 사용자 설정이 명확히 문서화된다.
-- 검증 결과가 docs/hangul-buffered-input.md의 device matrix에 반영된다.
+- 검증 결과가 docs/korean-input/hangul-buffered-input.md의 device matrix에 반영된다.
 
 **의존성/위험**
 

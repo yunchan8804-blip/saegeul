@@ -1,6 +1,6 @@
 # 한국어 문맥 추천·금고 품질 개선 계약
 
-기준일: 2026-09-07. 작업 상태: 진행 중. 백로그 정본은 [AI 개인화 백로그](ai-personalization-backlog.md)다.
+기준일: 2026-09-07. 작업 상태: 진행 중. 백로그 정본은 [AI 개인화 백로그](../ai/ai-personalization-backlog.md)다.
 
 ## 사용자 인수 기준
 

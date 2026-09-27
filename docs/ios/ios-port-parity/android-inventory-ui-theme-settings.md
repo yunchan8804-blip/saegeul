@@ -71,7 +71,7 @@
 | RosyDuskDark | 황혼 로즈 | PREMIUM | `data/theme/ThemeShopCatalog.kt:81-109` |
 | CeladonJadeLight | 청자 비취 | PREMIUM | `data/theme/ThemeShopCatalog.kt:110-138` |
 
-소유 기록은 `data/theme/ThemeOwnershipStore.kt:13-28`의 별도 SharedPreferences `theme_shop` / 키 `owned_shop_themes`에 저장한다. 기기 간 이전 불가로 설계돼 있다(`docs/ad-monetization-avenue-operations.md` 14.2 참조 주석).
+소유 기록은 `data/theme/ThemeOwnershipStore.kt:13-28`의 별도 SharedPreferences `theme_shop` / 키 `owned_shop_themes`에 저장한다. 기기 간 이전 불가로 설계돼 있다(`docs/business/ad-monetization-avenue-operations.md` 14.2 참조 주석).
 
 구매 다이얼로그와 리워드 광고 적립은 `ui/main/settings/theme/ThemeListFragment.kt:233-281`에 있다. 적립 제한은 하루 3회, 20분 간격이다(`ThemeListFragment.kt:276`).
 

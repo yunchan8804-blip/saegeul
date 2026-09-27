@@ -35,4 +35,4 @@ npm run build
 
 ## 운영 전환
 
-앱 수익화는 `../docs/ad-monetization-avenue-operations.md`, 앱 홍보 오케스트레이션은 `../docs/app-promotion-campaign-orchestration.md`를 따른다. 현재 개인정보 문서는 광고 SDK와 분석 추적 라이브러리가 없다고 약속하므로 해당 출시 게이트를 통과하기 전에는 프로덕션 광고나 측정을 연결하면 안 된다.
+앱 수익화는 `../docs/business/ad-monetization-avenue-operations.md`, 앱 홍보 오케스트레이션은 `../docs/business/app-promotion-campaign-orchestration.md`를 따른다. 현재 개인정보 문서는 광고 SDK와 분석 추적 라이브러리가 없다고 약속하므로 해당 출시 게이트를 통과하기 전에는 프로덕션 광고나 측정을 연결하면 안 된다.

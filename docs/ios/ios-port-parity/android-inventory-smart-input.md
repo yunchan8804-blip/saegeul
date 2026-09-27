@@ -2,7 +2,7 @@
 
 목적: iOS 1:1 이식 격차표의 기준 인벤토리. 모든 행은 코드 또는 문서에서 직접 확인한 사실만 담는다. 추측은 `추정`으로 표시한다.
 
-조사 범위: `app/src/main/java/org/fcitx/fcitx5/android/input/**`(특히 `input/ai/**`), `app/src/debug/**`, `app/src/release/**`, `plugin/hangul/**`, `app/src/main/assets/**`, `docs/korean-smart-input-ssot.md`, `docs/gemma-*.md`, `docs/wiki/*.md`, `docs/independent-fork/privacy-data-safety.md`.
+조사 범위: `app/src/main/java/org/fcitx/fcitx5/android/input/**`(특히 `input/ai/**`), `app/src/debug/**`, `app/src/release/**`, `plugin/hangul/**`, `app/src/main/assets/**`, `docs/korean-input/korean-smart-input-ssot.md`, `docs/logs/2026-09/gemma-*.md`, `docs/wiki/*.md`, `docs/independent-fork/privacy-data-safety.md`.
 
 경로는 따로 명시하지 않는 한 `app/src/main/java/org/fcitx/fcitx5/android/` 기준 상대 경로다.
 
@@ -29,7 +29,7 @@ val automaticSuggestionsSupported: Boolean
 
 ### 0.2 iOS 1차 범위는 이미 SSOT에 잠겨 있음
 
-`docs/korean-smart-input-ssot.md:87-95` — 「iOS 듀얼 플랫폼 (2026-09-13 잠금)」
+`docs/korean-input/korean-smart-input-ssot.md:87-95` — 「iOS 듀얼 플랫폼 (2026-09-13 잠금)」
 
 > 1. iOS 1차 성공 정의는 **자판 + 로컬 스마트 입력**이다. Full Access 없이 동작한다. 키보드 확장 안 Gemma 추론은 넣지 않는다.
 > 2. 1차 공개 자판은 위키 17종에서 **모아키만 제외**한다. 모아키는 삼성 특허 법률 검토 뒤에만 올린다.
@@ -45,7 +45,7 @@ val automaticSuggestionsSupported: Boolean
 | 초성 통합 검색 (`KO-02`) | `input/search/KoreanUnifiedSearch.kt:7-46`, `input/search/KoreanInitials.kt:7-39`, `input/search/KoreanSearchRepository.kt:14-46`, `input/search/KoreanSearchWindow.kt`, 툴바 버튼 `ButtonsBarUi.kt:172` | 툴바 버튼 상시 노출 | **필요.** 검색 소스에 클립보드 기록이 포함됨 (`input/search/KoreanSearchModels.kt:9`) | 소스 4종과 정렬 rank: QuickPhrase(0)·Clipboard(1)·Emotion(2)·Emoji(3). 기본 limit 60 (`KoreanUnifiedSearch.kt:8`). 화면 안 19개 초성 패드 |
 | 조사 받침 자동 판별 (`KO-07`) | `input/context/KoreanParticleSuggester.kt:67-78`, `input/context/KoreanParticleWindow.kt`, 진입 `input/search/KoreanSearchWindow.kt:63`, 호출 `FcitxInputMethodService.kt:2433` | 통합 검색 화면 안 버튼 (`input/search/KoreanSearchUi.kt:126,141`) | 불필요. 마지막 한글 음절의 종성만 계산 | 6종 `KoreanParticleKind`: Topic·Subject·Object·Conjunction·Direction·Copula. ㄹ 받침 예외 처리 (`KoreanParticleSuggester.kt:78`). 커밋 계약 `KoreanParticleCommitContract.canCommit` (:39-47), 1회 소비 게이트 `KoreanParticleCommitGate` (:50-59) |
 | 한글 어절 자동완성 (`KO-09`) | `plugin/hangul/src/main/cpp/fcitx5-hangul/src/completiondictionary.cpp`, `engine.cpp`, 정책 `candidatepolicy.h:28-33`, 데이터 `plugin/hangul/src/main/assets/usr/share/fcitx5/hangul/completion.txt` | 한글 addon 설정 `한글 어절 자동완성`, 기본 켬 | 불필요. 번들 자산만 조회 | 5,250 표제어 · 91,467 bytes. 국립국어원 `한국어 학습용 어휘 목록` 5,965개에서 완성형 한글만 추출 + 프로젝트 작성 모바일 대화 표현을 앞에 배치. **KOGL(공공누리) 제1유형**. 고지 `completion-NOTICE.md`, 원본 SHA-256 `3B49681F05D6A7490C13DA2A2847E433EFFDF65DA409FD295792D6EE33685064`, 생성 스크립트 `scripts/generate-korean-completion-dictionary.ps1` |
-| 다음 어절 추천 (`KO-07`) | `input/ai/BundledKoreanNgram.kt`(KONGRAM1 리더), 후보 생성 `input/ai/AiContextualPredictor.kt`의 `corpus_ngram` 블록, 로드 `FcitxApplication.warmUpLanguageAssets`, 데이터 `app/src/main/assets/korean/ko-ngram.bin` | 자동완성 토글에 종속 | 불필요. 번들 바이너리만 조회 | FineWeb-2 어절 bigram·trigram에 구어 층(ChatbotData 학습 분할, MIT)과 손작성 `nextword.txt` 쌍을 관측 수 가중 λ(0.7·n/(n+10))로 보간했다. 정적 연어(`KoreanCollocationModel`)는 코퍼스 아래로 내렸다. 생성 절차는 `docs/korean-smart-input-ssot.md`에 있다. 네이티브 `NextWordDictionary`는 코드에 남아 있지만, 메인 앱 번들에서 `nextword.txt`를 빼서 동작하지 않는다(`app/build.gradle.kts`의 `bundleHangulEngineAssets`) |
+| 다음 어절 추천 (`KO-07`) | `input/ai/BundledKoreanNgram.kt`(KONGRAM1 리더), 후보 생성 `input/ai/AiContextualPredictor.kt`의 `corpus_ngram` 블록, 로드 `FcitxApplication.warmUpLanguageAssets`, 데이터 `app/src/main/assets/korean/ko-ngram.bin` | 자동완성 토글에 종속 | 불필요. 번들 바이너리만 조회 | FineWeb-2 어절 bigram·trigram에 구어 층(ChatbotData 학습 분할, MIT)과 손작성 `nextword.txt` 쌍을 관측 수 가중 λ(0.7·n/(n+10))로 보간했다. 정적 연어(`KoreanCollocationModel`)는 코퍼스 아래로 내렸다. 생성 절차는 `docs/korean-input/korean-smart-input-ssot.md`에 있다. 네이티브 `NextWordDictionary`는 코드에 남아 있지만, 메인 앱 번들에서 `nextword.txt`를 빼서 동작하지 않는다(`app/build.gradle.kts`의 `bundleHangulEngineAssets`) |
 | 개인 단어장 (`KO-06`) | `data/personaldictionary/PersonalDictionaryStore.kt:16-17,55`, `data/personaldictionary/PersonalDictionary.kt:98`, UI `ui/main/settings/behavior/PersonalDictionaryFragment.kt:38-85` | `개인 단어장` opt-in 스위치 | **필요 추정.** 본체 앱 설정 화면이 쓰고 IME가 읽는 공유 저장소 (`noBackupFilesDir/korean-personal-dictionary/words.txt`) | 백업 제외. 카테고리별 단어 분류(`PersonalWordCategory`) |
 | 한자 음훈 변환 (`KO-05`) | 정책 `plugin/hangul/src/main/cpp/fcitx5-hangul/src/candidatepolicy.h:12-25`, 진입 `input/status/StatusAreaWindow.kt:88`, 아이콘 매핑 `input/status/StatusAreaEntry.kt:35-36`, 데이터 `plugin/hangul/src/main/assets/usr/share/libhangul/hanja/hanja.txt` | 더보기 → 상태 항목 (명시 1회 변환) | 불필요. 번들 자산만 조회 | 6,756,043 bytes. `가:可:옳을 가` 형식으로 음훈 포함. 자동완성이 켜져 있으면 지속 한자 모드를 끄고 명시 1회 변환으로만 동작 (`usePersistentHanjaCandidates`, `shouldClearLegacyHanjaMode`). 보조 데이터 `mssymbol.txt` |
 | 오프라인 국어사전 (`KO-05A`) | `input/search/KoreanDictionary.kt:11-30`, `KoreanDictionaryRepository.kt`, `KoreanDictionaryAdapter.kt`, 데이터 `app/src/main/assets/korean/dictionary.bin` | 통합 검색 안 명시적 `국어사전` 모드 | 불필요. 번들 바이너리만 조회 | 3,414,000 bytes 정렬 바이너리 offset 인덱스(lazy decode). **한국어 위키낱말사전, CC BY-SA 4.0**. 고지 `app/src/main/assets/korean/dictionary-ATTRIBUTION.txt` (Wiktextract/kaikki.org, 덤프 2026-07-03, 추출 2026-07-24). 읽기 전용이며 입력 원문을 바꾸지 않음 |
@@ -85,7 +85,7 @@ val automaticSuggestionsSupported: Boolean
 | 개인 n-gram 예측 | `input/ai/PersonalNgramModel.kt` (663줄), `PersonalNgramTokenizer.kt`, 참조 `FcitxInputMethodService.kt:1765,3215,3448` | 언어 지문 기능에 종속 | **필요 추정.** 암호화 파일 저장소 사용 | 배지 `⭐` (`AiContextualPredictor.kt:499-500`) |
 | 개인 문장 RAG (BM25) | `input/ai/rag/PersonalSentenceVault.kt:19-35`, 후보화 `AiContextualPredictor.kt:402-403`, 게이트 `input/ai/PersonalSentenceCompletionGate.kt` | 언어 지문 기능에 종속 | **필요 추정.** 암호화 파일 저장소 사용 | 최대 3,000문장, 반감기 45일. 주석: "No LLM, no embeddings, no network". 배지 `✨ 내기록` |
 | 문장 팩 | `input/ai/sentencepack/SentencePackRepository.kt`, `SentencePackCatalog.kt`, `SentencePackIndex.kt`, `SentencePackCsv.kt`, UI `ui/main/settings/behavior/SentencePackDialog.kt`, 요약 `PrivacyAiSettingsFragment.kt:150-164,375-405`, 자산 `app/src/main/assets/sentence-packs/ko-basic-v1.txt` | `문장 팩` 설정 항목 | 기본팩은 불필요, 추가 팩 다운로드는 **필요** | 기본팩 10,093 bytes 오프라인 번들. 프로젝트 자체 작성 예문(`sentence-packs/NOTICE.md`: "외부 말뭉치를 복제하지 않고 프로젝트에서 작성한 기본 예문"). 배지 `기본문장`. 오프라인 모드 켜면 다운로드 즉시 취소 (`PrivacyAiSettingsFragment.kt:143-146`) |
-| AI 어시스턴트 창 | `input/ai/AiAssistantWindow.kt` (708줄), `AiAssistantUi.kt` (1123줄), 툴바 버튼 `ButtonsBarUi.kt:180`, 연결 `input/bar/KawaiiBarComponent.kt:482` | 툴바 AI 버튼 | 조건부. 로컬 문맥 완성만 쓰면 불필요, 외부 AI는 **필요** | `docs/gemma-context-ime-2026-09-12.md:46`: "AI 도구 버튼은 debug 로컬 기능의 개인정보·앱 정책 조건을 만족해도 열 수 있다. 외부 AI 실행의 네트워크 차단은 그대로 유지한다." |
+| AI 어시스턴트 창 | `input/ai/AiAssistantWindow.kt` (708줄), `AiAssistantUi.kt` (1123줄), 툴바 버튼 `ButtonsBarUi.kt:180`, 연결 `input/bar/KawaiiBarComponent.kt:482` | 툴바 AI 버튼 | 조건부. 로컬 문맥 완성만 쓰면 불필요, 외부 AI는 **필요** | `docs/logs/2026-09/gemma-context-ime-2026-09-12.md:46`: "AI 도구 버튼은 debug 로컬 기능의 개인정보·앱 정책 조건을 만족해도 열 수 있다. 외부 AI 실행의 네트워크 차단은 그대로 유지한다." |
 
 **소계: 14개**
 
@@ -118,7 +118,7 @@ val automaticSuggestionsSupported: Boolean
 |---|---|---|---|---|
 | AI 글쓰기 액션 | `input/ai/AiAction.kt:12-99`, 실행 `input/ai/OpenAiResponsesClient.kt`, 적용 `input/ai/AiEditorTransaction.kt`, `AiResultApplyPolicy.kt`, diff `AiTextDiff.kt` | `AI 공급자 설정` (`PrivacyAiSettingsFragment.kt:166-185`) | **필요.** HTTPS 전송 | 액션 16종: `Proofread`·`Polite`·`Casual`·`Business`·`Decline`·`Apology`·`CustomerService`·`Compose`·`Reply`·`Custom`·`ContinueTyping`·`TranslateEnglish`·`TranslateKorean`·`TranslateJapanese`·`TranslateChinese`·`GraphEnrich`. 결과 적용 4갈래: 교체·뒤에 넣기·복사·취소 |
 | 컴패니언 자동 발견 (mDNS) | `input/ai/AiProviderDiscovery.kt` (234줄), `AiProviderDiscoveryManifest.kt:1-30`, `AiProviderManifestFailure.kt`, `AiProviderSetupActivity.kt` (457줄) | `내 컴퓨터 자동으로 찾기 (추천)` | **필요.** DNS-SD/mDNS 로컬 네트워크 검색 + HTTPS 매니페스트 검증 | service type `_saegeul-ai._tcp.`. TXT의 `manifest` 값만 신뢰하고 mDNS 이름·IP는 신뢰하지 않음. 매니페스트는 `https://<trusted-host>/.well-known/saegeul-ai-provider` 고정 (SSOT 8.2.3). 예시 `docs/examples/saegeul-ai-provider-manifest.debug.json` |
-| Tailscale Serve HTTPS 경계 | `docs/korean-smart-input-ssot.md:1333-1350,1438-1443` | 없음 (앱 밖 구성) | **필요** | loopback gateway `127.0.0.1:9211`, tailnet 공개면 Tailscale Serve HTTPS `:9210`, 발견 `_saegeul-ai._tcp.local.`. SSOT: "public host뿐 아니라 loopback, RFC1918, CGNAT/Tailscale IP, MagicDNS, `.ts.net`에도 평문 HTTP 예외를 두지 않는다" |
+| Tailscale Serve HTTPS 경계 | `docs/korean-input/korean-smart-input-ssot.md:1333-1350,1438-1443` | 없음 (앱 밖 구성) | **필요** | loopback gateway `127.0.0.1:9211`, tailnet 공개면 Tailscale Serve HTTPS `:9210`, 발견 `_saegeul-ai._tcp.local.`. SSOT: "public host뿐 아니라 loopback, RFC1918, CGNAT/Tailscale IP, MagicDNS, `.ts.net`에도 평문 HTTP 예외를 두지 않는다" |
 | PC 컴패니언 설치·실행 | `companion/windows/{install.bat,install.ps1,start.bat,uninstall.bat,uninstall.ps1}`, `companion/macos/{install.command,install.sh,start.command,uninstall.sh}`, `companion/linux/{install.sh,start.sh,uninstall.sh}`, `scripts/ai-provider-companion.py` | 앱 밖 | 해당 없음 (PC 측) | Windows 작업 스케줄러 / macOS LaunchAgent / systemd user 서비스. PC에 로그인된 Codex·Claude Code·AGY CLI를 stdio로 재사용. grant는 `%LOCALAPPDATA%/Saegeul/ai-companion-oauth.bin`에 DPAPI current-user 범위로 저장 |
 | endpoint OAuth (`AI-07`) | `input/ai/AiOAuthLoginActivity.kt` (207줄), `AiOAuthRefreshPolicy.kt`, `AiOAuthSessionIdentity.kt`, `AiOAuthStartFailure.kt`, `AiProviderCredentialStore.kt` (234줄) | `AI 공급자 설정` | **필요.** 외부 브라우저 + Keystore 저장 | public client Authorization Code + PKCE S256, 외부 브라우저(Custom Tab). API key와 상호 배타 (SSOT 8.2.1) |
 | BYOK 글쓰기 공급자 | `input/ai/AiProviderProfile.kt:1-30` (`AiEndpointPolicy`), `OpenAiResponsesClient.kt` (453줄), `AiAuthorization.kt` | `AI 공급자 설정` | **필요** | 키 저장 위치 `noBackupFilesDir/ai/provider.bin`. HTTPS만 허용 |
@@ -145,7 +145,7 @@ val automaticSuggestionsSupported: Boolean
 | 즉시 분석·동기화 | `input/ai/TypingDnaInstantSync.kt`, `TypingDnaSyncStatus.kt`, 서비스 `FcitxInputMethodService.kt:176-187,1691-1712`, UI `PrivacyAiSettingsFragment.kt:281-290` | `지금 언어 지문 분석 및 동기화` | 조건부. 그래프 강화가 같이 실행되면 **필요** | |
 | 언어 금고 대시보드 | `ui/main/ai/TypingDnaDashboardActivity.kt`, `DashboardSnapshot.kt:63,151-164`, `TypingDnaCardPreference.kt`, `TypingDnaCardSnapshot.kt`, `TypingDnaChartView.kt`, `VaultTimelineView.kt`, `CelebrationOverlayView.kt` | 본체 앱 화면 | 해당 없음 (본체 앱) | 레벨·데이터 축적 현황·톤 밸런스 그래프 |
 | 홈 화면 위젯 | `ui/main/ai/VaultWidgetProvider.kt:23-35`, `res/xml/vault_widget_info.xml` | 시스템 위젯 추가 | 해당 없음 | 레벨·진행·누적 표시, 탭하면 대시보드 진입 |
-| 습관·스트릭 | `input/ai/VaultHabitTracker.kt:9-15` | 없음 | 해당 없음 | 연속일·스트릭 프리즈·오늘/어제 분석 문장 수. 설계 근거 `docs/ai-vault-engagement-design.md` 3절 |
+| 습관·스트릭 | `input/ai/VaultHabitTracker.kt:9-15` | 없음 | 해당 없음 | 연속일·스트릭 프리즈·오늘/어제 분석 문장 수. 설계 근거 `docs/ai/ai-vault-engagement-design.md` 3절 |
 | 레벨 곡선·포인트 | `input/ai/TypingDnaLevelCurve.kt`, `data/points/LevelRewardStore.kt` | 없음 | 해당 없음 | |
 | 전면 광고 게이트 | `ads/TypingDnaAdGate.kt:12-60`, `ads/AdServingPolicy.kt`, `ads/AvenueFrequencyPolicy.kt`, `ads/AvenueFrequencyStore.kt`, `ads/LocalAvenueCatalog.kt`, `ads/TypingDnaInterstitialController.kt:53,128` | 없음 (오프라인 모드에 종속) | **필요** | placement 3종 `TYPING_DNA_SYNC_COMPLETE`·`TYPING_DNA_DASHBOARD_BANNER`·`THEME_POINT_EARN`. `if (offlineMode) return false` (`TypingDnaAdGate.kt:59`). 언어 지문 즉시 분석 완료 뒤에만 요청 |
 | 대시보드 배너 광고 | `ads/DashboardBannerController.kt:50,122` | 위와 동일 | **필요** | 대시보드 한정 |
@@ -158,7 +158,7 @@ val automaticSuggestionsSupported: Boolean
 
 ## 5. SSOT 원칙 원문 인용
 
-### 5.1 변경 불가 제품 원칙 — `docs/korean-smart-input-ssot.md:159-179`
+### 5.1 변경 불가 제품 원칙 — `docs/korean-input/korean-smart-input-ssot.md:159-179`
 
 > 1. 입력·첨부·링크 삽입은 사용자 동작 하나당 성공 경로에서 정확히 한 번만 실행한다.
 > 2. 전송 성공을 확인할 수 없는 경로 뒤에 다른 전송 방식을 자동 실행하지 않는다.
@@ -172,7 +172,7 @@ val automaticSuggestionsSupported: Boolean
 > 10. 링크·텍스트·rich content는 가능한 경우 clipboard를 거치지 않고 `InputConnection`으로 전달한다.
 > 11. AI 지시문, GIF·통합 검색 등 IME가 소유한 모든 text 입력은 현재 `KeyboardWindow`의 layout, Fcitx 조합, 후보, 숫자·기호 전환, theme, 높이를 재사용한다. 기능별 두벌식 복제판을 만들지 않는다.
 
-### 5.2 `KO-09` 한글 어절 자동완성 계약 — `docs/korean-smart-input-ssot.md:133-151`
+### 5.2 `KO-09` 한글 어절 자동완성 계약 — `docs/korean-input/korean-smart-input-ssot.md:133-151`
 
 > 2. 후보는 기기 안의 정적 사전만 사용한다. MVP에서는 입력 원문·선택 이력·앱 package를 저장하거나 네트워크로 보내지 않으며 개인 학습은 `KO-06`으로 분리한다.
 > 5. 후보는 자동 적용하지 않는다. 카드 tap, 숫자 키 또는 사용자가 Tab으로 후보를 명시적으로 고른 뒤 Enter를 누른 경우에만 적용한다. 후보가 미선택인 Enter·space·문장부호는 현재 어절을 그대로 확정한다.
@@ -180,14 +180,14 @@ val automaticSuggestionsSupported: Boolean
 > 7. backspace, cursor 이동, focus 변경, input method 변경, reset 뒤에는 추적 접두어와 후보를 함께 정리해 이전 editor의 후보를 재사용하지 않는다.
 > 8. password, sensitive, `NoSpellCheck` editor와 한자 모드에서는 후보를 만들지 않는다. 사전이 없거나 손상됐을 때는 입력 자체를 막지 않고 자동완성만 fail-closed한다.
 
-### 5.3 `KO-02` 초성 통합 검색 계약 — `docs/korean-smart-input-ssot.md:295-308`
+### 5.3 `KO-02` 초성 통합 검색 계약 — `docs/korean-input/korean-smart-input-ssot.md:295-308`
 
 > 5. 결과를 탭하면 조합을 먼저 안전하게 확정하고 `commitText`를 정확히 한 번 호출한 뒤 일반 키보드로 돌아간다. editor identity가 바뀌었으면 삽입하지 않고 오류를 표시한다.
 > 6. sensitive clipboard 항목은 검색 repository 단계에서 제외한다. password, sensitive, no-personalized-learning editor에서는 통합 검색 전체를 열어도 데이터 조회와 삽입을 차단한다.
 > 7. 검색은 전부 기기 안에서 수행하며 query나 결과 원문을 로그·분석·네트워크로 보내지 않는다.
 > 8. 빈 query는 전체 clipboard를 노출하지 않고 검색 안내만 표시한다. 결과 수에는 상한을 둔다.
 
-### 5.4 `KO-03A` 자동 스니펫 계약 — `docs/korean-smart-input-ssot.md:344-353`
+### 5.4 `KO-03A` 자동 스니펫 계약 — `docs/korean-input/korean-smart-input-ssot.md:344-353`
 
 > 3. trigger는 문장 시작 또는 공백 뒤에서 시작해 cursor 바로 앞에서 정확히 끝나야 한다. URL·시간·emoji shortcode의 일부처럼 앞 문자가 붙은 `:` 문자열은 확장하지 않는다.
 > 4. space 경계는 trigger를 확장 결과로 교체하고 공백 하나를 유지한다. Enter 경계는 채팅 전송 사고를 막기 위해 확장만 하고 해당 Enter를 소비하며, 사용자가 다시 Enter를 눌러야 전송 또는 줄바꿈된다.
@@ -195,11 +195,11 @@ val automaticSuggestionsSupported: Boolean
 > 6. 자동 스니펫은 기본 켬 toggle을 제공한다. password, sensitive, no-personalized-learning editor에서는 상용구와 주변 텍스트를 읽지 않고 완전히 비활성화한다.
 > 7. 개인 profile은 기존 Keystore·`noBackupFilesDir` 정책을 그대로 사용한다. 값이 비었거나 복호화에 실패하거나 editor/selection이 바뀐 경우 literal trigger와 경계키를 보존하고 자동 대체하지 않는다.
 
-### 5.5 온디바이스 재료 생성 계약 — `docs/korean-smart-input-ssot.md:26`
+### 5.5 온디바이스 재료 생성 계약 — `docs/korean-input/korean-smart-input-ssot.md:26`
 
 > 생성 재료 기반 교정의 첫 범위는 **명시적으로 선택하는 띄어쓰기 제안**이다. 입력한 완결 문장과 저장 문장의 글자·문장부호가 모두 같고 ASCII 공백 위치만 다르며 저장소의 정답 후보가 하나일 때만 제시한다. 글자·조사·어미를 추측해서 바꾸지 않는다. 입력 중에는 메모리 인덱스만 조회하며 사용자 입력을 모델이나 별도 저장소로 보내지 않는다. 제안에는 `기기 AI 띄어쓰기` 출처를 표시한다. 적용은 캡처한 editor 세션·선택 위치·원문이 현재와 모두 일치할 때 한 번만 허용하며 민감 입력에서는 조회·적용을 차단한다. 정식 앱 승격은 포함하지 않는다.
 
-### 5.6 자동 문맥 추천 개인정보·상태 경계 — `docs/gemma-automatic-context-2026-09-12.md:16-21`
+### 5.6 자동 문맥 추천 개인정보·상태 경계 — `docs/logs/2026-09/gemma-automatic-context-2026-09-12.md:16-21`
 
 > - 기능 활성화는 별도 opt-in이며 설정에서 처리 범위를 설명한다. 비밀번호·민감 필드·학습 금지·앱 차단 정책을 그대로 적용한다. 완전 오프라인에서 동작하며 외부 공급자 fallback이 없다.
 > - 앱 정보는 현재 EditorInfo의 패키지와 필드 종류 등 입력 대상 메타데이터로 한정한다. 화면 수집, 클립보드, 위치, 다른 앱 기록, 개인 금고를 자동으로 읽지 않는다. 앱 종류를 확실히 알 수 없으면 일반 문맥으로 처리한다.
@@ -207,7 +207,7 @@ val automaticSuggestionsSupported: Boolean
 > - 캐시 키는 앱·field ID·IME 세션·편집 revision·정확한 원문·커서다. 세션 전환, 숨김, 개인정보 제한, 선택·커서 이동, 삭제·치환은 요청과 캐시를 폐기한다. 원문이 되돌아와도 이전 요청을 되살리지 않는다.
 > - 자동 관측이 한글 조합을 강제로 확정해서는 안 된다. 조합 중 상태를 포함한 snapshot·적용 계약은 별도 통합 검증을 거친다. 후보 적용은 사용자 터치와 현재 snapshot 재검증이 필요하다.
 
-### 5.7 명시 문맥 완성 확정 경계 — `docs/gemma-context-ime-2026-09-12.md:44-53` (발췌)
+### 5.7 명시 문맥 완성 확정 경계 — `docs/logs/2026-09/gemma-context-ime-2026-09-12.md:44-53` (발췌)
 
 > - 기존 AI 패널에서 별도 명시 동작으로 문맥 완성을 연다. 원문을 먼저 보여주고 사용자가 실행을 눌러야 모델에 전달한다. 자동 입력·공개 재료 조회에 모델 생성을 끼워 넣지 않는다.
 > - 최초 지원 범위는 커서가 문맥 끝에 있고 선택 영역이 없는 미완성 입력이다. 선택 영역이나 중간 커서는 안내 후 거부하며 임의로 이동하지 않는다. 문맥은 최대 2048자다.
@@ -215,7 +215,7 @@ val automaticSuggestionsSupported: Boolean
 > - `PUBLIC_MATERIAL`은 키보드 활성 중 거부·취소한다. 사용자가 누른 `EXPLICIT_CONTEXT`만 기존 목적별 단일 native lease를 사용한다. 배터리 20% 이상, 절전 아님, 메모리 여유, 확인 가능한 열 상태가 MODERATE 미만인 조건을 시작과 실행 중 검사한다.
 > - 입력·커서·선택·세션 변경, 화면 종료, 사용자 취소는 ticket을 무효화하고 해당 native run을 취소한다. 변경 후 원래 값으로 돌아와도 이전 요청을 살리지 않는다. 늦게 도착한 결과는 폐기한다.
 
-### 5.8 AI text 읽기와 교체 — `docs/korean-smart-input-ssot.md:1464-1486`
+### 5.8 AI text 읽기와 교체 — `docs/korean-input/korean-smart-input-ssot.md:1464-1486`
 
 > - IME가 임의의 chat bubble이나 화면 전체를 읽을 수 있다고 가정하지 않는다.
 > - 사용자가 AI 툴바를 연 뒤에만 `InputConnection`을 읽는다. 선택이 있으면 선택문을 사용한다.

@@ -3,7 +3,7 @@
 상태: 설계 잠금, Phase 0 착수
 조사 기준일: 2026-09-13
 제품 결정일: 2026-09-13
-SSOT 포인터: [korean-smart-input-ssot.md](korean-smart-input-ssot.md) 3절
+SSOT 포인터: [korean-smart-input-ssot.md](../korean-input/korean-smart-input-ssot.md) 3절
 실행 백로그(정본 TODO): [ios-port-backlog.md](ios-port-backlog.md) / [ios-port-backlog.json](ios-port-backlog.json)
 인수인계: [HANDOFF-ios-port.md](HANDOFF-ios-port.md)
 

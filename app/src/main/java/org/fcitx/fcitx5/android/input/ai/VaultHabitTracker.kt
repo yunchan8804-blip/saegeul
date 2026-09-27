@@ -10,7 +10,7 @@ import android.content.Context
  * Daily habit state for the language vault: streak, streak freezes,
  * and today/yesterday analyzed sentence counts.
  * Pure logic; persistence lives in [VaultHabitStore].
- * See docs/ai-vault-engagement-design.md section 3.
+ * See docs/ai/ai-vault-engagement-design.md section 3.
  */
 data class VaultHabitState(
     val streak: Int = 0,

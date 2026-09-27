@@ -1,10 +1,10 @@
 # 새글 온디바이스 AI 극한 최적화 & 극한 정확성 마스터 백로그 (Master SSOT Backlog)
 
-- **문서 식별자**: `docs/extreme-ai-backlog.md`
+- **문서 식별자**: `docs/ai/extreme-ai-backlog.md`
 - **프로젝트**: 새글(Saegeul) Android 한국어 입력기 (`net.chanpaca.saegeul`)
 - **버전**: v1.0.0-SSOT
 - **기준 일자**: 2026-09-17
-- **마스터 아키텍처**: `docs/extreme-ai-master-plan.md`
+- **마스터 아키텍처**: `docs/ai/extreme-ai-master-plan.md`
 
 ---
 

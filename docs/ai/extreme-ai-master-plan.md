@@ -1,6 +1,6 @@
 # 새글 온디바이스 AI 극한 최적화 & 극한 정확성 마스터 계획서 (Master SSOT Architecture)
 
-- **문서 식별자**: `docs/extreme-ai-master-plan.md`
+- **문서 식별자**: `docs/ai/extreme-ai-master-plan.md`
 - **프로젝트**: 새글(Saegeul) Android 한국어 입력기 (`net.chanpaca.saegeul`)
 - **버전**: v1.0.0-SSOT
 - **기준 일자**: 2026-09-17
