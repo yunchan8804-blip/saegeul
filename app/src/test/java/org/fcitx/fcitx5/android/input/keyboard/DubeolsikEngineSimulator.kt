@@ -37,8 +37,92 @@ class DubeolsikEngineSimulator {
     /** Committed editor text, followed by whatever syllable is still open (being composed). */
     fun content(): String = committed.toString() + openText()
 
+    /** Editor text that is already finalized and can no longer change. */
+    fun committedText(): String = committed.toString()
+
+    /**
+     * Flattens [text] into its underlying sequence of choseong/jungseong/jongseong compatibility
+     * jamo, breaking every compound vowel or batchim down into its base components (e.g. ㅘ ->
+     * ㅗ,ㅏ; ㄶ -> ㄴ,ㅎ). A character outside the precomposed Hangul syllable block — a space, a
+     * punctuation mark, or a still-open bare compatibility jamo — passes through unchanged as its
+     * own single element.
+     */
+    fun flattenJamo(text: String): List<Char> = text.flatMap(::decomposeChar)
+
+    private fun decomposeChar(ch: Char): List<Char> {
+        val sIndex = ch.code - 0xAC00
+        if (sIndex < 0 || sIndex >= HANGUL_SYLLABLE_COUNT) return listOf(ch)
+        val cho = CHOSEONG_LIST[sIndex / (21 * 28)]
+        val jung = JUNGSEONG_LIST[(sIndex % (21 * 28)) / 28]
+        val jongIdx = sIndex % 28
+        return buildList {
+            add(cho)
+            addAll(decomposeCombined(jung, JUNGSEONG_COMBINE))
+            if (jongIdx != 0) addAll(decomposeCombined(JONGSEONG_LIST[jongIdx - 1], JONGSEONG_COMBINE))
+        }
+    }
+
+    private fun decomposeCombined(jamo: Char, combine: Map<Pair<Char, Char>, Char>): List<Char> {
+        val pair = combine.entries.firstOrNull { it.value == jamo }?.key ?: return listOf(jamo)
+        return decomposeCombined(pair.first, combine) + pair.second
+    }
+
+    /**
+     * Whether this state is still a plausible waypoint toward eventually typing [target].
+     *
+     * The already-committed text is checked as *characters*, not jamo: `committed` can never
+     * shrink again (Backspace is not among the search's own moves), so once a syllable is flushed
+     * its boundary is permanently frozen — decomposing it into jamo and comparing in flattened
+     * jamo space would silently let a *wrongly split* commit through whenever its jamo sequence
+     * happens to coincide with a *different* split of target's jamo. Concretely: typing "많다" can
+     * flush "만" (ㅁㅏㄴ) the moment ㅅ fails to combine with jong ㄴ, then leave a bare open ㅎ;
+     * flattened, "만"+ㅎ is ㅁㅏㄴㅎ — identical to "많"'s own flattening — even though "만" is
+     * already the wrong, permanently-committed syllable and can never become "많" again. Comparing
+     * the committed portion as characters against target's corresponding substring catches exactly
+     * this, since "만" (as committed text) is simply not a prefix of "많다".
+     *
+     * The still-open syllable's choseong and jungseong are allowed to not yet match target there,
+     * for as long as they could still be rewritten outright rather than merely grown: several
+     * primitives (the Chunjiin ㅣ/ㆍ/ㅡ keys, a [MobileHangulComposer.Token.Cycle]'s multitap
+     * replace, [MobileHangulComposer.Token.AddStroke]) send Backspace then a fresh, unrelated key
+     * instead of combining onto what's already open (choseong ㄴ on the way to ㄹ, say). A
+     * choseong locks in the moment its jungseong starts (any further consonant becomes a jongseong
+     * instead); a jungseong locks in the moment *its* jongseong starts. The jongseong itself is
+     * never checked against target at all, at any point: a consonant that does not belong on this
+     * syllable is not a dead end, because it is exactly a "tentative batchim" — the instant the
+     * *next* syllable's vowel is pressed, 도깨비불 moves it off to become that syllable's
+     * choseong, which is how a syllable with no batchim of its own is normally typed right before
+     * a following consonant-initial syllable. Reaching [target] exactly is decided separately, by
+     * plain string equality on [content].
+     */
+    fun isOnTrackTo(target: String): Boolean {
+        val committedSoFar = committed.toString()
+        if (committedSoFar.length > target.length || !target.startsWith(committedSoFar)) return false
+        val openJung = jungseongValue()
+        if (choseongKey == null && openJung == null) return true
+        if (committedSoFar.length >= target.length) return false
+        val sIndex = target[committedSoFar.length].code - 0xAC00
+        if (sIndex < 0 || sIndex >= HANGUL_SYLLABLE_COUNT) return false
+        val choT = CHOSEONG_LIST[sIndex / (21 * 28)]
+        val jungT = JUNGSEONG_LIST[(sIndex % (21 * 28)) / 28]
+        if (choseongKey == null) return false
+        if (openJung == null) return true
+        if (choseongKey != choT) return false
+        if (jongseongKeys.isEmpty()) return true
+        return openJung == jungT
+    }
+
     private fun pressRawKey(rawKey: Char) {
-        val jamo = ATOMIC_KEYS[rawKey] ?: return
+        val jamo = ATOMIC_KEYS[rawKey]
+        if (jamo == null) {
+            // Not a Dubeolsik ASCII key: this is a literal character (e.g. punctuation from a
+            // [MobileHangulComposer.Token.SymbolCycle], which emits the raw symbol itself rather
+            // than an encoded jamo key). Typing it forces the open syllable to commit first, then
+            // appends the literal character on its own, exactly like a raw Fcitx key action would.
+            flush()
+            committed.append(rawKey)
+            return
+        }
         if (jamo in CHOSEONG_LIST) pressConsonant(jamo) else pressVowel(jamo)
     }
 
@@ -105,10 +189,16 @@ class DubeolsikEngineSimulator {
 
     private fun openText(): String {
         val jung = jungseongValue()
+        val jong = jongseongValue()
         return when {
             choseongKey == null && jung == null -> ""
             jung == null -> choseongKey.toString()
-            else -> composeSyllable(choseongKey ?: FILLER_IEUNG, jung, jongseongValue())
+            // A standalone vowel with no onset and no jongseong yet shows as its bare
+            // compatibility jamo (e.g. "ㅡ", "ㅢ"), matching real libhangul/Dubeolsik behavior;
+            // the filler ㅇ onset is only synthesized once a jongseong forces a full syllable
+            // block (e.g. ㅡ + ㄱ -> 윽).
+            choseongKey == null && jong == null -> jung.toString()
+            else -> composeSyllable(choseongKey ?: FILLER_IEUNG, jung, jong)
         }
     }
 
@@ -133,6 +223,7 @@ class DubeolsikEngineSimulator {
 
     companion object {
         private const val FILLER_IEUNG = 'ㅇ'
+        private const val HANGUL_SYLLABLE_COUNT = 19 * 21 * 28
 
         private const val CHOSEONG_LIST = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
         private const val JUNGSEONG_LIST = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"

@@ -24,15 +24,15 @@ class MobileHangulVegaComposerTest {
         assertEquals("×1 -> 귀", "귀", engine.content())
 
         engine.apply(c.press(ie, 100))
-        assertEquals("×2 -> 구 committed + open ㅡ", "구으", engine.content())
+        assertEquals("×2 -> 구 committed + open ㅡ", "구ㅡ", engine.content())
 
         engine.apply(c.press(ie, 200))
-        assertEquals("×3 -> 구 committed + open ㅢ", "구의", engine.content())
+        assertEquals("×3 -> 구 committed + open ㅢ", "구ㅢ", engine.content())
 
         // ×4 wraps the cycle back to ㅣ, but P was already let go at ×2: it must NOT re-combine
         // into 귀 again. Only the still-open selection changes.
         engine.apply(c.press(ie, 300))
-        assertEquals("×4 -> 구 committed + open ㅣ, not 귀 again", "구이", engine.content())
+        assertEquals("×4 -> 구 committed + open ㅣ, not 귀 again", "구ㅣ", engine.content())
     }
 
     @Test
@@ -48,10 +48,10 @@ class MobileHangulVegaComposerTest {
         assertEquals("구", engine.content())
 
         engine.apply(c.press(a, 0))
-        assertEquals("구 committed, open 아, ㄱ never touched", "구아", engine.content())
+        assertEquals("구 committed, open ㅏ, ㄱ never touched", "구ㅏ", engine.content())
 
         engine.apply(c.press(a, 100))
-        assertEquals("replacing again only touches the open 아/야, never 구", "구야", engine.content())
+        assertEquals("replacing again only touches the open ㅏ/ㅑ, never 구", "구ㅑ", engine.content())
     }
 
     @Test
@@ -75,9 +75,9 @@ class MobileHangulVegaComposerTest {
         val a = MobileHangulComposer.Token.Cycle("vg_a", listOf('ㅏ', 'ㅑ'))
 
         engine.apply(c.press(a, 0))
-        assertEquals("아", engine.content())
+        assertEquals("ㅏ", engine.content())
         engine.apply(c.press(a, 100))
-        assertEquals("야", engine.content())
+        assertEquals("ㅑ", engine.content())
     }
 
     @Test

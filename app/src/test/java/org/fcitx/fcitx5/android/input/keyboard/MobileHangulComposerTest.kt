@@ -243,11 +243,11 @@ class MobileHangulComposerTest {
 
         // ㅓ does not combine with ㅗ: libhangul commits 고 right here, so ㄱ can never be lost.
         engine.apply(c.press(aEo, 200))
-        assertEquals("고 committed, open 어", "고어", engine.content())
+        assertEquals("고 committed, open ㅓ", "고ㅓ", engine.content())
 
         // ㅏ is selected again, but P (ㅗ) was already let go: it must not re-combine into 과.
         engine.apply(c.press(aEo, 300))
-        assertEquals("고 stays committed, open swaps to 아", "고아", engine.content())
+        assertEquals("고 stays committed, open swaps to ㅏ", "고ㅏ", engine.content())
     }
 
     @Test
@@ -263,11 +263,11 @@ class MobileHangulComposerTest {
         assertEquals("괘", engine.content())
 
         engine.apply(c.press(ae, 0))
-        assertEquals("괘 committed, open 애 (ㅐ doesn't combine with ㅙ)", "괘애", engine.content())
+        assertEquals("괘 committed, open ㅐ (ㅐ doesn't combine with ㅙ)", "괘ㅐ", engine.content())
 
         // Fast second tap (well within the 300ms window): the leading 괘 must stay untouched.
         engine.apply(c.press(ae, 100))
-        assertEquals("front 괘 kept, only the trailing vowel cycled to 얘", "괘얘", engine.content())
+        assertEquals("front 괘 kept, only the trailing vowel cycled to ㅒ", "괘ㅒ", engine.content())
     }
 
     @Test
@@ -322,7 +322,7 @@ class MobileHangulComposerTest {
         val engine = DubeolsikEngineSimulator()
         assertTrue(c.press(MobileHangulComposer.Token.VowelDot).isEmpty())
         engine.apply(c.press(MobileHangulComposer.Token.VowelEu))
-        assertEquals("오", engine.content())
+        assertEquals("ㅗ", engine.content())
     }
 
     @Test
