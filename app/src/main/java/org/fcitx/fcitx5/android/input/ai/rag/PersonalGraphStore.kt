@@ -13,7 +13,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * On-device store for the "personal knowledge graph" the companion enrichment pipeline builds
+ * On-device store for the "personal knowledge graph" the on-device enrichment pipeline builds
  * from the user's own sentences: a small set of frequent words/phrases (nodes), their pairwise
  * relations (edges) and topic clusters. Kept entirely in memory, persisted encrypted at rest, and
  * consumed purely as a local re-ranking signal via [proximityBoost] - no network, no model.

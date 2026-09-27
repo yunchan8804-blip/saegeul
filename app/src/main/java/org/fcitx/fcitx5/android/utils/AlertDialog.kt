@@ -11,12 +11,6 @@ import android.widget.Button
 val AlertDialog.positiveButton: Button
     get() = getButton(AlertDialog.BUTTON_POSITIVE)
 
-val AlertDialog.negativeButton: Button
-    get() = getButton(AlertDialog.BUTTON_NEGATIVE)
-
-val AlertDialog.neutralButton: Button
-    get() = getButton(AlertDialog.BUTTON_NEUTRAL)
-
 /**
  * Change positive button listener **AFTER** [AlertDialog.show] has been called.
  *

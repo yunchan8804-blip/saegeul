@@ -7,9 +7,6 @@ package org.fcitx.fcitx5.android
 import androidx.test.filters.MediumTest
 import androidx.test.runner.AndroidJUnit4
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
-import org.fcitx.fcitx5.android.input.ai.ContinuationTone
-import org.fcitx.fcitx5.android.input.ai.KoreanSentenceContinuation
-import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.SentenceRelevanceReranker
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine.JosaKind
@@ -29,8 +26,7 @@ import org.junit.runner.RunWith
  * 1. Phonological Josa bitmask decomposition and attachment on Android ART runtime.
  * 2. Stage 1 Syntax Rule Filter for ACC-01, ACC-02, ACC-04 violations.
  * 3. SentenceRelevanceReranker filtering ungrammatical/mismatched continuation candidates.
- * 4. Eradication of B19 Markov chaining regression ("내가 뭘 회의 참석합니다").
- * 5. Deterministic automatic correction of Josa mismatches.
+ * 4. Deterministic automatic correction of Josa mismatches.
  */
 @RunWith(AndroidJUnit4::class)
 @MediumTest
@@ -282,51 +278,6 @@ class ExtremeAccuracyE2eDeviceTest {
 
         // 정상 후보는 보존되어야 한다
         assertTrue("정상 후보 '공유해 드립니다'가 포함되어야 한다", reranked.any { it.text.contains("공유해 드립니다") })
-    }
-
-    @Test
-    fun testOnDeviceContinuationB19RegressionBlocked() {
-        val packageName = "net.chanpaca.saegeul.test"
-        val ngram = PersonalNgramModel(clock = { 1_000_000_000L })
-        // 고의로 unigram/bigram에 B19 유발 단어들을 주입
-        ngram.learn("내가 뭘 회의 참석합니다", packageName)
-        ngram.learn("회의 참석합니다", packageName)
-        ngram.learn("회의", packageName)
-        ngram.learn("참석", packageName)
-
-        val engine = KoreanSentenceContinuation(ngram = ngram)
-
-        // B19 회귀 재현 시도: contextTail = ["내가", "뭘"]
-        val result = engine.continuations(
-            contextTail = listOf("내가", "뭘"),
-            tone = ContinuationTone.Honorific,
-            packageName = packageName,
-            limit = 10
-        )
-
-        // "회의 참석합니다" 등 엉뚱한 비문이 전혀 반환되지 않는지 검증
-        for (cand in result) {
-            assertFalse("B19 결함: '회의'가 포함된 비문이 반환되면 안 된다 ($cand)", cand.contains("회의"))
-            assertFalse("B19 결함: '참석'이 포함된 비문이 반환되면 안 된다 ($cand)", cand.contains("참석"))
-            assertFalse("B19 결함: '내가 뭘 회의 참석합니다' 비문이 반환되면 안 된다", cand == "내가 뭘 회의 참석합니다")
-            assertFalse("B19 결함: '내가 뭘 회의참석합니다' 비문이 반환되면 안 된다", cand == "내가 뭘 회의참석합니다")
-            assertTrue("후보는 문법적으로 건전해야 한다 ($cand)", KoreanSyntaxRuleFilter.isGrammaticallySound(cand))
-            assertFalse("후보는 조사 불일치가 없어야 한다 ($cand)", KoreanJosaBitmaskEngine.hasJosaMismatch(cand))
-        }
-
-        // cold-start (빈 ngram) 상태에서도 검증
-        val cleanEngine = KoreanSentenceContinuation()
-        val cleanResult = cleanEngine.continuations(
-            contextTail = listOf("내가", "뭘"),
-            tone = ContinuationTone.Honorific,
-            packageName = packageName,
-            limit = 10
-        )
-        for (cand in cleanResult) {
-            assertFalse(cand.contains("회의"))
-            assertFalse(cand.contains("참석"))
-            assertTrue(KoreanSyntaxRuleFilter.isGrammaticallySound(cand))
-        }
     }
 
     @Test

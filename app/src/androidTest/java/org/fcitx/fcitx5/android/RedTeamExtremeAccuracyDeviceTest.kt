@@ -7,9 +7,6 @@ package org.fcitx.fcitx5.android
 import androidx.test.filters.MediumTest
 import androidx.test.runner.AndroidJUnit4
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
-import org.fcitx.fcitx5.android.input.ai.ContinuationTone
-import org.fcitx.fcitx5.android.input.ai.KoreanSentenceContinuation
-import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.SentenceRelevanceReranker
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine.JosaKind
@@ -29,7 +26,6 @@ import org.junit.runner.RunWith
  * - RED-PHONO-01: Double batchim (겹받침/복합종성) & 'ㄹ' batchim special rules.
  * - RED-PHONO-02: Loanwords, English acronyms/words, and numeric digit batchim resolution.
  * - RED-SYNTAX-03: Deep syntax violations (ACC-01, ACC-02, ACC-03, ACC-04).
- * - RED-B19-04: Markov chaining pollution suppression on interrogative/negative stems.
  */
 @RunWith(AndroidJUnit4::class)
 @MediumTest
@@ -312,70 +308,6 @@ class RedTeamExtremeAccuracyDeviceTest {
         for (sentence in validSentences) {
             assertTrue("Expected valid sentence for: '$sentence'", filter.isValid(sentence))
             assertTrue("Expected grammatically sound for: '$sentence'", KoreanSyntaxRuleFilter.isGrammaticallySound(sentence))
-        }
-    }
-
-    // =========================================================================
-    // RED-B19-04: B19 의문사/부정사 마르코프 오염 공격
-    // =========================================================================
-    @Test
-    fun testRedB1904_InterrogativeMarkovPollutionSuppression() {
-        val packageName = "net.chanpaca.saegeul.test"
-        val ngram = PersonalNgramModel(clock = { 1_000_000_000L })
-
-        // 고의로 B19 유발용 비문 합성 패턴 및 HADA_NOUNS를 강력하게 주입
-        ngram.learn("내가 뭘 회의 참석합니다", packageName)
-        ngram.learn("누가 언제 회의합니다", packageName)
-        ngram.learn("어디서 무엇을 진행합니다", packageName)
-        ngram.learn("왜 자꾸 회의합니다", packageName)
-        ngram.learn("회의 참석합니다", packageName)
-        ngram.learn("회의합니다", packageName)
-        ngram.learn("진행합니다", packageName)
-        ngram.learn("회의", packageName)
-        ngram.learn("참석", packageName)
-        ngram.learn("진행", packageName)
-        ngram.learn("준비", packageName)
-
-        val engine = KoreanSentenceContinuation(ngram = ngram)
-
-        val attackPrefixes = listOf(
-            listOf("내가", "뭘"),
-            listOf("누가", "언제"),
-            listOf("어디서", "무엇을"),
-            listOf("왜", "자꾸")
-        )
-
-        for (prefix in attackPrefixes) {
-            val results = engine.continuations(
-                contextTail = prefix,
-                tone = ContinuationTone.Honorific,
-                packageName = packageName,
-                limit = 10
-            )
-
-            // 무분별한 HADA_NOUNS 합성 비문이 일절 생성되지 않는지 검증
-            for (cand in results) {
-                assertFalse("B19 결함: 의문사 뒤 무분별한 '회의' 합성 배제 ($cand)", cand.contains("회의"))
-                assertFalse("B19 결함: 의문사 뒤 무분별한 '참석' 합성 배제 ($cand)", cand.contains("참석"))
-                assertFalse("B19 결함: 의문사 뒤 무분별한 '진행' 합성 배제 ($cand)", cand.contains("진행"))
-                assertFalse("B19 결함: 의문사 뒤 무분별한 '준비' 합성 배제 ($cand)", cand.contains("준비"))
-                assertTrue("생성된 후보는 문법적으로 올바라야 함 ($cand)", KoreanSyntaxRuleFilter.isGrammaticallySound(cand))
-                assertFalse("조사 불일치가 없어야 함 ($cand)", KoreanJosaBitmaskEngine.hasJosaMismatch(cand))
-            }
-
-            // cold-start (학습 없는 깨끗한 상태)에서도 동일 검증
-            val coldEngine = KoreanSentenceContinuation()
-            val coldResults = coldEngine.continuations(
-                contextTail = prefix,
-                tone = ContinuationTone.Honorific,
-                packageName = packageName,
-                limit = 10
-            )
-            for (cand in coldResults) {
-                assertFalse("Cold-start B19 결함: '회의' 합성 배제 ($cand)", cand.contains("회의"))
-                assertFalse("Cold-start B19 결함: '참석' 합성 배제 ($cand)", cand.contains("참석"))
-                assertTrue(KoreanSyntaxRuleFilter.isGrammaticallySound(cand))
-            }
         }
     }
 

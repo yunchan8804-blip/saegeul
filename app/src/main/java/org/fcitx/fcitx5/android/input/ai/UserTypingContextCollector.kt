@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.input.ai
 class UserTypingContextCollector(
     private val maxSentencesPerPackage: Int = 5,
     private val maxCharLength: Int = 300,
-    private val minTriggerChars: Int = 6,
     private val onSentenceCommitted: ((packageName: String, sentence: String) -> Unit)? = null,
     private val diagnostics: CollectionDiagnostics? = null
 ) {

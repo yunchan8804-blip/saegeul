@@ -28,7 +28,7 @@ object SentenceRelevanceReranker {
     private const val LENGTH_LONG_FACTOR = 0.95f
 
     // Re-ranking only reweights within an already-bounded confidence range, so clamp the boosted
-    // score back into the source scale like the other adjustment layers (AiToneAdaptivePredictor,
+    // score back into the source scale like the other adjustment layers (AiContextualPredictor,
     // personalized_style) do, so a near-1.0 candidate cannot exceed 1.0 and dominate the final sort.
     private const val MAX_CONFIDENCE = 0.999f
 

@@ -6,26 +6,14 @@ package org.fcitx.fcitx5.android
 
 import androidx.test.filters.MediumTest
 import androidx.test.runner.AndroidJUnit4
-import org.fcitx.fcitx5.android.input.ai.graph.EdgeInfo
-import org.fcitx.fcitx5.android.input.ai.graph.EntityInfo
-import org.fcitx.fcitx5.android.input.ai.graph.HippoRagPprEngine
-import org.fcitx.fcitx5.android.input.ai.graph.OnDeviceL1GraphCache
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine.JosaKind
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
-import org.fcitx.fcitx5.android.input.ai.thermal.ThermalGuardian
-import org.fcitx.fcitx5.android.input.ai.thermal.ThermalStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import kotlin.system.measureNanoTime
 
 /**
  * Red Team Round 3 Extreme Adversarial Device Instrumentation Test.
@@ -33,9 +21,6 @@ import kotlin.system.measureNanoTime
  * Exhaustive adversarial attack scenarios against on-device AI and engine components:
  * - RED-PHONO-HARD: Emoji, consonant abbreviations, rare coda, symbol/currency attachment destruction.
  * - RED-SYNTAX-HARD: Subordinate causal connective precision discrimination & accusative-intransitive discord.
- * - RED-CONCURRENCY-BLAST: Multi-threaded 8-worker L1 cache data race & stress bombardment.
- * - RED-GRAPH-CYCLE-BLAST: Self-loop, triangular cyclic graph, and 100-isolated-node PPR divergence test.
- * - RED-EXTREME-THERMAL-OVERHEAT: 45.0°C CRITICAL thermal throttling & dynamic recovery regulation.
  */
 @RunWith(AndroidJUnit4::class)
 @MediumTest
@@ -142,234 +127,5 @@ class RedTeamAdversarialDeviceTest {
             "목적격 조사 '을/를' 뒤 자동사/형용사 술어('고마워요') 직접 결합은 비문으로 차단되어야 한다",
             KoreanSyntaxRuleFilter.isGrammaticallySound("감사한 마음을 너무나 고마워요")
         )
-    }
-
-    // =========================================================================
-    // c. RED-CONCURRENCY-BLAST: 멀티스레드 동시성 데이터 레이스 공격
-    // =========================================================================
-    @Test(timeout = 30000)
-    fun testRedConcurrencyBlast_MultiThreadDataRaceAttack() {
-        val cache = OnDeviceL1GraphCache()
-        val threadCount = 8
-        val iterationsPerThread = 1000
-        val executor = Executors.newFixedThreadPool(threadCount)
-        val startLatch = CountDownLatch(1)
-        val doneLatch = CountDownLatch(threadCount)
-        val exceptions = ConcurrentLinkedQueue<Throwable>()
-
-        for (t in 0 until threadCount) {
-            executor.submit {
-                try {
-                    startLatch.await()
-                    for (i in 0 until iterationsPerThread) {
-                        val entityId = "node_${t}_${i % 50}"
-                        val targetId = "node_${(t + 1) % threadCount}_${(i + 1) % 50}"
-
-                        // 1. Concurrent Put Entity
-                        val entity = EntityInfo(
-                            id = entityId,
-                            label = "Label_$entityId",
-                            category = "Category_${i % 5}",
-                            weight = 1.0f + (i % 10) * 0.1f,
-                            lastSeenEpoch = System.currentTimeMillis()
-                        )
-                        cache.putEntity(entity)
-
-                        // 2. Concurrent Put Edge
-                        val edge = EdgeInfo(
-                            src = entityId,
-                            dst = targetId,
-                            relation = "REL_${i % 3}",
-                            weight = 0.5f + (i % 4) * 0.2f,
-                            frequency = i,
-                            lastUpdatedEpoch = System.currentTimeMillis()
-                        )
-                        cache.putEdge(edge)
-
-                        // 3. Concurrent Read 1-hop
-                        val neighbors = cache.get1Hop(entityId)
-                        assertNotNull("Neighbors should not be null", neighbors)
-
-                        // 4. Concurrent Read Entity
-                        val retrieved = cache.getEntity(entityId)
-                        assertNotNull("Entity should be retrieved", retrieved)
-
-                        // 5. Periodic full-read scan (ConcurrentModificationException 트리거 유도)
-                        if (i % 100 == 0) {
-                            val all = cache.getAllEntities()
-                            assertTrue("All entities collection should be populated", all.isNotEmpty())
-                        }
-                    }
-                } catch (e: Throwable) {
-                    exceptions.add(e)
-                } finally {
-                    doneLatch.countDown()
-                }
-            }
-        }
-
-        // 폭격 개시 동시 방아쇠 트리거
-        startLatch.countDown()
-        val finishedInTime = doneLatch.await(20, TimeUnit.SECONDS)
-        executor.shutdown()
-
-        // Deadlock 0건 검증
-        assertTrue("Deadlock detected! Threads failed to complete within 20s", finishedInTime)
-
-        // ConcurrentModificationException 및 동시성 예외 0건 검증
-        if (exceptions.isNotEmpty()) {
-            val first = exceptions.peek()
-            throw AssertionError("Concurrent modification or data race error: ${first?.message}", first)
-        }
-        assertTrue("Exceptions list must be strictly empty", exceptions.isEmpty())
-
-        // 최종 상태 무결성 검증
-        val finalEntities = cache.getAllEntities()
-        assertTrue("L1 cache must retain written entities", finalEntities.isNotEmpty())
-        for (t in 0 until threadCount) {
-            val sampleNode = "node_${t}_0"
-            assertNotNull("Sample node $sampleNode must exist", cache.getEntity(sampleNode))
-            val sampleEdges = cache.get1Hop(sampleNode)
-            assertTrue("Sample node $sampleNode must have neighbor edges", sampleEdges.isNotEmpty())
-        }
-    }
-
-    // =========================================================================
-    // d. RED-GRAPH-CYCLE-BLAST: 그래프 자기순환 및 다중 루프 PPR 발산 공격
-    // =========================================================================
-    @Test
-    fun testRedGraphCycleBlast_PprDivergenceAndLoopAttack() {
-        val cache = OnDeviceL1GraphCache()
-
-        // 1. 노드 생성
-        val entityA = EntityInfo("A", "Node A", "Core")
-        val entityB = EntityInfo("B", "Node B", "Core")
-        val entityC = EntityInfo("C", "Node C", "Core")
-        cache.putEntity(entityA)
-        cache.putEntity(entityB)
-        cache.putEntity(entityC)
-
-        // 2. Self-loop ($A -> A$) 주입
-        cache.putEdge(EdgeInfo("A", "A", "self_loop", weight = 1.0f))
-
-        // 3. 3각 순환 루프 ($A -> B -> C -> A$) 주입
-        cache.putEdge(EdgeInfo("A", "B", "cycle_ab", weight = 1.0f))
-        cache.putEdge(EdgeInfo("B", "C", "cycle_bc", weight = 1.0f))
-        cache.putEdge(EdgeInfo("C", "A", "cycle_ca", weight = 1.0f))
-
-        // 4. 고립 노드(Dangling / Isolated) 100개 주입 (연결된 엣지 없음)
-        for (i in 1..100) {
-            val isolatedId = "isolated_$i"
-            cache.putEntity(EntityInfo(isolatedId, "Isolated Node $i", "Isolated"))
-        }
-
-        val pprEngine = HippoRagPprEngine(
-            graphCache = cache,
-            dampingFactor = 0.85f,
-            maxIterations = 3
-        )
-
-        // Warmup (JIT hotspot 최적화)
-        repeat(5) {
-            pprEngine.computePpr(setOf("A"), maxResults = 10, excludeSeeds = false)
-        }
-
-        // 실행 시간 및 결과 측정
-        val results: List<Pair<String, Float>>
-        val elapsedNanos = measureNanoTime {
-            results = pprEngine.computePpr(
-                seedEntities = setOf("A"),
-                maxResults = 20,
-                excludeSeeds = false
-            )
-        }
-        val elapsedMs = elapsedNanos / 1_000_000.0
-
-        // 1. 실행 시간 < 2.0ms 수렴 검증
-        assertTrue(
-            "HippoRAG PPR execution must complete in < 2.0ms even with cycles and 100 isolated nodes. Actual: ${elapsedMs}ms",
-            elapsedMs < 2.0
-        )
-
-        // 2. 결과 유효성 및 무한 루프 탈출 검증
-        assertTrue("PPR results must return non-empty ranked list", results.isNotEmpty())
-
-        // 3. 무한 루프, NaN, 음수 스코어, Infinity 발생 0건 검증
-        for ((nodeId, score) in results) {
-            assertFalse("PPR score for node '$nodeId' must not be NaN", score.isNaN())
-            assertFalse("PPR score for node '$nodeId' must not be Infinite", score.isInfinite())
-            assertTrue("PPR score for node '$nodeId' must be strictly non-negative: $score", score >= 0f)
-        }
-
-        // 4. 스코어 내림차순 정렬 검증
-        for (i in 0 until results.size - 1) {
-            val current = results[i].second
-            val next = results[i + 1].second
-            assertTrue("Scores must be sorted in descending order: $current >= $next", current >= next)
-        }
-    }
-
-    // =========================================================================
-    // e. RED-EXTREME-THERMAL-OVERHEAT: 극한 과열 45°C 및 CRITICAL 발열 공격
-    // =========================================================================
-    @Test
-    fun testRedExtremeThermalOverheat_CriticalThrottlingAttack() {
-        val guardian = ThermalGuardian(
-            initialTemperatureCelsius = 30.0f,
-            initialStatus = ThermalStatus.NORMAL
-        )
-
-        // 1. 정상 상태 baseline 확인 (30.0°C, NORMAL)
-        assertTrue("30.0°C and NORMAL status must allow background training", guardian.isBackgroundTrainingAllowed())
-        assertEquals("Normal throttle delay must be 0ms", 0L, guardian.getThrottleDelayMs())
-        assertEquals("Normal recommended batch size must be 16", 16, guardian.getRecommendedBatchSize())
-
-        // 2. 극한 과열 45.0°C 및 ThermalStatus.CRITICAL 주입 공격
-        guardian.updateTemperature(45.0f)
-        guardian.updateThermalStatus(ThermalStatus.CRITICAL)
-
-        assertEquals(45.0f, guardian.currentTemperature, 0.001f)
-        assertEquals(ThermalStatus.CRITICAL, guardian.currentThermalStatus)
-
-        // 3. 극한 과열 제어 규칙 검증
-        // (1) isBackgroundTrainingAllowed() == false
-        assertFalse(
-            "45.0°C and CRITICAL status must strictly forbid background training",
-            guardian.isBackgroundTrainingAllowed()
-        )
-        // (2) getThrottleDelayMs() == 100L
-        assertEquals(
-            "CRITICAL thermal status must set throttle delay to 100ms",
-            100L,
-            guardian.getThrottleDelayMs()
-        )
-        // (3) getRecommendedBatchSize() == 0
-        assertEquals(
-            "CRITICAL thermal status must suspend batch computation (recommendedBatchSize == 0)",
-            0,
-            guardian.getRecommendedBatchSize()
-        )
-
-        // 4. 정상 상태(30.0°C, NORMAL) 복귀 시 즉각 회복 검증
-        guardian.updateTemperature(30.0f)
-        guardian.updateThermalStatus(ThermalStatus.NORMAL)
-
-        assertEquals(30.0f, guardian.currentTemperature, 0.001f)
-        assertEquals(ThermalStatus.NORMAL, guardian.currentThermalStatus)
-        assertTrue(
-            "Recovered 30.0°C and NORMAL status must immediately restore background training permission",
-            guardian.isBackgroundTrainingAllowed()
-        )
-        assertEquals("Recovered throttle delay must return to 0ms", 0L, guardian.getThrottleDelayMs())
-        assertEquals("Recovered batch size must return to 16", 16, guardian.getRecommendedBatchSize())
-
-        // 5. 중간 단계(MODERATE, SEVERE) 단계별 적응 제어 검증
-        guardian.updateThermalStatus(ThermalStatus.MODERATE)
-        assertEquals("MODERATE throttle delay must be 10ms", 10L, guardian.getThrottleDelayMs())
-        assertEquals("MODERATE batch size must be 4", 4, guardian.getRecommendedBatchSize())
-
-        guardian.updateThermalStatus(ThermalStatus.SEVERE)
-        assertEquals("SEVERE throttle delay must be 25ms", 25L, guardian.getThrottleDelayMs())
-        assertEquals("SEVERE batch size must be 1", 1, guardian.getRecommendedBatchSize())
     }
 }

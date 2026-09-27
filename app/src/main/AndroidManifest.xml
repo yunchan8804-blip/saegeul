@@ -240,11 +240,6 @@
                 <action android:name="${applicationId}.IPC" />
             </intent-filter>
         </service>
-        <service
-            android:name=".input.ai.daemon.AiDaemonService"
-            android:exported="false"
-            android:process=":ai_daemon" />
-
         <provider
             android:name=".provider.FcitxDataProvider"
             android:authorities="${applicationId}.provider"

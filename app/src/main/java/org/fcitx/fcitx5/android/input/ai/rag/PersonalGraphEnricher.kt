@@ -28,11 +28,11 @@ data class ChunkEnrichResult(
 )
 
 /**
- * Orchestrates the companion enrichment pipeline: batches the user's own committed sentences from
- * [vault], sends them to the companion LLM CLI (via the injected [enrich] `generate` callback) to
+ * Orchestrates the on-device enrichment pipeline: batches the user's own committed sentences from
+ * [vault], sends them to the on-device Gemma model (via the injected [enrich] `generate` callback) to
  * extract a "personal knowledge graph", parses the returned JSON, merges it across chunks, and
  * persists the result into [graphStore]. No network code lives here - [enrich]'s caller wires the
- * actual companion transport.
+ * actual on-device model call.
  */
 class PersonalGraphEnricher(
     private val vault: PersonalSentenceVault,
@@ -256,7 +256,7 @@ private fun parseChunk(raw: String?): ChunkParseResult {
 }
 
 /**
- * Extracts the JSON object substring from a companion response that may be wrapped in a
+ * Extracts the JSON object substring from an on-device model response that may be wrapped in a
  * ```json code fence and/or surrounded by explanatory prose. Returns null when no `{...}`
  * object can be located at all.
  */

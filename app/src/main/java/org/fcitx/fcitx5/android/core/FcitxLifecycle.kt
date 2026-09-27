@@ -113,8 +113,5 @@ suspend inline fun <T> FcitxLifecycle.whenAtState(
 suspend inline fun <T> FcitxLifecycle.whenReady(noinline block: suspend CoroutineScope.() -> T) =
     whenAtState(FcitxLifecycle.State.READY, block)
 
-suspend inline fun <T> FcitxLifecycle.whenStopped(noinline block: suspend CoroutineScope.() -> T) =
-    whenAtState(FcitxLifecycle.State.STOPPED, block)
-
 fun <T> FcitxLifecycle.launchWhenReady(block: suspend CoroutineScope.() -> T) =
     lifecycleScope.launch { whenReady(block) }

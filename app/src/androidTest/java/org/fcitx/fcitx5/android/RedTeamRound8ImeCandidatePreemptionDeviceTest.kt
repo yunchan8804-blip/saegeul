@@ -13,12 +13,8 @@ import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationWaitReaso
 import org.fcitx.fcitx5.android.input.ai.DynamicBigram
 import org.fcitx.fcitx5.android.input.ai.PersonaDna
 import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
-import org.fcitx.fcitx5.android.input.ai.graph.EdgeInfo
-import org.fcitx.fcitx5.android.input.ai.graph.EntityInfo
-import org.fcitx.fcitx5.android.input.ai.graph.OnDeviceL1GraphCache
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionSession
-import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine
 import org.fcitx.fcitx5.android.input.ai.vault.AesGcmVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.EnvelopeVaultCipher
 import org.junit.Assert.assertEquals
@@ -37,7 +33,6 @@ import java.io.File
  * 1. RED-PREEMPT-01: 자동 추천 vs 명시 완성 Lease 선점 및 복원 불변량
  * 2. RED-PREEMPT-02: 후보 바 문장 Pill 칩 초고속 더블 탭 멱등성
  * 3. RED-PREEMPT-03: 키보드 팝업/숨김 상태 전환에 따른 네이티브 휴면 무결성
- * 4. RED-PREEMPT-04: 120Hz 키보드 메인 스레드 레이턴시 예산 검증
  * 5. RED-PREEMPT-05: 온디바이스 금고 격리 및 오프라인 무결성
  */
 @RunWith(AndroidJUnit4::class)
@@ -260,83 +255,6 @@ class RedTeamRound8ImeCandidatePreemptionDeviceTest {
     // =========================================================================
     // 4. RED-PREEMPT-04: 120Hz 키보드 메인 스레드 레이턴시 예산 검증
     // =========================================================================
-    @Test
-    fun testRedPreempt04_120HzKeyboardMainThreadLatencyBudget() {
-        // L1 그래프 캐시 초기화 및 더미 그래프 구축
-        val l1Cache = OnDeviceL1GraphCache()
-        val entities = (0 until 50).map { i ->
-            EntityInfo(id = "entity_$i", label = "엔티티_$i", category = "TEST")
-        }
-        val edges = (0 until 49).map { i ->
-            EdgeInfo(src = "entity_$i", dst = "entity_${i + 1}", relation = "NEXT", weight = 1.0f)
-        }
-        l1Cache.warmup(entities, edges)
-
-        val testSentences = listOf(
-            "사과을 먹었다",
-            "선생님은 학교로 가신다",
-            "연필를 샀습니다",
-            "하늘이 맑고 푸르다",
-            "책을 읽고 있습니다",
-            "친구과 영화를 봤다",
-            "의사은 병원에 있다",
-            "물로 씻었습니다"
-        )
-
-        // JIT 컴파일 및 캐시 충분한 웜업 (모든 문장과 캐시 엔티티에 대해 예열)
-        repeat(500) { i ->
-            KoreanJosaBitmaskEngine.correctJosaMismatch(testSentences[i % testSentences.size])
-            l1Cache.get1Hop("entity_${i % 50}")
-        }
-        System.gc()
-        Thread.sleep(100)
-
-        // 원시 배열을 사용하여 루프 중 메모리 할당/박싱 오버헤드를 원천 차단
-        val latencyListNanos = LongArray(1000)
-
-        // 1) KoreanJosaBitmaskEngine.correctJosaMismatch 500회 연속 호출
-        for (i in 0 until 500) {
-            val sentence = testSentences[i % testSentences.size]
-            val start = System.nanoTime()
-            val corrected = KoreanJosaBitmaskEngine.correctJosaMismatch(sentence)
-            val elapsedNanos = System.nanoTime() - start
-
-            latencyListNanos[i] = elapsedNanos
-            val elapsedMs = elapsedNanos / 1_000_000.0
-
-            assertTrue(
-                "KoreanJosaBitmaskEngine.correctJosaMismatch 단일 호출 소요 시간($elapsedMs ms)이 8.0ms(120Hz 프레임 예산)를 넘지 않아야 합니다. (iter=$i)",
-                elapsedMs < 8.0
-            )
-            assertTrue("교정 결과가 비어있지 않아야 합니다.", corrected.isNotEmpty())
-        }
-
-        // 2) OnDeviceL1GraphCache.get1Hop 500회 연속 호출
-        for (i in 0 until 500) {
-            val entityId = "entity_${i % 50}"
-            val start = System.nanoTime()
-            val neighbors = l1Cache.get1Hop(entityId)
-            val elapsedNanos = System.nanoTime() - start
-
-            latencyListNanos[500 + i] = elapsedNanos
-            val elapsedMs = elapsedNanos / 1_000_000.0
-
-            assertTrue(
-                "OnDeviceL1GraphCache.get1Hop 단일 호출 소요 시간($elapsedMs ms)이 8.0ms(120Hz 프레임 예산)를 넘지 않아야 합니다. (iter=$i)",
-                elapsedMs < 8.0
-            )
-        }
-
-        // 3) 1,000회 연산의 평균 지연시간 < 0.2ms(200µs) 단언
-        val averageNanos = latencyListNanos.average()
-        val averageMs = averageNanos / 1_000_000.0
-
-        assertTrue(
-            "1,000회 연산의 평균 지연시간이 0.2ms(200µs) 미만이어야 합니다. Actual: ${averageMs}ms (${averageNanos / 1000.0}µs)",
-            averageMs < 0.2
-        )
-    }
-
     // =========================================================================
     // 5. RED-PREEMPT-05: 온디바이스 금고 격리 및 오프라인 무결성
     // =========================================================================

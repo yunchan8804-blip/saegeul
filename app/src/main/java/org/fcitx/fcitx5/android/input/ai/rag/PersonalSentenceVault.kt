@@ -177,7 +177,7 @@ class PersonalSentenceVault(
     }
 
     /**
-     * Exports up to [limit] stored sentences (already PII-scrubbed) for the companion
+     * Exports up to [limit] stored sentences (already PII-scrubbed) for the on-device
      * enrichment pipeline, ranked by [decayedCount] descending so the sentences that are still
      * most "alive" (recent and/or repeated) are sent first. Read-only; does not affect retrieval.
      */
