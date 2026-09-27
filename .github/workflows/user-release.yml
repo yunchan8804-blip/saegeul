@@ -60,6 +60,10 @@ jobs:
 
       - name: Set up Android
         uses: android-actions/setup-android@v3
+        with:
+          # The runner's cmdline-tools no longer ship the retired "tools" package the
+          # action installs by default, which fails sdkmanager before any build step.
+          packages: platform-tools
 
       - name: Install native build dependencies
         shell: bash
