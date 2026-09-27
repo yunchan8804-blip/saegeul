@@ -306,7 +306,7 @@ $hangulManifest = Get-ManifestValues -ApkPath $resolvedHangulApk
 $expectedPluginAction = "$ExpectedApplicationId.plugin.MANIFEST"
 $expectedPluginMetadata = "$ExpectedApplicationId.plugin.METADATA"
 $expectedIpcPermission = "$ExpectedApplicationId.permission.IPC"
-$expectedOAuthScheme = "$ExpectedApplicationId.oauth"
+$removedOAuthScheme = "$ExpectedApplicationId.oauth"
 
 if ($expectedIpcPermission -notin $mainManifest.Permissions) {
     throw "Main APK does not declare the expected IPC permission '$expectedIpcPermission'."
@@ -314,8 +314,10 @@ if ($expectedIpcPermission -notin $mainManifest.Permissions) {
 if ($expectedPluginAction -notin $mainManifest.Actions) {
     throw "Main APK does not query the expected plugin action '$expectedPluginAction'."
 }
-if ($expectedOAuthScheme -notin $mainManifest.Schemes) {
-    throw "Main APK does not declare the expected OAuth scheme '$expectedOAuthScheme'."
+# External writing AI (and its OAuth sign-in) was removed on 2026-09-24; a leftover redirect
+# scheme would be an unused sign-in entry point, so its presence now fails the audit.
+if ($removedOAuthScheme -in $mainManifest.Schemes) {
+    throw "Main APK still declares the removed OAuth scheme '$removedOAuthScheme'."
 }
 if ($expectedPluginAction -notin $hangulManifest.Actions) {
     throw "Hangul APK does not declare the expected plugin action '$expectedPluginAction'."
@@ -379,7 +381,7 @@ Write-Output "Release identity audit: PASS"
 Write-Output "Product: $ExpectedProductName"
 Write-Output "Main application ID: $mainApplicationId"
 Write-Output "Hangul application ID: $hangulApplicationId"
-Write-Output "OAuth scheme: $expectedOAuthScheme"
+Write-Output "Removed OAuth scheme absent: $removedOAuthScheme"
 Write-Output "Plugin action: $expectedPluginAction"
 Write-Output "Signing certificate SHA-256: $mainCertificate"
 Write-Output "Signature schemes: $(($mainSignature.Schemes.Keys | Where-Object { $mainSignature.Schemes[$_] }) -join ', ')"
