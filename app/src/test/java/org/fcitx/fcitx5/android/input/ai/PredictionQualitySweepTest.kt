@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
+import org.fcitx.fcitx5.android.input.ai.rule.KoreanSpacingLint
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackIndex
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackText
@@ -75,15 +76,7 @@ class PredictionQualitySweepTest {
             "나 지금 ", "너 어디야? 나 ", "잘 자 내일 ", "고마워 진짜 ", "괜찮아 걱정마 "
         )
 
-        // 흔한 띄어쓰기 오류 패턴(의존명사/보조용언 붙여쓰기). 오탐이 적도록 구체적인 형태소
-        // 결합만 매칭하고, "맛있게"/"재미있게"처럼 원래부터 붙여 쓰는 형용사는 건드리지 않는다.
-        private val SPACING_PATTERNS = listOf(
-            "수있_붙여쓰기" to Regex("[가-힣]수있"),
-            "것같_붙여쓰기" to Regex("것같"),
-            "하면되_붙여쓰기" to Regex("하면되"),
-            "까싶_는지싶_붙여쓰기" to Regex("까싶|는지싶"),
-            "명사+있게_붙여쓰기" to Regex("(자신감|책임감|열정|성의|여유|관심|실력|정성|능력|자격|용기|믿음)있게")
-        )
+        // 흔한 띄어쓰기 오류 패턴 검사는 정본 KoreanSpacingLint를 그대로 쓴다(중복 규칙 금지).
 
         private fun findAsset(vararg candidates: String): File =
             candidates.map(::File).firstOrNull { it.exists() }
@@ -199,10 +192,10 @@ class PredictionQualitySweepTest {
                 packageName = "com.example.sweep",
                 limit = 8
             )
-            val contextTone = if (case.context.isNotBlank()) {
-                semanticPredictor.inferTone(case.context)
+            val contextEvidence = if (case.context.isNotBlank()) {
+                KoreanToneClassifier.evidence(case.context)
             } else {
-                KoreanTone.Neutral
+                null
             }
             val strokeTrim = case.stroke.trim()
             val contextTrim = case.context.trim()
@@ -218,22 +211,18 @@ class PredictionQualitySweepTest {
                     issues += Issue("SYNTAX", syntaxResult.violationType.code, case, candidate)
                 }
 
-                SPACING_PATTERNS.forEach { (name, regex) ->
-                    if (regex.containsMatchIn(prediction.text)) {
-                        issues += Issue("SPACING", name, case, candidate)
-                    }
+                if (KoreanSpacingLint.hasSpacingIssue(prediction.text)) {
+                    issues += Issue("SPACING", "KoreanSpacingLint", case, candidate)
                 }
 
                 if (hasDuplication(prediction.text)) {
                     issues += Issue("DUP", "음절/어절 반복", case, candidate)
                 }
 
-                if (contextTone == KoreanTone.Honorific || contextTone == KoreanTone.Informal) {
-                    val candidateTone = semanticPredictor.inferTone(prediction.text)
-                    if ((candidateTone == KoreanTone.Honorific || candidateTone == KoreanTone.Informal) &&
-                        candidateTone != contextTone
-                    ) {
-                        issues += Issue("TONE", "문맥=$contextTone 후보=$candidateTone", case, candidate)
+                if (contextEvidence != null) {
+                    val candidateEvidence = KoreanToneClassifier.evidence(prediction.text)
+                    if (candidateEvidence != null && candidateEvidence != contextEvidence) {
+                        issues += Issue("TONE", "문맥=$contextEvidence 후보=$candidateEvidence", case, candidate)
                     }
                 }
 

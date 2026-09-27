@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
+import org.fcitx.fcitx5.android.input.ai.rule.KoreanSpacingLint
 import org.fcitx.fcitx5.android.input.ai.sentencepack.MatchEvidence
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 
@@ -37,7 +38,10 @@ object ImmediateContextualPredictions {
         }
         val trimmedContext = input.rawContext.trim(' ')
         generatedSpacingLookup?.invoke(trimmedContext)
-            ?.takeIf { target -> trimmedContext.isNotBlank() && target.isNotBlank() && target != trimmedContext }
+            ?.takeIf { target ->
+                trimmedContext.isNotBlank() && target.isNotBlank() && target != trimmedContext &&
+                    !KoreanSpacingLint.hasSpacingIssue(target)
+            }
             ?.let { target ->
                 val leadingSpaces = input.rawContext.takeWhile { it == ' ' }
                 val trailingSpaces = input.rawContext.takeLastWhile { it == ' ' }
@@ -69,6 +73,7 @@ object ImmediateContextualPredictions {
         if (persona != "browser" && persona != "commerce") {
             generatedSentenceLookup?.invoke(input.rawContext, input.limit)
                 ?.filter { it.evidence == MatchEvidence.PREFIX || it.evidence == MatchEvidence.CONTEXT_SUFFIX }
+                ?.filterNot { KoreanSpacingLint.hasSpacingIssue(it.suffix) }
                 ?.forEach { match ->
                     predictions += AiPrediction(
                         text = match.suffix,

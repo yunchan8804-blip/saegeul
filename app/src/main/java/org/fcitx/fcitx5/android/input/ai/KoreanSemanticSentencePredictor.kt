@@ -55,21 +55,6 @@ data class ExtractedEntities(
  */
 class KoreanSemanticSentencePredictor {
 
-    private val honorificMarkers = listOf(
-        "습니다", "입니다", "합니다", "드립니다", "보내드립니다", "송부드립니다",
-        "세요", "해요", "시겠습니까", "감사합니다", "고맙습니다", "죄송합니다",
-        "부탁드립니다", "말씀해", "확인했습니다", "알겠습니다", "되세요", "편안한"
-    )
-
-    private val informalMarkers = listOf(
-        "고마워", "고마웡", "땡큐", "수고했어", "축하해", "어디야", "밥 먹자",
-        "치맥", "갈래", "뭐해", "이따 봐", "알겠어", "ㅇㅋ", "ㄱㅅ", "ㅋㅋ", "ㅎㅎ",
-        "했어", "갔어", "봤어", "할게", "갈게", "올게", "먹었어", "있어?",
-        "올렸어", "해봐", "해줘", "보자", "볼까", "어때", "됐어", "맞아", "편해",
-        "뭘", "뭐", "시프지", "시퍼", "하구", "시프니까", "시프면", "싶으니까", "싶으면", "난", "그걸",
-        "좋아", "동의해", "오케이", "그래"
-    )
-
     private val knownPlaces = listOf(
         "판교", "강남", "홍대", "성수", "여의도", "종로", "신촌", "잠실", "광화문",
         "사당", "수원", "사무실", "회사", "회의실", "카페", "식당", "본사",
@@ -100,45 +85,10 @@ class KoreanSemanticSentencePredictor {
         private val PLACE_PARTICLE_REGEX = Regex("([가-힣]{2,6})(?:에서|역에서|쪽에서|근처)")
     }
 
-    fun inferTone(context: String): KoreanTone = inferToneInternal(context, null)
+    fun inferTone(context: String): KoreanTone = KoreanToneClassifier.infer(context, null)
 
-    internal fun inferToneInternal(context: String, preSplitSentences: List<String>? = null): KoreanTone {
-        if (context.isBlank()) return KoreanTone.Honorific
-        val clean = context.trim().lowercase()
-        val sentences = preSplitSentences ?: clean.split(SENTENCE_SPLIT_REGEX).map { it.trim() }.filter { it.isNotBlank() }
-        val lastSentence = sentences.lastOrNull() ?: clean
-
-        var honorificScore = 0
-        var informalScore = 0
-
-        // Historic sentences evaluated with 1x weight
-        sentences.dropLast(1).takeLast(3).forEach { s ->
-            honorificMarkers.forEach { marker ->
-                if (s.contains(marker)) honorificScore += 1
-            }
-            informalMarkers.forEach { marker ->
-                if (s.contains(marker)) informalScore += 1
-            }
-        }
-
-        // Latest sentence evaluated with 3x weight for rapid nuance reaction
-        honorificMarkers.forEach { marker ->
-            if (lastSentence.contains(marker)) honorificScore += 3
-        }
-        informalMarkers.forEach { marker ->
-            if (lastSentence.contains(marker)) informalScore += 3
-        }
-
-        return when {
-            informalScore > honorificScore -> KoreanTone.Informal
-            lastSentence.contains("배포") || lastSentence.contains("커밋") || lastSentence.contains("머지") ||
-                lastSentence.contains("pr") || lastSentence.contains("api") || lastSentence.contains("빌드") ||
-                clean.contains("배포") || clean.contains("커밋") -> KoreanTone.Technical
-            lastSentence.contains("보고서") || lastSentence.contains("품의") || lastSentence.contains("공유드립니다") ||
-                lastSentence.contains("회의록") || lastSentence.contains("검토 요청") -> KoreanTone.Business
-            else -> KoreanTone.Honorific
-        }
-    }
+    internal fun inferToneInternal(context: String, preSplitSentences: List<String>? = null): KoreanTone =
+        KoreanToneClassifier.infer(context, preSplitSentences)
 
     /**
      * Extracts concrete entities (times, locations, topics) and polarity from the context.
