@@ -63,6 +63,7 @@ class MobileHangulComposer {
     private fun pressCycle(token: Token.Cycle, nowMillis: Long): List<Output> {
         require(token.jamo.isNotEmpty()) { "A multitap key needs at least one jamo" }
         pendingDots = 0
+        val previousVowel = currentVowel
         val replacing = lastCycleId == token.id && nowMillis - lastCycleAt <= token.timeoutMillis
         cycleIndex = if (replacing) (cycleIndex + 1) % token.jamo.size else 0
         val selected = token.jamo[cycleIndex]
@@ -92,7 +93,7 @@ class MobileHangulComposer {
         lastJamo = next.singleOrNull()
         return buildList {
             if (replacing || cyclePreviousVowel != null && next != selected.toString()) {
-                add(Output.Backspace)
+                addAll(backspacesFor(previousVowel))
             }
             add(Output.Keys(encode(next)))
         }
@@ -126,7 +127,7 @@ class MobileHangulComposer {
         pendingDots = 0
         currentVowel = next
         lastJamo = next.single()
-        return replaceVowel(next)
+        return replaceVowel(requireNotNull(old), next)
     }
 
     private fun pressChunjiinVowel(primitive: Char): List<Output> {
@@ -148,7 +149,7 @@ class MobileHangulComposer {
         return if (old == null || combined == null) {
             listOf(Output.Keys(encode(next)))
         } else {
-            replaceVowel(next)
+            replaceVowel(old, next)
         }
     }
 
@@ -158,7 +159,12 @@ class MobileHangulComposer {
         return if (closesMultitap) emptyList() else listOf(Output.Space)
     }
 
-    private fun replaceVowel(next: String) = listOf(Output.Backspace, Output.Keys(encode(next)))
+    private fun replaceVowel(previous: String, next: String) =
+        backspacesFor(previous) + Output.Keys(encode(next))
+
+    /** libhangul Backspace removes one Dubeolsik input key, not one composed vowel. */
+    private fun backspacesFor(jamo: String?) =
+        List(jamo?.let(::encode)?.length ?: 0) { Output.Backspace }
 
     private fun encode(jamo: String) = jamo.map { dubeolsik.getValue(it) }.joinToString("")
 

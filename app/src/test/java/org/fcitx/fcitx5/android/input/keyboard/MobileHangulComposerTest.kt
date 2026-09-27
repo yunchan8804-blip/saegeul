@@ -61,8 +61,14 @@ class MobileHangulComposerTest {
         c.press(MobileHangulComposer.Token.VowelDot)
         c.press(MobileHangulComposer.Token.VowelEu)
         assertEquals(listOf(backspace, keys("hl")), c.press(MobileHangulComposer.Token.VowelI))
-        assertEquals(listOf(backspace, keys("hk")), c.press(MobileHangulComposer.Token.VowelDot))
-        assertEquals(listOf(backspace, keys("ho")), c.press(MobileHangulComposer.Token.VowelI))
+        assertEquals(
+            listOf(backspace, backspace, keys("hk")),
+            c.press(MobileHangulComposer.Token.VowelDot)
+        )
+        assertEquals(
+            listOf(backspace, backspace, keys("ho")),
+            c.press(MobileHangulComposer.Token.VowelI)
+        )
     }
 
     @Test
@@ -112,7 +118,10 @@ class MobileHangulComposerTest {
         assertEquals(listOf(backspace, keys("hk")), c.press(
             MobileHangulComposer.Token.Cycle("nr_a", listOf('ㅏ', 'ㅓ'), 1_500), 2_000
         ))
-        assertEquals(listOf(backspace, keys("ho")), c.press(MobileHangulComposer.Token.VowelI))
+        assertEquals(
+            listOf(backspace, backspace, keys("ho")),
+            c.press(MobileHangulComposer.Token.VowelI)
+        )
     }
 
     @Test
@@ -128,7 +137,40 @@ class MobileHangulComposerTest {
         assertEquals(listOf(keys("h")), c.press(oU, 100))
         assertEquals(listOf(backspace, keys("n")), c.press(oU, 200))
         assertEquals(listOf(backspace, keys("nj")), c.press(aEo, 300))
-        assertEquals(listOf(backspace, keys("np")), c.press(MobileHangulComposer.Token.VowelI, 400))
+        assertEquals(
+            listOf(backspace, backspace, keys("np")),
+            c.press(MobileHangulComposer.Token.VowelI, 400)
+        )
+    }
+
+    @Test
+    fun `compound vowel rewrites erase every Dubeolsik engine key`() {
+        val c = MobileHangulComposer()
+        val i = MobileHangulComposer.Token.VowelI
+        val dot = MobileHangulComposer.Token.VowelDot
+        val eu = MobileHangulComposer.Token.VowelEu
+
+        c.press(dot)
+        c.press(eu)
+        c.press(i)
+        assertEquals(
+            listOf(backspace, backspace, keys("hk")),
+            c.press(dot)
+        )
+        assertEquals(
+            listOf(backspace, backspace, keys("ho")),
+            c.press(i)
+        )
+
+        c.reset()
+        c.press(eu)
+        c.press(dot)
+        c.press(dot)
+        c.press(i)
+        assertEquals(
+            listOf(backspace, backspace, keys("np")),
+            c.press(i)
+        )
     }
 
     @Test
