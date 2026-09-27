@@ -92,6 +92,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val currentKeyboard: BaseKeyboard? get() = keyboards[currentKeyboardName]
 
+    /** Called whenever the attached surface changes in a way that can change [baseRowCount] (K15). */
+    var onKeyboardSurfaceChanged: (() -> Unit)? = null
+
+    fun currentBaseRowCount(): Int = currentKeyboard?.baseRowCount ?: 4
+
     private fun keyboard(name: String): BaseKeyboard? = keyboards[name] ?: keyboardFactories[name]?.invoke()?.also {
         keyboards[name] = it
         if (hangulLayoutKnown) applyHangulLayout(it, activeHangulLayout)
@@ -245,6 +250,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 if (windowManager.isAttached(this)) {
                     notifyBarLayoutChanged()
                 }
+                onKeyboardSurfaceChanged?.invoke()
             } else {
                 if (remember) {
                     lastSymbolType = PickerWindow.Key.Symbol.name
@@ -266,7 +272,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 expandedLandscapeGapDp = keyboardPrefs.splitKeyboardExpandedGapLandscape.getValue()
             )
         )
-        val splitCurrentSurface = profile.enabled && currentKeyboardName != NumberKeyboard.Name
+        val splitCurrentSurface = profile.enabled &&
+            currentKeyboardName != NumberKeyboard.Name &&
+            !currentKeyboardName.startsWith("MobileHangul:")
         currentKeyboard?.updateThumbSplit(
             enabled = splitCurrentSurface,
             centerGapPx = if (splitCurrentSurface) context.dp(profile.centerGapDp) else 0
@@ -288,10 +296,19 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
         switchLayout(targetLayout, remember = false)
         updateInputMethod(fcitx.runImmediately { inputMethodEntryCached })
+        currentKeyboard?.onStartInput()
     }
 
     override fun onImeUpdate(ime: InputMethodEntry) {
         updateInputMethod(ime)
+    }
+
+    override fun onSelectionUpdate(start: Int, end: Int) {
+        currentKeyboard?.onSelectionUpdate(start, end)
+    }
+
+    override fun onPreeditEmptyStateUpdate(empty: Boolean) {
+        currentKeyboard?.onPreeditEmptyStateUpdate(empty)
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
@@ -309,6 +326,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.onAttach()
         }
         notifyBarLayoutChanged()
+        onKeyboardSurfaceChanged?.invoke()
     }
 
     override fun onDetached() {

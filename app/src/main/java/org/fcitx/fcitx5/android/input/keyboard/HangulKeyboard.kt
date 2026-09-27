@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.popup.PopupAction
 import splitties.views.imageResource
 
 class HangulPositionKey(
@@ -55,6 +56,9 @@ class HangulKeyboard(context: Context, theme: Theme) : BaseKeyboard(context, the
             .filterIsInstance<HangulPositionKey>()
             .associateBy { it.appearance }
     }
+
+    // Full physical-key surface, never pinned; its layout is already five rows on its own.
+    override val baseRowCount: Int = Layout.size
 
     private val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
     private val space: TextKeyView by lazy { findViewById(R.id.button_space) }
@@ -109,6 +113,23 @@ class HangulKeyboard(context: Context, theme: Theme) : BaseKeyboard(context, the
         updateLegends()
     }
 
+    /** Shows the key's actual Hangul jamo instead of its Latin position letter. See K8. */
+    override fun onPopupAction(action: PopupAction) {
+        val transformed = when (action) {
+            is PopupAction.PreviewAction -> action.copy(content = transformPreview(action.content))
+            is PopupAction.PreviewUpdateAction -> action.copy(content = transformPreview(action.content))
+            else -> action
+        }
+        super.onPopupAction(transformed)
+    }
+
+    private fun transformPreview(c: String): String {
+        if (c.length != 1) return c
+        val shifted = shiftState == ShiftState.Once
+        return HangulKeyLegends.legend(c, shifted, layoutName)
+            ?: HangulKeyLegends.actionCharacter(c.single(), shifted).toString()
+    }
+
     override fun onReturnDrawableUpdate(returnDrawable: Int) {
         `return`.img.imageResource = returnDrawable
     }
@@ -145,7 +166,9 @@ class HangulKeyboard(context: Context, theme: Theme) : BaseKeyboard(context, the
     }
 
     private fun updateLegends() {
-        val shifted = shiftState != ShiftState.None
+        // The Shift jamo legend is only ever shown for a one-time Shift (K7); a locked Caps
+        // still types the shifted jamo, but the persistent key labels stay unshifted.
+        val shifted = shiftState == ShiftState.Once
         positionKeys.forEach { view ->
             val key = positionByAppearance.getValue(view.def).character
             view.mainText.text = HangulKeyLegends.legend(key.toString(), shifted, layoutName)

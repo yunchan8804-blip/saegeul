@@ -4,8 +4,17 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+/** Which vowel-combination table a mobile Hangul surface's directional/dot primitives use. */
+enum class MobileHangulFamily {
+    /** Builds ㅠ from ㆍ, so a following ㅣ combines into ㅝ (Chunjiin, ChunjiinPlus). */
+    Chunjiin,
+
+    /** Reaches ㅠ some other way, so a following ㅣ is always a new, separate vowel. */
+    Other
+}
+
 /** Converts Samsung-style mobile Hangul key semantics into Dubeolsik engine actions. */
-class MobileHangulComposer {
+class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangulFamily.Chunjiin) {
     sealed interface Output {
         data object Backspace : Output
         data object Space : Output
@@ -18,6 +27,13 @@ class MobileHangulComposer {
             val jamo: List<Char>,
             val timeoutMillis: Long = PHONEPAD_MULTITAP_TIMEOUT_MS,
             val naratgulVowelPair: Boolean = false
+        ) : Token
+
+        /** A punctuation key that cycles through [symbols] on repeated taps, like [Cycle]. */
+        data class SymbolCycle(
+            val id: String,
+            val symbols: List<Char>,
+            val timeoutMillis: Long = PHONEPAD_MULTITAP_TIMEOUT_MS
         ) : Token
 
         data class Jamo(val value: Char) : Token
@@ -34,6 +50,22 @@ class MobileHangulComposer {
     private var cycleIndex = 0
     private var lastCycleAt = 0L
     private var cyclePreviousVowel: String? = null
+
+    /** Dubeolsik keys currently visible in the backend for the active cycle's replaceable tail. */
+    private var cycleTailKeys = ""
+
+    /** Once true, [cyclePreviousVowel] has been folded into [cycleTailKeys] for this cycle. */
+    private var cycleTailIncludesPrevious = false
+
+    /** Whether the last jamo [pressCycle] selected was a vowel, for the space-swallow rule. */
+    private var lastCycleSelectedVowel = false
+
+    // Symbol cycles keep their own multitap bookkeeping so a punctuation key never shares a
+    // replace streak with a jamo cycle, and never closes on Boundary like one (K4).
+    private var lastSymbolCycleId: String? = null
+    private var lastSymbolCycleAt = 0L
+    private var symbolCycleIndex = 0
+
     private var currentVowel: String? = null
     private var pendingDots = 0
     private var lastJamo: Char? = null
@@ -44,13 +76,33 @@ class MobileHangulComposer {
         cycleIndex = 0
         lastCycleAt = 0L
         cyclePreviousVowel = null
+        cycleTailKeys = ""
+        cycleTailIncludesPrevious = false
+        lastCycleSelectedVowel = false
+        lastSymbolCycleId = null
+        lastSymbolCycleAt = 0L
+        symbolCycleIndex = 0
         currentVowel = null
         pendingDots = 0
         lastJamo = null
     }
 
+    fun pendingDotCount(): Int = pendingDots
+
+    /**
+     * Absorbs one accidental ㆍ tap locally so Backspace does not reach the Dubeolsik backend
+     * and delete the preceding completed glyph. Returns false when there is nothing pending, so
+     * the caller should send a normal Backspace instead.
+     */
+    fun cancelPendingDot(): Boolean {
+        if (pendingDots == 0) return false
+        pendingDots--
+        return true
+    }
+
     fun press(token: Token, nowMillis: Long = System.currentTimeMillis()): List<Output> = when (token) {
         is Token.Cycle -> pressCycle(token, nowMillis)
+        is Token.SymbolCycle -> pressSymbolCycle(token, nowMillis)
         is Token.Jamo -> emitJamo(token.value)
         Token.VowelI -> pressChunjiinVowel('ㅣ')
         Token.VowelDot -> pressDot()
@@ -60,42 +112,71 @@ class MobileHangulComposer {
         Token.Boundary -> pressBoundary(nowMillis)
     }
 
+    /**
+     * Replays a multitap cycle so the backend always ends up holding exactly what "the syllable
+     * before this cycle" + "the selected jamo combined with it" would be: [cycleTailKeys] is
+     * everything we ourselves put in the backend for this cycle, and [cyclePreviousVowel] (`P`)
+     * is only ever erased once, the first time a selection needs it gone; after that it either
+     * stays folded into a combined vowel or gets retyped alongside a non-combining selection.
+     */
     private fun pressCycle(token: Token.Cycle, nowMillis: Long): List<Output> {
         require(token.jamo.isNotEmpty()) { "A multitap key needs at least one jamo" }
         pendingDots = 0
-        val previousVowel = currentVowel
+        lastSymbolCycleId = null
         val replacing = lastCycleId == token.id && nowMillis - lastCycleAt <= token.timeoutMillis
         cycleIndex = if (replacing) (cycleIndex + 1) % token.jamo.size else 0
         val selected = token.jamo[cycleIndex]
 
         if (!replacing) {
             cyclePreviousVowel = currentVowel.takeIf { selected.isVowel() }
+            cycleTailKeys = ""
+            cycleTailIncludesPrevious = false
         }
         lastCycleId = token.id
         lastCycleTimeout = token.timeoutMillis
         lastCycleAt = nowMillis
 
-        if (!selected.isVowel()) {
-            currentVowel = null
-            lastJamo = selected
-            return buildList {
-                if (replacing) add(Output.Backspace)
-                add(Output.Keys(encode(selected.toString())))
-            }
+        val previous = cyclePreviousVowel
+        val combined = previous
+            ?.let { combineVowels(it, selected, token.naratgulVowelPair) }
+            ?.takeIf { selected.isVowel() }
+
+        val eraseUnfoldedPrevious = combined != null && !cycleTailIncludesPrevious
+        val backspaceCount = cycleTailKeys.length + when {
+            eraseUnfoldedPrevious && previous != null -> encode(previous).length
+            else -> 0
         }
 
-        val next = combineVowels(
-            cyclePreviousVowel,
-            selected,
-            token.naratgulVowelPair
-        ) ?: selected.toString()
-        currentVowel = next
-        lastJamo = next.singleOrNull()
+        val target = when {
+            combined != null -> encode(combined)
+            !cycleTailIncludesPrevious || previous == null -> encode(selected.toString())
+            else -> encode(previous) + encode(selected.toString())
+        }
+        if (combined != null) cycleTailIncludesPrevious = true
+
+        currentVowel = if (selected.isVowel()) (combined ?: selected.toString()) else null
+        lastJamo = if (selected.isVowel()) currentVowel?.singleOrNull() else selected
+        lastCycleSelectedVowel = selected.isVowel()
+        cycleTailKeys = target
+
+        return List(backspaceCount) { Output.Backspace } + Output.Keys(target)
+    }
+
+    private fun pressSymbolCycle(token: Token.SymbolCycle, nowMillis: Long): List<Output> {
+        require(token.symbols.isNotEmpty()) { "A symbol cycle key needs at least one symbol" }
+        val replacing =
+            lastSymbolCycleId == token.id && nowMillis - lastSymbolCycleAt <= token.timeoutMillis
+        symbolCycleIndex = if (replacing) (symbolCycleIndex + 1) % token.symbols.size else 0
+        val selected = token.symbols[symbolCycleIndex]
+        clearCycle()
+        pendingDots = 0
+        currentVowel = null
+        lastJamo = null
+        lastSymbolCycleId = token.id
+        lastSymbolCycleAt = nowMillis
         return buildList {
-            if (replacing || cyclePreviousVowel != null && next != selected.toString()) {
-                addAll(backspacesFor(previousVowel))
-            }
-            add(Output.Keys(encode(next)))
+            if (replacing) add(Output.Backspace)
+            add(Output.Keys(selected.toString()))
         }
     }
 
@@ -139,7 +220,7 @@ class MobileHangulComposer {
             primitive == 'ㅣ' && pendingDots == 2 -> "ㅕ"
             primitive == 'ㅡ' && pendingDots == 1 -> "ㅗ"
             primitive == 'ㅡ' && pendingDots == 2 -> "ㅛ"
-            primitive == 'ㅣ' -> chunjiinICombinations[old]
+            primitive == 'ㅣ' -> vowelICombination(old)
             else -> null
         }
         val next = combined ?: primitive.toString()
@@ -153,8 +234,19 @@ class MobileHangulComposer {
         }
     }
 
+    /** ㅠ + ㅣ → ㅝ only on the Chunjiin family, which is the only one that builds ㅠ from ㆍ. */
+    private fun vowelICombination(previous: String?): String? =
+        chunjiinICombinations[previous]?.takeIf { family == MobileHangulFamily.Chunjiin || previous != "ㅠ" }
+
+    /**
+     * A timely space only closes a still-open Phonepad-style *consonant* multitap (K4); a vowel
+     * cycle, and every 300ms single-vowel cycle, always produces a real space.
+     */
     private fun pressBoundary(nowMillis: Long): List<Output> {
-        val closesMultitap = lastCycleId != null && nowMillis - lastCycleAt <= lastCycleTimeout
+        val closesMultitap = lastCycleId != null &&
+            nowMillis - lastCycleAt <= lastCycleTimeout &&
+            lastCycleTimeout >= PHONEPAD_MULTITAP_TIMEOUT_MS &&
+            !lastCycleSelectedVowel
         reset()
         return if (closesMultitap) emptyList() else listOf(Output.Space)
     }
@@ -181,6 +273,10 @@ class MobileHangulComposer {
         lastCycleId = null
         lastCycleTimeout = 0L
         cyclePreviousVowel = null
+        cycleTailKeys = ""
+        cycleTailIncludesPrevious = false
+        lastCycleSelectedVowel = false
+        lastSymbolCycleId = null
     }
 
     private fun combineVowels(
@@ -217,7 +313,8 @@ class MobileHangulComposer {
             'ㄱ' to 'ㅋ', 'ㄴ' to 'ㄷ', 'ㄷ' to 'ㅌ',
             'ㅁ' to 'ㅂ', 'ㅂ' to 'ㅍ',
             'ㅅ' to 'ㅈ', 'ㅈ' to 'ㅊ', 'ㅇ' to 'ㅎ',
-            'ㅏ' to 'ㅑ', 'ㅓ' to 'ㅕ', 'ㅗ' to 'ㅛ', 'ㅜ' to 'ㅠ'
+            'ㅏ' to 'ㅑ', 'ㅓ' to 'ㅕ', 'ㅗ' to 'ㅛ', 'ㅜ' to 'ㅠ',
+            'ㅐ' to 'ㅒ', 'ㅔ' to 'ㅖ'
         )
 
         private val doubleConsonants = mapOf(

@@ -32,6 +32,15 @@ class PinnedNumberRowTest {
     }
 
     @Test
+    fun `K15 the height correction generalizes to a surface's own base row count`() {
+        // A five-row surface (e.g. Moakey) becomes six, so 30% grows by 6/5, not the 5/4 default.
+        assertEquals(
+            36,
+            PinnedNumberRow.scaleHeightPercent(30, 90, enabled = true, baseRows = 5)
+        )
+    }
+
+    @Test
     fun `pinned row shifts the split boundary of every letter row down by one`() {
         // Bottom row of TextKeyboard: 6 keys splitting after the language key.
         assertEquals(3, TextKeyboardSplitPolicy.boundaryIndex(rowIndex = 3, keyCount = 6))

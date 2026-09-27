@@ -226,15 +226,23 @@ class InputView(
                 Configuration.ORIENTATION_LANDSCAPE -> keyboardHeightPercentLandscape
                 else -> keyboardHeightPercent
             }.getValue()
-            // A pinned number row adds a fifth row to the letter surfaces. Grow the keyboard with
-            // it so the existing keys keep their size instead of being squeezed.
-            val effectivePercent = PinnedNumberRow.scaleHeightPercent(percent, MAX_HEIGHT_PERCENT)
+            // A pinned number row adds one more row on top of the active surface's own (K15: not
+            // every surface starts at four, e.g. Moakey is five), so grow the keyboard with it to
+            // keep the existing keys the same size instead of squeezing them.
+            val effectivePercent = PinnedNumberRow.scaleHeightPercent(
+                percent,
+                MAX_HEIGHT_PERCENT,
+                baseRows = keyboardWindow.currentBaseRowCount()
+            )
             val metrics = resources.displayMetrics
             return KeyboardHeightFloor.apply(
                 percentHeightPx = metrics.heightPixels * effectivePercent / 100,
                 density = metrics.density,
                 isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE,
-                rows = KeyboardHeightFloor.rowCount(PinnedNumberRow.isEnabled())
+                rows = KeyboardHeightFloor.rowCount(
+                    PinnedNumberRow.isEnabled(),
+                    keyboardWindow.currentBaseRowCount()
+                )
             )
         }
 
@@ -347,6 +355,9 @@ class InputView(
         }
 
         updateKeyboardSize()
+        // A surface switch can change baseRowCount (e.g. Text <-> Moakey), which changes how much
+        // room a pinned number row needs (K15). switchLayout/onAttached call this back.
+        keyboardWindow.onKeyboardSurfaceChanged = { updateKeyboardSize() }
 
         add(preedit.ui.root, lParams(matchParent, wrapContent) {
             above(promptInputBar)

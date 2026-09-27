@@ -5,7 +5,31 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+
+/**
+ * Accumulates a composer's raw Dubeolsik key stream the way the real engine's input buffer
+ * would: [MobileHangulComposer.Output.Backspace] drops the last key, [MobileHangulComposer.Output.Keys]
+ * appends. This is the same simple model [RedTeamHangulEngineAutomataTest]'s VirtualDubeolsikBuffer
+ * uses, kept local to this file rather than shared.
+ */
+private class DubeolsikBuffer {
+    private val buffer = StringBuilder()
+
+    fun applyAll(outputs: List<MobileHangulComposer.Output>) {
+        outputs.forEach { output ->
+            when (output) {
+                MobileHangulComposer.Output.Backspace ->
+                    if (buffer.isNotEmpty()) buffer.deleteCharAt(buffer.length - 1)
+                MobileHangulComposer.Output.Space -> buffer.append(' ')
+                is MobileHangulComposer.Output.Keys -> buffer.append(output.value)
+            }
+        }
+    }
+
+    fun content(): String = buffer.toString()
+}
 
 class MobileHangulComposerTest {
     private val backspace = MobileHangulComposer.Output.Backspace
@@ -184,5 +208,191 @@ class MobileHangulComposerTest {
         c.reset()
         c.press(token, 100)
         assertEquals(listOf(space), c.press(MobileHangulComposer.Token.Boundary, 1_601))
+    }
+
+    @Test
+    fun `K1 backspace absorbs a lone accidental dot and leaves the completed glyph intact`() {
+        val c = MobileHangulComposer()
+        val buffer = DubeolsikBuffer()
+        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        buffer.applyAll(c.press(MobileHangulComposer.Token.VowelI))
+        buffer.applyAll(c.press(MobileHangulComposer.Token.VowelDot))
+        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅇ')))
+        assertEquals("강", "rkd", buffer.content())
+
+        assertTrue(c.press(MobileHangulComposer.Token.VowelDot).isEmpty())
+        assertTrue("Backspace must cancel the pending dot locally", c.cancelPendingDot())
+        assertEquals("강 stays intact in the backend", "rkd", buffer.content())
+    }
+
+    @Test
+    fun `K1 backspace on a double pending dot leaves exactly one dot waiting`() {
+        val c = MobileHangulComposer()
+        c.press(MobileHangulComposer.Token.VowelDot)
+        c.press(MobileHangulComposer.Token.VowelDot)
+        assertEquals(2, c.pendingDotCount())
+
+        assertTrue(c.cancelPendingDot())
+        assertEquals(1, c.pendingDotCount())
+    }
+
+    @Test
+    fun `K2 a reset breaks a following dot's combination with the old vowel`() {
+        val c = MobileHangulComposer()
+        c.press(MobileHangulComposer.Token.Jamo('ㅑ'))
+
+        // Stands in for the composer reset that onStartInput / an empty-preedit selection
+        // change / a non-mobile key would trigger.
+        c.reset()
+
+        assertEquals(
+            "ㅣ must not combine into ㅒ once the old ㅑ has been forgotten",
+            listOf(keys("l")),
+            c.press(MobileHangulComposer.Token.VowelI)
+        )
+    }
+
+    @Test
+    fun `K3 naratgul cross-key vowel replace retypes the base vowel instead of doubling it`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val buffer = DubeolsikBuffer()
+        val oU = MobileHangulComposer.Token.Cycle("nr_o", listOf('ㅗ', 'ㅜ'), naratgulVowelPair = true)
+        val aEo = MobileHangulComposer.Token.Cycle("nr_a", listOf('ㅏ', 'ㅓ'), naratgulVowelPair = true)
+
+        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        buffer.applyAll(c.press(oU, 0))
+        buffer.applyAll(c.press(aEo, 100))
+        assertEquals("과", "rhk", buffer.content())
+
+        buffer.applyAll(c.press(aEo, 200))
+        assertEquals("고어 (ㅗ kept, ㅓ replaces ㅏ)", "rhj", buffer.content())
+
+        buffer.applyAll(c.press(aEo, 300))
+        assertEquals("back to 과", "rhk", buffer.content())
+    }
+
+    @Test
+    fun `K3 danmoum single-vowel cycle never touches the syllable's own front vowel`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val buffer = DubeolsikBuffer()
+        val ae = MobileHangulComposer.Token.Cycle(
+            "dm_ae", listOf('ㅐ', 'ㅒ'), MobileHangulComposer.SINGLE_VOWEL_MULTITAP_TIMEOUT_MS
+        )
+
+        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅙ')))
+        assertEquals("괘", "rho", buffer.content())
+
+        buffer.applyAll(c.press(ae, 0))
+        assertEquals("rhoo", buffer.content())
+
+        // Fast second tap (well within the 300ms window): the leading 괘 must stay untouched.
+        buffer.applyAll(c.press(ae, 100))
+        assertEquals("front 괘 (rho) kept, only the trailing vowel cycled", "rhoO", buffer.content())
+    }
+
+    @Test
+    fun `K4 space after a single-vowel or vega vowel cycle always inserts a space`() {
+        val c = MobileHangulComposer()
+        val danmoumVowel = MobileHangulComposer.Token.Cycle(
+            "dm_a", listOf('ㅏ', 'ㅑ'), MobileHangulComposer.SINGLE_VOWEL_MULTITAP_TIMEOUT_MS
+        )
+        c.press(danmoumVowel, 0)
+        assertEquals(listOf(space), c.press(MobileHangulComposer.Token.Boundary, 50))
+
+        c.reset()
+        val vegaVowel = MobileHangulComposer.Token.Cycle("vg_a", listOf('ㅏ', 'ㅑ'))
+        c.press(vegaVowel, 0)
+        assertEquals(listOf(space), c.press(MobileHangulComposer.Token.Boundary, 50))
+    }
+
+    @Test
+    fun `K4 space right after a chunjiin consonant cycle is swallowed to close it`() {
+        val c = MobileHangulComposer()
+        val consonant = MobileHangulComposer.Token.Cycle("cj_g", listOf('ㄱ', 'ㅋ', 'ㄲ'))
+        c.press(consonant, 0)
+        assertEquals(emptyList<MobileHangulComposer.Output>(), c.press(MobileHangulComposer.Token.Boundary, 50))
+    }
+
+    @Test
+    fun `K5 a symbol cycle key replaces one symbol with the next in tap order`() {
+        val c = MobileHangulComposer()
+        val periodComma = MobileHangulComposer.Token.SymbolCycle("cj_period", listOf('.', ','))
+        assertEquals(listOf(keys(".")), c.press(periodComma, 0))
+        assertEquals(listOf(backspace, keys(",")), c.press(periodComma, 100))
+        assertEquals(listOf(backspace, keys(".")), c.press(periodComma, 200))
+
+        val questionMark = MobileHangulComposer.Token.SymbolCycle("cj_question", listOf('?', '!'))
+        assertEquals(listOf(keys("?")), c.press(questionMark, 0))
+        assertEquals(listOf(backspace, keys("!")), c.press(questionMark, 100))
+    }
+
+    @Test
+    fun `K13 the four-symbol punctuation cycle taps in period comma question mark exclaim order`() {
+        val c = MobileHangulComposer()
+        val punct = MobileHangulComposer.Token.SymbolCycle("vg_punct", listOf('.', ',', '?', '!'))
+        val order = listOf(0L, 100L, 200L, 300L).map { at ->
+            (c.press(punct, at).last() as MobileHangulComposer.Output.Keys).value
+        }
+        assertEquals(listOf(".", ",", "?", "!"), order)
+    }
+
+    @Test
+    fun `K9 two-hand moakey dot then eu forms ㅗ`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val buffer = DubeolsikBuffer()
+        assertTrue(c.press(MobileHangulComposer.Token.VowelDot).isEmpty())
+        buffer.applyAll(c.press(MobileHangulComposer.Token.VowelEu))
+        assertEquals("ㅗ", "h", buffer.content())
+    }
+
+    @Test
+    fun `K9 one-hand moakey vowel key's ㅣ push combines ㅑ and ㅕ into ㅒ and ㅖ`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val buffer = DubeolsikBuffer()
+        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅇ')))
+        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅑ')))
+        assertEquals("야", "di", buffer.content())
+        buffer.applyAll(c.press(MobileHangulComposer.Token.VowelI))
+        assertEquals("얘", "dO", buffer.content())
+    }
+
+    @Test
+    fun `K10 chunjiin family combines ㅠ and a following ㅣ into ㅝ`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Chunjiin)
+        c.press(MobileHangulComposer.Token.VowelEu) // ㅡ
+        c.press(MobileHangulComposer.Token.VowelDot) // ㅜ
+        c.press(MobileHangulComposer.Token.VowelDot) // ㅠ
+        assertEquals(
+            listOf(backspace, keys("nj")),
+            c.press(MobileHangulComposer.Token.VowelI)
+        )
+    }
+
+    @Test
+    fun `K10 other families keep ㅠ and a following ㅣ as separate vowels`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        c.press(MobileHangulComposer.Token.Jamo('ㅠ'))
+        assertEquals(
+            listOf(keys("l")),
+            c.press(MobileHangulComposer.Token.VowelI)
+        )
+    }
+
+    @Test
+    fun `K12 naratgul add-stroke also turns ㅐ into ㅒ and ㅔ into ㅖ`() {
+        val c = MobileHangulComposer()
+        c.press(MobileHangulComposer.Token.Jamo('ㅐ'))
+        assertEquals(
+            listOf(backspace, keys("O")),
+            c.press(MobileHangulComposer.Token.AddStroke)
+        )
+
+        c.reset()
+        c.press(MobileHangulComposer.Token.Jamo('ㅔ'))
+        assertEquals(
+            listOf(backspace, keys("P")),
+            c.press(MobileHangulComposer.Token.AddStroke)
+        )
     }
 }

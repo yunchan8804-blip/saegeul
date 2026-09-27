@@ -145,5 +145,6 @@ class KeyboardFrameTest {
     fun heightFloorRowCountFollowsNumberRow() {
         assertEquals(4, KeyboardHeightFloor.rowCount(false))
         assertEquals(5, KeyboardHeightFloor.rowCount(true))
+        assertEquals(6, KeyboardHeightFloor.rowCount(true, baseRows = 5))
     }
 }

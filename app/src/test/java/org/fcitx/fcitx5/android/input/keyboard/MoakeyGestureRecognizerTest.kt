@@ -3,6 +3,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.input.keyboard.MoakeyGestureRecognizer.Zone.*
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class MoakeyGestureRecognizerTest {
@@ -37,5 +38,35 @@ class MoakeyGestureRecognizerTest {
         val standalone = MoakeyGestureRecognizer(standaloneVowelKey = true)
         assertEquals('ㅣ', standalone.resolve(listOf(Right)))
         assertEquals('ㅡ', standalone.resolve(listOf(Left)))
+    }
+
+    @Test fun `K9 standalone vowel key swipes carry chunjiin VowelI and VowelEu meaning`() {
+        val standalone = MoakeyGestureRecognizer(standaloneVowelKey = true)
+        assertEquals(MobileHangulComposer.Token.VowelI, gesture(standalone, 100f, 0f))
+        assertEquals(MobileHangulComposer.Token.VowelEu, gesture(standalone, -100f, 0f))
+    }
+
+    @Test fun `K9 the regular (non-standalone) vowel keys still emit plain jamo`() {
+        val token = gesture(recognizer, 100f, 0f)
+        assertEquals(MobileHangulComposer.Token.Jamo('ㅏ'), token)
+    }
+
+    @Test fun `K16 a larger threshold needs a longer swipe to register a direction`() {
+        val loose = MoakeyGestureRecognizer(threshold = 56f)
+        // A 40px move clears the default 28px threshold but not a 56px (dp-scaled) one.
+        assertNull(gesture(loose, 40f, 0f))
+        assertEquals(MobileHangulComposer.Token.Jamo('ㅏ'), gesture(loose, 100f, 0f))
+    }
+
+    private fun gesture(
+        recognizer: MoakeyGestureRecognizer,
+        dx: Float,
+        dy: Float
+    ): MobileHangulComposer.Token? {
+        recognizer.onEvent(CustomGestureView.Event(CustomGestureView.GestureType.Down, false, 0f, 0f, 0, 0, 0, 0))
+        recognizer.onEvent(CustomGestureView.Event(CustomGestureView.GestureType.Move, false, dx, dy, 0, 0, 0, 0))
+        return recognizer.onEvent(
+            CustomGestureView.Event(CustomGestureView.GestureType.Up, false, dx, dy, 0, 0, 0, 0)
+        )
     }
 }

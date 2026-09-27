@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -86,7 +87,7 @@ class MobileHangulKeyboardLayoutTest {
             listOf(
                 listOf("ㄱㅋ", "ㅣㅡ", "ㅏㅑ", "BACKSPACE"),
                 listOf("ㄷㅌ", "ㄴㄹ", "ㅓㅕ", "SPACE"),
-                listOf("ㅁㅅ", "ㅂㅍ", "ㅗㅛ", ",", "RETURN"),
+                listOf("ㅁㅅ", "ㅂㅍ", "ㅗㅛ", ".,?!", "RETURN"),
                 listOf("ㅈㅊ", "ㅇㅎ", "ㅜㅠ", "?123", "LANGUAGE")
             )
         )
@@ -113,7 +114,7 @@ class MobileHangulKeyboardLayoutTest {
             listOf(
                 listOf("ㄱ", "ㄴ", "ㅏㅓ", "BACKSPACE"),
                 listOf("ㄹ", "ㅁ", "ㅗㅜ", "SPACE"),
-                listOf("ㅅ", "ㅇ", "ㅣ", ",", "RETURN"),
+                listOf("ㅅ", "ㅇ", "ㅣ", ".,?!", "RETURN"),
                 listOf("획추가", "ㅡ", "쌍자음", "?123", "LANGUAGE")
             )
         )
@@ -189,6 +190,34 @@ class MobileHangulKeyboardLayoutTest {
     }
 
     @Test
+    fun `K16 moakey gesture threshold scales with device density instead of a fixed px value`() {
+        val default = MobileHangulKeyboard.layoutFor(MobileHangulLayout.MoakeyTwoHand, density = 1f)
+        val scaled = MobileHangulKeyboard.layoutFor(MobileHangulLayout.MoakeyTwoHand, density = 3f)
+
+        assertTrue(
+            "a 40px swipe clears the default (1x density) 28px threshold",
+            fires(default[0][1], 40f, 0f)
+        )
+        assertFalse(
+            "the same 40px swipe misses a 3x-density (84px) threshold",
+            fires(scaled[0][1], 40f, 0f)
+        )
+    }
+
+    @Test
+    fun `K15 each mobile layout's own row count is what baseRowCount should report`() {
+        val fourRow = listOf(
+            MobileHangulLayout.Chunjiin, MobileHangulLayout.ChunjiinPlus, MobileHangulLayout.Danmoum,
+            MobileHangulLayout.Vega, MobileHangulLayout.VegaCenter,
+            MobileHangulLayout.Naratgul, MobileHangulLayout.NaratgulCenter
+        )
+        val fiveRow = listOf(MobileHangulLayout.MoakeyOneHand, MobileHangulLayout.MoakeyTwoHand)
+
+        fourRow.forEach { assertEquals("$it", 4, MobileHangulKeyboard.layoutFor(it).size) }
+        fiveRow.forEach { assertEquals("$it", 5, MobileHangulKeyboard.layoutFor(it).size) }
+    }
+
+    @Test
     fun `surface picker is available only for the Dubeolsik engine`() {
         assertTrue(MobileHangulSurfaceSwitcher.isAvailable("Dubeolsik"))
         assertTrue(MobileHangulSurfaceSwitcher.isAvailable("0"))
@@ -234,4 +263,11 @@ class MobileHangulKeyboardLayoutTest {
 
     private fun event(type: CustomGestureView.GestureType, x: Float, y: Float) =
         CustomGestureView.Event(type, false, x, y, 0, 0, 0, 0)
+
+    private fun fires(key: KeyDef, dx: Float, dy: Float): Boolean {
+        val gesture = key.behaviors.filterIsInstance<KeyDef.Behavior.Gesture>().single()
+        gesture.handler(event(CustomGestureView.GestureType.Down, 0f, 0f))
+        gesture.handler(event(CustomGestureView.GestureType.Move, dx, dy))
+        return gesture.handler(event(CustomGestureView.GestureType.Up, dx, dy)) != null
+    }
 }

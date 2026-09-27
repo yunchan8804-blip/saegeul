@@ -107,7 +107,8 @@ object KeyboardHeightFloor {
     const val MIN_ROW_DP_LANDSCAPE = 36
 
     /** Letter surfaces have four rows; a pinned number row adds a fifth. */
-    fun rowCount(numberRowPinned: Boolean): Int = if (numberRowPinned) 5 else 4
+    fun rowCount(numberRowPinned: Boolean, baseRows: Int = 4): Int =
+        if (numberRowPinned) baseRows + 1 else baseRows
 
     fun apply(percentHeightPx: Int, density: Float, isLandscape: Boolean, rows: Int): Int {
         val minRowDp = if (isLandscape) MIN_ROW_DP_LANDSCAPE else MIN_ROW_DP_PORTRAIT

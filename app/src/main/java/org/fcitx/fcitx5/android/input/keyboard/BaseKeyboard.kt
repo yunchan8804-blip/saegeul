@@ -588,6 +588,28 @@ abstract class BaseKeyboard(
         // do nothing by default
     }
 
+    /**
+     * How many rows this surface has before a pinned number row (if any) adds one more. Used to
+     * scale the keyboard height so a taller surface (e.g. Moakey's five rows) isn't squeezed the
+     * same amount a four-row one is (K15). The default fits every four-row surface; a keyboard
+     * with a different base row count overrides it.
+     */
+    open val baseRowCount: Int = 4
+
+    /** The editor session changed, e.g. focus moved to a different input field. */
+    open fun onStartInput() {
+        // do nothing by default
+    }
+
+    /** The selection moved for a reason other than this keyboard's own composition. */
+    open fun onSelectionUpdate(start: Int, end: Int) {
+        // do nothing by default
+    }
+
+    open fun onPreeditEmptyStateUpdate(empty: Boolean) {
+        // do nothing by default
+    }
+
     open fun onDetach() {
         // do nothing by default
     }

@@ -6,11 +6,14 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.views.imageResource
 
@@ -20,12 +23,13 @@ private class MobileHangulKey(
     percentWidth: Float,
     altLabel: String? = null,
     gesture: MoakeyGestureRecognizer? = null,
-    includePressTokenOnGesture: Boolean = false
+    includePressTokenOnGesture: Boolean = false,
+    viewId: Int = -1
 ) : KeyDef(
     if (altLabel == null) {
-        Appearance.Text(label, textSize = 19f, percentWidth = percentWidth)
+        Appearance.Text(label, textSize = 19f, percentWidth = percentWidth, viewId = viewId)
     } else {
-        Appearance.AltText(label, altLabel, textSize = 19f, percentWidth = percentWidth)
+        Appearance.AltText(label, altLabel, textSize = 19f, percentWidth = percentWidth, viewId = viewId)
     },
     buildSet {
         add(Behavior.Press(KeyAction.MobileHangulAction(token)))
@@ -50,7 +54,11 @@ class MobileHangulKeyboard(
     context: Context,
     theme: Theme,
     val mobileLayout: MobileHangulLayout
-) : BaseKeyboard(context, theme, PinnedNumberRow.prependTo(layoutFor(mobileLayout))) {
+) : BaseKeyboard(
+    context,
+    theme,
+    PinnedNumberRow.prependTo(layoutFor(mobileLayout, effectiveDensity(context)))
+) {
 
     companion object {
         fun name(layout: MobileHangulLayout) = "MobileHangul:${layout.name}"
@@ -59,6 +67,12 @@ class MobileHangulKeyboard(
         private const val EIGHTH = 0.125f
         private const val CENTER_SIDE = 0.16f
         private const val CENTER_KEY = (1f - CENTER_SIDE * 2f) / 3f
+
+        /** Moakey's directional-swipe reach, in dp rather than a screen-density-blind px value. */
+        private const val MOAKEY_GESTURE_THRESHOLD_DP = 28f
+
+        private fun effectiveDensity(context: Context): Float =
+            context.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
 
         private fun jamo(label: String, value: Char, width: Float) =
             MobileHangulKey(label, MobileHangulComposer.Token.Jamo(value), width)
@@ -105,8 +119,19 @@ class MobileHangulKeyboard(
                 width
             )
 
-        private fun token(label: String, value: MobileHangulComposer.Token, width: Float) =
-            MobileHangulKey(label, value, width)
+        private fun symbolCycle(id: String, label: String, width: Float, vararg symbols: Char) =
+            MobileHangulKey(
+                label,
+                MobileHangulComposer.Token.SymbolCycle(id, symbols.toList()),
+                width
+            )
+
+        private fun token(
+            label: String,
+            value: MobileHangulComposer.Token,
+            width: Float,
+            viewId: Int = -1
+        ) = MobileHangulKey(label, value, width, viewId = viewId)
 
         private fun symbol(label: String, value: String = label, width: Float) = KeyDef(
             KeyDef.Appearance.Text(label, textSize = 17f, percentWidth = width),
@@ -119,12 +144,12 @@ class MobileHangulKeyboard(
             pressAction = KeyAction.MobileHangulAction(MobileHangulComposer.Token.Boundary)
         )
 
-        private fun moakeyJamo(label: String, value: Char, width: Float) =
+        private fun moakeyJamo(label: String, value: Char, width: Float, gestureThresholdPx: Float) =
             MobileHangulKey(
                 label,
                 MobileHangulComposer.Token.Jamo(value),
                 width,
-                gesture = MoakeyGestureRecognizer(),
+                gesture = MoakeyGestureRecognizer(threshold = gestureThresholdPx),
                 includePressTokenOnGesture = true
             )
 
@@ -140,7 +165,7 @@ class MobileHangulKeyboard(
         private fun chunjiin() = listOf(
             listOf(
                 token("ㅣ", MobileHangulComposer.Token.VowelI, QUARTER),
-                token("ㆍ", MobileHangulComposer.Token.VowelDot, QUARTER),
+                token("ㆍ", MobileHangulComposer.Token.VowelDot, QUARTER, R.id.button_chunjiin_dot),
                 token("ㅡ", MobileHangulComposer.Token.VowelEu, QUARTER),
                 BackspaceKey(percentWidth = QUARTER)
             ),
@@ -154,8 +179,8 @@ class MobileHangulKeyboard(
                 cycle("cj_b", "ㅂㅍ", QUARTER, 'ㅂ', 'ㅍ', 'ㅃ'),
                 cycle("cj_s", "ㅅㅎ", QUARTER, 'ㅅ', 'ㅎ', 'ㅆ'),
                 cycle("cj_j", "ㅈㅊ", QUARTER, 'ㅈ', 'ㅊ', 'ㅉ'),
-                symbol(".,", ".", EIGHTH),
-                symbol("?!", "?", EIGHTH)
+                symbolCycle("cj_period", ".,", EIGHTH, '.', ','),
+                symbolCycle("cj_question", "?!", EIGHTH, '?', '!')
             ),
             listOf(
                 LayoutSwitchKey("?123", "", percentWidth = EIGHTH),
@@ -169,7 +194,7 @@ class MobileHangulKeyboard(
         private fun chunjiinPlus() = listOf(
             listOf(
                 token("ㅣ", MobileHangulComposer.Token.VowelI, QUARTER),
-                token("ㆍ", MobileHangulComposer.Token.VowelDot, QUARTER),
+                token("ㆍ", MobileHangulComposer.Token.VowelDot, QUARTER, R.id.button_chunjiin_dot),
                 token("ㅡ", MobileHangulComposer.Token.VowelEu, QUARTER),
                 BackspaceKey(percentWidth = QUARTER)
             ),
@@ -189,8 +214,8 @@ class MobileHangulKeyboard(
                 cycleAlt("cjp_h", "ㅎ", "ㅆ", EIGHTH, 'ㅎ', 'ㅆ'),
                 jamo("ㅈ", 'ㅈ', EIGHTH),
                 cycleAlt("cjp_c", "ㅊ", "ㅉ", EIGHTH, 'ㅊ', 'ㅉ'),
-                symbol(".,", ".", EIGHTH),
-                symbol("?!", "?", EIGHTH)
+                symbolCycle("cjp_period", ".,", EIGHTH, '.', ','),
+                symbolCycle("cjp_question", "?!", EIGHTH, '?', '!')
             ),
             listOf(
                 LayoutSwitchKey("?123", "", percentWidth = EIGHTH),
@@ -231,7 +256,7 @@ class MobileHangulKeyboard(
             qwertyBottom()
         )
 
-        private fun moakeyBottom(oneHand: Boolean) = buildList {
+        private fun moakeyBottom(oneHand: Boolean, gestureThresholdPx: Float) = buildList {
             add(LayoutSwitchKey("?123", "", percentWidth = 0.13f))
             add(LanguageKey())
             add(symbol(",", width = 0.08f))
@@ -242,49 +267,54 @@ class MobileHangulKeyboard(
                         "ㆍ ㅣ ㅡ",
                         MobileHangulComposer.Token.VowelDot,
                         0.16f,
-                        gesture = MoakeyGestureRecognizer(standaloneVowelKey = true)
+                        gesture = MoakeyGestureRecognizer(
+                            standaloneVowelKey = true,
+                            threshold = gestureThresholdPx
+                        )
                     )
                 )
             } else {
-                add(symbol("?.!", ".", 0.10f))
+                add(symbolCycle("mk_punct", "?.!", 0.10f, '.', '?', '!'))
             }
             add(ReturnKey(percentWidth = 0.15f))
         }
 
-        private fun moakey(oneHand: Boolean): List<List<KeyDef>> {
+        private fun moakey(oneHand: Boolean, gestureThresholdPx: Float): List<List<KeyDef>> {
             val seven = 1f / 7f
             val six = 1f / 6f
             return buildList {
                 add(
                     listOf(symbol("~", width = seven)) +
-                        "ㅃㅉㄸㄲㅆ".map { moakeyJamo(it.toString(), it, seven) } +
+                        "ㅃㅉㄸㄲㅆ".map { moakeyJamo(it.toString(), it, seven, gestureThresholdPx) } +
                         symbol(if (oneHand) "!" else "#", width = seven)
                 )
                 add(
                     listOf(symbol("^", width = seven)) +
-                        "ㅂㅈㄷㄱㅅ".map { moakeyJamo(it.toString(), it, seven) } +
+                        "ㅂㅈㄷㄱㅅ".map { moakeyJamo(it.toString(), it, seven, gestureThresholdPx) } +
                         if (oneHand) listOf(symbol("?", width = seven))
                         else listOf(BackspaceKey(percentWidth = seven))
                 )
                 add(
                     listOf(symbol(";", width = seven)) +
-                        "ㅁㄴㅇㄹㅎ".map { moakeyJamo(it.toString(), it, seven) } +
+                        "ㅁㄴㅇㄹㅎ".map { moakeyJamo(it.toString(), it, seven, gestureThresholdPx) } +
                         if (oneHand) listOf(symbol(".", width = seven))
                         else listOf(token("ㅣ", MobileHangulComposer.Token.VowelI, seven))
                 )
                 add(
                     listOf(symbol("*", width = if (oneHand) six else seven)) +
-                        "ㅋㅌㅊㅍ".map { moakeyJamo(it.toString(), it, if (oneHand) six else seven) } +
+                        "ㅋㅌㅊㅍ".map {
+                            moakeyJamo(it.toString(), it, if (oneHand) six else seven, gestureThresholdPx)
+                        } +
                         if (oneHand) {
                             listOf(BackspaceKey(percentWidth = six))
                         } else {
                             listOf(
-                                jamo("ㅡ", 'ㅡ', seven),
+                                token("ㅡ", MobileHangulComposer.Token.VowelEu, seven),
                                 token("ㆍ", MobileHangulComposer.Token.VowelDot, seven)
                             )
                         }
                 )
-                add(moakeyBottom(oneHand))
+                add(moakeyBottom(oneHand, gestureThresholdPx))
             }
         }
 
@@ -316,7 +346,8 @@ class MobileHangulKeyboard(
             val core = vegaCore(width)
             return if (centered) {
                 listOf(
-                    listOf(symbol("?!", "?", CENTER_SIDE)) + core[0] + BackspaceKey(CENTER_SIDE),
+                    listOf(symbolCycle("vg_qm", "?!", CENTER_SIDE, '?', '!')) + core[0] +
+                        BackspaceKey(CENTER_SIDE),
                     listOf(symbol(",", width = CENTER_SIDE)) + core[1] + mobileSpace(CENTER_SIDE),
                     listOf(LanguageKey(CENTER_SIDE)) + core[2] + ReturnKey(CENTER_SIDE),
                     listOf(LayoutSwitchKey("?123", "", CENTER_SIDE)) + core[3] +
@@ -326,7 +357,10 @@ class MobileHangulKeyboard(
                 listOf(
                     core[0] + BackspaceKey(QUARTER),
                     core[1] + mobileSpace(QUARTER),
-                    core[2] + listOf(symbol(",", width = EIGHTH), ReturnKey(EIGHTH)),
+                    core[2] + listOf(
+                        symbolCycle("vg_punct", ".,?!", EIGHTH, '.', ',', '?', '!'),
+                        ReturnKey(EIGHTH)
+                    ),
                     core[3] + listOf(LayoutSwitchKey("?123", "", EIGHTH), LanguageKey(EIGHTH))
                 )
             }
@@ -360,7 +394,8 @@ class MobileHangulKeyboard(
             val core = naratgulCore(width)
             return if (centered) {
                 listOf(
-                    listOf(symbol("?!", "?", CENTER_SIDE)) + core[0] + BackspaceKey(CENTER_SIDE),
+                    listOf(symbolCycle("nr_qm", "?!", CENTER_SIDE, '?', '!')) + core[0] +
+                        BackspaceKey(CENTER_SIDE),
                     listOf(symbol(",", width = CENTER_SIDE)) + core[1] + mobileSpace(CENTER_SIDE),
                     listOf(LanguageKey(CENTER_SIDE)) + core[2] + ReturnKey(CENTER_SIDE),
                     listOf(LayoutSwitchKey("?123", "", CENTER_SIDE)) + core[3] +
@@ -370,29 +405,55 @@ class MobileHangulKeyboard(
                 listOf(
                     core[0] + BackspaceKey(QUARTER),
                     core[1] + mobileSpace(QUARTER),
-                    core[2] + listOf(symbol(",", width = EIGHTH), ReturnKey(EIGHTH)),
+                    core[2] + listOf(
+                        symbolCycle("nr_punct", ".,?!", EIGHTH, '.', ',', '?', '!'),
+                        ReturnKey(EIGHTH)
+                    ),
                     core[3] + listOf(LayoutSwitchKey("?123", "", EIGHTH), LanguageKey(EIGHTH))
                 )
             }
         }
 
-        fun layoutFor(layout: MobileHangulLayout): List<List<KeyDef>> = when (layout) {
-            MobileHangulLayout.Chunjiin -> chunjiin()
-            MobileHangulLayout.ChunjiinPlus -> chunjiinPlus()
-            MobileHangulLayout.Danmoum -> danmoum()
-            MobileHangulLayout.MoakeyOneHand -> moakey(true)
-            MobileHangulLayout.MoakeyTwoHand -> moakey(false)
-            MobileHangulLayout.Vega -> vega(false)
-            MobileHangulLayout.VegaCenter -> vega(true)
-            MobileHangulLayout.Naratgul -> naratgul(false)
-            MobileHangulLayout.NaratgulCenter -> naratgul(true)
-            MobileHangulLayout.Physical -> error("Physical layout does not use MobileHangulKeyboard")
-        }
+        fun layoutFor(layout: MobileHangulLayout, density: Float = 1f): List<List<KeyDef>> =
+            when (layout) {
+                MobileHangulLayout.Chunjiin -> chunjiin()
+                MobileHangulLayout.ChunjiinPlus -> chunjiinPlus()
+                MobileHangulLayout.Danmoum -> danmoum()
+                MobileHangulLayout.MoakeyOneHand ->
+                    moakey(true, MOAKEY_GESTURE_THRESHOLD_DP * density)
+                MobileHangulLayout.MoakeyTwoHand ->
+                    moakey(false, MOAKEY_GESTURE_THRESHOLD_DP * density)
+                MobileHangulLayout.Vega -> vega(false)
+                MobileHangulLayout.VegaCenter -> vega(true)
+                MobileHangulLayout.Naratgul -> naratgul(false)
+                MobileHangulLayout.NaratgulCenter -> naratgul(true)
+                MobileHangulLayout.Physical -> error("Physical layout does not use MobileHangulKeyboard")
+            }
     }
 
-    private val composer = MobileHangulComposer()
+    // The layout's own row count, before PinnedNumberRow prepends a number row on top (K15).
+    override val baseRowCount: Int = layoutFor(mobileLayout).size
+
+    private val composer = MobileHangulComposer(family = mobileHangulFamily(mobileLayout))
     private val space: TextKeyView by lazy { findViewById(R.id.button_space) }
     private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
+    private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
+    private val dotKeyView: TextKeyView? by lazy { findViewById(R.id.button_chunjiin_dot) }
+
+    private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
+
+    @Suppress("unused")
+    private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, value ->
+        lang.visibility = if (value) View.VISIBLE else View.GONE
+    }
+
+    init {
+        lang.visibility = if (showLangSwitchKey.getValue()) View.VISIBLE else View.GONE
+        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
+    }
+
+    private val backspaceSym = KeySym(FcitxKeyMapping.FcitxKey_BackSpace)
+    private var preeditEmpty = true
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         when (action) {
@@ -402,11 +463,20 @@ class MobileHangulKeyboard(
             is KeyAction.MobileHangulSequenceAction -> action.tokens.forEach { token ->
                 composer.press(token).forEach { dispatch(it, source) }
             }
+            is KeyAction.SymAction ->
+                if (action.sym == backspaceSym && composer.cancelPendingDot()) {
+                    // A lone accidental ㆍ tap is absorbed locally, protecting the preceding
+                    // completed glyph from an unrelated Backspace reaching the Dubeolsik backend.
+                } else {
+                    composer.reset()
+                    super.onAction(action, source)
+                }
             else -> {
                 composer.reset()
                 super.onAction(action, source)
             }
         }
+        updateDotLabel()
     }
 
     private fun dispatch(output: MobileHangulComposer.Output, source: KeyActionListener.Source) {
@@ -425,7 +495,30 @@ class MobileHangulKeyboard(
         }
     }
 
-    override fun onAttach() = composer.reset()
+    private fun updateDotLabel() {
+        dotKeyView?.mainText?.text = if (composer.pendingDotCount() == 2) "‥" else "ㆍ"
+    }
+
+    override fun onAttach() {
+        composer.reset()
+        updateDotLabel()
+    }
+
+    override fun onStartInput() {
+        composer.reset()
+        updateDotLabel()
+    }
+
+    override fun onSelectionUpdate(start: Int, end: Int) {
+        if (preeditEmpty) {
+            composer.reset()
+            updateDotLabel()
+        }
+    }
+
+    override fun onPreeditEmptyStateUpdate(empty: Boolean) {
+        preeditEmpty = empty
+    }
 
     override fun onReturnDrawableUpdate(returnDrawable: Int) {
         `return`.img.imageResource = returnDrawable
@@ -436,4 +529,10 @@ class MobileHangulKeyboard(
         space.mainText.text = context.getString(R.string.mobile_hangul_switch_label, label)
         space.contentDescription = context.getString(R.string.mobile_hangul_switch_hint, label)
     }
+}
+
+/** Which vowel-combination table this layout's ㅣ/ㅡ primitives should use. See K10. */
+private fun mobileHangulFamily(layout: MobileHangulLayout): MobileHangulFamily = when (layout) {
+    MobileHangulLayout.Chunjiin, MobileHangulLayout.ChunjiinPlus -> MobileHangulFamily.Chunjiin
+    else -> MobileHangulFamily.Other
 }

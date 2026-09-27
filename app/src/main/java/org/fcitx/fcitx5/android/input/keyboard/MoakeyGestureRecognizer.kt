@@ -30,7 +30,19 @@ class MoakeyGestureRecognizer(
             }
             null
         }
-        CustomGestureView.GestureType.Up -> resolve(path)?.let(MobileHangulComposer.Token::Jamo)
+        CustomGestureView.GestureType.Up -> resolve(path)?.let { char ->
+            if (standaloneVowelKey) {
+                // The one-hand vowel key's ㅣ/ㅡ pushes carry Chunjiin's directional-vowel
+                // meaning, so they combine with whatever vowel is already there (ㅑ+ㅣ→ㅒ).
+                when (char) {
+                    'ㅣ' -> MobileHangulComposer.Token.VowelI
+                    'ㅡ' -> MobileHangulComposer.Token.VowelEu
+                    else -> MobileHangulComposer.Token.Jamo(char)
+                }
+            } else {
+                MobileHangulComposer.Token.Jamo(char)
+            }
+        }
     }
 
     fun resolve(zones: List<Zone>): Char? {

@@ -39,12 +39,8 @@ object PinnedNumberRow {
     /** Ten keys wide, so it splits at the same column as the letter rows above the fold. */
     const val SPLIT_BOUNDARY = 5
 
-    /**
-     * Letter surfaces are four rows tall; pinning a fifth needs proportionally more height,
-     * otherwise every key shrinks to keep the keyboard the same size.
-     */
-    private const val HEIGHT_NUMERATOR = 5
-    private const val HEIGHT_DENOMINATOR = 4
+    /** Most letter surfaces are four rows tall; a handful (e.g. Moakey) are already five. */
+    private const val DEFAULT_BASE_ROWS = 4
 
     val Keys: List<KeyDef> = "1234567890".map { PinnedNumberKey(it.toString()) }
 
@@ -57,12 +53,17 @@ object PinnedNumberRow {
 
     /**
      * Scales a keyboard height percentage to make room for the extra row, clamped to the same
-     * upper bound the height preference itself allows.
+     * upper bound the height preference itself allows. [baseRows] is the surface's own row count
+     * before pinning, so a five-row surface grows by 6/5 rather than the four-row default's 5/4.
      */
-    fun scaleHeightPercent(percent: Int, maxPercent: Int, enabled: Boolean = isEnabled()): Int =
-        if (enabled) {
-            (percent * HEIGHT_NUMERATOR / HEIGHT_DENOMINATOR).coerceAtMost(maxPercent)
-        } else {
-            percent
-        }
+    fun scaleHeightPercent(
+        percent: Int,
+        maxPercent: Int,
+        enabled: Boolean = isEnabled(),
+        baseRows: Int = DEFAULT_BASE_ROWS
+    ): Int = if (enabled && baseRows > 0) {
+        (percent * (baseRows + 1) / baseRows).coerceAtMost(maxPercent)
+    } else {
+        percent
+    }
 }
