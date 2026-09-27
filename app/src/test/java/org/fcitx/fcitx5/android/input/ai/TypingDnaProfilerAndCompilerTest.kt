@@ -94,6 +94,73 @@ class TypingDnaProfilerAndCompilerTest {
     }
 
     @Test
+    fun profileOnDeviceRequiresAtLeastTwoOccurrencesForCannedPhrases() {
+        // Every sentence appears exactly once: "frequent" phrase promotion must not happen off a
+        // single observation, or an unrepresentative one-off gets misrepresented as "내 스타일".
+        val singleOccurrenceSentences = listOf(
+            "오늘 퇴근하고 저녁 먹을까?",
+            "완전 고마워 덕분이야!",
+            "내일 몇 시에 볼까?"
+        )
+        val persona = profiler.profileOnDevice("messenger", singleOccurrenceSentences)
+        assertTrue("No phrase was repeated, so cannedPhrases must be empty", persona.cannedPhrases.isEmpty())
+    }
+
+    @Test
+    fun profileOnDevicePromotesOnlyPhrasesSeenAtLeastTwice() {
+        val sentences = listOf(
+            "오늘 퇴근하고 치맥 먹자",
+            "완전 고마워 덕분이야",
+            "오늘 퇴근하고 치맥 먹자",
+            "내일 몇 시에 볼까"
+        )
+        val persona = profiler.profileOnDevice("messenger", sentences)
+        assertEquals(listOf("오늘 퇴근하고 치맥 먹자"), persona.cannedPhrases)
+    }
+
+    @Test
+    fun profileOnDeviceExcludesUngrammaticalPhraseEvenIfRepeated() {
+        // "안녕하해요" is repeated 3 times (the reported bug scenario), but it is not a real
+        // sentence (하 stem duplicated onto 해요) and must never be promoted to cannedPhrases.
+        val sentences = listOf(
+            "안녕하해요",
+            "안녕하해요",
+            "안녕하해요",
+            "오늘 퇴근하고 치맥 먹자",
+            "오늘 퇴근하고 치맥 먹자"
+        )
+        val persona = profiler.profileOnDevice("messenger", sentences)
+        assertFalse(persona.cannedPhrases.contains("안녕하해요"))
+        assertTrue(persona.cannedPhrases.contains("오늘 퇴근하고 치맥 먹자"))
+    }
+
+    @Test
+    fun compilePersonaPrunesExistingUserPhraseThatFailsTheGrammarGate() {
+        // Simulates a store record injected before the ACC-05 grammar gate existed (or rehydrated
+        // from an already-merged profile that still carries the bad phrase): compiling a persona
+        // that still lists it must actively remove it from the store, not just skip re-injecting it.
+        sentenceStore.upsert(
+            PersonalizedSentenceRecord(
+                sentence = "안녕하해요",
+                source = PersonalizedSentenceRecord.SOURCE_USER_PHRASE,
+                score = 5.0f,
+                useCount = 3
+            )
+        )
+        assertTrue(sentenceStore.contains("안녕하해요"))
+
+        val persona = PersonaDna(
+            category = "messenger",
+            dominantTone = "Honorific",
+            cannedPhrases = listOf("안녕하해요", "오늘 퇴근하고 만나자")
+        )
+        compiler.compilePersona(persona, persist = false)
+
+        assertFalse("Stale ungrammatical USER_PHRASE must be pruned from the store", sentenceStore.contains("안녕하해요"))
+        assertTrue(sentenceStore.contains("오늘 퇴근하고 만나자"))
+    }
+
+    @Test
     fun testCompilerPersistsDynamicBigramsAndPendingProcessorConsumesVault() {
         // 1. Buffer text in vault
         vault.recordSentence("com.kakao.talk", "오늘 야근하고 치맥 먹자.")

@@ -168,6 +168,39 @@ class KoreanSyntaxRuleFilterTest {
     }
 
     @Test
+    fun testAcc05StemDuplication() {
+        // Violations: "하" stem immediately followed by another "해/했/하여" stem within an eojeol
+        val rejectCases = listOf(
+            "안녕하해요",
+            "공부하했어",
+            "오늘 회의 준비하해요",
+            "어제 발표 자료를 정리하했어"
+        )
+
+        for (text in rejectCases) {
+            val result = filter.check(text)
+            assertTrue("Expected ACC-05 violation for: '$text', but got $result", result is RuleResult.Invalid)
+            val invalid = result as RuleResult.Invalid
+            assertEquals(ViolationType.ACC_05_STEM_DUPLICATION, invalid.violationType)
+            assertFalse(filter.isValid(text))
+        }
+
+        // Valid cases: eojeol-initial "하해" (河海, used on its own) and normal endings must pass
+        val allowCases = listOf(
+            "하해와 같은 은혜에 감사드립니다",
+            "안녕해요",
+            "공부해요",
+            "안녕하세요"
+        )
+
+        for (text in allowCases) {
+            val result = filter.check(text)
+            assertTrue("Expected valid for: '$text', but got $result", result is RuleResult.Valid)
+            assertTrue(filter.isValid(text))
+        }
+    }
+
+    @Test
     fun testFilterCandidatesWithContext() {
         // ACC-01 filtering with prefix context
         val cands1 = listOf("무슨 일인가요?", "죄송합니다", "우산을 쓰세요", "내일 뵙겠습니다")

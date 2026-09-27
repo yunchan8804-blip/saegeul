@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
+import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
@@ -360,7 +361,8 @@ class AiContextualPredictor(
                 limit = limit
             ).filter {
                 it.source == PersonalizedSentenceRecord.SOURCE_USER_PHRASE &&
-                    PersonalSentenceCompletionGate.isContinuation(normalizedFullContext, it.sentence)
+                    PersonalSentenceCompletionGate.isContinuation(normalizedFullContext, it.sentence) &&
+                    KoreanSyntaxRuleFilter.isGrammaticallySound(it.sentence, normalizedFullContext)
             }
             personalMatches.forEach { record ->
                 val score = (0.96f + (record.score * 0.01f)).coerceAtMost(0.999f)

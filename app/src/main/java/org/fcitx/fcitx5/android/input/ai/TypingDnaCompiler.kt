@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
+
 /**
  * 0ms Local Knowledge Compiler:
  * Compiles distilled [TypingDnaProfile] knowledge into the high-speed Tier-1 runtime engines
@@ -39,8 +41,15 @@ class TypingDnaCompiler(
         }
         collocationModel.injectDynamicBigrams(bigramMap, isInformal)
 
-        // 2. Upsert canned sentences into PersonalizedSentenceStore
+        // 2. Upsert canned sentences into PersonalizedSentenceStore. A persona rehydrated from a
+        // profile persisted before the grammar gate existed may still carry an ungrammatical
+        // merged phrase (e.g. "안녕하해요"); such a phrase must not be re-injected, and a stale
+        // record for it left over in the store from before must be pruned here.
         for (phrase in persona.cannedPhrases) {
+            if (!KoreanSyntaxRuleFilter.isGrammaticallySound(phrase)) {
+                sentenceStore.remove(phrase)
+                continue
+            }
             val tone = if (isInformal) KoreanTone.Informal else KoreanTone.Honorific
             sentenceStore.upsert(
                 PersonalizedSentenceRecord(

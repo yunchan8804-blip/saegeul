@@ -8,7 +8,7 @@ package org.fcitx.fcitx5.android.input.ai.rule
  * Stage 1 Lightweight Korean Syntax Rule Filter.
  *
  * Rejects ungrammatical or pragmatically inconsistent sentence continuations within <= 0.05ms (50µs).
- * Targets 5 critical empirical defects (ACC-01 ~ ACC-04):
+ * Targets 5 critical empirical defects (ACC-01 ~ ACC-05):
  *
  * 1. ACC-01 (Causal Subordination Mismatch):
  *    Rejects sentences where a causal clause ending in `-[아/어/여]서` or `-느라고` is followed by
@@ -20,6 +20,11 @@ package org.fcitx.fcitx5.android.input.ai.rule
  *
  * 3. ACC-04 (Formality / Honorific Tone Inconsistency):
  *    Rejects text mixing formal endings (`-ㅂ니다/-해요`) with informal endings (`-어/-지/-냐`).
+ *
+ * 4. ACC-05 (Stem Duplication):
+ *    Rejects an eojeol where a `하` verb stem is immediately followed by another `해/했/하여`
+ *    stem (e.g. `안녕하해요`, `공부하했어`), while allowing an eojeol that itself starts with
+ *    `하` (e.g. the noun `하해(河海)` used on its own).
  */
 class KoreanSyntaxRuleFilter {
 
@@ -27,7 +32,8 @@ class KoreanSyntaxRuleFilter {
         ACC_01_CAUSAL_SUBORDINATION("ACC-01", "선행 이유절(-아서/어서/느라고) 뒤 의문/명령/청유 호응 오류"),
         ACC_02_INTRANSITIVE_OBJECT("ACC-02", "목적어 격조사(-을/를) 뒤 자동사 술어(감사/고맙/기쁘/슬프) 직접 결합 오류"),
         ACC_03_INTERROGATIVE_DISCORD("ACC-03", "의문사(뭘/무엇을/왜 등) 뒤 평서문 종결 호응 오류"),
-        ACC_04_FORMALITY_INCONSISTENCY("ACC-04", "한 문맥 내 격식체(-ㅂ니다/-해요)와 비격식체(-어/-지/-냐) 혼용 오류")
+        ACC_04_FORMALITY_INCONSISTENCY("ACC-04", "한 문맥 내 격식체(-ㅂ니다/-해요)와 비격식체(-어/-지/-냐) 혼용 오류"),
+        ACC_05_STEM_DUPLICATION("ACC-05", "어절 중간에서 '하' 어간이 '해/했/하여'와 중복 결합된 오류")
     }
 
     sealed class RuleResult {
@@ -108,6 +114,17 @@ class KoreanSyntaxRuleFilter {
         // Sentence delimiters: punctuation followed by space or newline
         private val SENTENCE_DELIMITERS = Regex("""(?<=[.?!])\s+|\n+""")
 
+        // ==========================================
+        // ACC-05 Patterns: Stem Duplication (하 + 해/했/하여)
+        // ==========================================
+        // Requires a preceding Hangul syllable so the eojeol-initial "하해" (e.g. the noun
+        // 하해(河海) used on its own) is never flagged - only a "하" glued onto an earlier
+        // stem within the same eojeol (안녕+하해요, 공부+하했어) is a duplication error.
+        // "하해서" is also covered since it contains the "하해" substring.
+        private val ACC05_STEM_DUPLICATION_PATTERN = Regex(
+            """(?<=[가-힣])하(?:해|했|하여)"""
+        )
+
         // Formal start / Informal start without punctuation (e.g. "안녕하세요 밥 먹었어?")
         private val FORMAL_START_PATTERN = Regex(
             """^(?:안녕하세요|안녕하십니까|반갑습니다|감사합니다|고맙습니다|죄송합니다)"""
@@ -160,6 +177,10 @@ class KoreanSyntaxRuleFilter {
         // Rule 4: ACC-04 (Formality Inconsistency)
         val acc04Result = checkAcc04(text)
         if (acc04Result is RuleResult.Invalid) return acc04Result
+
+        // Rule 5: ACC-05 (Stem Duplication: 하 + 해/했/하여)
+        val acc05Result = checkAcc05(text)
+        if (acc05Result is RuleResult.Invalid) return acc05Result
 
         return RuleResult.Valid
     }
@@ -311,6 +332,23 @@ class KoreanSyntaxRuleFilter {
             )
         }
 
+        return RuleResult.Valid
+    }
+
+    /**
+     * ACC-05: Rejects an eojeol where a `하` verb stem is immediately followed by another
+     * `해/했/하여` stem (e.g. `안녕하해요`, `공부하했어`). An eojeol that itself starts with `하`
+     * (e.g. the noun `하해(河海)` used on its own) is not flagged.
+     */
+    fun checkAcc05(text: String): RuleResult {
+        val match = ACC05_STEM_DUPLICATION_PATTERN.find(text)
+        if (match != null) {
+            return RuleResult.Invalid(
+                violationType = ViolationType.ACC_05_STEM_DUPLICATION,
+                reason = "어절 중간에서 '하' 어간이 중복 결합되었습니다('${match.value}'). (예: 하해요→해요, 하했어→했어)",
+                matchedSnippet = match.value
+            )
+        }
         return RuleResult.Valid
     }
 }

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
+
 /**
  * Typing DNA Profiler:
  * Analyzes accumulated user sentences and extracts the user's distinct linguistic DNA
@@ -12,6 +14,15 @@ package org.fcitx.fcitx5.android.input.ai
  * 100% on-device statistical analysis; requires zero network access.
  */
 class TypingDnaProfiler {
+
+    companion object {
+        /**
+         * A sentence must be observed at least this many times before it is considered
+         * "frequently used" enough to be promoted to [PersonaDna.cannedPhrases]. A single
+         * occurrence is not evidence of habit and must never be surfaced as "내 스타일".
+         */
+        const val MIN_CANNED_PHRASE_FREQUENCY = 2
+    }
 
     /**
      * Profiles the given sentences using 100% on-device statistical analysis.
@@ -34,12 +45,14 @@ class TypingDnaProfiler {
         val endingCounts = mutableMapOf<String, Int>()
         val bigramCounts = mutableMapOf<Pair<String, String>, Int>()
         val phraseCounts = mutableMapOf<String, Int>()
+        val phraseLastSeenIndex = mutableMapOf<String, Int>()
 
-        for (s in sentences) {
+        for ((index, s) in sentences.withIndex()) {
             val trimmed = s.trim()
             if (trimmed.isBlank()) continue
 
             phraseCounts[trimmed] = (phraseCounts[trimmed] ?: 0) + 1
+            phraseLastSeenIndex[trimmed] = index
 
             KoreanSentenceEndingExtractor.sentenceFragments(trimmed).forEach { fragment ->
                 val ending = KoreanSentenceEndingExtractor.endingOf(fragment)
@@ -83,8 +96,17 @@ class TypingDnaProfiler {
                 DynamicBigram(pair.first, pair.second, weight)
             }
 
+        // "자주 쓴 문장"으로 승격하려면 최소 2회 이상 관측되고 문법적으로도 온전해야 한다.
+        // 동률은 빈도 -> 최근성(마지막으로 등장한 위치) -> 문자열 순으로 결정적으로 정렬한다.
         val canned = phraseCounts.entries
-            .sortedByDescending { it.value }
+            .filter { (phrase, count) ->
+                count >= MIN_CANNED_PHRASE_FREQUENCY && KoreanSyntaxRuleFilter.isGrammaticallySound(phrase)
+            }
+            .sortedWith(
+                compareByDescending<Map.Entry<String, Int>> { it.value }
+                    .thenByDescending { phraseLastSeenIndex[it.key] ?: -1 }
+                    .thenBy { it.key }
+            )
             .take(5)
             .map { it.key }
 
