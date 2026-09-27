@@ -11,8 +11,14 @@ package org.fcitx.fcitx5.android.input.ai.rule
  * Targets 5 critical empirical defects (ACC-01 ~ ACC-05):
  *
  * 1. ACC-01 (Causal Subordination Mismatch):
- *    Rejects sentences where a causal clause ending in `-[아/어/여]서` or `-느라고` is followed by
- *    an interrogative clause (`?`, `인가요`, `나요`, `까`) or an imperative/propositive clause (`자`, `십시오`, `세요`).
+ *    Rejects sentences where a causal clause is followed by an imperative/propositive clause
+ *    (`자`, `십시오`, `세요`, or a command-adverb-gated bare casual imperative like `빨리 와`).
+ *    The causal clause must be either an unrestricted connective (`-느라고`, `-기에`, `-길래`) or
+ *    a `-[아/어]서` ending on one of a fixed list of state/emotion/circumstance predicates (더워서,
+ *    피곤해서, 늦어서, 배고파서, 막혀서 등). An action-verb `-[아/어]서` (걸어서, 표시해서, 골라서
+ *    등, expressing sequence/manner rather than reason) is never treated as causal here, and an
+ *    interrogative ending after a causal clause is never rejected — both are extremely common,
+ *    grammatical colloquial Korean ("걸어서 갈까요?", "배고파서 뭐 먹을까?").
  *
  * 2. ACC-02 (Intransitive Predicate with Accusative Object):
  *    Rejects sentences where an accusative noun phrase (`을/를`) directly binds to an
@@ -29,7 +35,7 @@ package org.fcitx.fcitx5.android.input.ai.rule
 class KoreanSyntaxRuleFilter {
 
     enum class ViolationType(val code: String, val description: String) {
-        ACC_01_CAUSAL_SUBORDINATION("ACC-01", "선행 이유절(-아서/어서/느라고) 뒤 의문/명령/청유 호응 오류"),
+        ACC_01_CAUSAL_SUBORDINATION("ACC-01", "선행 이유절(상태 용언 -아서/어서, 느라고/기에/길래) 뒤 명령/청유 호응 오류"),
         ACC_02_INTRANSITIVE_OBJECT("ACC-02", "목적어 격조사(-을/를) 뒤 자동사 술어(감사/고맙/기쁘/슬프) 직접 결합 오류"),
         ACC_03_INTERROGATIVE_DISCORD("ACC-03", "의문사(뭘/무엇을/왜 등) 뒤 평서문 종결 호응 오류"),
         ACC_04_FORMALITY_INCONSISTENCY("ACC-04", "한 문맥 내 격식체(-ㅂ니다/-해요)와 비격식체(-어/-지/-냐) 혼용 오류"),
@@ -51,25 +57,47 @@ class KoreanSyntaxRuleFilter {
         // ==========================================
         // ACC-01 Patterns: Causal Subordination
         // ==========================================
-        // Causal connective ending: -어서, -아서, -여서, -와서, -봐서, -돼서, -되어서, -느라고, -기에, -길래
-        // Includes 7 major irregular conjugations (ㄷ, ㅂ, ㅅ, 르, ㅎ, 우, 여)
-        // Note: '-니까', '-니' intentionally excluded as they grammatically allow question/imperative.
-        private val CAUSAL_CONNECTIVE_PATTERN = Regex(
-            """([가-힣]*(?:[아어여]서|[와봐가사타자나돼해줘써커켜쳐혀겨셔서펴퍼파]서|워서|려서|러서|라서|얘서|래서|개서|져서|느라고|기에|길래))(?=[^가-힣]|${'$'})""",
-            RegexOption.IGNORE_CASE
+        // -[아/어]서 attached to a fixed list of state/emotion/circumstance predicates only.
+        // 2026-09-27 정밀화: 동작 용언의 -아서/어서(걸어서, 표시해서, 골라서, 타서, 가져와서, 만들어서
+        // 등, 순서·방법을 뜻함)는 여기서 다루지 않는다. 활용형은 표준 규칙/불규칙 활용을 그대로 반영한다
+        // (ㅂ 불규칙: 덥→더워서, 춥→추워서, 무섭→무서워서, 가깝→가까워서, 어렵→어려워서, 쉽→쉬워서,
+        // 고맙→고마워서, 시끄럽→시끄러워서; ㅡ 불규칙: 바쁘→바빠서, 아프→아파서, 배고프→배고파서;
+        // 르 불규칙: 모르→몰라서; 축약: 막히→막혀서, 밀리→밀려서, 졸리→졸려서).
+        private val STATE_CAUSAL_FORMS = listOf(
+            "더워서", "추워서", "바빠서", "아파서", "피곤해서", "늦어서", "없어서", "있어서",
+            "몰라서", "좋아서", "싫어서", "힘들어서", "무서워서", "배고파서", "졸려서", "급해서",
+            "멀어서", "가까워서", "비싸서", "싸서", "어려워서", "쉬워서", "귀찮아서", "미안해서",
+            "고마워서", "괜찮아서", "시끄러워서", "막혀서", "밀려서"
+        )
+        private val STATE_CAUSAL_PATTERN = Regex(
+            "(?:${STATE_CAUSAL_FORMS.joinToString("|")})(?=[^가-힣]|${'$'})"
         )
 
-        // Interrogative / Question endings:
-        // ?, 인가요, 나요, 까, 습니까, ㅂ니까, 을까요, ㄹ까요, 을까, ㄹ까, 니, 냐, 던가, 어떡하죠, 어쩌죠
-        private val QUESTION_ENDING_PATTERN = Regex(
-            """(?:\?|(?:[가-힣]*(?:인가요|은가요|나요|가요|습니까|ㅂ니까|을까요|ㄹ까요|을까|ㄹ까|는가|은가|던가|는지요|니|냐|까)|어떡하죠|어쩌죠)\s*[\?]?)[\s.]*${'$'}"""
+        // -느라고/-기에/-길래는 용언 종류를 가리지 않고 항상 이유절로 본다(기존과 동일, 변경 없음).
+        private val UNRESTRICTED_CAUSAL_PATTERN = Regex(
+            """[가-힣]*(?:느라고|기에|길래)(?=[^가-힣]|${'$'})"""
         )
 
         // Imperative / Propositive endings:
-        // 세요, 으세요, 십시오, 으십시오, 자, 합시다, 읍시다, 시지요, 어라, 아라, 렴
+        // 세요, 으세요, 십시오, 으십시오, 자(하자 포함), 합시다, 읍시다, 시지요, 어라, 아라, 렴
         private val IMPERATIVE_PROPOSITIVE_PATTERN = Regex(
             """(?:십시오|으십시오|세요|으세요|시지요|합시다|읍시다|자|어라|아라|렴)[\s.!]*${'$'}"""
         )
+
+        // 반말 축약 명령형(와라/아라 같은 어미가 붙지 않는 "와.", "빨리 가." 류)은 평서문과 표면형이
+        // 같아 명령·청유 어미만으로는 구분할 수 없다. 오탐을 줄이기 위해 "빨리/제발/당장/얼른/이리"
+        // 같은 명령 신호 부사가 함께 있고, 그 부사 뒤 마지막 어절이 이 짧은 동사 원형 그대로일 때만
+        // 명령으로 본다.
+        private val COMMAND_ADVERBS = setOf("빨리", "제발", "당장", "얼른", "이리")
+        private val BARE_CASUAL_IMPERATIVE_ENDING_PATTERN = Regex(
+            """(?:^|\s)(?:와|가|줘|봐|해)[.!]?${'$'}"""
+        )
+
+        private fun isImperativeOrPropositive(followingText: String): Boolean {
+            if (IMPERATIVE_PROPOSITIVE_PATTERN.containsMatchIn(followingText)) return true
+            return COMMAND_ADVERBS.any(followingText::contains) &&
+                BARE_CASUAL_IMPERATIVE_ENDING_PATTERN.containsMatchIn(followingText)
+        }
 
         // ==========================================
         // ACC-02 Patterns: Accusative + Intransitive
@@ -202,27 +230,18 @@ class KoreanSyntaxRuleFilter {
     }
 
     /**
-     * ACC-01: Rejects sentences where causal clauses (-어서, -아서, -여서, -느라고) are followed
-     * by interrogative or imperative/propositive endings.
+     * ACC-01: Rejects sentences where a causal clause (a state/emotion/circumstance predicate's
+     * -[아/어]서, or an unrestricted -느라고/-기에/-길래) is followed by an explicit imperative or
+     * propositive ending. An interrogative ending after a causal clause is never rejected — that
+     * combination is common, grammatical, colloquial Korean ("배고파서 뭐 먹을까?").
      */
     fun checkAcc01(text: String): RuleResult {
-        val matches = CAUSAL_CONNECTIVE_PATTERN.findAll(text)
-        for (match in matches) {
-            val causalVerb = match.groupValues[1]
+        (STATE_CAUSAL_PATTERN.findAll(text) + UNRESTRICTED_CAUSAL_PATTERN.findAll(text)).forEach { match ->
+            val causalVerb = match.value
             val followingText = text.substring(match.range.last + 1).trim()
-            if (followingText.isEmpty()) continue
+            if (followingText.isEmpty()) return@forEach
 
-            // 1. Interrogative check (e.g. "?", "인가요", "나요", "까")
-            if (followingText.contains('?') || QUESTION_ENDING_PATTERN.containsMatchIn(followingText)) {
-                return RuleResult.Invalid(
-                    violationType = ViolationType.ACC_01_CAUSAL_SUBORDINATION,
-                    reason = "이유 접속어미('$causalVerb') 뒤에 의문문('$followingText')이 결합되었습니다. (-니까/-니로 교체 필요)",
-                    matchedSnippet = "$causalVerb $followingText"
-                )
-            }
-
-            // 2. Imperative / Propositive check (e.g. "자", "십시오", "세요")
-            if (IMPERATIVE_PROPOSITIVE_PATTERN.containsMatchIn(followingText)) {
+            if (isImperativeOrPropositive(followingText)) {
                 return RuleResult.Invalid(
                     violationType = ViolationType.ACC_01_CAUSAL_SUBORDINATION,
                     reason = "이유 접속어미('$causalVerb') 뒤에 명령/청유문('$followingText')이 결합되었습니다. (-니까/-니로 교체 필요)",

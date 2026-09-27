@@ -440,6 +440,69 @@ class GeneratedSentenceBankTest {
         }
     }
 
+    @Test
+    fun openIngestionRejectsSpacingLintViolationWithoutChangingMaterial() {
+        val bank = GeneratedSentenceBank(file("spacing-open.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        val report = bank.addGeneratedOpen(
+            responseWith("렬하고 자신감있게 하면 되지 않을까싶어요."),
+            MODEL_ID, SHA
+        )
+        assertEquals(0, report.added)
+        assertEquals(1, report.rejected)
+        assertEquals(IngestionRejectionReason.SPACING, report.rejectionReasons.keys.single())
+        assertEquals(0, bank.sentenceCount)
+    }
+
+    @Test
+    fun prefixIngestionRejectsSpacingLintViolation() {
+        val bank = GeneratedSentenceBank(file("spacing-prefix.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        val report = bank.addGeneratedForPrefix(
+            responseWith("회의 자료를 할수있어요."),
+            "회의 자료를 ", MODEL_ID, SHA
+        )
+        assertEquals(0, report.added)
+        assertEquals(1, report.rejected)
+        assertEquals(IngestionRejectionReason.SPACING, report.rejectionReasons.keys.single())
+    }
+
+    @Test
+    fun strictAddGeneratedRejectsSpacingLintViolation() {
+        val bank = GeneratedSentenceBank(file("spacing-strict.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        assertFormatFailure { bank.addGenerated(responseWith("먹을것같아서 그냥 왔어요."), MODEL_ID, SHA) }
+        assertEquals(0, bank.sentenceCount)
+    }
+
+    @Test
+    fun openIngestionRejectsSyntaxViolationWithoutChangingMaterial() {
+        val bank = GeneratedSentenceBank(file("syntax-open.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        // ACC-02: 목적격 조사 뒤에 자동사/형용사 술어("감사합니다")가 직접 결합된 비문.
+        val report = bank.addGeneratedOpen(responseWith("회의 자료를 감사합니다."), MODEL_ID, SHA)
+        assertEquals(0, report.added)
+        assertEquals(1, report.rejected)
+        assertEquals(IngestionRejectionReason.SYNTAX, report.rejectionReasons.keys.single())
+        assertEquals(0, bank.sentenceCount)
+    }
+
+    @Test
+    fun prefixIngestionRejectsSyntaxViolation() {
+        val bank = GeneratedSentenceBank(file("syntax-prefix.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        // ACC-05: 어절 중간 '하' 어간이 '해'와 중복 결합된 비문("안녕하해요").
+        val report = bank.addGeneratedForPrefix(
+            responseWith("회의 자료를 안녕하해요."),
+            "회의 자료를 ", MODEL_ID, SHA
+        )
+        assertEquals(0, report.added)
+        assertEquals(1, report.rejected)
+        assertEquals(IngestionRejectionReason.SYNTAX, report.rejectionReasons.keys.single())
+    }
+
+    @Test
+    fun strictAddGeneratedRejectsSyntaxViolation() {
+        val bank = GeneratedSentenceBank(file("syntax-strict.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
+        assertFormatFailure { bank.addGenerated(responseWith("회의 자료를 감사합니다."), MODEL_ID, SHA) }
+        assertEquals(0, bank.sentenceCount)
+    }
+
     private fun file(name: String): File = File(tempFolder.root, name)
 
     private fun responseWith(vararg sentences: String): String =

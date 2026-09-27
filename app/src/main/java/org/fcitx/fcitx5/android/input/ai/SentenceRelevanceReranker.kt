@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
-import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
 
 /**
  * Re-ranks and filters sentence-line (isSentenceCompletion=true) candidates using purely
@@ -14,6 +13,10 @@ import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
  * how topically overlapping the candidate is with the recently typed words, and whether the
  * user's own personal n-gram model supports the candidate's next eojeol. No model, network,
  * or I/O is involved.
+ *
+ * Callers are expected to already have run candidates through
+ * [org.fcitx.fcitx5.android.input.ai.rule.SuggestionQualityGate] (grammar soundness included),
+ * so this reranker no longer repeats that syntax check itself.
  */
 object SentenceRelevanceReranker {
 
@@ -44,7 +47,6 @@ object SentenceRelevanceReranker {
 
         if (contextBeforeCursor.isBlank()) {
             return sentences.mapNotNull { pred ->
-                if (!KoreanSyntaxRuleFilter.isGrammaticallySound(pred.text, contextBeforeCursor)) return@mapNotNull null
                 val correctedText = KoreanJosaBitmaskEngine.correctJosaMismatch(pred.text)
                 if (KoreanJosaBitmaskEngine.hasJosaMismatch(correctedText)) return@mapNotNull null
                 val safe = if (pred.confidenceScore.isNaN() || pred.confidenceScore < 0f) 0f else pred.confidenceScore.coerceIn(0f, MAX_CONFIDENCE)
@@ -74,11 +76,6 @@ object SentenceRelevanceReranker {
 
         val scored = mutableListOf<Pair<AiPrediction, Float>>()
         for (pred in sentences) {
-            // Stage 1 Syntax Rule Filter: reject ungrammatical candidates immediately
-            if (!KoreanSyntaxRuleFilter.isGrammaticallySound(pred.text, contextBeforeCursor)) {
-                continue
-            }
-
             // Stage 0 Phonological Josa Engine: seamlessly correct particle mismatch
             val correctedText = KoreanJosaBitmaskEngine.correctJosaMismatch(pred.text)
             if (KoreanJosaBitmaskEngine.hasJosaMismatch(correctedText)) {

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.ai
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
+import org.fcitx.fcitx5.android.input.ai.rule.SuggestionQualityGate
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
@@ -599,14 +600,24 @@ class AiContextualPredictor(
 
         deferredDiscoursePredictions.forEach(::addPrediction)
 
+        // 최종 품질 게이트: 소스를 가리지 않고 모든 후보(단어 줄·문장 줄)를 여기 한 곳에서 정본
+        // SuggestionQualityGate로 거른다. 지금 입력 중인 스트로크를 그대로 반영한 후보와, 이미
+        // 큐레이션된 초성 약어 확장(choseong_abbrev)만 예외로 둔다. 사용자 데이터(n-gram·금고·RAG)
+        // 자체는 지우지 않고 화면에 보여줄 때만 거른다.
+        val gated = results.filter { pred ->
+            pred.source == "choseong_abbrev" ||
+                (cleanStroke.isNotBlank() && pred.text.trim() == cleanStroke) ||
+                SuggestionQualityGate.accepts(pred.text, rawFullContext, pred.isSentenceCompletion)
+        }
+
         // Sentence-line whitelist: only sources backed by the user's own data, model output,
         // or a verified on-device sentence-pack continuation may appear as a full-sentence
         // candidate. This blocks hardcoded content templates (collocation_next_word,
         // baseKoreanLexicon, etc.) that occasionally produce a multi-word string long enough
         // to be marked isSentenceCompletion=true from leaking into the sentence line.
         // Word-line candidates are unaffected.
-        val words = results.filter { !it.isSentenceCompletion }.sortedByDescending { it.confidenceScore }.take(limit)
-        val sentenceCandidates = results
+        val words = gated.filter { !it.isSentenceCompletion }.sortedByDescending { it.confidenceScore }.take(limit)
+        val sentenceCandidates = gated
             .filter { it.isSentenceCompletion && it.source !in SENTENCE_LINE_SOURCE_BLOCKLIST }
         val sentences = SentenceRelevanceReranker.rerank(
             sentenceCandidates, rawFullContext, ngram, packageName, limit, personalGraphStore

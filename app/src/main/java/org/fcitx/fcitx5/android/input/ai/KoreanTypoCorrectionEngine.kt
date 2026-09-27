@@ -82,7 +82,13 @@ class KoreanTypoCorrectionEngine(
         "마자" to "맞아",
         "마자요" to "맞아요",
         "감사합니더" to "감사합니다",
-        "반갑습니더" to "반갑습니다"
+        "반갑습니더" to "반갑습니다",
+        "몇일" to "며칠",
+        "금새" to "금세",
+        "역활" to "역할",
+        "설겆이" to "설거지",
+        "오랫만" to "오랜만",
+        "어떻해" to "어떡해"
     )
 
     // Suffix rules for auxiliary verb '-고 싶다' (phonetic typos like 시프-, 시퍼-, 시픈-, 시플-, 시펐-)
@@ -113,6 +119,15 @@ class KoreanTypoCorrectionEngine(
         "시픈" to "싶은",
         "시플" to "싶을",
         "시픔" to "싶음"
+    )
+
+    // 표준어 규정상 명백한 흔한 오표기 어간. 활용형(어의없어서/왠만하면/몰겠어요/희안해요 등)까지
+    // 덮도록 어절 전체가 아니라 어간 부분 문자열을 치환한다(됬/됫/됀과 같은 방식).
+    private val STANDARD_SPELLING_STEMS = listOf(
+        "어의없" to "어이없",
+        "왠만하" to "웬만하",
+        "몰겠" to "모르겠",
+        "희안하" to "희한하"
     )
 
     private val standardDictionary: Set<String> by lazy {
@@ -329,6 +344,14 @@ class KoreanTypoCorrectionEngine(
             val rest = word.drop(2)
             val normalizedRest = if (rest.startsWith("되")) "돼" + rest.drop(1) else rest
             return if (normalizedRest.isEmpty()) "안 돼" else "안 $normalizedRest"
+        }
+
+        // 7. 표준어 규정상 명백한 흔한 오표기(어간이 활용되므로 어절 전체 대신 어간을 치환한다).
+        // 어의없다 -> 어이없다, 왠만하다 -> 웬만하다, 몰겠다 -> 모르겠다, 희안하다 -> 희한하다
+        for ((typoStem, standardStem) in STANDARD_SPELLING_STEMS) {
+            if (word.contains(typoStem)) {
+                return word.replace(typoStem, standardStem)
+            }
         }
 
         return null
