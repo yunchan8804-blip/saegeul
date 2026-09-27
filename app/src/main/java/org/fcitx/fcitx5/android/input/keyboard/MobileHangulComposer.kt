@@ -57,6 +57,9 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
     /** Once true, [cyclePreviousVowel] has been folded into [cycleTailKeys] for this cycle. */
     private var cycleTailIncludesPrevious = false
 
+    /** Once true, `P` has been let go for the rest of this cycle (K3: it was just committed). */
+    private var cyclePreviousVowelReleased = false
+
     /** Whether the last jamo [pressCycle] selected was a vowel, for the space-swallow rule. */
     private var lastCycleSelectedVowel = false
 
@@ -78,6 +81,7 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
         cyclePreviousVowel = null
         cycleTailKeys = ""
         cycleTailIncludesPrevious = false
+        cyclePreviousVowelReleased = false
         lastCycleSelectedVowel = false
         lastSymbolCycleId = null
         lastSymbolCycleAt = 0L
@@ -114,10 +118,15 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
 
     /**
      * Replays a multitap cycle so the backend always ends up holding exactly what "the syllable
-     * before this cycle" + "the selected jamo combined with it" would be: [cycleTailKeys] is
-     * everything we ourselves put in the backend for this cycle, and [cyclePreviousVowel] (`P`)
-     * is only ever erased once, the first time a selection needs it gone; after that it either
-     * stays folded into a combined vowel or gets retyped alongside a non-combining selection.
+     * before this cycle" + "the selected jamo combined with it" would be. While a selection keeps
+     * combining with the cycle's starting vowel `P` ([cyclePreviousVowel]), nothing has committed
+     * yet, so [cycleTailKeys] safely backspaces and resends the whole compound each time.
+     *
+     * The moment a selection does *not* combine with `P`, libhangul commits the syllable holding
+     * `P` on its own the instant this new, non-attaching key lands — Dubeolsik Backspace cannot
+     * pick that commit back apart. From then on this cycle must let `P` go entirely
+     * ([cyclePreviousVowelReleased]): never backspace or resend it again, only ever replace the
+     * still-open selected jamo. [cycleTailKeys] tracks only what open text is under our control.
      */
     private fun pressCycle(token: Token.Cycle, nowMillis: Long): List<Output> {
         require(token.jamo.isNotEmpty()) { "A multitap key needs at least one jamo" }
@@ -131,28 +140,37 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
             cyclePreviousVowel = currentVowel.takeIf { selected.isVowel() }
             cycleTailKeys = ""
             cycleTailIncludesPrevious = false
+            cyclePreviousVowelReleased = false
         }
         lastCycleId = token.id
         lastCycleTimeout = token.timeoutMillis
         lastCycleAt = nowMillis
 
         val previous = cyclePreviousVowel
-        val combined = previous
-            ?.let { combineVowels(it, selected, token.naratgulVowelPair) }
-            ?.takeIf { selected.isVowel() }
-
-        val eraseUnfoldedPrevious = combined != null && !cycleTailIncludesPrevious
-        val backspaceCount = cycleTailKeys.length + when {
-            eraseUnfoldedPrevious && previous != null -> encode(previous).length
-            else -> 0
+        val combined = if (cyclePreviousVowelReleased) {
+            null
+        } else {
+            previous?.let { combineVowels(it, selected, token.naratgulVowelPair) }
+                ?.takeIf { selected.isVowel() }
         }
+        val previousKeyLength = previous?.let(::encode)?.length ?: 0
 
-        val target = when {
-            combined != null -> encode(combined)
-            !cycleTailIncludesPrevious || previous == null -> encode(selected.toString())
-            else -> encode(previous) + encode(selected.toString())
+        val backspaceCount: Int
+        val target: String
+        if (combined != null) {
+            backspaceCount = cycleTailKeys.length + if (!cycleTailIncludesPrevious) previousKeyLength else 0
+            target = encode(combined)
+            cycleTailIncludesPrevious = true
+        } else {
+            // Peel back only our own still-open contribution; a `P` that is still open commits
+            // itself the moment this key lands, so it is never part of what we backspace/resend.
+            // The subtraction only ever applies once, at the exact press that lets `P` go — every
+            // later replace in this same cycle backspaces its own tail alone.
+            backspaceCount = cycleTailKeys.length - if (cycleTailIncludesPrevious) previousKeyLength else 0
+            target = encode(selected.toString())
+            cyclePreviousVowelReleased = true
+            cycleTailIncludesPrevious = false
         }
-        if (combined != null) cycleTailIncludesPrevious = true
 
         currentVowel = if (selected.isVowel()) (combined ?: selected.toString()) else null
         lastJamo = if (selected.isVowel()) currentVowel?.singleOrNull() else selected
@@ -275,6 +293,7 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
         cyclePreviousVowel = null
         cycleTailKeys = ""
         cycleTailIncludesPrevious = false
+        cyclePreviousVowelReleased = false
         lastCycleSelectedVowel = false
         lastSymbolCycleId = null
     }

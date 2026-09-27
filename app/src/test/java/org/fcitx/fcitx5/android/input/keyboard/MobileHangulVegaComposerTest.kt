@@ -7,91 +7,91 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Accumulates a composer's raw Dubeolsik key stream the same way [RedTeamHangulEngineAutomataTest]'s
- * VirtualDubeolsikBuffer does, kept local to this file rather than shared.
- */
-private class VegaDubeolsikBuffer {
-    private val buffer = StringBuilder()
-
-    fun applyAll(outputs: List<MobileHangulComposer.Output>) {
-        outputs.forEach { output ->
-            when (output) {
-                MobileHangulComposer.Output.Backspace ->
-                    if (buffer.isNotEmpty()) buffer.deleteCharAt(buffer.length - 1)
-                MobileHangulComposer.Output.Space -> buffer.append(' ')
-                is MobileHangulComposer.Output.Keys -> buffer.append(output.value)
-            }
-        }
-    }
-
-    fun content(): String = buffer.toString()
-}
-
 /** Vega's own composer behavior: cross-key vowel combination and its ㅣㅡ multitap key. */
 class MobileHangulVegaComposerTest {
 
     @Test
     fun `K3 vega ie key replays without corrupting the base syllable`() {
         val c = MobileHangulComposer(MobileHangulFamily.Other)
-        val buffer = VegaDubeolsikBuffer()
+        val engine = DubeolsikEngineSimulator()
         val ie = MobileHangulComposer.Token.Cycle("vg_ie", listOf('ㅣ', 'ㅡ', 'ㅢ'))
 
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㅜ')))
-        assertEquals("구", "rn", buffer.content())
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅜ')))
+        assertEquals("구", engine.content())
 
-        buffer.applyAll(c.press(ie, 0))
-        assertEquals("×1 -> 귀", "rnl", buffer.content())
+        engine.apply(c.press(ie, 0))
+        assertEquals("×1 -> 귀", "귀", engine.content())
 
-        buffer.applyAll(c.press(ie, 100))
-        assertEquals("×2 -> 구ㅡ", "rnm", buffer.content())
+        engine.apply(c.press(ie, 100))
+        assertEquals("×2 -> 구 committed + open ㅡ", "구으", engine.content())
 
-        buffer.applyAll(c.press(ie, 200))
-        assertEquals("×3 -> 구ㅢ (구의)", "rnml", buffer.content())
+        engine.apply(c.press(ie, 200))
+        assertEquals("×3 -> 구 committed + open ㅢ", "구의", engine.content())
 
-        buffer.applyAll(c.press(ie, 300))
-        assertEquals("×4 -> back to 귀", "rnl", buffer.content())
+        // ×4 wraps the cycle back to ㅣ, but P was already let go at ×2: it must NOT re-combine
+        // into 귀 again. Only the still-open selection changes.
+        engine.apply(c.press(ie, 300))
+        assertEquals("×4 -> 구 committed + open ㅣ, not 귀 again", "구이", engine.content())
+    }
+
+    @Test
+    fun `vega ie key still lets P go when the very first tap doesn't combine`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val engine = DubeolsikEngineSimulator()
+        // vg_ie itself always combines on its first tap, so use a plain jamo P with a cycle
+        // whose first jamo can't combine with it at all (vg_a's ㅏ never combines with ㅜ).
+        val a = MobileHangulComposer.Token.Cycle("vg_a", listOf('ㅏ', 'ㅑ'))
+
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㅜ')))
+        assertEquals("구", engine.content())
+
+        engine.apply(c.press(a, 0))
+        assertEquals("구 committed, open 아, ㄱ never touched", "구아", engine.content())
+
+        engine.apply(c.press(a, 100))
+        assertEquals("replacing again only touches the open 아/야, never 구", "구야", engine.content())
     }
 
     @Test
     fun `vega consonant cycle steps through giyeok kieuk ssanggiyeok`() {
         val c = MobileHangulComposer(MobileHangulFamily.Other)
-        val buffer = VegaDubeolsikBuffer()
+        val engine = DubeolsikEngineSimulator()
         val g = MobileHangulComposer.Token.Cycle("vg_g", listOf('ㄱ', 'ㅋ', 'ㄲ'))
 
-        buffer.applyAll(c.press(g, 0))
-        assertEquals("r", buffer.content())
-        buffer.applyAll(c.press(g, 100))
-        assertEquals("z", buffer.content())
-        buffer.applyAll(c.press(g, 200))
-        assertEquals("R", buffer.content())
+        engine.apply(c.press(g, 0))
+        assertEquals("ㄱ", engine.content())
+        engine.apply(c.press(g, 100))
+        assertEquals("ㅋ", engine.content())
+        engine.apply(c.press(g, 200))
+        assertEquals("ㄲ", engine.content())
     }
 
     @Test
     fun `vega ㅏㅑ cycle replaces cleanly when there is no leading vowel`() {
         val c = MobileHangulComposer(MobileHangulFamily.Other)
-        val buffer = VegaDubeolsikBuffer()
+        val engine = DubeolsikEngineSimulator()
         val a = MobileHangulComposer.Token.Cycle("vg_a", listOf('ㅏ', 'ㅑ'))
 
-        buffer.applyAll(c.press(a, 0))
-        assertEquals("k", buffer.content())
-        buffer.applyAll(c.press(a, 100))
-        assertEquals("i", buffer.content())
+        engine.apply(c.press(a, 0))
+        assertEquals("아", engine.content())
+        engine.apply(c.press(a, 100))
+        assertEquals("야", engine.content())
     }
 
     @Test
     fun `vega cross-key vowels combine ㅗ then ㅏ into ㅘ`() {
         val c = MobileHangulComposer(MobileHangulFamily.Other)
-        val buffer = VegaDubeolsikBuffer()
+        val engine = DubeolsikEngineSimulator()
         val o = MobileHangulComposer.Token.Cycle("vg_o", listOf('ㅗ', 'ㅛ'))
         val a = MobileHangulComposer.Token.Cycle("vg_a", listOf('ㅏ', 'ㅑ'))
 
-        buffer.applyAll(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
-        buffer.applyAll(c.press(o, 0))
-        assertEquals("고", "rh", buffer.content())
+        engine.apply(c.press(MobileHangulComposer.Token.Jamo('ㄱ')))
+        engine.apply(c.press(o, 0))
+        assertEquals("고", engine.content())
 
-        buffer.applyAll(c.press(a, 1_000))
-        assertEquals("과", "rhk", buffer.content())
+        engine.apply(c.press(a, 1_000))
+        assertEquals("과", engine.content())
     }
 }
