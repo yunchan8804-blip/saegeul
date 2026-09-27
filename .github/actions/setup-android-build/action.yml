@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Yun Chan
+
+name: Set up Saegeul Android build
+description: JDK 17, Android SDK, CMake and native build tools on an Ubuntu runner, then Gradle.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: "17"
+
+    - name: Set up Android
+      uses: android-actions/setup-android@v3
+      with:
+        # The runner's cmdline-tools no longer ship the retired "tools" package the
+        # action installs by default, which fails sdkmanager before any build step.
+        packages: platform-tools
+
+    - name: Install native build dependencies
+      shell: bash
+      run: |
+        sdkmanager --install "cmake;3.31.6"
+        sudo apt-get update
+        sudo apt-get install -y extra-cmake-modules gettext
+
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v5

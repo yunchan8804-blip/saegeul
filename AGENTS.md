@@ -153,7 +153,7 @@
 | Android 단위 테스트 (전체) | `./gradlew :app:testDebugUnitTest` |
 | Android 빌드 | `./gradlew :app:assembleDebug :plugin:hangul:assembleDebug` |
 | 관제 UI (`admin/`) | `npm run test`, `npm run check`, `npm run build` (모두 `admin/`에서 실행) |
-| 컴패니언 스크립트 | `python scripts/test_ai_provider_companion.py` |
+| 한국어 데이터 스크립트 | `python scripts/test_ko_doc_quality.py`, `python scripts/test_korean_continuation_surface.py` |
 | 릴리스 게이트 | `scripts/verify-release-licenses.ps1`, `verify-release-identity.ps1`, `verify-release-bundle.ps1`. 인자는 `docs/wiki/09-Developer-and-Build-Guide.md` 4절 |
 
 - 단위 테스트 중 `RedTeam*Test`는 회귀 방어선이다. 통과시키기 위해 테스트를 고치거나 지우지 않는다. 테스트가 잘못됐다고 보이면 그대로 두고 보고한다.
@@ -165,7 +165,7 @@
   - `app/src/main/java/org/fcitx/fcitx5/android/input/**` (입력·엔진 연동). 단 `input/ai/**`는 별도 단위.
   - `app/src/main/java/org/fcitx/fcitx5/android/ui/**` (설정·대시보드 UI)
   - `plugin/hangul/**` (cpp 서브모듈 제외)
-  - `admin/**`, `companion/**`, `scripts/**`, `site/**`, `docs/**`
+  - `admin/**`, `scripts/**`, `site/**`, `docs/**`
 - 워커가 건드리지 않는 것: `Versions.kt` 버전 범프, `ProductIdentity.kt`, 서명·릴리스 스크립트, `.github/workflows/**`, 개인정보 선언 문서, 서브모듈 포인터, `.env`. 필요하면 멈추고 보고한다. 오케스트레이터가 직접 한다.
 - 릴리스 아티팩트 생성, Play 콘솔 조작(`admin/tools/play-*.py`), 원격 push, 태그는 오케스트레이터가 사용자 확인 후 직접 한다.
 

@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # saegul.chanpaca.net is served by the Cloudflare Pages project `saegul`, which uses
       # direct upload rather than a Git integration. A push therefore cannot deploy it on its
       # own; Wrangler uploads site/ against the project's production branch.
