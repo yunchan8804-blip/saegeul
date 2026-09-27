@@ -129,19 +129,12 @@ class AiToneAdaptivePredictor(
                 KoreanTone.Neutral -> {}
             }
 
-            // Contextual Emoji Infusion for celebratory or supportive contexts
-            if (contextBeforeCursor.contains("축하") || currentStroke.contains("축하")) {
-                if (!adaptedText.contains("🎉") && !adaptedText.contains("👏")) {
-                    adaptedText = "$adaptedText 🎉"
-                }
-            } else if (contextBeforeCursor.contains("합격") || contextBeforeCursor.contains("승진")) {
-                if (!adaptedText.contains("✨") && !adaptedText.contains("🎉")) {
-                    adaptedText = "$adaptedText ✨"
-                }
-            } else if (contextBeforeCursor.contains("감사") || currentStroke == "ㄱㅅ") {
-                if (detectedTone == KoreanTone.Informal && !adaptedText.contains("고마워")) {
-                    adaptedText = "고마워! 😊"
-                }
+            // 캐주얼 맥락(정보체+"감사"/"ㄱㅅ")에서는 격식체 대신 캐주얼한 인사말을 준다. 이모지는
+            // 사용자 글에 섞이지 않도록 덧붙이지 않는다(2026-09-26 확정, design.md 라운드 3).
+            if ((contextBeforeCursor.contains("감사") || currentStroke == "ㄱㅅ") &&
+                detectedTone == KoreanTone.Informal && !adaptedText.contains("고마워")
+            ) {
+                adaptedText = "고마워!"
             }
 
             if (seen.add(adaptedText)) {

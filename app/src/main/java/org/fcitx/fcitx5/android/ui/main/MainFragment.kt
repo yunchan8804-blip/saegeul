@@ -4,19 +4,24 @@
  */
 package org.fcitx.fcitx5.android.ui.main
 
+import android.content.Context
 import android.os.Bundle
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.fragment.app.activityViewModels
+import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardPreference
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeDisplayNames
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
+import org.fcitx.fcitx5.android.utils.setup
 
 class MainFragment : PaddingPreferenceFragment() {
 
@@ -41,10 +46,24 @@ class MainFragment : PaddingPreferenceFragment() {
     private fun PreferenceCategory.addDestinationPreference(
         @StringRes title: Int,
         @DrawableRes icon: Int,
-        route: SettingsRoute
+        route: SettingsRoute,
+        summary: String? = null
     ) {
-        addPreference(title, icon = icon) {
-            navigateWithAnim(route)
+        addPreference(Preference(context).apply {
+            setup(context.getString(title), summary, icon) {
+                navigateWithAnim(route)
+            }
+        })
+    }
+
+    private fun themeSummary(ctx: Context): String {
+        val prefs = ThemeManager.prefs
+        return if (prefs.followSystemDayNightTheme.getValue()) {
+            val light = ThemeDisplayNames.displayName(ctx, prefs.lightModeTheme.getValue())
+            val dark = ThemeDisplayNames.displayName(ctx, prefs.darkModeTheme.getValue())
+            ctx.getString(R.string.settings_summary_theme_split, light, dark)
+        } else {
+            ThemeDisplayNames.displayName(ctx, prefs.normalModeTheme.getValue())
         }
     }
 
@@ -59,34 +78,40 @@ class MainFragment : PaddingPreferenceFragment() {
                 addDestinationPreference(
                     R.string.input_methods,
                     R.drawable.ic_baseline_language_24,
-                    SettingsRoute.InputMethodList
+                    SettingsRoute.InputMethodList,
+                    ctx.getString(R.string.settings_summary_input_methods)
                 )
             }
             addCategory(R.string.product_settings) {
                 addDestinationPreference(
                     R.string.theme,
                     R.drawable.ic_baseline_palette_24,
-                    SettingsRoute.Theme
+                    SettingsRoute.Theme,
+                    themeSummary(ctx)
                 )
                 addDestinationPreference(
                     R.string.virtual_keyboard,
                     R.drawable.ic_baseline_keyboard_24,
-                    SettingsRoute.VirtualKeyboard
+                    SettingsRoute.VirtualKeyboard,
+                    ctx.getString(R.string.settings_summary_virtual_keyboard)
                 )
                 addDestinationPreference(
                     R.string.candidates_window,
                     R.drawable.ic_baseline_list_alt_24,
-                    SettingsRoute.CandidatesWindow
+                    SettingsRoute.CandidatesWindow,
+                    ctx.getString(R.string.settings_summary_candidates_window)
                 )
                 addDestinationPreference(
                     R.string.clipboard,
                     R.drawable.ic_clipboard,
-                    SettingsRoute.Clipboard
+                    SettingsRoute.Clipboard,
+                    ctx.getString(R.string.settings_summary_clipboard)
                 )
                 addDestinationPreference(
                     R.string.emoji_and_symbols,
                     R.drawable.ic_baseline_emoji_symbols_24,
-                    SettingsRoute.Symbol
+                    SettingsRoute.Symbol,
+                    ctx.getString(R.string.settings_summary_emoji_and_symbols)
                 )
                 if (productSurfaces.showPluginManager) {
                     addDestinationPreference(
@@ -98,22 +123,26 @@ class MainFragment : PaddingPreferenceFragment() {
                 addDestinationPreference(
                     R.string.advanced,
                     R.drawable.ic_baseline_more_horiz_24,
-                    SettingsRoute.Advanced
+                    SettingsRoute.Advanced,
+                    ctx.getString(R.string.settings_summary_advanced)
                 )
                 addDestinationPreference(
                     R.string.privacy_ai,
                     R.drawable.ic_baseline_auto_awesome_24,
-                    SettingsRoute.PrivacyAi
+                    SettingsRoute.PrivacyAi,
+                    ctx.getString(R.string.settings_summary_privacy_ai)
                 )
                 addDestinationPreference(
                     R.string.app_profiles,
                     R.drawable.ic_baseline_settings_24,
-                    SettingsRoute.AppProfiles
+                    SettingsRoute.AppProfiles,
+                    ctx.getString(R.string.settings_summary_app_profiles)
                 )
                 addDestinationPreference(
                     R.string.personal_dictionary,
                     R.drawable.ic_baseline_library_books_24,
-                    SettingsRoute.PersonalDictionary
+                    SettingsRoute.PersonalDictionary,
+                    ctx.getString(R.string.settings_summary_personal_dictionary)
                 )
             }
             if (productSurfaces.showRawEngineSettings) {

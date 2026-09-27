@@ -145,6 +145,12 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         responsiveRoot.addTool(it)
     }
 
+    // 한손 모드는 툴바를 펼쳤을 때 첫 화면(가로 스크롤 없이 보이는 자리)에 있어야 한다(design.md
+    // 라운드 3 다듬기, 사용자 확정 2026-09-26). 실행 취소 버튼 바로 앞에 둔다.
+    val oneHandModeButton = toolButton(R.drawable.ic_baseline_swap_horiz_24).apply {
+        contentDescription = ctx.getString(R.string.one_hand_mode)
+    }
+
     val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
         contentDescription = ctx.getString(R.string.undo)
     }
@@ -195,9 +201,5 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     val moreButton = toolButton(R.drawable.ic_baseline_more_horiz_24).apply {
         contentDescription = ctx.getString(R.string.status_area)
-    }
-
-    val oneHandModeButton = toolButton(R.drawable.ic_baseline_swap_horiz_24).apply {
-        contentDescription = ctx.getString(R.string.one_hand_mode)
     }
 }

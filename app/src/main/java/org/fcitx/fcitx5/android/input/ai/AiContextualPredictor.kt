@@ -17,7 +17,7 @@ data class AiPrediction(
     val confidenceScore: Float,
     val isSentenceCompletion: Boolean = false,
     val source: String = "local_ai",
-    val badge: String = "✨ AI완성",
+    val badge: String = "AI 완성",
     val replaceLength: Int = 0,
     val append: ContextualAppend? = null,
     val replacement: ContextualReplacement? = null
@@ -93,7 +93,7 @@ class AiContextualPredictor(
         "ㅈㅅ" to listOf("죄송합니다", "죄송해요", "죄송"),
         "ㅇㅋ" to listOf("오케이", "알겠습니다", "알겠어"),
         "ㅅㄱ" to listOf("수고하셨습니다", "수고하세요", "수고했어"),
-        "ㅊㅋ" to listOf("축하드립니다! 🎉", "축하해! 🎉", "축하"),
+        "ㅊㅋ" to listOf("축하드립니다!", "축하해!", "축하"),
         "ㅂㅍ" to listOf("배포", "발표"),
         "ㅁㅌ" to listOf("미팅"),
         "ㅎㅇ" to listOf("회의", "확인"),
@@ -349,7 +349,7 @@ class AiContextualPredictor(
             fullContext
         }
 
-        // 0. Personalized Learned Sentences (Priority: ✨). Only the user's own previously
+        // 0. Personalized Learned Sentences (highest priority). Only the user's own previously
         // typed sentences (SOURCE_USER_PHRASE) reach the sentence line — synthetic/LLM-authored
         // records are content templates, not something the user actually typed, so they are
         // excluded here to keep the sentence line entirely user-data-driven.
@@ -370,7 +370,7 @@ class AiContextualPredictor(
                         confidenceScore = score,
                         isSentenceCompletion = true,
                         source = "personalized_style",
-                        badge = "✨ 내스타일"
+                        badge = "내 스타일"
                     )
                 )
             }
@@ -395,7 +395,7 @@ class AiContextualPredictor(
                         confidenceScore = score.coerceAtMost(0.999f),
                         isSentenceCompletion = true,
                         source = "rag_personal",
-                        badge = "✨ 내기록"
+                        badge = "내 기록"
                     )
                 )
             }
@@ -472,7 +472,7 @@ class AiContextualPredictor(
                             confidenceScore = score,
                             isSentenceCompletion = isSentence,
                             source = "collocation_next_word",
-                            badge = if (isSentence) "✨ AI완성" else "✨ AI단어"
+                            badge = if (isSentence) "AI 완성" else "AI 단어"
                         )
                     )
                 }
@@ -588,7 +588,7 @@ class AiContextualPredictor(
                             score,
                             isSentenceCompletion = isSentence,
                             source = "base_lexicon",
-                            badge = if (isSentence) "✨ AI완성" else "✨ AI단어"
+                            badge = if (isSentence) "AI 완성" else "AI 단어"
                         )
                     )
                 }

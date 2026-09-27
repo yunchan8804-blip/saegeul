@@ -94,3 +94,24 @@ object KeyTextScale {
 
     fun scale(baseSizeDp: Float, percent: Int): Float = baseSizeDp * factor(percent)
 }
+
+/**
+ * Keeps key rows tappable when the keyboard height (a percentage of the screen height) is taken
+ * from a short screen, such as a foldable's cover screen in landscape.
+ */
+object KeyboardHeightFloor {
+    /** Minimum key row height in portrait, in dp. */
+    const val MIN_ROW_DP_PORTRAIT = 40
+
+    /** Minimum key row height in landscape, in dp. */
+    const val MIN_ROW_DP_LANDSCAPE = 36
+
+    /** Letter surfaces have four rows; a pinned number row adds a fifth. */
+    fun rowCount(numberRowPinned: Boolean): Int = if (numberRowPinned) 5 else 4
+
+    fun apply(percentHeightPx: Int, density: Float, isLandscape: Boolean, rows: Int): Int {
+        val minRowDp = if (isLandscape) MIN_ROW_DP_LANDSCAPE else MIN_ROW_DP_PORTRAIT
+        val floorPx = (rows * minRowDp * density).roundToInt()
+        return maxOf(percentHeightPx, floorPx)
+    }
+}

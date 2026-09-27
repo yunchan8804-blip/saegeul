@@ -29,7 +29,7 @@ object CandidateBadge {
             clean.contains("이어쓰기") || clean.contains("Gemma") || clean.contains("생성") || clean.contains("완성") -> "✨"
             clean.contains("동의") || clean.contains("확인") || clean.contains("인사") || clean.contains("요청") -> "💬"
             clean.contains("답변") || clean.contains("대화") || clean.contains("친근") || clean.contains("구문") || clean.contains("자주") || clean.contains("일상") -> "💬"
-            clean.contains("맞춤") || clean.contains("AI") || clean.contains("스타일") || clean.contains("✨") -> "✨"
+            clean.contains("맞춤") || clean.contains("AI") || clean.contains("스타일") || clean.contains("기록") || clean.contains("✨") -> "✨"
             clean.contains("웹") || clean.contains("🌐") -> "🌐"
             else -> {
                 val noSpace = clean.replace(Regex("\\s"), "")

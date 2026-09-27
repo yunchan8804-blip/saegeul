@@ -126,4 +126,24 @@ class KeyboardFrameTest {
         assertEquals(11.2f, KeyTextScale.scale(14f, 80), 0.001f)
         assertEquals(14f, KeyTextScale.scale(14f, 100), 0.001f)
     }
+
+    @Test
+    fun heightFloorLiftsShortLandscapeCoverScreen() {
+        // Fold6 cover screen in landscape: 968px tall at 2.25 density, user height 25% + number row.
+        val percentPx = 968 * 31 / 100
+        val floored = KeyboardHeightFloor.apply(percentPx, 2.25f, isLandscape = true, rows = 5)
+        assertEquals((5 * 36 * 2.25f).toInt(), floored)
+    }
+
+    @Test
+    fun heightFloorKeepsTallerUserHeight() {
+        val percentPx = 2400 * 30 / 100
+        assertEquals(percentPx, KeyboardHeightFloor.apply(percentPx, 2.625f, isLandscape = false, rows = 4))
+    }
+
+    @Test
+    fun heightFloorRowCountFollowsNumberRow() {
+        assertEquals(4, KeyboardHeightFloor.rowCount(false))
+        assertEquals(5, KeyboardHeightFloor.rowCount(true))
+    }
 }

@@ -13,6 +13,18 @@ abstract class ManagedPreferenceCategory(
     protected val sharedPreferences: SharedPreferences
 ) : ManagedPreferenceProvider() {
 
+    /**
+     * A storage-less group header shown as a [androidx.preference.PreferenceCategory] above the
+     * items declared after it. Does not create a [ManagedPreference], so it has no key, no
+     * default value, and is never touched by backup/export.
+     */
+    protected fun header(
+        @StringRes
+        title: Int
+    ) {
+        ManagedPreferenceUi.Header(title).registerUi()
+    }
+
     protected fun switch(
         @StringRes
         title: Int,

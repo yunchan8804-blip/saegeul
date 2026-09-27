@@ -68,7 +68,7 @@ class PersonalizedAiIntegrationTest {
         )
 
         assertTrue(predictions.isNotEmpty())
-        val myStyleMatch = predictions.find { it.badge == "✨ 내스타일" }
+        val myStyleMatch = predictions.find { it.badge == "내 스타일" }
         assertNotNull(myStyleMatch)
         assertEquals("판교 카카오 아지트 1층 로비에서 뵙겠습니다.", myStyleMatch?.text)
         assertTrue(myStyleMatch?.isSentenceCompletion == true)

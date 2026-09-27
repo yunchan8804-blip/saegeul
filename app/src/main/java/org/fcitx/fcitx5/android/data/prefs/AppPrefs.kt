@@ -51,6 +51,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** Whether the "새글 AI 모델(Google Gemma)을 Hugging Face에서 받아요" consent notice has been shown once (onboarding or the install dialog); [org.fcitx.fcitx5.android.ui.main.ai.install.GemmaInstallFlow] skips it after. */
         val gemmaInstallConsentShown =
             bool("gemma_install_consent_shown", false)
+        /** K7 (design.md, 사용자 승인 2026-09-26): 펼친 화면 분할 키보드 안내를 어느 버튼으로든 한 번 닫으면 다시 보이지 않는다. */
+        val splitExpandedPromptDone =
+            bool("split_expanded_prompt_done", false)
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
@@ -92,146 +95,23 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     inner class Keyboard : ManagedPreferenceCategory(R.string.virtual_keyboard, sharedPreferences) {
+
+        // 1. 자판·크기
+        init {
+            header(R.string.settings_header_layout_size)
+        }
+
         val mobileHangulLayout = enumList(
             R.string.mobile_hangul_layout,
             "mobile_hangul_layout",
             MobileHangulLayout.Physical
         )
-        val hapticOnKeyPress =
-            enumList(
-                R.string.button_haptic_feedback,
-                "haptic_on_keypress",
-                InputFeedbackMode.FollowingSystem
-            )
-        val hapticOnKeyUp = switch(
-            R.string.button_up_haptic_feedback,
-            "haptic_on_keyup",
-            false
-        ) { hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled }
-        val hapticOnRepeat = switch(R.string.haptic_on_repeat, "haptic_on_repeat", false)
-
-        val buttonPressVibrationMilliseconds: ManagedPreference.PInt
-        val buttonLongPressVibrationMilliseconds: ManagedPreference.PInt
-
-        init {
-            val (primary, secondary) = twinInt(
-                R.string.button_vibration_milliseconds,
-                R.string.button_press,
-                "button_vibration_press_milliseconds",
-                0,
-                R.string.button_long_press,
-                "button_vibration_long_press_milliseconds",
-                0,
-                0,
-                100,
-                "ms",
-                defaultLabel = R.string.system_default
-            ) { hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled }
-            buttonPressVibrationMilliseconds = primary
-            buttonLongPressVibrationMilliseconds = secondary
-        }
-
-        val buttonPressVibrationAmplitude: ManagedPreference.PInt
-        val buttonLongPressVibrationAmplitude: ManagedPreference.PInt
-
-        init {
-            val (primary, secondary) = twinInt(
-                R.string.button_vibration_amplitude,
-                R.string.button_press,
-                "button_vibration_press_amplitude",
-                0,
-                R.string.button_long_press,
-                "button_vibration_long_press_amplitude",
-                0,
-                0,
-                255,
-                defaultLabel = R.string.system_default
-            ) {
-                (hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled)
-                        // hide this if using default duration
-                        && (buttonPressVibrationMilliseconds.getValue() != 0 || buttonLongPressVibrationMilliseconds.getValue() != 0)
-                        && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appContext.vibrator.hasAmplitudeControl())
-            }
-            buttonPressVibrationAmplitude = primary
-            buttonLongPressVibrationAmplitude = secondary
-        }
-
-        val soundOnKeyPress = enumList(
-            R.string.button_sound,
-            "sound_on_keypress",
-            InputFeedbackMode.FollowingSystem
-        )
-        val soundOnKeyPressVolume = int(
-            R.string.button_sound_volume,
-            "button_sound_volume",
-            0,
-            0,
-            100,
-            "%",
-            defaultLabel = R.string.system_default
-        ) {
-            soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
-        }
-        val focusChangeResetKeyboard =
-            switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true)
-        val expandToolbarByDefault =
-            switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", false)
-        val inlineSuggestions = switch(R.string.inline_suggestions, "inline_suggestions", true)
         val showNumberRow = switch(
             R.string.show_number_row,
             "show_number_row",
             false,
             R.string.show_number_row_summary
         )
-        // Redundant while the keyboard already pins a number row of its own.
-        val toolbarNumRowOnPassword = switch(
-            R.string.toolbar_num_row_on_password,
-            "toolbar_num_row_on_password",
-            true
-        ) { !showNumberRow.getValue() }
-        val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
-        val keepLettersUppercase = switch(
-            R.string.keep_keyboard_letters_uppercase,
-            "keep_keyboard_letters_uppercase",
-            false
-        )
-
-        val showVoiceInputButton =
-            switch(R.string.show_voice_input_button, "show_voice_input_button", false)
-        val preferredVoiceInput = voiceInputPreference(
-            R.string.preferred_voice_input, "preferred_voice_input", ""
-        ) { showVoiceInputButton.getValue() }
-
-        val expandKeypressArea =
-            switch(R.string.expand_keypress_area, "expand_keypress_area", false)
-        val swipeSymbolDirection = enumList(
-            R.string.swipe_symbol_behavior,
-            "swipe_symbol_behavior",
-            SwipeSymbolDirection.Down
-        )
-        val longPressDelay = int(
-            R.string.keyboard_long_press_delay,
-            "keyboard_long_press_delay",
-            300,
-            100,
-            700,
-            "ms",
-            10
-        )
-        val spaceKeyLongPressBehavior = enumList(
-            R.string.space_long_press_behavior,
-            "space_long_press_behavior",
-            SpaceLongPressBehavior.None
-        )
-        val spaceSwipeMoveCursor =
-            switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
-        val showLangSwitchKey =
-            switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
-        val langSwitchKeyBehavior = enumList(
-            R.string.lang_switch_key_behavior,
-            "lang_switch_key_behavior",
-            LangSwitchBehavior.Enumerate
-        ) { showLangSwitchKey.getValue() }
 
         val keyboardHeightPercent: ManagedPreference.PInt
         val keyboardHeightPercentLandscape: ManagedPreference.PInt
@@ -318,7 +198,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val splitKeyboardExpanded = switch(
             R.string.split_keyboard_expanded,
             "split_keyboard_expanded",
-            false,
+            true,
             R.string.split_keyboard_expanded_summary
         )
 
@@ -363,6 +243,152 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             splitKeyboardExpandedGapPortrait = primary
             splitKeyboardExpandedGapLandscape = secondary
         }
+
+        // 2. 누르기·제스처
+        init {
+            header(R.string.settings_header_press_gestures)
+        }
+
+        val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
+        val longPressDelay = int(
+            R.string.keyboard_long_press_delay,
+            "keyboard_long_press_delay",
+            300,
+            100,
+            700,
+            "ms",
+            10
+        )
+        val swipeSymbolDirection = enumList(
+            R.string.swipe_symbol_behavior,
+            "swipe_symbol_behavior",
+            SwipeSymbolDirection.Down
+        )
+        val spaceKeyLongPressBehavior = enumList(
+            R.string.space_long_press_behavior,
+            "space_long_press_behavior",
+            SpaceLongPressBehavior.None
+        )
+        val spaceSwipeMoveCursor =
+            switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
+        val showLangSwitchKey =
+            switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
+        val langSwitchKeyBehavior = enumList(
+            R.string.lang_switch_key_behavior,
+            "lang_switch_key_behavior",
+            LangSwitchBehavior.Enumerate
+        ) { showLangSwitchKey.getValue() }
+        val expandKeypressArea =
+            switch(R.string.expand_keypress_area, "expand_keypress_area", false)
+        val keepLettersUppercase = switch(
+            R.string.keep_keyboard_letters_uppercase,
+            "keep_keyboard_letters_uppercase",
+            false
+        )
+
+        // 3. 진동·소리
+        init {
+            header(R.string.settings_header_vibration_sound)
+        }
+
+        val hapticOnKeyPress =
+            enumList(
+                R.string.button_haptic_feedback,
+                "haptic_on_keypress",
+                InputFeedbackMode.FollowingSystem
+            )
+        val hapticOnKeyUp = switch(
+            R.string.button_up_haptic_feedback,
+            "haptic_on_keyup",
+            false
+        ) { hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled }
+        val hapticOnRepeat = switch(R.string.haptic_on_repeat, "haptic_on_repeat", false)
+
+        val buttonPressVibrationMilliseconds: ManagedPreference.PInt
+        val buttonLongPressVibrationMilliseconds: ManagedPreference.PInt
+
+        init {
+            val (primary, secondary) = twinInt(
+                R.string.button_vibration_milliseconds,
+                R.string.button_press,
+                "button_vibration_press_milliseconds",
+                0,
+                R.string.button_long_press,
+                "button_vibration_long_press_milliseconds",
+                0,
+                0,
+                100,
+                "ms",
+                defaultLabel = R.string.system_default
+            ) { hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled }
+            buttonPressVibrationMilliseconds = primary
+            buttonLongPressVibrationMilliseconds = secondary
+        }
+
+        val buttonPressVibrationAmplitude: ManagedPreference.PInt
+        val buttonLongPressVibrationAmplitude: ManagedPreference.PInt
+
+        init {
+            val (primary, secondary) = twinInt(
+                R.string.button_vibration_amplitude,
+                R.string.button_press,
+                "button_vibration_press_amplitude",
+                0,
+                R.string.button_long_press,
+                "button_vibration_long_press_amplitude",
+                0,
+                0,
+                255,
+                defaultLabel = R.string.system_default
+            ) {
+                (hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled)
+                        // hide this if using default duration
+                        && (buttonPressVibrationMilliseconds.getValue() != 0 || buttonLongPressVibrationMilliseconds.getValue() != 0)
+                        && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appContext.vibrator.hasAmplitudeControl())
+            }
+            buttonPressVibrationAmplitude = primary
+            buttonLongPressVibrationAmplitude = secondary
+        }
+
+        val soundOnKeyPress = enumList(
+            R.string.button_sound,
+            "sound_on_keypress",
+            InputFeedbackMode.FollowingSystem
+        )
+        val soundOnKeyPressVolume = int(
+            R.string.button_sound_volume,
+            "button_sound_volume",
+            0,
+            0,
+            100,
+            "%",
+            defaultLabel = R.string.system_default
+        ) {
+            soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
+        }
+
+        // 4. 툴바·입력칸 (나머지 전부)
+        init {
+            header(R.string.settings_header_toolbar_fields)
+        }
+
+        val focusChangeResetKeyboard =
+            switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true)
+        val expandToolbarByDefault =
+            switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", false)
+        val inlineSuggestions = switch(R.string.inline_suggestions, "inline_suggestions", true)
+        // Redundant while the keyboard already pins a number row of its own.
+        val toolbarNumRowOnPassword = switch(
+            R.string.toolbar_num_row_on_password,
+            "toolbar_num_row_on_password",
+            true
+        ) { !showNumberRow.getValue() }
+
+        val showVoiceInputButton =
+            switch(R.string.show_voice_input_button, "show_voice_input_button", false)
+        val preferredVoiceInput = voiceInputPreference(
+            R.string.preferred_voice_input, "preferred_voice_input", ""
+        ) { showVoiceInputButton.getValue() }
 
         val horizontalCandidateStyle = enumList(
             R.string.horizontal_candidate_style,

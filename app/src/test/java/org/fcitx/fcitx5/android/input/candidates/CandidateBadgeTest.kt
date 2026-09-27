@@ -28,6 +28,17 @@ class CandidateBadgeTest {
     }
 
     @Test
+    fun `renamed AI and personalization badges without the emoji prefix still resolve to the AI icon`() {
+        // 2026-09-26 확정(design.md 라운드 3): 배지 문자열에서 ✨ 접두어를 뺐다. 텍스트에 있던
+        // 한국어 단서(완성/단어/스타일/맞춤/AI/기록)만으로 계속 같은 아이콘으로 분류돼야 한다.
+        assertEquals("✨", CandidateBadge.iconFor("AI 완성"))
+        assertEquals("✨", CandidateBadge.iconFor("AI 단어"))
+        assertEquals("✨", CandidateBadge.iconFor("내 스타일"))
+        assertEquals("✨", CandidateBadge.iconFor("내 기록"))
+        assertEquals("✨", CandidateBadge.iconFor("맞춤 AI"))
+    }
+
+    @Test
     fun `symbol only comments are returned as their own icon`() {
         assertEquals("⚡", CandidateBadge.iconFor("⚡"))
         assertEquals("✏️", CandidateBadge.iconFor("✏️"))

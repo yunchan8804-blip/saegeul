@@ -72,6 +72,9 @@ import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseWindow
 import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
+import org.fcitx.fcitx5.android.input.keyboard.FoldKeyboardProfileResolver
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardScreenProfile
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardViewportReader
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.gif.GifSearchWindow
 import org.fcitx.fcitx5.android.input.ocr.OcrWindow
@@ -124,6 +127,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val showNumberRow by prefs.keyboard.showNumberRow
     private val showVoiceInputButton by prefs.keyboard.showVoiceInputButton
     private val preferredVoiceInput by prefs.keyboard.preferredVoiceInput
+    private val splitKeyboardExpandedPref = prefs.keyboard.splitKeyboardExpanded
+    private val splitExpandedPromptDonePref = prefs.internal.splitExpandedPromptDone
 
     private var clipboardTimeoutJob: Job? = null
 
@@ -138,6 +143,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var toolbarNeedsSecondRow: Boolean = false
     private var lastPreeditEmpty: Boolean = true
     private var lastCandidateListEmpty: Boolean = true
+    private var isExpandedKeyboardProfile: Boolean = false
     private var automaticSuggestionIndicator: OnDeviceAutomaticSuggestionIndicator =
         OnDeviceAutomaticSuggestionIndicator.Hidden
     private val onDeviceContextCompletionRuntime by lazy { OnDeviceContextCompletionRuntime(context) }
@@ -255,6 +261,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
     }
 
+    // K7 (design.md, 사용자 승인 2026-09-26): idle 상태(입력 전, 후보 없음, 툴바 접힘)에서만
+    // 분할 키보드 안내가 Empty 자리를 대신 차지한다. 후보가 뜨면(candidateRowVisible) 조건이
+    // 저절로 거짓이 되어 다음 evalIdleUiState 호출에서 안내가 가려진다.
+    private fun shouldShowSplitPrompt(): Boolean = SplitPromptPolicy.shouldShow(
+        expandedProfile = isExpandedKeyboardProfile,
+        splitEnabled = splitKeyboardExpandedPref.getValue(),
+        promptDone = splitExpandedPromptDonePref.getValue(),
+        // The two-row candidate area keeps its row visible at all times (fixed-height contract), and
+        // the toolbar row sits above it, so the prompt only competes with candidates when the
+        // landscape single row would merge the toolbar into the candidate row.
+        toolbarIdle = !candidateSingleRowLandscape || !candidateRowVisible
+    )
+
     private fun evalIdleUiState(fromUser: Boolean = false) {
         val newState = when {
             numberRowState == NumberRowState.ForceShow -> IdleUi.State.NumberRow
@@ -268,7 +287,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
              * isToolbarManuallyToggled |  true |   Empty | Toolbar
              *                          | false | Toolbar |   Empty
              */
-            expandToolbarForEditor == isToolbarManuallyToggled -> IdleUi.State.Empty
+            expandToolbarForEditor == isToolbarManuallyToggled ->
+                if (shouldShowSplitPrompt()) IdleUi.State.SplitPrompt else IdleUi.State.Empty
             else -> IdleUi.State.Toolbar
         }
         if (newState != idleUi.currentState) {
@@ -281,7 +301,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     needsSecondRow = toolbarNeedsSecondRow
                 )
             }
-            fromUser && newState == IdleUi.State.Empty -> {
+            fromUser && (newState == IdleUi.State.Empty || newState == IdleUi.State.SplitPrompt) -> {
                 toolbarHeightSession = toolbarHeightSession.onToolbarVisibilityChanged(
                     visible = false,
                     needsSecondRow = toolbarNeedsSecondRow
@@ -564,6 +584,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     evalIdleUiState(fromUser = true)
                 }
             }
+            splitPromptUi.apply {
+                splitButton.setOnClickListener {
+                    // Setting the pref alone reaches InputView's existing keyboardPrefs change
+                    // listener (thumbSplitPrefs), which re-resolves and re-splits the layout.
+                    splitKeyboardExpandedPref.setValue(true)
+                    splitExpandedPromptDonePref.setValue(true)
+                    evalIdleUiState(fromUser = true)
+                }
+                closeButton.setOnClickListener {
+                    splitExpandedPromptDonePref.setValue(true)
+                    evalIdleUiState(fromUser = true)
+                }
+            }
         }
     }
 
@@ -577,6 +610,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 swipeThresholdY = dp(HEIGHT.toFloat())
                 onGestureListener = swipeDownExpandCallback
             }
+            // K5 후속: this row's menu/hide-keyboard buttons are only shown while
+            // updateBarHeight() decides to merge the compact idle toolbar row into this one; their
+            // clicks simply delegate to idleUi's real buttons so behavior stays in one place.
+            menuButton.setOnClickListener { idleUi.menuButton.performClick() }
+            hideKeyboardButton.setOnClickListener { idleUi.hideKeyboardButton.performClick() }
         }
     }
 
@@ -788,6 +826,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             shouldShowVoiceInput,
             if (shouldShowVoiceInput) switchToVoiceInputCallback else hideKeyboardCallback
         )
+        // Re-resolve for every editor session so a Fold posture or multi-window viewport change is
+        // reflected without requiring the user to reopen the keyboard (mirrors
+        // KeyboardWindow.updateThumbSplitProfile()).
+        val viewport = KeyboardViewportReader.read(context)
+        isExpandedKeyboardProfile =
+            FoldKeyboardProfileResolver.classify(viewport.widthDp, viewport.heightDp) ==
+                KeyboardScreenProfile.Expanded
         evalIdleUiState()
     }
 
@@ -980,6 +1025,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
 
+    // K5: set by HorizontalCandidateComponent when the landscape (non-split) single-row candidate
+    // bar is active (see CandidateBarModePolicy.isHorizontalSingleRow). Like
+    // [candidateRowFixedHeight], this row's height never changes with content, but it takes
+    // priority over every other height flag: see CandidateBarModePolicy.candidateRowHeightDp.
+    var candidateSingleRowLandscape: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                // Also re-decides the K7 split prompt; evalIdleUiState() updates the bar height.
+                evalIdleUiState()
+            }
+        }
+
     private fun setRowHeight(row: View, heightDp: Int) {
         val heightPx = context.dp(heightDp)
         val params = row.layoutParams as? LinearLayout.LayoutParams ?: return
@@ -997,14 +1055,27 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             expanded = toolbarNeedsSecondRow
         )
         val toolRowHeightDp = toolbarHeightSession.heightDp
-        val candidateRowHeightDp = when {
-            candidateRowFixedHeight -> HEIGHT * 2 + 1
-            isCandidateTwoRow && hasAutomaticCandidates -> HEIGHT * 2 + 1
-            candidateConnectionHintVisible || candidateStatusRowVisible -> 77
-            isCandidateTwoRow -> CANDIDATE_TWO_ROW_HEIGHT_DP
-            else -> HEIGHT
-        }
-        setRowHeight(idleUi.root, toolRowHeightDp)
+        val candidateRowHeightDp = CandidateBarModePolicy.candidateRowHeightDp(
+            singleRowLandscape = candidateSingleRowLandscape,
+            candidateRowFixedHeight = candidateRowFixedHeight,
+            twoRowWithAutomaticCandidates = isCandidateTwoRow && hasAutomaticCandidates,
+            hintOrStatusRowVisible = candidateConnectionHintVisible || candidateStatusRowVisible,
+            isCandidateTwoRow = isCandidateTwoRow,
+            unitHeightDp = HEIGHT,
+            twoRowHeightDp = CANDIDATE_TWO_ROW_HEIGHT_DP,
+            hintStatusHeightDp = 77
+        )
+        // K5 후속: landscape 단일 줄에서 idle 툴바가 압축 상태(`>`/`▾`만)이고 후보가 실제로 보이면,
+        // 그 툴바 줄을 후보 줄에 합쳐 총 48dp 한 줄을 유지한다(design.md K5 진행 기록 참고).
+        val singleRowMerged = CandidateBarModePolicy.isSingleRowMerged(
+            singleRowLandscape = candidateSingleRowLandscape,
+            candidateRowVisible = candidateRowVisible,
+            idleToolbarCompact = idleUi.currentState == IdleUi.State.Empty
+        )
+        candidateUi.menuButton.visibility = if (singleRowMerged) View.VISIBLE else View.GONE
+        candidateUi.hideKeyboardButton.visibility = if (singleRowMerged) View.VISIBLE else View.GONE
+        val effectiveToolRowHeightDp = CandidateBarModePolicy.toolRowHeightDp(singleRowMerged, toolRowHeightDp)
+        setRowHeight(idleUi.root, effectiveToolRowHeightDp)
         setRowHeight(candidateUi.root, candidateRowHeightDp)
         // Normal mode stacks both rows, so the bar height is their sum. When the suggestion row
         // is collapsed (no candidates), it contributes zero height. Title mode keeps its
@@ -1013,7 +1084,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             context.dp(toolbarHeightSession.heightDp)
         } else {
             val visibleCandidateRowHeightDp = if (candidateRowVisible) candidateRowHeightDp else 0
-            context.dp(toolRowHeightDp + visibleCandidateRowHeightDp)
+            context.dp(effectiveToolRowHeightDp + visibleCandidateRowHeightDp)
         }
         val params = view.layoutParams ?: return
         if (params.height == targetHeight) return
@@ -1056,7 +1127,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         if (candidateRowVisible == visible) return
         candidateRowVisible = visible
         candidateUi.root.visibility = if (visible) View.VISIBLE else View.GONE
-        updateBarHeight()
+        // K7: the split prompt is only idle-eligible while no candidates show (see
+        // shouldShowSplitPrompt()); re-check so it hides/reappears alongside the candidate row.
+        // evalIdleUiState() also calls updateBarHeight(), so no separate call is needed here.
+        evalIdleUiState()
     }
 
 }

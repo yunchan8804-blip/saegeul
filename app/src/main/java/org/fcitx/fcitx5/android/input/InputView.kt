@@ -229,7 +229,13 @@ class InputView(
             // A pinned number row adds a fifth row to the letter surfaces. Grow the keyboard with
             // it so the existing keys keep their size instead of being squeezed.
             val effectivePercent = PinnedNumberRow.scaleHeightPercent(percent, MAX_HEIGHT_PERCENT)
-            return resources.displayMetrics.heightPixels * effectivePercent / 100
+            val metrics = resources.displayMetrics
+            return KeyboardHeightFloor.apply(
+                percentHeightPx = metrics.heightPixels * effectivePercent / 100,
+                density = metrics.density,
+                isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE,
+                rows = KeyboardHeightFloor.rowCount(PinnedNumberRow.isEnabled())
+            )
         }
 
     private val keyboardSidePaddingPx: Int

@@ -62,7 +62,7 @@ class KoreanCollocationModel {
         "다음에" to listOf("꼭 뵙겠습니다", "시간 맞춰서 봬요", "대접하겠습니다"),
         "항상" to listOf("감사드립니다", "응원합니다", "수고 많으십니다"),
         "진심으로" to listOf("감사드립니다", "축하드립니다", "응원합니다"),
-        "축하" to listOf("드립니다! 🎉", "의 말씀 전합니다", "해요")
+        "축하" to listOf("드립니다!", "의 말씀 전합니다", "해요")
     )
 
     private val informalBigrams: Map<String, List<String>> = mapOf(
@@ -101,7 +101,7 @@ class KoreanCollocationModel {
         "천천히" to listOf("와!", "해 괜찮아", "준비해"),
         "언제든" to listOf("편하게 물어봐!", "연락해~"),
         "다음에" to listOf("꼭 보자!", "밥 한번 먹자", "시간 맞추자"),
-        "축하" to listOf("해! 🎉", "진짜 대단해!", "완전 축하해!")
+        "축하" to listOf("해!", "진짜 대단해!", "완전 축하해!")
     )
 
     /**

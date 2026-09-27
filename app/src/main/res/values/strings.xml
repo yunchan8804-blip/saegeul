@@ -7,6 +7,22 @@
     <string name="engine_developer_tools" tools:ignore="MissingTranslation">Engine developer tools</string>
     <string name="distribution_channel" tools:ignore="MissingTranslation">Distribution channel</string>
     <string name="save">Save</string>
+
+    <!-- Main settings list: group headers and one-line summaries (app/design.md round 3) -->
+    <string name="settings_header_layout_size" tools:ignore="MissingTranslation">Layout &amp; size</string>
+    <string name="settings_header_press_gestures" tools:ignore="MissingTranslation">Press &amp; gestures</string>
+    <string name="settings_header_vibration_sound" tools:ignore="MissingTranslation">Vibration &amp; sound</string>
+    <string name="settings_header_toolbar_fields" tools:ignore="MissingTranslation">Toolbar &amp; fields</string>
+    <string name="settings_summary_input_methods" tools:ignore="MissingTranslation">Languages and layouts</string>
+    <string name="settings_summary_theme_split" tools:ignore="MissingTranslation">Light %1$s · Dark %2$s</string>
+    <string name="settings_summary_virtual_keyboard" tools:ignore="MissingTranslation">Layout, size, one-handed mode, vibration</string>
+    <string name="settings_summary_candidates_window" tools:ignore="MissingTranslation">Word and sentence suggestions</string>
+    <string name="settings_summary_clipboard" tools:ignore="MissingTranslation">History and paste</string>
+    <string name="settings_summary_emoji_and_symbols" tools:ignore="MissingTranslation">Emoji skin tone and display</string>
+    <string name="settings_summary_advanced" tools:ignore="MissingTranslation">Data export/import and more</string>
+    <string name="settings_summary_privacy_ai" tools:ignore="MissingTranslation">Language vault, on-device AI, offline</string>
+    <string name="settings_summary_app_profiles" tools:ignore="MissingTranslation">Per-app layouts and settings</string>
+    <string name="settings_summary_personal_dictionary" tools:ignore="MissingTranslation">Words you added</string>
     <string name="input_methods">Input Methods</string>
     <string name="add_input_method">Add Input Method</string>
     <string name="addons">Addons</string>
@@ -74,6 +90,9 @@
     <string name="split_keyboard_expanded_summary" tools:ignore="MissingTranslation">Use the saved expanded-screen profile when both window dimensions are at least 600 dp.</string>
     <string name="split_keyboard_compact_gap" tools:ignore="MissingTranslation">Phone/cover center gap</string>
     <string name="split_keyboard_expanded_gap" tools:ignore="MissingTranslation">Unfolded/tablet center gap</string>
+    <string name="split_expanded_prompt_message" tools:ignore="MissingTranslation">Split the keyboard on the unfolded screen?</string>
+    <string name="split_expanded_prompt_split" tools:ignore="MissingTranslation">Split</string>
+    <string name="split_expanded_prompt_close" tools:ignore="MissingTranslation">Close</string>
     <string name="virtual_keyboard">Virtual Keyboard</string>
     <string name="clipboard_suggestion_timeout">Clipboard suggestion timeout</string>
     <string name="version">Version</string>
@@ -185,26 +204,104 @@
     <string name="theme_choose_image">Choose Image</string>
     <string name="theme_remove_image">Remove Image</string>
     <string name="theme_key_border_radius">Key Radius</string>
+    <string name="theme_key_border_color">Key Border Color</string>
+    <string name="theme_key_reset_button">Reset This Key</string>
+
+    <!-- Short display names shown in the theme list and "시작 테마" chips -->
+    <string name="theme_name_saegeul_ivory">Saegeul Ivory</string>
+    <string name="theme_name_saegeul_navy">Saegeul Navy</string>
+    <string name="theme_name_hanji">Hanji</string>
+    <string name="theme_name_dancheong">Dancheong</string>
+    <string name="theme_name_baegja">Baegja</string>
+    <string name="theme_name_cheongja">Cheongja</string>
+    <string name="theme_name_midnight_oled">Midnight OLED</string>
+    <string name="theme_name_seoul_mist">Seoul Mist</string>
+    <string name="theme_name_material_light">Material Light</string>
+    <string name="theme_name_material_dark">Material Dark</string>
+    <string name="theme_name_pixel_light">Pixel Light</string>
+    <string name="theme_name_pixel_dark">Pixel Dark</string>
+    <string name="theme_name_nord_light">Nord Light</string>
+    <string name="theme_name_nord_dark">Nord Dark</string>
+    <string name="theme_name_deep_blue">Deep Blue</string>
+    <string name="theme_name_monokai">Monokai</string>
+    <string name="theme_name_amoled_black">AMOLED Black</string>
+    <string name="theme_name_monet_light">System Color Light</string>
+    <string name="theme_name_monet_dark">System Color Dark</string>
+    <string name="theme_name_my_theme">My Theme</string>
+
+    <!-- Easy tier: starting theme / seed color / key tone / contrast warning -->
+    <string name="theme_section_starting_theme">Starting Theme</string>
+    <string name="theme_section_seed_color">Make from One Color</string>
+    <string name="theme_brightness_light">Light</string>
+    <string name="theme_brightness_dark">Dark</string>
+    <string name="theme_key_tone_light">Light Keys</string>
+    <string name="theme_key_tone_dark">Dark Keys</string>
+    <string name="theme_contrast_role_key">Key</string>
+    <string name="theme_contrast_role_alt_key">Alt key</string>
+    <string name="theme_contrast_role_accent_key">Accent key</string>
+    <string name="theme_contrast_role_candidate">Candidate/bar</string>
+    <string name="theme_contrast_role_key_override">Per-key style</string>
+    <string name="theme_contrast_warning">Text may be hard to read · %1$s contrast %2$s:1</string>
+    <string name="theme_contrast_autofix">Auto-fix</string>
+
+    <!-- Deeper tier: "더 꾸미기" collapsible section -->
+    <string name="theme_section_more">More Styling</string>
+    <string name="theme_more_summary_effects">%1$d effects in use</string>
+    <string name="theme_section_detail_colors">Detailed Colors</string>
+    <string name="theme_color_group_keyboard">Keyboard</string>
+    <string name="theme_color_group_key">Key</string>
+    <string name="theme_color_group_alt_key">Alt Key</string>
+    <string name="theme_color_group_accent_key">Accent Key</string>
+    <string name="theme_color_group_candidate">Candidate</string>
+    <string name="theme_color_group_popup">Popup</string>
+    <string name="theme_color_group_clipboard">Clipboard</string>
+    <string name="theme_field_background">Background with key borders</string>
+    <string name="theme_field_keyboard">Keyboard background</string>
+    <string name="theme_field_bar">Toolbar</string>
+    <string name="theme_field_key_background">Key Background</string>
+    <string name="theme_field_key_text">Key Text</string>
+    <string name="theme_field_space_bar">Space Bar</string>
+    <string name="theme_field_key_press_highlight">Key Press Highlight</string>
+    <string name="theme_field_key_shadow">Key Shadow</string>
+    <string name="theme_field_alt_key_background">Alt Key Background</string>
+    <string name="theme_field_alt_key_text">Alt Key Text</string>
+    <string name="theme_field_accent_key_background">Accent Key Background</string>
+    <string name="theme_field_accent_key_text">Accent Key Text</string>
+    <string name="theme_field_generic_active_background">Active Background</string>
+    <string name="theme_field_generic_active_text">Active Text</string>
+    <string name="theme_field_candidate_text">Candidate Text</string>
+    <string name="theme_field_candidate_label">Candidate Label</string>
+    <string name="theme_field_candidate_comment">Candidate Comment</string>
+    <string name="theme_field_divider">Divider</string>
+    <string name="theme_field_popup_background">Popup Background</string>
+    <string name="theme_field_popup_text">Popup Text</string>
+    <string name="theme_field_clipboard_entry">Clipboard Entry</string>
+
+    <!-- Color picker dialog -->
+    <string name="theme_color_picker_title">Choose Color</string>
+    <string name="theme_color_hex_hint">#RRGGBB or #AARRGGBB</string>
+    <string name="theme_color_hex_invalid">Invalid color code</string>
+
     <string name="theme_rgb_backlight">Ambient RGB Backlight Animation</string>
     <string name="theme_rgb_mode_off">Off</string>
-    <string name="theme_rgb_mode_wave">🌈 Rainbow Wave</string>
-    <string name="theme_rgb_mode_breathe">💓 Breathing</string>
-    <string name="theme_rgb_mode_cyberpunk">⚡ Cyberpunk Neon</string>
-    <string name="theme_rgb_mode_matrix">🟢 Matrix Flow</string>
-    <string name="theme_rgb_mode_pulse">💫 Neon Pulse</string>
-    <string name="theme_rgb_mode_aurora">🌌 Aurora Borealis</string>
-    <string name="theme_rgb_mode_starlight">⭐ Starlight Twinkle</string>
-    <string name="theme_rgb_mode_ocean">🌊 Ocean Tide</string>
-    <string name="theme_rgb_mode_fire">🔥 Fire Ember</string>
-    <string name="theme_rgb_mode_supernova">🪐 Cosmic Supernova</string>
-    <string name="theme_rgb_mode_sakura">🌸 Pastel Sakura</string>
-    <string name="theme_rgb_mode_frost">🧊 Frost Glaze</string>
+    <string name="theme_rgb_mode_wave">Rainbow Wave</string>
+    <string name="theme_rgb_mode_breathe">Breathing</string>
+    <string name="theme_rgb_mode_cyberpunk">Cyberpunk Neon</string>
+    <string name="theme_rgb_mode_matrix">Matrix Flow</string>
+    <string name="theme_rgb_mode_pulse">Neon Pulse</string>
+    <string name="theme_rgb_mode_aurora">Aurora Borealis</string>
+    <string name="theme_rgb_mode_starlight">Starlight Twinkle</string>
+    <string name="theme_rgb_mode_ocean">Ocean Tide</string>
+    <string name="theme_rgb_mode_fire">Fire Ember</string>
+    <string name="theme_rgb_mode_supernova">Cosmic Supernova</string>
+    <string name="theme_rgb_mode_sakura">Pastel Sakura</string>
+    <string name="theme_rgb_mode_frost">Frost Glaze</string>
     <string name="theme_rgb_reactive_title">Keypress Reactive Animation</string>
     <string name="theme_reactive_mode_off">Off</string>
-    <string name="theme_reactive_mode_ripple">🌊 Ripple Wave</string>
-    <string name="theme_reactive_mode_fade">💡 Key Fade Glow</string>
-    <string name="theme_reactive_mode_firework">🎆 Starburst Spark</string>
-    <string name="theme_reactive_mode_laser">⚡ Laser Cross</string>
+    <string name="theme_reactive_mode_ripple">Ripple Wave</string>
+    <string name="theme_reactive_mode_fade">Key Fade Glow</string>
+    <string name="theme_reactive_mode_firework">Starburst Spark</string>
+    <string name="theme_reactive_mode_laser">Laser Cross</string>
     <string name="theme_rgb_speed">Animation Speed</string>
     <string name="theme_rgb_intensity">Light Brightness &amp; Intensity</string>
     <string name="theme_rgb_direction">Light Flow Direction</string>
@@ -217,10 +314,10 @@
     <string name="theme_key_translucency">Pudding Keycap Translucency</string>
     <string name="theme_particle_effect">Touch Particle &amp; Sparkle Feedback</string>
     <string name="theme_particle_mode_off">Off</string>
-    <string name="theme_particle_mode_star">⭐ Star Sparkles</string>
-    <string name="theme_particle_mode_dust">💫 Glowing Stardust</string>
-    <string name="theme_particle_mode_burst">💥 Neon Burst</string>
-    <string name="theme_particle_mode_ripple">🌊 Cosmic Ripple</string>
+    <string name="theme_particle_mode_star">Star Sparkles</string>
+    <string name="theme_particle_mode_dust">Glowing Stardust</string>
+    <string name="theme_particle_mode_burst">Neon Burst</string>
+    <string name="theme_particle_mode_ripple">Cosmic Ripple</string>
     <string name="theme_particle_count">Particle Count</string>
     <string name="theme_particle_lifetime">Particle Lifetime</string>
     <string name="theme_particle_speed">Spread Speed</string>

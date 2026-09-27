@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.utils.rippleDrawable
 import splitties.dimensions.dp
+import splitties.resources.color
 import splitties.views.backgroundColor
 import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
@@ -31,11 +32,18 @@ import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.imageView
+import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.textView
+import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.view
+import splitties.views.dsl.core.wrapContent
+import splitties.views.gravityCenterHorizontal
 import splitties.views.imageDrawable
 import splitties.views.imageResource
 import splitties.views.setPaddingDp
+import android.text.TextUtils
+import android.widget.TextView
 
 class ThemeThumbnailUi(override val ctx: Context) : Ui {
 
@@ -67,7 +75,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         imageResource = R.drawable.ic_baseline_auto_awesome_24
     }
 
-    override val root = constraintLayout {
+    private val card = constraintLayout {
         outlineProvider = ViewOutlineProvider.BOUNDS
         elevation = dp(2f)
         add(bkg, lParams(matchParent, matchParent))
@@ -94,10 +102,24 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         })
     }
 
+    /** The theme's display name, shown below the thumbnail card. */
+    val nameLabel: TextView = textView {
+        textSize = 11f
+        gravity = gravityCenterHorizontal
+        setTextColor(ctx.color(R.color.saegeul_ink))
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        setPaddingDp(2, 4, 2, 0)
+    }
+
+    override val root = verticalLayout {
+        add(card, lParams(matchParent, 0) { weight = 1f })
+        add(nameLabel, lParams(matchParent, wrapContent))
+    }
+
     fun setTheme(theme: Theme) {
-        root.apply {
-            foreground = rippleDrawable(theme.keyPressHighlightColor)
-        }
+        root.foreground = rippleDrawable(theme.keyPressHighlightColor)
+        nameLabel.text = ThemeDisplayNames.displayName(ctx, theme)
         bkg.imageDrawable = theme.backgroundDrawable()
         bar.backgroundColor = theme.barColor
         spaceBar.background = GradientDrawable().apply {

@@ -134,7 +134,7 @@ class KoreanSemanticSentencePredictorTest {
         assertTrue(predictions.isNotEmpty())
         assertTrue(
             "Synthesized slot-filled candidate should be present",
-            predictions.any { it.text.contains("판교") || it.text.contains("회의") || it.badge.contains("맞춤AI") }
+            predictions.any { it.text.contains("판교") || it.text.contains("회의") || it.badge.contains("맞춤 AI") }
         )
     }
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-2.1-or-later
+  SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
+-->
+<resources>
+    <!-- Accessibility state for a color swatch that is currently the selected choice -->
+    <string name="theme_swatch_selected">Selected</string>
+    <!-- Accessibility label for a color swatch with no specific name, e.g. "Color 3" -->
+    <string name="theme_swatch_color_index">Color %1$d</string>
+</resources>

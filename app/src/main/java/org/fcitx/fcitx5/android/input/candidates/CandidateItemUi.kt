@@ -68,6 +68,15 @@ class CandidateItemUi(
         visibility = View.GONE
     }
 
+    // 출처 배지는 이모지가 아니라 4dp 원형 점으로 표시한다(2026-09-26 확정, design.md 라운드 3 다듬기).
+    private val aiBadgeDot = view(::View) {
+        visibility = View.GONE
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(theme.accentKeyBackgroundColor)
+        }
+    }
+
     private val aiText = view(::TextView) {
         textSize = 14f // sp - crisp, legible candidate text
         isSingleLine = true
@@ -82,6 +91,9 @@ class CandidateItemUi(
     private val chipContainer = view(::LinearLayout) {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
+        add(aiBadgeDot, lParams(dp(4), dp(4)) {
+            marginEnd = dp(4)
+        })
         add(aiBadge, lParams(wrapContent, wrapContent) {
             marginEnd = dp(3)
         })
@@ -185,10 +197,10 @@ class CandidateItemUi(
         }
 
         if (isAiBadge) {
-            aiBadge.text = icon
-            aiBadge.background = null
-            aiBadge.setPadding(0, 0, 0, 0)
-            aiBadge.visibility = View.VISIBLE
+            // 출처 배지(AI·개인화·업무·일정·감사 등)는 이모지 대신 모두 같은 4dp 점으로 표시한다
+            // (2026-09-26 확정, design.md 라운드 3 다듬기). 출처 이름은 contentDescription이 전한다.
+            aiBadgeDot.visibility = View.VISIBLE
+            aiBadge.visibility = View.GONE
 
             aiText.text = candidate.text
             aiText.typeface = if (isFeatured) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
@@ -199,10 +211,12 @@ class CandidateItemUi(
             }
             aiText.visibility = View.VISIBLE
             nativeText.visibility = View.GONE
-            // Screen readers and UI automation see one label per chip: the text plus its source.
-            root.contentDescription = "${candidate.text} ${candidate.comment.trim()}"
+            // Screen readers and UI automation see one label per chip. The dot is decorative (no
+            // separate a11y node), so its source is spoken as a "배지: 후보" prefix instead.
+            root.contentDescription = "${candidate.comment.trim()}: ${candidate.text}"
         } else {
             root.contentDescription = null
+            aiBadgeDot.visibility = View.GONE
             aiBadge.visibility = View.GONE
             aiText.visibility = View.GONE
             nativeText.visibility = View.VISIBLE

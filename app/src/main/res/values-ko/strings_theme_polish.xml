@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-2.1-or-later
+  SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
+-->
+<resources>
+    <string name="theme_swatch_selected">선택됨</string>
+    <string name="theme_swatch_color_index">색 %1$d</string>
+</resources>

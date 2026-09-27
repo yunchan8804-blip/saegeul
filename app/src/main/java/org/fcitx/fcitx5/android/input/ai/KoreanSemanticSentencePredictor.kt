@@ -33,7 +33,7 @@ data class SemanticSentencePrediction(
     val intent: ContextualIntent,
     val tone: KoreanTone,
     val isCompleteSentence: Boolean = true,
-    val badge: String = "✨ AI완성"
+    val badge: String = "AI 완성"
 )
 
 /**
@@ -766,14 +766,14 @@ class KoreanSemanticSentencePredictor {
 
             ContextualIntent.Cheering -> if (isInformal) {
                 listOf(
-                    "진심으로 축하해! 🎉",
+                    "진심으로 축하해!",
                     "그동안 고생 많았어, 진짜 대단하다!",
                     "항상 응원하고 있어, 파이팅!",
                     "좋은 결과 있을 거야, 힘내자!"
                 )
             } else {
                 listOf(
-                    "진심으로 축하드립니다! 🎉",
+                    "진심으로 축하드립니다!",
                     "그동안의 노고에 깊이 감사드리며 축하드립니다.",
                     "항상 응원하고 있습니다. 파이팅입니다!",
                     "좋은 결실 맺으시길 진심으로 기원합니다."
@@ -856,7 +856,7 @@ class KoreanSemanticSentencePredictor {
             val isShort = sentence.split(" ").size <= 2 && sentence.length <= 10
             val score = (0.98f - (index * 0.04f)).coerceIn(0.70f, 0.99f)
             val badge = when {
-                dynamicCandidates.contains(sentence) -> "✨ 맞춤AI"
+                dynamicCandidates.contains(sentence) -> "맞춤 AI"
                 isShort -> "핵심구문"
                 intent == ContextualIntent.Scheduling -> "일정추천"
                 intent == ContextualIntent.WorkProgress -> "업무/보고"
@@ -870,7 +870,7 @@ class KoreanSemanticSentencePredictor {
                 intent == ContextualIntent.Cheering -> "응원/축하"
                 intent == ContextualIntent.StatusUpdate -> "현황/보고"
                 intent == ContextualIntent.Request -> "정중요청"
-                else -> "✨ AI완성"
+                else -> "AI 완성"
             }
             SemanticSentencePrediction(
                 text = sentence,

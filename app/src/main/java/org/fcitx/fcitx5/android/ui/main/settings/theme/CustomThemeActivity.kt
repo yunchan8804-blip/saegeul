@@ -25,7 +25,10 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.MimeTypeMap
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
@@ -46,7 +49,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeColorGenerator
+import org.fcitx.fcitx5.android.data.theme.ThemeContrast
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.CropImageActivity.CropContract
@@ -62,22 +68,16 @@ import splitties.resources.styledColor
 import splitties.resources.styledDrawable
 import splitties.views.backgroundColor
 import splitties.views.bottomPadding
-import splitties.views.dsl.appcompat.switch
-import splitties.views.dsl.constraintlayout.above
-import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.constraintLayout
-import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
-import splitties.views.dsl.constraintlayout.matchConstraints
-import splitties.views.dsl.constraintlayout.packed
-import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
-import splitties.views.dsl.constraintlayout.topToTopOf
 import splitties.views.dsl.core.add
+import splitties.views.dsl.core.editText
 import splitties.views.dsl.core.horizontalLayout
+import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.seekBar
@@ -88,6 +88,7 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.dsl.core.wrapInScrollView
 import splitties.views.gravityVerticalCenter
 import splitties.views.horizontalPadding
+import splitties.views.imageResource
 import splitties.views.textAppearance
 import splitties.views.topPadding
 import java.io.File
@@ -144,107 +145,365 @@ class CustomThemeActivity : AppCompatActivity() {
         setPadding(dp(16), dp(16), dp(16), dp(6))
     }
 
-    private val variantLabel by lazy {
-        createTextView(R.string.dark_keys, ripple = true)
+    // ---- Unified chip / swatch styling (design.md round 2 "테마" item 3) ----
+
+    private fun styledChip(label: String, selected: Boolean, onClick: () -> Unit) = TextView(this).apply {
+        text = label
+        textSize = 13f
+        gravity = Gravity.CENTER
+        minimumHeight = dp(48)
+        setPadding(dp(16), dp(8), dp(16), dp(8))
+        val shape = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(20f)
+            if (selected) {
+                setColor(color(R.color.saegeul_action))
+            } else {
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), color(R.color.saegeul_outline))
+            }
+        }
+        setTextColor(if (selected) color(R.color.saegeul_on_action) else color(R.color.saegeul_ink))
+        background = RippleDrawable(ColorStateList.valueOf(Color.argb(40, 0, 0, 0)), shape, null)
+        setOnClickListener { onClick() }
     }
-    private val variantSwitch by lazy {
-        switch {
-            isChecked = false
+
+    private fun horizontalChipRow(chips: List<View>) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(dp(12), dp(4), dp(12), dp(4))
+        chips.forEach { chip ->
+            addView(
+                chip,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    rightMargin = dp(8)
+                }
+            )
         }
     }
 
-    private val brightnessLabel by lazy {
-        createTextView(R.string.brightness)
+    private fun twoOptionSegment(
+        labelA: String,
+        labelB: String,
+        isASelected: Boolean,
+        onSelectA: () -> Unit,
+        onSelectB: () -> Unit
+    ) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(
+            styledChip(labelA, isASelected, onSelectA),
+            LinearLayout.LayoutParams(0, dp(48)).apply { weight = 1f; rightMargin = dp(6) }
+        )
+        addView(
+            styledChip(labelB, !isASelected, onSelectB),
+            LinearLayout.LayoutParams(0, dp(48)).apply { weight = 1f }
+        )
     }
-    private val brightnessValue by lazy {
-        createTextView()
-    }
-    private val brightnessSeekBar by lazy {
-        seekBar {
-            max = 100
+
+    private fun colorSwatchView(currentColor: Int) = View(this).apply {
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(8f)
+            setColor(currentColor)
+            setStroke(dp(1), color(R.color.saegeul_outline))
         }
     }
 
-    private val cropLabel by lazy {
-        createTextView(R.string.recrop_image, ripple = true)
+    /**
+     * A label + tappable color swatch row that opens [showColorPickerDialog].
+     * [currentColor] and [onPicked] are called lazily so the row always
+     * reflects the live [theme], even after it changes from elsewhere (e.g.
+     * a preset chip).
+     */
+    private fun colorSwatchRow(
+        label: String,
+        refresherList: MutableList<() -> Unit> = swatchRefreshers,
+        currentColor: () -> Int,
+        onPicked: (Int) -> Unit
+    ): LinearLayout {
+        val swatch = colorSwatchView(currentColor())
+        val refresh: () -> Unit = { (swatch.background as GradientDrawable).setColor(currentColor()) }
+        swatch.setOnClickListener {
+            showColorPickerDialog(currentColor()) { picked ->
+                onPicked(picked)
+                refresh()
+            }
+        }
+        refresherList += refresh
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(48)
+            setPadding(dp(16), dp(2), dp(16), dp(2))
+            addView(
+                TextView(this@CustomThemeActivity).apply {
+                    text = label
+                    setTextColor(color(R.color.saegeul_ink))
+                },
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT).apply { weight = 1f }
+            )
+            addView(swatch, LinearLayout.LayoutParams(dp(48), dp(48)))
+        }
     }
 
-    private val changeImageLabel by lazy {
-        createTextView(R.string.theme_choose_image, ripple = true)
+    /**
+     * A tappable color swatch (circular seed swatch or the color-picker's preset palette)
+     * that shows a ring + check mark when [isSelected] is true (design.md round 2 "테마"
+     * item 2). The ring sits 2dp outside the swatch with a 3dp stroke, so selecting a swatch
+     * never changes its own footprint; the check mark is tinted for whichever of white/ink
+     * contrasts best against the swatch color. Returns the tappable container together with
+     * a `refresh()` callback the caller re-runs whenever [isSelected] may have changed.
+     */
+    private fun selectableSwatch(
+        swatchColor: Int,
+        oval: Boolean,
+        swatchSizePx: Int,
+        description: String,
+        isSelected: () -> Boolean,
+        onClick: () -> Unit
+    ): Pair<FrameLayout, () -> Unit> {
+        val ringWidthPx = dp(3)
+        val insetPx = dp(2) + ringWidthPx
+        val containerSizePx = swatchSizePx + insetPx * 2
+        val shapeType = if (oval) GradientDrawable.OVAL else GradientDrawable.RECTANGLE
+        val ring = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = shapeType
+                if (!oval) cornerRadius = dp(10f)
+                setStroke(ringWidthPx, color(R.color.saegeul_ink))
+            }
+        }
+        val swatch = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = shapeType
+                if (!oval) cornerRadius = dp(8f)
+                setColor(swatchColor)
+                setStroke(dp(1), color(R.color.saegeul_outline))
+            }
+        }
+        val check = ImageView(this).apply {
+            setImageResource(R.drawable.ic_baseline_check_24)
+        }
+        val container = FrameLayout(this).apply {
+            contentDescription = description
+            addView(ring, FrameLayout.LayoutParams(containerSizePx, containerSizePx))
+            addView(swatch, FrameLayout.LayoutParams(swatchSizePx, swatchSizePx).apply {
+                gravity = Gravity.CENTER
+            })
+            addView(check, FrameLayout.LayoutParams(swatchSizePx / 2, swatchSizePx / 2).apply {
+                gravity = Gravity.CENTER
+            })
+            setOnClickListener { onClick() }
+        }
+        val refresh: () -> Unit = {
+            val selected = isSelected()
+            ring.visibility = if (selected) View.VISIBLE else View.INVISIBLE
+            check.visibility = if (selected) View.VISIBLE else View.GONE
+            container.isSelected = selected
+            ViewCompat.setStateDescription(
+                container,
+                if (selected) getString(R.string.theme_swatch_selected) else null
+            )
+            if (selected) {
+                val onInk = ThemeContrast.ratio(color(R.color.saegeul_ink), swatchColor)
+                val onWhite = ThemeContrast.ratio(Color.WHITE, swatchColor)
+                check.imageTintList = ColorStateList.valueOf(
+                    if (onWhite >= onInk) Color.WHITE else color(R.color.saegeul_ink)
+                )
+            }
+        }
+        refresh()
+        return container to refresh
     }
 
-    private val removeImageLabel by lazy {
-        createTextView(R.string.theme_remove_image, ripple = true)
-    }
+    private val colorPickerPalette = listOf(
+        0xFF101827.toInt(), 0xFFFFF9ED.toInt(), 0xFFFFFFFF.toInt(), 0xFF000000.toInt(),
+        0xFF176B50.toInt(), 0xFF55D6A6.toInt(), 0xFF2F5BD3.toInt(), 0xFFB83A32.toInt(),
+        0xFFC49A45.toInt(), 0xFF38BDF8.toInt(), 0xFFEC4899.toInt(), 0xFF8B5CF6.toInt(),
+        0xFFF59E0B.toInt(), 0xFF10B981.toInt(), 0xFF52605D.toInt(), 0xFFD2DED7.toInt()
+    )
 
-    private val palettePresetContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
+    private fun showColorPickerDialog(current: Int, onPicked: (Int) -> Unit) {
+        val hexInput: EditText = editText {
+            setText(ThemeHexColor.format(current))
+            hint = getString(R.string.theme_color_hex_hint)
+        }
+        val errorText = TextView(this).apply {
+            text = getString(R.string.theme_color_hex_invalid)
+            setTextColor(color(R.color.red_400))
+            textSize = 12f
+            visibility = View.GONE
+        }
+        val paletteContent = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+        }
+        var selectedPaletteColor: Int? = current.takeIf { it in colorPickerPalette }
+        val paletteRefreshers = mutableListOf<() -> Unit>()
+        colorPickerPalette.forEachIndexed { index, swatchColor ->
+            val (swatch, refresh) = selectableSwatch(
+                swatchColor = swatchColor,
+                oval = true,
+                swatchSizePx = dp(36),
+                description = getString(R.string.theme_swatch_color_index, index + 1),
+                isSelected = { selectedPaletteColor == swatchColor },
+                onClick = {
+                    hexInput.setText(ThemeHexColor.format(swatchColor))
+                    errorText.visibility = View.GONE
+                    selectedPaletteColor = swatchColor
+                    paletteRefreshers.forEach { it() }
+                }
+            )
+            paletteRefreshers += refresh
+            paletteContent.addView(
+                swatch,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    .apply { rightMargin = dp(8) }
+            )
+        }
+        val paletteRow = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
+            addView(paletteContent)
+        }
+        val container = verticalLayout {
+            setPadding(dp(20), dp(12), dp(20), dp(0))
+            add(paletteRow, lParams(matchParent, wrapContent) { bottomMargin = dp(12) })
+            add(hexInput, lParams(matchParent, wrapContent))
+            add(errorText, lParams(matchParent, wrapContent) { topMargin = dp(4) })
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.theme_color_picker_title)
+            .setView(container)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val parsed = ThemeHexColor.parse(hexInput.text.toString())
+            if (parsed == null) {
+                errorText.visibility = View.VISIBLE
+            } else {
+                onPicked(parsed)
+                dialog.dismiss()
+            }
         }
     }
 
-    private val accentColorContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
+    // ---- Easy tier containers ----
+
+    private val startingThemeContainer by lazy {
+        HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+    }
+
+    private val seedBrightnessContainer by lazy {
+        LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+    }
+
+    private val seedSwatchContainer by lazy {
+        HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+    }
+
+    private val keyToneSectionContainer by lazy {
+        verticalLayout { }
+    }
+
+    private val contrastWarningContainer by lazy {
+        LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+    }
+
+    // ---- Deeper tier ("더 꾸미기") ----
+
+    private var moreExpanded = false
+
+    private val moreHeaderIcon by lazy {
+        imageView {
+            imageResource = R.drawable.ic_baseline_expand_more_24
+            imageTintList = ColorStateList.valueOf(color(R.color.saegeul_ink))
         }
     }
 
-    private val surfaceColorContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
+    private val moreSummaryText by lazy {
+        textView {
+            textSize = 12f
+            setTextColor(color(R.color.saegeul_secondary))
         }
+    }
+
+    private val moreHeaderRow by lazy {
+        horizontalLayout {
+            gravity = Gravity.CENTER_VERTICAL
+            background = styledDrawable(android.R.attr.selectableItemBackground)
+            setOnClickListener { toggleMoreExpanded() }
+            add(
+                textView {
+                    text = getString(R.string.theme_section_more)
+                    textSize = 13f
+                    paint.isFakeBoldText = true
+                    setTextColor(color(R.color.saegeul_ink))
+                },
+                lParams(wrapContent, wrapContent) { leftMargin = dp(16) }
+            )
+            add(moreSummaryText, lParams(0, wrapContent) { weight = 1f; leftMargin = dp(8) })
+            add(moreHeaderIcon, lParams(dp(24), dp(24)) { rightMargin = dp(16) })
+        }
+    }
+
+    private val moreContainer by lazy {
+        verticalLayout { visibility = View.GONE }
+    }
+
+    private val detailColorContainer by lazy {
+        verticalLayout { }
+    }
+
+    private fun effectsInUseCount(): Int {
+        var n = 0
+        theme.lightingEffect?.let { if (it.mode != "off") n++ }
+        theme.particleEffect?.let { if (it.type != "off") n++ }
+        theme.keyGlowEffect?.let { if (it.enabled) n++ }
+        if (theme.globalKeyStyle != null) n++
+        if (!theme.keyOverrides.isNullOrEmpty()) n++
+        return n
+    }
+
+    private fun toggleMoreExpanded() {
+        moreExpanded = !moreExpanded
+        updateMoreVisibility()
+    }
+
+    private fun updateMoreVisibility() {
+        moreContainer.visibility = if (moreExpanded) View.VISIBLE else View.GONE
+        moreHeaderIcon.imageResource =
+            if (moreExpanded) R.drawable.ic_baseline_expand_less_24 else R.drawable.ic_baseline_expand_more_24
+        val count = effectsInUseCount()
+        moreSummaryText.text = if (!moreExpanded && count > 0) getString(R.string.theme_more_summary_effects, count) else ""
     }
 
     private val ambientModeContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
-        }
+        HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
     }
 
     private val ambientDirectionContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
-        }
+        HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
     }
 
     private val reactiveModeContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
-        }
+        HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
     }
 
     private val particleModeContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
-        }
+        HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
     }
 
     private val glowColorContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
-        }
+        HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
     }
 
     private val perKeyTargetContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
-        }
+        HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
     }
 
-    private val perKeyColorContainer by lazy {
-        HorizontalScrollView(this).apply {
-            isFillViewport = true
-            isHorizontalScrollBarEnabled = false
-        }
+    private val perKeyDetailContainer by lazy {
+        verticalLayout { }
     }
 
     // Fine-tuning Controls: Ambient Speed
@@ -319,6 +578,44 @@ class CustomThemeActivity : AppCompatActivity() {
 
     private var selectedKeyTarget = "ALL"
 
+    /** Refresh callbacks for every "세부 색" swatch, run after any theme change so they stay in sync. */
+    private val swatchRefreshers = mutableListOf<() -> Unit>()
+
+    /** Same as [swatchRefreshers] but for the "개별 키" section, which is rebuilt when the target changes. */
+    private var perKeyRefreshers = mutableListOf<() -> Unit>()
+
+    // Whether the "색 하나로 만들기" seed generator is set to produce a light or dark palette.
+    private var seedGenIsDark = false
+
+    // Whether the "키 톤" segment (background-image key legibility) is set to dark-colored keys.
+    private var keyToneIsDark = false
+
+    private val backgroundImageLabel by lazy { createSectionHeader(getString(R.string.theme_background_image)) }
+
+    private val cropLabel by lazy {
+        createTextView(R.string.recrop_image, ripple = true)
+    }
+
+    private val changeImageLabel by lazy {
+        createTextView(R.string.theme_choose_image, ripple = true)
+    }
+
+    private val removeImageLabel by lazy {
+        createTextView(R.string.theme_remove_image, ripple = true)
+    }
+
+    private val brightnessLabel by lazy {
+        createTextView(R.string.brightness)
+    }
+    private val brightnessValue by lazy {
+        createTextView()
+    }
+    private val brightnessSeekBar by lazy {
+        seekBar {
+            max = 100
+        }
+    }
+
     // Sub-containers for grouped visibility
     private lateinit var ambientControlsLayout: LinearLayout
     private lateinit var particleControlsLayout: LinearLayout
@@ -328,26 +625,58 @@ class CustomThemeActivity : AppCompatActivity() {
         verticalLayout {
             setPadding(dp(12), dp(8), dp(12), dp(32))
 
-            // 1. Preset Palettes Section
-            add(createSectionHeader(getString(R.string.theme_style_palette)), lParams(matchParent, wrapContent))
-            add(palettePresetContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(8)
-            })
+            // ---- Easy tier ----
 
-            // 2. Ambient RGB Backlight Section
-            add(createSectionHeader(getString(R.string.theme_rgb_backlight)), lParams(matchParent, wrapContent))
-            add(ambientModeContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(6)
+            // a. Starting theme
+            add(createSectionHeader(getString(R.string.theme_section_starting_theme)), lParams(matchParent, wrapContent))
+            add(startingThemeContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
+
+            // b. Make from one color
+            add(createSectionHeader(getString(R.string.theme_section_seed_color)), lParams(matchParent, wrapContent))
+            add(seedBrightnessContainer, lParams(matchParent, dp(48)) {
+                leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
             })
+            add(seedSwatchContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
+
+            // c. Background image (+ key tone segment when a background image is set)
+            add(backgroundImageLabel, lParams(matchParent, wrapContent))
+            add(changeImageLabel, lParams(matchParent, dp(48)))
+            add(cropLabel, lParams(matchParent, dp(48)))
+            add(removeImageLabel, lParams(matchParent, dp(48)))
+            val brightnessRow = horizontalLayout {
+                gravity = Gravity.CENTER_VERTICAL
+                add(brightnessLabel, lParams(0, dp(40)) { weight = 1f })
+                add(brightnessValue, lParams(wrapContent, dp(40)) { rightMargin = dp(16) })
+            }
+            add(brightnessRow, lParams(matchParent, wrapContent))
+            add(brightnessSeekBar, lParams(matchParent, wrapContent) {
+                leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+            })
+            add(keyToneSectionContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
+
+            // d. Contrast warning (only rendered when there is an issue)
+            add(contrastWarningContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
+
+            // ---- Deeper tier ----
+            add(moreHeaderRow, lParams(matchParent, dp(48)))
+            add(moreContainer, lParams(matchParent, wrapContent))
+        }
+    }
+
+    private fun buildMoreContainer() {
+        moreContainer.apply {
+            // e. Detail colors
+            add(createSectionHeader(getString(R.string.theme_section_detail_colors)), lParams(matchParent, wrapContent))
+            add(detailColorContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
+
+            // f. Ambient lighting / reactive / particle / glow
+            add(createSectionHeader(getString(R.string.theme_rgb_backlight)), lParams(matchParent, wrapContent))
+            add(ambientModeContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(6) })
 
             ambientControlsLayout = verticalLayout {
-                // Direction
                 add(createTextView(R.string.theme_rgb_direction), lParams(matchParent, dp(36)))
-                add(ambientDirectionContainer, lParams(matchParent, wrapContent) {
-                    bottomMargin = dp(6)
-                })
+                add(ambientDirectionContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(6) })
 
-                // Speed
                 val speedRow = horizontalLayout {
                     gravity = Gravity.CENTER_VERTICAL
                     add(ambientSpeedLabel, lParams(0, dp(36)) { weight = 1f })
@@ -358,7 +687,6 @@ class CustomThemeActivity : AppCompatActivity() {
                     leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
                 })
 
-                // Intensity
                 val intensityRow = horizontalLayout {
                     gravity = Gravity.CENTER_VERTICAL
                     add(ambientIntensityLabel, lParams(0, dp(36)) { weight = 1f })
@@ -369,7 +697,6 @@ class CustomThemeActivity : AppCompatActivity() {
                     leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
                 })
 
-                // Key Translucency
                 val transRow = horizontalLayout {
                     gravity = Gravity.CENTER_VERTICAL
                     add(keyTranslucencyLabel, lParams(0, dp(36)) { weight = 1f })
@@ -382,20 +709,13 @@ class CustomThemeActivity : AppCompatActivity() {
             }
             add(ambientControlsLayout, lParams(matchParent, wrapContent))
 
-            // 3. Keypress Reactive Animation Section
             add(createSectionHeader(getString(R.string.theme_rgb_reactive_title)), lParams(matchParent, wrapContent))
-            add(reactiveModeContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(8)
-            })
+            add(reactiveModeContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
 
-            // 4. Touch Particle & Sparkle Section
             add(createSectionHeader(getString(R.string.theme_particle_effect)), lParams(matchParent, wrapContent))
-            add(particleModeContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(6)
-            })
+            add(particleModeContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(6) })
 
             particleControlsLayout = verticalLayout {
-                // Count
                 val pCountRow = horizontalLayout {
                     gravity = Gravity.CENTER_VERTICAL
                     add(particleCountLabel, lParams(0, dp(36)) { weight = 1f })
@@ -406,7 +726,6 @@ class CustomThemeActivity : AppCompatActivity() {
                     leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
                 })
 
-                // Lifetime
                 val pLifeRow = horizontalLayout {
                     gravity = Gravity.CENTER_VERTICAL
                     add(particleLifetimeLabel, lParams(0, dp(36)) { weight = 1f })
@@ -417,7 +736,6 @@ class CustomThemeActivity : AppCompatActivity() {
                     leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
                 })
 
-                // Speed
                 val pSpeedRow = horizontalLayout {
                     gravity = Gravity.CENTER_VERTICAL
                     add(particleSpeedLabel, lParams(0, dp(36)) { weight = 1f })
@@ -430,11 +748,8 @@ class CustomThemeActivity : AppCompatActivity() {
             }
             add(particleControlsLayout, lParams(matchParent, wrapContent))
 
-            // 5. Keycap Glow & Aura Section
             add(createSectionHeader(getString(R.string.theme_key_glow_effect)), lParams(matchParent, wrapContent))
-            add(glowColorContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(6)
-            })
+            add(glowColorContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(6) })
 
             glowControlsLayout = verticalLayout {
                 val glowRadRow = horizontalLayout {
@@ -449,61 +764,10 @@ class CustomThemeActivity : AppCompatActivity() {
             }
             add(glowControlsLayout, lParams(matchParent, wrapContent))
 
-            // 6. Per-Key Custom Studio Section
+            // g. Per-key
             add(createSectionHeader(getString(R.string.theme_per_key_customization)), lParams(matchParent, wrapContent))
-            add(perKeyTargetContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(4)
-            })
-            add(perKeyColorContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(8)
-            })
-
-            // 7. Accent / Enter Color Swatches
-            add(createSectionHeader(getString(R.string.theme_accent_key_color)), lParams(matchParent, wrapContent))
-            add(accentColorContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(8)
-            })
-
-            // 8. Keyboard Surface Color Swatches
-            add(createSectionHeader(getString(R.string.theme_keyboard_bg_color)), lParams(matchParent, wrapContent))
-            add(surfaceColorContainer, lParams(matchParent, wrapContent) {
-                bottomMargin = dp(8)
-            })
-
-            // 9. Keycap & Style Options
-            add(createSectionHeader(getString(R.string.theme_color_customization)), lParams(matchParent, wrapContent))
-            val variantRow = horizontalLayout {
-                gravity = Gravity.CENTER_VERTICAL
-                add(variantLabel, lParams(0, dp(48)) {
-                    weight = 1f
-                })
-                add(variantSwitch, lParams(wrapContent, wrapContent) {
-                    rightMargin = dp(16)
-                })
-            }
-            add(variantRow, lParams(matchParent, wrapContent))
-
-            // 10. Background Image Section
-            add(createSectionHeader(getString(R.string.theme_background_image)), lParams(matchParent, wrapContent))
-            add(changeImageLabel, lParams(matchParent, dp(44)))
-            add(cropLabel, lParams(matchParent, dp(44)))
-            add(removeImageLabel, lParams(matchParent, dp(44)))
-
-            val brightnessRow = horizontalLayout {
-                gravity = Gravity.CENTER_VERTICAL
-                add(brightnessLabel, lParams(0, dp(40)) {
-                    weight = 1f
-                })
-                add(brightnessValue, lParams(wrapContent, dp(40)) {
-                    rightMargin = dp(16)
-                })
-            }
-            add(brightnessRow, lParams(matchParent, wrapContent))
-            add(brightnessSeekBar, lParams(matchParent, wrapContent) {
-                leftMargin = dp(16)
-                rightMargin = dp(16)
-                bottomMargin = dp(16)
-            })
+            add(perKeyTargetContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(4) })
+            add(perKeyDetailContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
         }
     }
 
@@ -567,6 +831,10 @@ class CustomThemeActivity : AppCompatActivity() {
         }
         previewUi.setTheme(theme, bgDrawable)
         updateControlsVisibility()
+        swatchRefreshers.forEach { it() }
+        perKeyRefreshers.forEach { it() }
+        refreshContrastRow()
+        if (!moreExpanded) updateMoreVisibility()
     }
 
     @SuppressLint("SetTextI18n")
@@ -577,6 +845,7 @@ class CustomThemeActivity : AppCompatActivity() {
         brightnessLabel.visibility = if (hasBg) View.VISIBLE else View.GONE
         brightnessValue.visibility = if (hasBg) View.VISIBLE else View.GONE
         brightnessSeekBar.visibility = if (hasBg) View.VISIBLE else View.GONE
+        keyToneSectionContainer.visibility = if (hasBg) View.VISIBLE else View.GONE
 
         val hasAmbient = (theme.lightingEffect?.effectiveAmbientMode ?: "off") != "off"
         ambientControlsLayout.visibility = if (hasAmbient) View.VISIBLE else View.GONE
@@ -587,7 +856,6 @@ class CustomThemeActivity : AppCompatActivity() {
         val hasGlow = theme.keyGlowEffect?.enabled == true
         glowControlsLayout.visibility = if (hasGlow) View.VISIBLE else View.GONE
 
-        // Sync slider values
         theme.lightingEffect?.let { l ->
             ambientSpeedValue.text = "%.1fx".format(l.speed)
             ambientIntensityValue.text = "${(l.intensity * 100).toInt()}%"
@@ -605,122 +873,231 @@ class CustomThemeActivity : AppCompatActivity() {
         }
     }
 
+    // ---- a. Starting theme ----
+
     private fun applyPreset(preset: Theme.Builtin) {
-        val currentBg = theme.backgroundImage
-        val custom = if (currentBg != null) {
-            preset.deriveCustomBackground(
-                name = theme.name,
-                croppedBackgroundImage = currentBg.croppedFilePath,
-                originBackgroundImage = currentBg.srcFilePath,
-                brightness = brightnessSeekBar.progress,
-                cropBackgroundRect = currentBg.cropRect,
-                cropBackgroundRotation = currentBg.cropRotation
-            )
-        } else {
-            preset.deriveCustomNoBackground(theme.name)
+        theme = ThemeColorApply.replaceColors(theme, preset)
+        updatePreview()
+        setupStartingThemeRow()
+    }
+
+    private fun setupStartingThemeRow() {
+        val chips = ThemeManager.BuiltinThemes.map { preset ->
+            val selected = theme.keyTextColor == preset.keyTextColor &&
+                theme.backgroundColor == preset.backgroundColor &&
+                theme.accentKeyBackgroundColor == preset.accentKeyBackgroundColor
+            styledChip(ThemeDisplayNames.displayName(this, preset), selected) { applyPreset(preset) }
         }
-        theme = custom
-        variantSwitch.isChecked = !preset.isDark
-        updatePreview()
-        setupAmbientModeRow()
-        setupAmbientDirectionRow()
-        setupReactiveModeRow()
-        setupParticleModeRow()
-        setupGlowColorRow()
+        startingThemeContainer.removeAllViews()
+        startingThemeContainer.addView(horizontalChipRow(chips))
     }
 
-    private fun applyAccentColor(accentColor: Int, accentTextColor: Int = 0xffffffff.toInt()) {
-        theme = theme.copy(
-            accentKeyBackgroundColor = accentColor,
-            accentKeyTextColor = accentTextColor,
-            genericActiveBackgroundColor = accentColor,
-            genericActiveForegroundColor = accentTextColor
+    // ---- b. Make from one color ----
+
+    private val seedSwatches = listOf(
+        0xFF55D6A6.toInt(), // 새글 제이드
+        0xFF2F5BD3.toInt(), // 새글 네이비 기반 청색
+        0xFFC84141.toInt(),
+        0xFFC88541.toInt(),
+        0xFFC8C841.toInt(),
+        0xFF85C841.toInt(),
+        0xFF41C885.toInt(),
+        0xFF419BC8.toInt(),
+        0xFF6E41C8.toInt(),
+        0xFFB141C8.toInt(),
+        0xFFC8419B.toInt(),
+        0xFFC84158.toInt()
+    )
+
+    // The seed swatch most recently applied, so the editor can show which one is
+    // "selected" even though the generated theme's colors no longer equal the seed itself.
+    private var lastAppliedSeedColor: Int? = null
+
+    private fun applySeedColor(seedColor: Int) {
+        val generated = ThemeColorGenerator.generate(seedColor, seedGenIsDark, theme.name)
+        theme = ThemeColorApply.replaceColors(theme, generated)
+        lastAppliedSeedColor = seedColor
+        updatePreview()
+        setupStartingThemeRow()
+        setupSeedSwatchRow()
+    }
+
+    private fun setupSeedBrightnessRow() {
+        seedBrightnessContainer.removeAllViews()
+        seedBrightnessContainer.addView(
+            twoOptionSegment(
+                getString(R.string.theme_brightness_light),
+                getString(R.string.theme_brightness_dark),
+                isASelected = !seedGenIsDark,
+                onSelectA = { seedGenIsDark = false; setupSeedBrightnessRow() },
+                onSelectB = { seedGenIsDark = true; setupSeedBrightnessRow() }
+            ),
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
         )
-        updatePreview()
     }
 
-    private fun applySurfaceColor(surfaceColor: Int, barColor: Int? = null) {
-        val actualBar = barColor ?: surfaceColor
-        theme = theme.copy(
-            backgroundColor = surfaceColor,
-            keyboardColor = surfaceColor,
-            barColor = actualBar,
-            popupBackgroundColor = actualBar
-        )
-        updatePreview()
-    }
-
-    private fun setKeyVariant(darkKeys: Boolean) {
-        val template = if (darkKeys) ThemePreset.TransparentLight else ThemePreset.TransparentDark
-        val bg = theme.backgroundImage
-        theme = if (bg != null) {
-            template.deriveCustomBackground(
-                theme.name,
-                bg.croppedFilePath,
-                bg.srcFilePath,
-                brightnessSeekBar.progress,
-                bg.cropRect,
-                bg.cropRotation
-            )
-        } else {
-            template.deriveCustomNoBackground(theme.name)
-        }
-        updatePreview()
-    }
-
-    private fun setupPresetPaletteRow() {
-        val presets = listOf(
-            "한지" to ThemePreset.HanjiLight,
-            "단청" to ThemePreset.DancheongDark,
-            "백자" to ThemePreset.BaegjaLight,
-            "청자" to ThemePreset.CheongjaDark,
-            "자정 OLED" to ThemePreset.MidnightOLED,
-            "안개 Glass" to ThemePreset.SeoulMistGlass,
-            "픽셀 다크" to ThemePreset.PixelDark,
-            "픽셀 라이트" to ThemePreset.PixelLight,
-            "머티리얼 다크" to ThemePreset.MaterialDark,
-            "머티리얼 라이트" to ThemePreset.MaterialLight,
-            "노르딕 다크" to ThemePreset.NordDark,
-            "노르딕 라이트" to ThemePreset.NordLight,
-            "모노카이" to ThemePreset.Monokai,
-            "딥블루" to ThemePreset.DeepBlue
-        )
-
+    private fun setupSeedSwatchRow() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(12), dp(4), dp(12), dp(4))
         }
+        seedSwatches.forEachIndexed { index, seedColor ->
+            val (swatch, _) = selectableSwatch(
+                swatchColor = seedColor,
+                oval = true,
+                swatchSizePx = dp(40),
+                description = getString(R.string.theme_swatch_color_index, index + 1),
+                isSelected = { lastAppliedSeedColor == seedColor },
+                onClick = { applySeedColor(seedColor) }
+            )
+            row.addView(
+                swatch,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    .apply { rightMargin = dp(10) }
+            )
+        }
+        seedSwatchContainer.removeAllViews()
+        seedSwatchContainer.addView(row)
+    }
 
-        presets.forEach { (name, preset) ->
-            val pill = TextView(this).apply {
-                text = name
+    // ---- c. Background image / key tone ----
+
+    private fun applyKeyTone(darkKeys: Boolean) {
+        val template = if (darkKeys) ThemePreset.TransparentLight else ThemePreset.TransparentDark
+        theme = ThemeColorApply.replaceColors(theme, template)
+        keyToneIsDark = darkKeys
+        updatePreview()
+        setupKeyToneRow()
+    }
+
+    private fun setupKeyToneRow() {
+        keyToneSectionContainer.removeAllViews()
+        if (theme.backgroundImage == null) return
+        keyToneSectionContainer.add(
+            twoOptionSegment(
+                getString(R.string.theme_key_tone_light),
+                getString(R.string.theme_key_tone_dark),
+                isASelected = !keyToneIsDark,
+                onSelectA = { applyKeyTone(false) },
+                onSelectB = { applyKeyTone(true) }
+            ),
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48))
+        )
+    }
+
+    // ---- d. Contrast warning ----
+
+    private fun roleStringRes(role: ThemeContrast.Role): Int = when (role) {
+        ThemeContrast.Role.Key -> R.string.theme_contrast_role_key
+        ThemeContrast.Role.AltKey -> R.string.theme_contrast_role_alt_key
+        ThemeContrast.Role.AccentKey -> R.string.theme_contrast_role_accent_key
+        ThemeContrast.Role.Candidate -> R.string.theme_contrast_role_candidate
+        ThemeContrast.Role.KeyOverride -> R.string.theme_contrast_role_key_override
+    }
+
+    private fun refreshContrastRow() {
+        contrastWarningContainer.removeAllViews()
+        val issues = ThemeContrast.findIssues(theme)
+        val worst = issues.minByOrNull { it.ratio } ?: return
+        val roleName = getString(roleStringRes(worst.role))
+        val ratioText = "%.1f".format(worst.ratio)
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+        row.addView(
+            ImageView(this).apply {
+                setImageResource(R.drawable.ic_baseline_warning_24)
+                imageTintList = ColorStateList.valueOf(color(R.color.red_400))
+            },
+            LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) }
+        )
+        row.addView(
+            TextView(this).apply {
+                text = getString(R.string.theme_contrast_warning, roleName, ratioText)
                 textSize = 12f
-                paint.isFakeBoldText = true
-                setTextColor(if (preset.isDark) Color.WHITE else Color.BLACK)
-                gravity = Gravity.CENTER
-                setPadding(dp(14), dp(8), dp(14), dp(8))
+                setTextColor(color(R.color.red_400))
+            },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                weight = 1f
+                rightMargin = dp(8)
+            }
+        )
+        row.addView(
+            styledChip(getString(R.string.theme_contrast_autofix), false) {
+                theme = ThemeContrast.autoFix(theme)
+                updatePreview()
+            },
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36))
+        )
+        contrastWarningContainer.addView(row)
+    }
 
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(20f)
-                    setColor(preset.accentKeyBackgroundColor)
-                    setStroke(dp(1), if (preset.isDark) Color.argb(60, 255, 255, 255) else Color.argb(40, 0, 0, 0))
-                }
-                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
+    // ---- e. Detail colors (21 fields) ----
 
-                setOnClickListener {
-                    applyPreset(preset)
+    private data class ColorField(
+        @StringRes val labelRes: Int,
+        val get: (Theme.Custom) -> Int,
+        val set: (Theme.Custom, Int) -> Theme.Custom
+    )
+
+    private fun setupDetailColorSection() {
+        val groups = listOf(
+            R.string.theme_color_group_keyboard to listOf(
+                ColorField(R.string.theme_field_background, { it.backgroundColor }, { t, c -> t.copy(backgroundColor = c) }),
+                ColorField(R.string.theme_field_keyboard, { it.keyboardColor }, { t, c -> t.copy(keyboardColor = c) }),
+                ColorField(R.string.theme_field_bar, { it.barColor }, { t, c -> t.copy(barColor = c) })
+            ),
+            R.string.theme_color_group_key to listOf(
+                ColorField(R.string.theme_field_key_background, { it.keyBackgroundColor }, { t, c -> t.copy(keyBackgroundColor = c) }),
+                ColorField(R.string.theme_field_key_text, { it.keyTextColor }, { t, c -> t.copy(keyTextColor = c) }),
+                ColorField(R.string.theme_field_space_bar, { it.spaceBarColor }, { t, c -> t.copy(spaceBarColor = c) }),
+                ColorField(R.string.theme_field_key_press_highlight, { it.keyPressHighlightColor }, { t, c -> t.copy(keyPressHighlightColor = c) }),
+                ColorField(R.string.theme_field_key_shadow, { it.keyShadowColor }, { t, c -> t.copy(keyShadowColor = c) })
+            ),
+            R.string.theme_color_group_alt_key to listOf(
+                ColorField(R.string.theme_field_alt_key_background, { it.altKeyBackgroundColor }, { t, c -> t.copy(altKeyBackgroundColor = c) }),
+                ColorField(R.string.theme_field_alt_key_text, { it.altKeyTextColor }, { t, c -> t.copy(altKeyTextColor = c) })
+            ),
+            R.string.theme_color_group_accent_key to listOf(
+                ColorField(R.string.theme_field_accent_key_background, { it.accentKeyBackgroundColor }, { t, c -> t.copy(accentKeyBackgroundColor = c) }),
+                ColorField(R.string.theme_field_accent_key_text, { it.accentKeyTextColor }, { t, c -> t.copy(accentKeyTextColor = c) }),
+                ColorField(R.string.theme_field_generic_active_background, { it.genericActiveBackgroundColor }, { t, c -> t.copy(genericActiveBackgroundColor = c) }),
+                ColorField(R.string.theme_field_generic_active_text, { it.genericActiveForegroundColor }, { t, c -> t.copy(genericActiveForegroundColor = c) })
+            ),
+            R.string.theme_color_group_candidate to listOf(
+                ColorField(R.string.theme_field_candidate_text, { it.candidateTextColor }, { t, c -> t.copy(candidateTextColor = c) }),
+                ColorField(R.string.theme_field_candidate_label, { it.candidateLabelColor }, { t, c -> t.copy(candidateLabelColor = c) }),
+                ColorField(R.string.theme_field_candidate_comment, { it.candidateCommentColor }, { t, c -> t.copy(candidateCommentColor = c) }),
+                ColorField(R.string.theme_field_divider, { it.dividerColor }, { t, c -> t.copy(dividerColor = c) })
+            ),
+            R.string.theme_color_group_popup to listOf(
+                ColorField(R.string.theme_field_popup_background, { it.popupBackgroundColor }, { t, c -> t.copy(popupBackgroundColor = c) }),
+                ColorField(R.string.theme_field_popup_text, { it.popupTextColor }, { t, c -> t.copy(popupTextColor = c) })
+            ),
+            R.string.theme_color_group_clipboard to listOf(
+                ColorField(R.string.theme_field_clipboard_entry, { it.clipboardEntryColor }, { t, c -> t.copy(clipboardEntryColor = c) })
+            )
+        )
+        detailColorContainer.apply {
+            groups.forEach { (groupLabelRes, fields) ->
+                add(createSectionHeader(getString(groupLabelRes)), lParams(matchParent, wrapContent))
+                fields.forEach { field ->
+                    add(
+                        colorSwatchRow(
+                            getString(field.labelRes),
+                            currentColor = { field.get(theme) },
+                            onPicked = { picked -> theme = field.set(theme, picked); updatePreview() }
+                        ),
+                        lParams(matchParent, wrapContent)
+                    )
                 }
             }
-
-            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                rightMargin = dp(8)
-            })
         }
-
-        palettePresetContainer.removeAllViews()
-        palettePresetContainer.addView(row)
     }
+
+    // ---- f. Ambient / reactive / particle / glow (unchanged behavior, unified chip styling) ----
 
     private fun setupAmbientModeRow() {
         val modes = listOf(
@@ -738,62 +1115,32 @@ class CustomThemeActivity : AppCompatActivity() {
             getString(R.string.theme_rgb_mode_sakura) to "sakura_breeze",
             getString(R.string.theme_rgb_mode_frost) to "frost_crystal"
         )
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
         val currentAmbient = theme.lightingEffect?.effectiveAmbientMode ?: "off"
-
-        modes.forEach { (label, modeKey) ->
-            val pill = TextView(this).apply {
-                text = label
-                textSize = 12f
-                paint.isFakeBoldText = true
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                setPadding(dp(14), dp(8), dp(14), dp(8))
-
-                val isCurrent = currentAmbient == modeKey
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(20f)
-                    setColor(if (isCurrent) Color.parseColor("#7C3AED") else Color.parseColor("#27272A"))
-                    setStroke(dp(1), if (isCurrent) Color.parseColor("#A78BFA") else Color.parseColor("#3F3F46"))
+        val chips = modes.map { (label, modeKey) ->
+            styledChip(label, currentAmbient == modeKey) {
+                val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
+                val defaultSpeed = when (modeKey) {
+                    "neon_pulse" -> 1.5f
+                    "matrix_flow" -> 1.2f
+                    "starlight" -> 1.0f
+                    "rgb_breathe" -> 0.85f
+                    else -> 1.0f
                 }
-                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
-
-                setOnClickListener {
-                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
-                    val defaultSpeed = when (modeKey) {
-                        "neon_pulse" -> 1.5f
-                        "matrix_flow" -> 1.2f
-                        "starlight" -> 1.0f
-                        "rgb_breathe" -> 0.85f
-                        else -> 1.0f
-                    }
-                    theme = theme.copy(
-                        lightingEffect = currentDef.copy(
-                            mode = modeKey,
-                            speed = if (currentDef.speed == 1.0f) defaultSpeed else currentDef.speed
-                        )
+                theme = theme.copy(
+                    lightingEffect = currentDef.copy(
+                        mode = modeKey,
+                        speed = if (currentDef.speed == 1.0f) defaultSpeed else currentDef.speed
                     )
-                    ambientSpeedSeekBar.progress = (theme.lightingEffect!!.speed * 100).toInt()
-                    ambientIntensitySeekBar.progress = (theme.lightingEffect!!.intensity * 100).toInt()
-                    keyTranslucencySeekBar.progress = (theme.lightingEffect!!.keyTranslucency * 100).toInt()
-                    updatePreview()
-                    setupAmbientModeRow()
-                }
+                )
+                ambientSpeedSeekBar.progress = (theme.lightingEffect!!.speed * 100).toInt()
+                ambientIntensitySeekBar.progress = (theme.lightingEffect!!.intensity * 100).toInt()
+                keyTranslucencySeekBar.progress = (theme.lightingEffect!!.keyTranslucency * 100).toInt()
+                updatePreview()
+                setupAmbientModeRow()
             }
-
-            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                rightMargin = dp(8)
-            })
         }
-
         ambientModeContainer.removeAllViews()
-        ambientModeContainer.addView(row)
+        ambientModeContainer.addView(horizontalChipRow(chips))
     }
 
     private fun setupAmbientDirectionRow() {
@@ -805,47 +1152,17 @@ class CustomThemeActivity : AppCompatActivity() {
             getString(R.string.theme_rgb_dir_diagonal) to "diagonal",
             getString(R.string.theme_rgb_dir_radial) to "radial"
         )
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
         val currentDir = theme.lightingEffect?.direction ?: "left_to_right"
-
-        directions.forEach { (label, dirKey) ->
-            val pill = TextView(this).apply {
-                text = label
-                textSize = 11f
-                paint.isFakeBoldText = true
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                setPadding(dp(12), dp(6), dp(12), dp(6))
-
-                val isCurrent = currentDir == dirKey
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(16f)
-                    setColor(if (isCurrent) Color.parseColor("#6366F1") else Color.parseColor("#27272A"))
-                    setStroke(dp(1), if (isCurrent) Color.parseColor("#818CF8") else Color.parseColor("#3F3F46"))
-                }
-                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
-
-                setOnClickListener {
-                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
-                    theme = theme.copy(lightingEffect = currentDef.copy(direction = dirKey))
-                    updatePreview()
-                    setupAmbientDirectionRow()
-                }
+        val chips = directions.map { (label, dirKey) ->
+            styledChip(label, currentDir == dirKey) {
+                val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
+                theme = theme.copy(lightingEffect = currentDef.copy(direction = dirKey))
+                updatePreview()
+                setupAmbientDirectionRow()
             }
-
-            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                rightMargin = dp(6)
-            })
         }
-
         ambientDirectionContainer.removeAllViews()
-        ambientDirectionContainer.addView(row)
+        ambientDirectionContainer.addView(horizontalChipRow(chips))
     }
 
     private fun setupReactiveModeRow() {
@@ -856,47 +1173,17 @@ class CustomThemeActivity : AppCompatActivity() {
             getString(R.string.theme_reactive_mode_firework) to "firework",
             getString(R.string.theme_reactive_mode_laser) to "laser"
         )
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
         val currentReactive = theme.lightingEffect?.effectiveReactiveMode ?: "off"
-
-        reactives.forEach { (label, modeKey) ->
-            val pill = TextView(this).apply {
-                text = label
-                textSize = 12f
-                paint.isFakeBoldText = true
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                setPadding(dp(14), dp(8), dp(14), dp(8))
-
-                val isCurrent = currentReactive == modeKey
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(20f)
-                    setColor(if (isCurrent) Color.parseColor("#EC4899") else Color.parseColor("#27272A"))
-                    setStroke(dp(1), if (isCurrent) Color.parseColor("#F472B6") else Color.parseColor("#3F3F46"))
-                }
-                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
-
-                setOnClickListener {
-                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
-                    theme = theme.copy(lightingEffect = currentDef.copy(reactiveMode = modeKey))
-                    updatePreview()
-                    setupReactiveModeRow()
-                }
+        val chips = reactives.map { (label, modeKey) ->
+            styledChip(label, currentReactive == modeKey) {
+                val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
+                theme = theme.copy(lightingEffect = currentDef.copy(reactiveMode = modeKey))
+                updatePreview()
+                setupReactiveModeRow()
             }
-
-            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                rightMargin = dp(8)
-            })
         }
-
         reactiveModeContainer.removeAllViews()
-        reactiveModeContainer.addView(row)
+        reactiveModeContainer.addView(horizontalChipRow(chips))
     }
 
     private fun setupParticleModeRow() {
@@ -907,59 +1194,31 @@ class CustomThemeActivity : AppCompatActivity() {
             getString(R.string.theme_particle_mode_burst) to "neon_burst",
             getString(R.string.theme_particle_mode_ripple) to "cosmic_ripple"
         )
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
-        particles.forEach { (label, typeKey) ->
-            val pill = TextView(this).apply {
-                text = label
-                textSize = 12f
-                paint.isFakeBoldText = true
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                setPadding(dp(14), dp(8), dp(14), dp(8))
-
-                val isCurrent = (theme.particleEffect?.type ?: "off") == typeKey
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(20f)
-                    setColor(if (isCurrent) Color.parseColor("#0EA5E9") else Color.parseColor("#27272A"))
-                    setStroke(dp(1), if (isCurrent) Color.parseColor("#38BDF8") else Color.parseColor("#3F3F46"))
-                }
-                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
-
-                setOnClickListener {
-                    val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
-                    theme = theme.copy(
-                        particleEffect = currentP.copy(
-                            type = typeKey,
-                            particleCount = if (typeKey == "cosmic_ripple") 6 else 10,
-                            lifetimeMs = 500L
-                        )
+        val chips = particles.map { (label, typeKey) ->
+            val isCurrent = (theme.particleEffect?.type ?: "off") == typeKey
+            styledChip(label, isCurrent) {
+                val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
+                theme = theme.copy(
+                    particleEffect = currentP.copy(
+                        type = typeKey,
+                        particleCount = if (typeKey == "cosmic_ripple") 6 else 10,
+                        lifetimeMs = 500L
                     )
-                    particleCountSeekBar.progress = theme.particleEffect!!.particleCount
-                    particleLifetimeSeekBar.progress = theme.particleEffect!!.lifetimeMs.toInt()
-                    particleSpeedSeekBar.progress = (theme.particleEffect!!.speed * 100).toInt()
-                    updatePreview()
-                    setupParticleModeRow()
-                }
+                )
+                particleCountSeekBar.progress = theme.particleEffect!!.particleCount
+                particleLifetimeSeekBar.progress = theme.particleEffect!!.lifetimeMs.toInt()
+                particleSpeedSeekBar.progress = (theme.particleEffect!!.speed * 100).toInt()
+                updatePreview()
+                setupParticleModeRow()
             }
-
-            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                rightMargin = dp(8)
-            })
         }
-
         particleModeContainer.removeAllViews()
-        particleModeContainer.addView(row)
+        particleModeContainer.addView(horizontalChipRow(chips))
     }
 
     private fun setupGlowColorRow() {
         val glowColors = listOf(
-            0 to "Off",
+            null to getString(R.string.theme_rgb_mode_off),
             0xFF00F0FF.toInt() to "Cyan",
             0xFFFF007F.toInt() to "Pink",
             0xFFFFE600.toInt() to "Gold",
@@ -967,22 +1226,23 @@ class CustomThemeActivity : AppCompatActivity() {
             0xFFA855F7.toInt() to "Purple",
             0xFFFFFFFF.toInt() to "White"
         )
-
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(12), dp(4), dp(12), dp(4))
         }
-
         glowColors.forEach { (colorVal, _) ->
             val circle = View(this).apply {
-                val isOff = colorVal == 0
-                val isSelected = if (isOff) (theme.keyGlowEffect?.enabled != true) else (theme.keyGlowEffect?.enabled == true && theme.keyGlowEffect?.glowColor == colorVal)
-                val shape = GradientDrawable().apply {
+                val isOff = colorVal == null
+                val isSelected = if (isOff) (theme.keyGlowEffect?.enabled != true)
+                else (theme.keyGlowEffect?.enabled == true && theme.keyGlowEffect?.glowColor == colorVal)
+                background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(if (isOff) Color.parseColor("#27272A") else colorVal)
-                    setStroke(dp(if (isSelected) 3 else 1), if (isSelected) Color.WHITE else Color.argb(80, 255, 255, 255))
+                    setColor(colorVal ?: color(R.color.saegeul_outline))
+                    setStroke(
+                        dp(if (isSelected) 3 else 1),
+                        if (isSelected) color(R.color.saegeul_action) else color(R.color.saegeul_outline)
+                    )
                 }
-                background = shape
                 setOnClickListener {
                     theme = if (isOff) {
                         theme.copy(keyGlowEffect = null)
@@ -995,14 +1255,40 @@ class CustomThemeActivity : AppCompatActivity() {
                     setupGlowColorRow()
                 }
             }
-
-            row.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
-                rightMargin = dp(10)
-            })
+            row.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(10) })
         }
-
         glowColorContainer.removeAllViews()
         glowColorContainer.addView(row)
+    }
+
+    // ---- g. Per-key ----
+
+    private fun currentPerKeyStyle(): Theme.Custom.KeyCustomStyle =
+        if (selectedKeyTarget == "ALL") theme.globalKeyStyle ?: Theme.Custom.KeyCustomStyle()
+        else (theme.keyOverrides ?: emptyMap())[selectedKeyTarget] ?: Theme.Custom.KeyCustomStyle()
+
+    private fun updatePerKeyStyle(mutate: (Theme.Custom.KeyCustomStyle) -> Theme.Custom.KeyCustomStyle) {
+        val updated = mutate(currentPerKeyStyle())
+        theme = if (selectedKeyTarget == "ALL") {
+            theme.copy(globalKeyStyle = updated)
+        } else {
+            val overrides = (theme.keyOverrides ?: emptyMap()).toMutableMap()
+            overrides[selectedKeyTarget] = updated
+            theme.copy(keyOverrides = overrides)
+        }
+        updatePreview()
+    }
+
+    private fun resetPerKeyStyle() {
+        theme = if (selectedKeyTarget == "ALL") {
+            theme.copy(globalKeyStyle = null)
+        } else {
+            val overrides = (theme.keyOverrides ?: emptyMap()).toMutableMap()
+            overrides.remove(selectedKeyTarget)
+            theme.copy(keyOverrides = if (overrides.isEmpty()) null else overrides)
+        }
+        updatePreview()
+        setupPerKeyDetailSection()
     }
 
     private fun setupPerKeyRow() {
@@ -1013,187 +1299,84 @@ class CustomThemeActivity : AppCompatActivity() {
             getString(R.string.theme_target_backspace) to "button_backspace",
             getString(R.string.theme_target_shift) to "button_shift"
         )
-
-        val targetRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
-        targets.forEach { (name, targetKey) ->
-            val pill = TextView(this).apply {
-                text = name
-                textSize = 12f
-                paint.isFakeBoldText = true
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                setPadding(dp(12), dp(6), dp(12), dp(6))
-
-                val isSelected = selectedKeyTarget == targetKey
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(16f)
-                    setColor(if (isSelected) Color.parseColor("#E11D48") else Color.parseColor("#27272A"))
-                    setStroke(dp(1), if (isSelected) Color.parseColor("#FB7185") else Color.parseColor("#3F3F46"))
-                }
-                background = RippleDrawable(ColorStateList.valueOf(Color.argb(50, 255, 255, 255)), shape, null)
-
-                setOnClickListener {
-                    selectedKeyTarget = targetKey
-                    setupPerKeyRow()
-                }
+        val chips = targets.map { (name, targetKey) ->
+            styledChip(name, selectedKeyTarget == targetKey) {
+                selectedKeyTarget = targetKey
+                setupPerKeyRow()
+                setupPerKeyDetailSection()
             }
-
-            targetRow.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                rightMargin = dp(8)
-            })
         }
-
         perKeyTargetContainer.removeAllViews()
-        perKeyTargetContainer.addView(targetRow)
-
-        val keyColors = listOf(
-            null, // Reset / Default
-            0xFF2D2D2D.toInt(),
-            0xFF1E293B.toInt(),
-            0xFFE11D48.toInt(),
-            0xFF0EA5E9.toInt(),
-            0xFF10B981.toInt(),
-            0xFFF59E0B.toInt(),
-            0xFF8B5CF6.toInt(),
-            0xFFF8FAFC.toInt()
-        )
-
-        val colorRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
-        keyColors.forEach { col ->
-            val circle = View(this).apply {
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(6f)
-                    setColor(col ?: Color.TRANSPARENT)
-                    setStroke(dp(if (col == null) 2 else 1), if (col == null) Color.RED else Color.argb(80, 255, 255, 255))
-                }
-                background = shape
-                setOnClickListener {
-                    if (selectedKeyTarget == "ALL") {
-                        val currentGlobal = theme.globalKeyStyle ?: Theme.Custom.KeyCustomStyle()
-                        theme = theme.copy(
-                            globalKeyStyle = if (col == null) null else currentGlobal.copy(keyBackgroundColor = col)
-                        )
-                    } else {
-                        val overrides = (theme.keyOverrides ?: emptyMap()).toMutableMap()
-                        if (col == null) {
-                            overrides.remove(selectedKeyTarget)
-                        } else {
-                            val current = overrides[selectedKeyTarget] ?: Theme.Custom.KeyCustomStyle()
-                            overrides[selectedKeyTarget] = current.copy(keyBackgroundColor = col)
-                        }
-                        theme = theme.copy(keyOverrides = if (overrides.isEmpty()) null else overrides)
-                    }
-                    updatePreview()
-                }
-            }
-
-            colorRow.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
-                rightMargin = dp(10)
-            })
-        }
-
-        perKeyColorContainer.removeAllViews()
-        perKeyColorContainer.addView(colorRow)
+        perKeyTargetContainer.addView(horizontalChipRow(chips))
     }
 
-    private fun setupAccentColorRow() {
-        val accentColors = listOf(
-            0xffb83a32.toInt() to 0xffffffff.toInt(), // 한지 적갈색
-            0xffc84a3f.toInt() to 0xffffffff.toInt(), // 단청 주홍
-            0xff1e40af.toInt() to 0xffffffff.toInt(), // 백자 코발트
-            0xffc49a45.toInt() to 0xff1a1a1a.toInt(), // 청자 금색
-            0xff00e699.toInt() to 0xff000000.toInt(), // 자정 네온 제이드
-            0xff38bdf8.toInt() to 0xff0f172a.toInt(), // 안개 스카이
-            0xff2563eb.toInt() to 0xffffffff.toInt(), // 로얄 블루
-            0xff10b981.toInt() to 0xffffffff.toInt(), // 에메랄드
-            0xffec4899.toInt() to 0xffffffff.toInt(), // 핑크 로즈
-            0xff8b5cf6.toInt() to 0xffffffff.toInt(), // 바이올렛
-            0xfff59e0b.toInt() to 0xff000000.toInt(), // 앰버 옐로우
-            0xffffffff.toInt() to 0xff000000.toInt(), // 퓨어 화이트
-            0xff212121.toInt() to 0xffffffff.toInt()  // 퓨어 블랙
+    private fun setupPerKeyDetailSection() {
+        perKeyRefreshers = mutableListOf()
+        perKeyDetailContainer.removeAllViews()
+
+        val bgRow = colorSwatchRow(
+            getString(R.string.theme_key_bg_color),
+            refresherList = perKeyRefreshers,
+            currentColor = { currentPerKeyStyle().keyBackgroundColor ?: theme.keyBackgroundColor },
+            onPicked = { picked -> updatePerKeyStyle { it.copy(keyBackgroundColor = picked) } }
+        )
+        val textRow = colorSwatchRow(
+            getString(R.string.theme_key_text_color),
+            refresherList = perKeyRefreshers,
+            currentColor = { currentPerKeyStyle().keyTextColor ?: theme.keyTextColor },
+            onPicked = { picked -> updatePerKeyStyle { it.copy(keyTextColor = picked) } }
+        )
+        val borderRow = colorSwatchRow(
+            getString(R.string.theme_key_border_color),
+            refresherList = perKeyRefreshers,
+            currentColor = { currentPerKeyStyle().keyBorderColor ?: theme.keyShadowColor },
+            onPicked = { picked -> updatePerKeyStyle { it.copy(keyBorderColor = picked) } }
         )
 
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
+        val radiusLabel = createTextView(R.string.theme_key_border_radius)
+        val radiusValue = createTextView()
+        val radiusSeekBar = seekBar {
+            max = 24
+            progress = currentPerKeyStyle().cornerRadius?.toInt() ?: 0
         }
-
-        accentColors.forEach { (bg, fg) ->
-            val circle = View(this).apply {
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(bg)
-                    setStroke(dp(2), Color.argb(80, 255, 255, 255))
-                }
-                background = shape
-                setOnClickListener {
-                    applyAccentColor(bg, fg)
-                }
-            }
-
-            row.addView(circle, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
-                rightMargin = dp(10)
-            })
+        fun refreshRadiusValue() {
+            radiusValue.text = "${radiusSeekBar.progress}dp"
         }
-
-        accentColorContainer.removeAllViews()
-        accentColorContainer.addView(row)
-    }
-
-    private fun setupSurfaceColorRow() {
-        val surfaces = listOf(
-            0xfff5f6f8.toInt() to 0xffeef0f3.toInt(), // 백자 오프화이트
-            0xffe9e1d2.toInt() to 0xfff3eddf.toInt(), // 한지 미색
-            0xffffffff.toInt() to 0xffeeeeee.toInt(), // 퓨어 화이트
-            0xff101918.toInt() to 0xff0b1211.toInt(), // 단청 묵색
-            0xff0f1e1b.toInt() to 0xff0a1614.toInt(), // 청자 비색
-            0xff000000.toInt() to 0xff080808.toInt(), // 자정 OLED
-            0xff182230.toInt() to 0xff0f1722.toInt(), // 안개 슬레이트
-            0xff2d2d2d.toInt() to 0xff373737.toInt(), // 픽셀 다크
-            0xff263238.toInt() to 0xff21272b.toInt(), // 머티리얼 다크
-            0xff2e3440.toInt() to 0xff434c5e.toInt()  // 노르딕 다크
-        )
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
-
-        surfaces.forEach { (surf, bar) ->
-            val rect = View(this).apply {
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(8f)
-                    setColor(surf)
-                    setStroke(dp(1), Color.argb(60, 255, 255, 255))
-                }
-                background = shape
-                setOnClickListener {
-                    applySurfaceColor(surf, bar)
+        refreshRadiusValue()
+        radiusSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                refreshRadiusValue()
+                if (fromUser) {
+                    updatePerKeyStyle { it.copy(cornerRadius = progress.toFloat()) }
                 }
             }
+        })
+        perKeyRefreshers.add { radiusSeekBar.progress = currentPerKeyStyle().cornerRadius?.toInt() ?: radiusSeekBar.progress }
 
-            row.addView(rect, LinearLayout.LayoutParams(dp(44), dp(36)).apply {
-                rightMargin = dp(10)
-            })
+        val resetButton = styledChip(getString(R.string.theme_key_reset_button), false) {
+            resetPerKeyStyle()
         }
 
-        surfaceColorContainer.removeAllViews()
-        surfaceColorContainer.addView(row)
+        perKeyDetailContainer.apply {
+            add(bgRow, lParams(matchParent, wrapContent))
+            add(textRow, lParams(matchParent, wrapContent))
+            add(borderRow, lParams(matchParent, wrapContent))
+            val radiusRow = horizontalLayout {
+                gravity = Gravity.CENTER_VERTICAL
+                add(radiusLabel, lParams(0, dp(36)) { weight = 1f })
+                add(radiusValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
+            }
+            add(radiusRow, lParams(matchParent, wrapContent))
+            add(radiusSeekBar, lParams(matchParent, wrapContent) {
+                leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+            })
+            add(resetButton, lParams(wrapContent, dp(48)) { leftMargin = dp(16); bottomMargin = dp(8) })
+        }
     }
 
     private fun setupSeekBars() {
-        // Ambient Speed
         ambientSpeedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onStartTrackingTouch(bar: SeekBar) {}
             override fun onStopTrackingTouch(bar: SeekBar) {}
@@ -1207,7 +1390,6 @@ class CustomThemeActivity : AppCompatActivity() {
             }
         })
 
-        // Ambient Intensity
         ambientIntensitySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onStartTrackingTouch(bar: SeekBar) {}
             override fun onStopTrackingTouch(bar: SeekBar) {}
@@ -1221,7 +1403,6 @@ class CustomThemeActivity : AppCompatActivity() {
             }
         })
 
-        // Key Translucency
         keyTranslucencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onStartTrackingTouch(bar: SeekBar) {}
             override fun onStopTrackingTouch(bar: SeekBar) {}
@@ -1235,7 +1416,6 @@ class CustomThemeActivity : AppCompatActivity() {
             }
         })
 
-        // Particle Count
         particleCountSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onStartTrackingTouch(bar: SeekBar) {}
             override fun onStopTrackingTouch(bar: SeekBar) {}
@@ -1249,7 +1429,6 @@ class CustomThemeActivity : AppCompatActivity() {
             }
         })
 
-        // Particle Lifetime
         particleLifetimeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onStartTrackingTouch(bar: SeekBar) {}
             override fun onStopTrackingTouch(bar: SeekBar) {}
@@ -1263,7 +1442,6 @@ class CustomThemeActivity : AppCompatActivity() {
             }
         })
 
-        // Particle Speed
         particleSpeedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onStartTrackingTouch(bar: SeekBar) {}
             override fun onStopTrackingTouch(bar: SeekBar) {}
@@ -1277,7 +1455,6 @@ class CustomThemeActivity : AppCompatActivity() {
             }
         })
 
-        // Glow Radius
         glowRadiusSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onStartTrackingTouch(bar: SeekBar) {}
             override fun onStopTrackingTouch(bar: SeekBar) {}
@@ -1316,9 +1493,11 @@ class CustomThemeActivity : AppCompatActivity() {
                 croppedImageFile = c
                 srcImageFile = s
             }
-            // Use HanjiLight as starting template for brand-new custom theme
-            theme = ThemePreset.HanjiLight.deriveCustomNoBackground(n)
+            // Use SaegeulIvory as the starting template for a brand-new custom theme
+            theme = ThemePreset.SaegeulIvory.deriveCustomNoBackground(n)
         }
+        seedGenIsDark = theme.isDark
+        keyToneIsDark = !theme.isDark
         previewUi = KeyboardPreviewUi(this, theme)
 
         enableEdgeToEdge()
@@ -1333,22 +1512,30 @@ class CustomThemeActivity : AppCompatActivity() {
             scrollView.bottomPadding = navBars.bottom
             windowInsets
         }
-        // show Activity label on toolbar
+        // show Activity label on toolbar (explicit, so it follows the app's language
+        // setting instead of the manifest label resolved from the system locale)
         setSupportActionBar(toolbar)
+        supportActionBar!!.title = getString(R.string.edit_theme)
         // show back button
         supportActionBar!!.setDisplayHomeAsUpEnabled(true)
         setContentView(ui)
 
-        // Setup preset rows
-        setupPresetPaletteRow()
+        // Build the deeper "더 꾸미기" tier before it's needed by updateMoreVisibility()/updatePreview()
+        buildMoreContainer()
+
+        // Setup rows
+        setupStartingThemeRow()
+        setupSeedBrightnessRow()
+        setupSeedSwatchRow()
+        setupKeyToneRow()
+        setupDetailColorSection()
         setupAmbientModeRow()
         setupAmbientDirectionRow()
         setupReactiveModeRow()
         setupParticleModeRow()
         setupGlowColorRow()
         setupPerKeyRow()
-        setupAccentColorRow()
-        setupSurfaceColorRow()
+        setupPerKeyDetailSection()
         setupSeekBars()
 
         backgroundStates.launcher = registerForActivityResult(CropContract()) {
@@ -1380,6 +1567,7 @@ class CustomThemeActivity : AppCompatActivity() {
                     )
                     theme = theme.copy(backgroundImage = bg)
                     updateBackgroundState()
+                    setupKeyToneRow()
                 }
             }
         }
@@ -1396,13 +1584,7 @@ class CustomThemeActivity : AppCompatActivity() {
             theme = theme.copy(backgroundImage = null)
             backgroundStates.filteredDrawable = null
             updatePreview()
-        }
-
-        variantLabel.setOnClickListener {
-            variantSwitch.isChecked = !variantSwitch.isChecked
-        }
-        variantSwitch.setOnCheckedChangeListener { _, isChecked ->
-            setKeyVariant(darkKeys = isChecked)
+            setupKeyToneRow()
         }
 
         brightnessSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -1416,7 +1598,6 @@ class CustomThemeActivity : AppCompatActivity() {
 
         whenHasBackground { background ->
             brightnessSeekBar.progress = background.brightness
-            variantSwitch.isChecked = !theme.isDark
             updateBackgroundState()
         }
 
@@ -1436,6 +1617,8 @@ class CustomThemeActivity : AppCompatActivity() {
         }
 
         updateControlsVisibility()
+        refreshContrastRow()
+        updateMoreVisibility()
 
         onBackPressedDispatcher.addCallback {
             cancel()
@@ -1540,7 +1723,7 @@ class CustomThemeActivity : AppCompatActivity() {
     private fun promptDelete() {
         AlertDialog.Builder(this)
             .setTitle(R.string.delete_theme)
-            .setMessage(getString(R.string.delete_theme_msg, theme.name))
+            .setMessage(getString(R.string.delete_theme_msg, ThemeDisplayNames.displayName(this, theme)))
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 delete()
             }

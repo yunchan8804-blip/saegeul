@@ -9,6 +9,7 @@ import androidx.annotation.StringRes
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.main.modified.MySwitchPreference
 import org.fcitx.fcitx5.android.ui.main.settings.DialogSeekBarPreference
@@ -25,6 +26,21 @@ abstract class ManagedPreferenceUi<T : Preference>(
     abstract fun createUi(context: Context): T
 
     fun isEnabled() = enableUiOn?.invoke() ?: true
+
+    /**
+     * A storage-less group header, drawn as a [PreferenceCategory]. It has no backing
+     * [ManagedPreference], so it never registers in [ManagedPreferenceProvider.managedPreferences]
+     * and is never touched by backup/export or [ManagedPreferenceCategory.createUi]'s enabled state.
+     */
+    class Header(
+        @StringRes
+        val title: Int
+    ) : ManagedPreferenceUi<PreferenceCategory>("header_$title") {
+        override fun createUi(context: Context) = PreferenceCategory(context).apply {
+            isIconSpaceReserved = false
+            setTitle(this@Header.title)
+        }
+    }
 
     class Switch(
         @StringRes

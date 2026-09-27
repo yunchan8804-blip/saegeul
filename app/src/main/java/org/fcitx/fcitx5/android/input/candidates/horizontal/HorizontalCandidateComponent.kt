@@ -18,11 +18,13 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
 import android.os.SystemClock
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.inputmethod.EditorInfo
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import androidx.lifecycle.lifecycleScope
@@ -42,11 +44,13 @@ import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.bar.CandidateBarModePolicy
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.FlexboxVerticalDecoration
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AlwaysFillWidth
@@ -57,6 +61,9 @@ import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.keyboard.FoldKeyboardProfileResolver
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardViewportReader
+import org.fcitx.fcitx5.android.input.keyboard.ThumbSplitPreferences
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualAppendSnapshot
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualReplacementSnapshot
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionWarmupState
@@ -91,9 +98,29 @@ class HorizontalCandidateComponent :
     private val inputView by manager.inputView()
     private val bar: KawaiiBarComponent by manager.must()
 
-    private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
-    private val twoRowCandidateBar by AppPrefs.getInstance().keyboard.twoRowCandidateBar
+    private val keyboardPrefs = AppPrefs.getInstance().keyboard
+    private val fillStyle by keyboardPrefs.horizontalCandidateStyle
+    private val twoRowCandidateBar by keyboardPrefs.twoRowCandidateBar
     private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
+
+    // K5: gross orientation/split classification for the landscape single-row candidate bar. See
+    // CandidateBarModePolicy.isHorizontalSingleRow and InputView.isThumbSplitActive (same resolver,
+    // duplicated per that existing call-site pattern rather than shared, since it is a small pure
+    // read of live config/prefs with no state to share).
+    private fun isLandscapeOrientation(): Boolean =
+        context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    private fun isThumbSplitActive(): Boolean = FoldKeyboardProfileResolver.resolve(
+        KeyboardViewportReader.read(context),
+        ThumbSplitPreferences(
+            compactEnabled = keyboardPrefs.splitKeyboardCompact.getValue(),
+            expandedEnabled = keyboardPrefs.splitKeyboardExpanded.getValue(),
+            compactPortraitGapDp = keyboardPrefs.splitKeyboardCompactGapPortrait.getValue(),
+            compactLandscapeGapDp = keyboardPrefs.splitKeyboardCompactGapLandscape.getValue(),
+            expandedPortraitGapDp = keyboardPrefs.splitKeyboardExpandedGapPortrait.getValue(),
+            expandedLandscapeGapDp = keyboardPrefs.splitKeyboardExpandedGapLandscape.getValue()
+        )
+    ).enabled
     private val maxSpanCountPref by lazy {
         AppPrefs.getInstance().keyboard.run {
             if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
@@ -570,6 +597,88 @@ class HorizontalCandidateComponent :
         }
     }
 
+    /**
+     * K5: caps its single child's measured width at [maxWidthPx] (an AT_MOST bound, not a fixed
+     * width), so the landscape single-row sentence chip below can size to its own content up to
+     * that cap and still render as a normal wrapContent-width chip when shorter.
+     */
+    private class MaxWidthContainer(context: Context) : FrameLayout(context) {
+        var maxWidthPx: Int = Int.MAX_VALUE
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val boundedWidthSpec = if (maxWidthPx < Int.MAX_VALUE) {
+                val incomingSize = MeasureSpec.getSize(widthMeasureSpec)
+                val cappedSize = if (incomingSize > 0) minOf(incomingSize, maxWidthPx) else maxWidthPx
+                MeasureSpec.makeMeasureSpec(cappedSize, MeasureSpec.AT_MOST)
+            } else {
+                widthMeasureSpec
+            }
+            super.onMeasure(boundedWidthSpec, heightMeasureSpec)
+        }
+    }
+
+    // K5: the landscape single-row candidate bar's sentence chip. Reuses CandidateItemUi with
+    // isSentenceRow=true — the exact same chip look as sentenceAdapter's rows — bound directly
+    // (no RecyclerView/adapter) since at most one sentence candidate is ever shown here. See
+    // bindSingleRowSentenceChip for its click/long-click wiring.
+    private val singleRowSentenceUi: CandidateItemUi by lazy {
+        CandidateItemUi(context, theme, isSentenceRow = true)
+    }
+
+    private val singleRowSentenceContainer: MaxWidthContainer by lazy {
+        MaxWidthContainer(context).apply {
+            visibility = View.GONE
+            addView(
+                singleRowSentenceUi.root,
+                FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            )
+        }
+    }
+
+    // K5: rides at the single row's right edge while on-device generation is running, exactly
+    // like [generatingSpinner] does for the portrait sentence row. A separate instance since the
+    // two rows are never shown at the same time but must each own their spinner view.
+    private val singleRowGeneratingSpinner: ProgressBar by lazy {
+        ProgressBar(context).apply {
+            isIndeterminate = true
+            indeterminateDrawable = IndeterminateRingDrawable(theme.candidateCommentColor, context.dp(16))
+            contentDescription = context.getString(R.string.gemma_automatic_generating)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            visibility = View.GONE
+        }
+    }
+
+    // K5: wraps wordRecyclerView so the landscape single row can place the sentence chip and the
+    // generating spinner alongside it without disturbing wordRecyclerView's own scrolling content.
+    // In every other mode singleRowSentenceContainer stays GONE (0 width), so wordRecyclerView's
+    // weight=1 slot fills the row exactly as it did as a direct child of [view] before K5.
+    private val wordRow: LinearLayout by lazy {
+        object : LinearLayout(context) {
+            override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+                super.onSizeChanged(w, h, oldw, oldh)
+                singleRowSentenceContainer.maxWidthPx = (w * SINGLE_ROW_SENTENCE_MAX_WIDTH_FRACTION).toInt()
+            }
+        }.apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(
+                singleRowSentenceContainer,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            )
+            addView(
+                wordRecyclerView,
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT).apply { weight = 1f }
+            )
+            addView(
+                singleRowGeneratingSpinner,
+                LinearLayout.LayoutParams(context.dp(16), context.dp(16)).apply {
+                    marginStart = context.dp(4)
+                    marginEnd = context.dp(12)
+                }
+            )
+        }
+    }
+
     private val connectionHintView: TextView by lazy {
         TextView(context).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -579,6 +688,10 @@ class HorizontalCandidateComponent :
             isClickable = true
             isFocusable = true
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            // A narrow candidate bar (e.g. one-hand mode) must not wrap this to two lines and
+            // grow the row height; the row's height is fixed regardless of content.
+            isSingleLine = true
+            ellipsize = TextUtils.TruncateAt.END
         }
     }
 
@@ -694,6 +807,9 @@ class HorizontalCandidateComponent :
             setTextColor(theme.candidateTextColor)
             setPadding(context.dp(12), 0, context.dp(12), 0)
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            // Same fixed-row-height reasoning as connectionHintView above.
+            isSingleLine = true
+            ellipsize = TextUtils.TruncateAt.END
         }
     }
 
@@ -718,7 +834,7 @@ class HorizontalCandidateComponent :
         LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(
-                wordRecyclerView,
+                wordRow,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             )
             addView(
@@ -1002,7 +1118,14 @@ class HorizontalCandidateComponent :
         val isEmail = EditorPrivacyPolicy.isEmailAddressField(service.currentInputEditorInfo, flags)
         val isUrl = EditorPrivacyPolicy.isUrlField(service.currentInputEditorInfo, flags)
 
-        val showTwoRows = twoRowCandidateBar && !isEmail && !isUrl
+        // K5: landscape while not thumb-split overrides the two-row preference entirely with the
+        // fixed 48dp single row (see CandidateBarModePolicy.isHorizontalSingleRow / design.md K5).
+        val singleRowLandscape = CandidateBarModePolicy.isHorizontalSingleRow(
+            landscape = isLandscapeOrientation(),
+            thumbSplitActive = isThumbSplitActive()
+        )
+        bar.candidateSingleRowLandscape = singleRowLandscape
+        val showTwoRows = twoRowCandidateBar && !isEmail && !isUrl && !singleRowLandscape
         // The always-two-row candidate bar never collapses; see the showTwoRows branch below.
         bar.candidateRowFixedHeight = showTwoRows
         // 다른 소스(문장팩·네트워크·개인화)의 문장 후보가 있으면 상태 행이 그 행을 가리지 않는다.
@@ -1021,7 +1144,13 @@ class HorizontalCandidateComponent :
         }
         val statusRowForcesBar = statusRowActive && statusRowContent?.spinner == true
 
-        if (showTwoRows) {
+        // wordRow is a permanent structural wrapper (see K5); only the single-row-landscape
+        // PLACEHOLDER state collapses it, and that branch below sets it back to GONE explicitly.
+        wordRow.visibility = View.VISIBLE
+
+        if (singleRowLandscape) {
+            renderSingleRowLandscape(automaticCandidates, displayNativeCandidates, contextualWords, contextualSentences)
+        } else if (showTwoRows) {
             val topCandidates = prependAutomaticCandidates(
                 automaticCandidates.words,
                 mergeCandidates(displayNativeCandidates, contextualWords, emptyList())
@@ -1040,11 +1169,13 @@ class HorizontalCandidateComponent :
             // The word and sentence rows always occupy exactly HEIGHT each (see
             // KawaiiBarComponent.candidateRowFixedHeight): an empty row shows a placeholder chip
             // in the same spot instead of shrinking, so the bar never resizes.
+            singleRowSentenceContainer.visibility = View.GONE
+            singleRowGeneratingSpinner.visibility = View.GONE
             wordAdapter.updateCandidates(topCandidates, topCandidates.size)
             wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
             val wordRowHasCandidates = topCandidates.isNotEmpty()
             wordRecyclerView.visibility = if (wordRowHasCandidates) View.VISIBLE else View.GONE
-            wordRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
+            wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
                 height = if (wordRowHasCandidates) context.dp(wordAdapter.rowHeightDp) else 0
                 weight = 0f
             }
@@ -1120,13 +1251,15 @@ class HorizontalCandidateComponent :
             wordAdapter.updateCandidates(candidates, candidates.size)
             sentenceAdapter.updateCandidates(emptyArray(), 0)
 
+            singleRowSentenceContainer.visibility = View.GONE
+            singleRowGeneratingSpinner.visibility = View.GONE
             val hasCandidates = candidates.isNotEmpty()
             if (hasCandidates) {
                 setConnectionHint(null)
                 setStatusRow(false, null)
                 wordRecyclerView.visibility = View.VISIBLE
                 wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
-                wordRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
+                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
                     height = ViewGroup.LayoutParams.MATCH_PARENT
                     weight = 0f
                 }
@@ -1147,7 +1280,7 @@ class HorizontalCandidateComponent :
                 setConnectionHint(null)
                 wordRecyclerView.visibility = View.VISIBLE
                 wordAdapter.rowHeightDp = 28
-                wordRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
+                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
                     height = context.dp(wordAdapter.rowHeightDp)
                     weight = 0f
                 }
@@ -1173,6 +1306,8 @@ class HorizontalCandidateComponent :
                 setConnectionHint(null)
                 setStatusRow(false, null)
                 wordRecyclerView.visibility = View.GONE
+                singleRowSentenceContainer.visibility = View.GONE
+                singleRowGeneratingSpinner.visibility = View.GONE
                 hairlineDivider.visibility = View.GONE
                 sentenceRecyclerView.visibility = View.GONE
                 bar.isCandidateTwoRow = false
@@ -1185,6 +1320,140 @@ class HorizontalCandidateComponent :
             }
         }
         scheduleCandidateVisibilityMeasurement()
+    }
+
+    /**
+     * K5: gray-mode aside, this is the landscape-non-split single row. Its first item, when a
+     * sentence recommendation exists, is a sentence chip (capped at 45% of the row's width, see
+     * [wordRow]); the rest of the row is the ordinary word candidate recycler. When neither exists
+     * the row collapses to the shared "추천 단어 없음" placeholder chip. The row's height is fixed
+     * (48dp) regardless of which of these three states is active — see
+     * CandidateBarModePolicy.candidateRowHeightDp.
+     */
+    private fun renderSingleRowLandscape(
+        automaticCandidates: AutomaticCandidates,
+        displayNativeCandidates: List<CandidateWord>,
+        contextualWords: List<CandidateWord>,
+        contextualSentences: List<CandidateWord>
+    ) {
+        setConnectionHint(null)
+        setStatusRow(false, null)
+        hairlineDivider.visibility = View.GONE
+        sentenceRow.visibility = View.GONE
+        sentenceRecyclerView.visibility = View.GONE
+        sentenceAdapter.updateCandidates(emptyArray(), 0)
+
+        val topCandidates = prependAutomaticCandidates(
+            automaticCandidates.words,
+            mergeCandidates(displayNativeCandidates, contextualWords, emptyList())
+        )
+        val topSentenceCandidates = prependAutomaticCandidates(
+            automaticCandidates.sentences,
+            contextualSentences.toTypedArray()
+        )
+        val sentenceCandidate = topSentenceCandidates.firstOrNull()
+
+        wordAdapter.updateCandidates(topCandidates, topCandidates.size)
+        wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
+
+        val hasSentence = sentenceCandidate != null
+        val hasWords = topCandidates.isNotEmpty()
+        when (CandidateBarModePolicy.singleRowContent(hasSentence, hasWords)) {
+            CandidateBarModePolicy.SingleRowContent.SENTENCE_AND_WORDS -> {
+                bindSingleRowSentenceChip(sentenceCandidate!!)
+                singleRowSentenceContainer.visibility = View.VISIBLE
+                wordRecyclerView.visibility = if (hasWords) View.VISIBLE else View.GONE
+                wordPlaceholder.visibility = View.GONE
+                wordPlaceholder.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = 0
+                    weight = 0f
+                }
+                wordRow.visibility = View.VISIBLE
+                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = context.dp(KawaiiBarComponent.HEIGHT)
+                    weight = 0f
+                }
+            }
+            CandidateBarModePolicy.SingleRowContent.WORDS_ONLY -> {
+                singleRowSentenceContainer.visibility = View.GONE
+                wordRecyclerView.visibility = View.VISIBLE
+                wordPlaceholder.visibility = View.GONE
+                wordPlaceholder.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = 0
+                    weight = 0f
+                }
+                wordRow.visibility = View.VISIBLE
+                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = context.dp(KawaiiBarComponent.HEIGHT)
+                    weight = 0f
+                }
+            }
+            CandidateBarModePolicy.SingleRowContent.PLACEHOLDER -> {
+                singleRowSentenceContainer.visibility = View.GONE
+                wordRecyclerView.visibility = View.GONE
+                wordRow.visibility = View.GONE
+                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = 0
+                    weight = 0f
+                }
+                wordPlaceholder.visibility = View.VISIBLE
+                wordPlaceholder.updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = context.dp(KawaiiBarComponent.HEIGHT)
+                    weight = 0f
+                }
+                refreshExpanded(0)
+            }
+        }
+
+        val generating = service.automaticSuggestionStatus.state in setOf(
+            OnDeviceSuggestionCoordinator.State.DEBOUNCING,
+            OnDeviceSuggestionCoordinator.State.GENERATING
+        )
+        singleRowGeneratingSpinner.visibility = if (generating) View.VISIBLE else View.GONE
+
+        bar.isCandidateTwoRow = false
+        // This row's height never collapses (see CandidateBarModePolicy.candidateRowHeightDp), so
+        // it always counts as visible, exactly like the portrait always-two-row bar.
+        bar.barStateMachine.push(
+            KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
+            KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
+        )
+        applyFillStyle(topCandidates.size)
+        setHasVisibleCandidates(true)
+    }
+
+    /**
+     * Wires the landscape single row's sentence chip to the exact same action/learning/metrics
+     * path as sentenceAdapter's own onBindViewHolder (see above): the chip is a plain bound view,
+     * not a RecyclerView item, but the tap must resolve through the same
+     * commitAutomaticSuggestionCandidate / commitContextualSentence / recordContextualCandidateRejected
+     * calls so it counts identically for learning and metrics.
+     */
+    private fun bindSingleRowSentenceChip(candidate: CandidateWord) {
+        singleRowSentenceUi.updateCandidate(candidate, isFeatured = true)
+        val automaticCandidate = automaticSuggestionCandidates[candidate]
+        val root = singleRowSentenceUi.root
+        root.setOnClickListener {
+            if (automaticCandidate != null) {
+                service.commitAutomaticSuggestionCandidate(automaticCandidate)
+                view.post { refreshContextualCandidatesIfNeeded() }
+                return@setOnClickListener
+            }
+            if (!contextualMetricsCandidates.containsKey(candidate)) return@setOnClickListener
+            service.commitContextualSentence(
+                candidate.text,
+                contextualMetricsCandidates[candidate],
+                contextualAppendSnapshots[candidate],
+                contextualReplacementSnapshots[candidate]
+            )
+            view.post { refreshContextualCandidatesIfNeeded() }
+        }
+        root.setOnLongClickListener {
+            if (automaticCandidate != null) return@setOnLongClickListener true
+            service.recordContextualCandidateRejected(candidate.text, heavyPenalty = true)
+            view.post { refreshContextualCandidatesIfNeeded() }
+            true
+        }
     }
 
     private fun applyFillStyle(candidateCount: Int) {
@@ -1278,6 +1547,10 @@ class HorizontalCandidateComponent :
     internal companion object {
         const val STATUS_ROW_NO_CANDIDATE_TIMEOUT_MS = 1500L
         const val COLLECTION_FEEDBACK_DISPLAY_MS = 1200L
+
+        // K5: sentence chip's max width in the landscape single row, as a fraction of the row's
+        // own width ("최대 폭 = 줄 폭의 45%").
+        const val SINGLE_ROW_SENTENCE_MAX_WIDTH_FRACTION = 0.45f
 
         /**
          * Whether the status row's spinner should be shown, given the logical state's spinner

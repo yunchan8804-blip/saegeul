@@ -66,7 +66,9 @@ class AiToneAdaptivePredictorTest {
     }
 
     @Test
-    fun testContextualEmojiAndKaomojiInfusion() {
+    fun testCelebratoryContextDoesNotInjectEmoji() {
+        // 2026-09-26 확정(design.md 라운드 3): 생성 문장에 이모지를 덧붙이지 않는다. 축하/합격 같은
+        // 축제 맥락에서도 사용자 글에 이모지가 섞여 들어가면 안 된다.
         val predictions = adaptivePredictor.predictWithTone(
             currentStroke = "축하",
             contextBeforeCursor = "합격을 진심으로 ",
@@ -74,8 +76,10 @@ class AiToneAdaptivePredictorTest {
         )
 
         assertTrue(predictions.isNotEmpty())
-        val withEmoji = predictions.any { it.text.contains("🎉") || it.text.contains("👏") || it.text.contains("✨") }
-        assertTrue("Celebration context should suggest celebratory emojis", withEmoji)
+        val withEmoji = predictions.any {
+            it.text.contains("🎉") || it.text.contains("👏") || it.text.contains("✨") || it.text.contains("😊")
+        }
+        assertFalse("Predictions must never inject emoji into the user's text", withEmoji)
     }
 
     @Test
