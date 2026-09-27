@@ -19,6 +19,16 @@ import org.fcitx.fcitx5.android.core.KeySym
  * real K2 selection-change signal does — or an accidental ㆍ tap's pending state would be wiped
  * out just before the Backspace meant to cancel it arrives (K3's "조합기 상태는 키 동작 순서에
  * 흔들리지 않는다").
+ *
+ * It also owns K2's "초기화 시점" call: while there is no preedit, a composer output that commits
+ * straight to the editor (a symbol cycle's Backspace/character, Space, …) moves the selection on
+ * its own, and that self-caused move must not be mistaken for the user moving the cursor. Before
+ * dispatching such outputs, [route] projects the selection positions they should produce from the
+ * last known selection end; [onSelectionUpdate] then recognizes a collapsed selection landing on
+ * that projected path (including its intermediate steps) as its own echo and leaves the composer
+ * alone, consuming the path up to and including the matched step. Anything else — an unknown
+ * starting position, a position off the path, or a non-collapsed selection — resets the composer,
+ * exactly as before.
  */
 class MobileHangulActionRouter(private val composer: MobileHangulComposer) {
 
@@ -29,11 +39,14 @@ class MobileHangulActionRouter(private val composer: MobileHangulComposer) {
 
     private val backspaceSym = KeySym(FcitxKeyMapping.FcitxKey_BackSpace)
 
+    private var preeditEmpty = true
+    private var lastSelectionEnd: Int? = null
+    private val expectedSelectionEnds = mutableListOf<Int>()
+
     fun route(action: KeyAction): List<RoutedAction> = when (action) {
-        is KeyAction.MobileHangulAction ->
-            listOf(RoutedAction.ComposerOutputs(composer.press(action.token)))
+        is KeyAction.MobileHangulAction -> routeComposerOutputs(composer.press(action.token))
         is KeyAction.MobileHangulSequenceAction ->
-            listOf(RoutedAction.ComposerOutputs(action.tokens.flatMap(composer::press)))
+            routeComposerOutputs(action.tokens.flatMap(composer::press))
         is KeyAction.DeleteSelectionAction, is KeyAction.MoveSelectionAction ->
             listOf(RoutedAction.Forward(action))
         is KeyAction.SymAction ->
@@ -41,12 +54,79 @@ class MobileHangulActionRouter(private val composer: MobileHangulComposer) {
                 // Absorbed locally: a lone accidental ㆍ tap must not reach the Dubeolsik backend.
                 emptyList()
             } else {
-                composer.reset()
+                resetComposer()
                 listOf(RoutedAction.Forward(action))
             }
         else -> {
-            composer.reset()
+            resetComposer()
             listOf(RoutedAction.Forward(action))
         }
+    }
+
+    /** Forwarded from [BaseKeyboard.onPreeditEmptyStateUpdate]; no other state changes. */
+    fun onPreeditEmptyStateUpdate(empty: Boolean) {
+        preeditEmpty = empty
+    }
+
+    /**
+     * Forwarded from [BaseKeyboard.onSelectionUpdate]. Resets the composer for a real user/engine
+     * selection change, but not for the echo of an output this router just dispatched itself.
+     */
+    fun onSelectionUpdate(start: Int, end: Int) {
+        val isOwnEcho = preeditEmpty && start == end && consumeExpectedSelectionEnd(end)
+        if (preeditEmpty && !isOwnEcho) {
+            resetComposer()
+        }
+        lastSelectionEnd = end
+    }
+
+    /** Full reset for a new input session (attach / input-field change). */
+    fun reset() {
+        resetComposer()
+        lastSelectionEnd = null
+        preeditEmpty = true
+    }
+
+    private fun routeComposerOutputs(
+        outputs: List<MobileHangulComposer.Output>
+    ): List<RoutedAction> {
+        if (preeditEmpty) registerExpectedPath(outputs)
+        return listOf(RoutedAction.ComposerOutputs(outputs))
+    }
+
+    /** Projects the selection-end position after each atomic step these outputs will cause. */
+    private fun registerExpectedPath(outputs: List<MobileHangulComposer.Output>) {
+        val base = lastSelectionEnd ?: return
+        expectedSelectionEnds.clear()
+        var position = base
+        outputs.forEach { output ->
+            when (output) {
+                MobileHangulComposer.Output.Backspace -> {
+                    position -= 1
+                    expectedSelectionEnds.add(position)
+                }
+                MobileHangulComposer.Output.Space -> {
+                    position += 1
+                    expectedSelectionEnds.add(position)
+                }
+                is MobileHangulComposer.Output.Keys -> repeat(output.value.length) {
+                    position += 1
+                    expectedSelectionEnds.add(position)
+                }
+            }
+        }
+    }
+
+    /** If [end] is on the projected path, consumes it and every step before it. */
+    private fun consumeExpectedSelectionEnd(end: Int): Boolean {
+        val index = expectedSelectionEnds.indexOf(end)
+        if (index < 0) return false
+        repeat(index + 1) { expectedSelectionEnds.removeAt(0) }
+        return true
+    }
+
+    private fun resetComposer() {
+        composer.reset()
+        expectedSelectionEnds.clear()
     }
 }

@@ -453,7 +453,6 @@ class MobileHangulKeyboard(
     }
 
     private val router = MobileHangulActionRouter(composer)
-    private var preeditEmpty = true
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         router.route(action).forEach { routed ->
@@ -487,29 +486,27 @@ class MobileHangulKeyboard(
         val pending = composer.pendingDotCount()
         dotKeyView?.mainText?.apply {
             text = if (pending == 2) "‥" else "ㆍ"
-            setTextColor(if (pending > 0) theme.accentKeyTextColor else theme.keyTextColor)
+            setTextColor(if (pending > 0) theme.accentKeyBackgroundColor else theme.keyTextColor)
         }
     }
 
     override fun onAttach() {
-        composer.reset()
+        router.reset()
         updateDotLabel()
     }
 
     override fun onStartInput() {
-        composer.reset()
+        router.reset()
         updateDotLabel()
     }
 
     override fun onSelectionUpdate(start: Int, end: Int) {
-        if (preeditEmpty) {
-            composer.reset()
-            updateDotLabel()
-        }
+        router.onSelectionUpdate(start, end)
+        updateDotLabel()
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
-        preeditEmpty = empty
+        router.onPreeditEmptyStateUpdate(empty)
     }
 
     override fun onReturnDrawableUpdate(returnDrawable: Int) {
