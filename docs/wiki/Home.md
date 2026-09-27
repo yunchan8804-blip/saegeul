@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>한국어의 결을 아는 자판. 내 컴퓨터와 연결하는 AI.</strong><br>
+  <strong>한국어의 결을 아는 자판. 내 폰 안에서 배우는 AI.</strong><br>
   새글(Saegeul) 프로젝트의 공식 기술 사양 및 사용자 가이드 포털입니다.
 </p>
 
@@ -17,7 +17,7 @@
 - **[01. 시작하기 (Getting Started)](01-Getting-Started.md):** APK 다운로드, Play Protect 무시 설치, 기본 키보드 설정 및 SHA-256 서명 검증
 - **[02. 17가지 한국어 자판 (Keyboard Layouts)](02-Keyboard-Layouts-and-Engine.md):** 천지인, 모아키, 나랏글, 두벌식, 세벌식(390/최종/순이 등), 안마태 상세 설명
 - **[03. 지능형 한글 입력 (Smart Input)](03-Korean-Smart-Input.md):** 한/영 오타 복구(`dkssud` ➔ `안녕`), 초성 검색, 조사 받침 판별, 한자 음훈, 오프라인 사전
-- **[04. AI 글쓰기 & PC Companion (AI & Companion)](04-AI-Writing-and-Companion.md):** 내 Windows PC의 Codex/Claude를 활용한 추가 비용 0원 Tailscale HTTPS 연동
+- **[04. 기기 안 AI, 새글 AI (On-Device AI)](04-On-Device-AI.md):** Google Gemma를 기기 안에서만 실행하는 문장 추천, 인터넷 없이도 쓸 수 있음
 
 ### 🛠️ 고급 기능 & 기기 호환성
 - **[05. 한글 버퍼 호환 모드 (Buffer Compatibility)](05-Hangul-Buffer-Compatibility.md):** 웹뷰, 게임, Flutter, 원격 데스크톱 등 특수 환경의 글자 깨짐 해결 기술 규격

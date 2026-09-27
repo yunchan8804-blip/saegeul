@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="17가지 한글 자판, 한/영 오타 자동복구, 초성 검색, 오프라인 국어사전, 그리고 내 컴퓨터 연결로 추가 요금 없는 AI 글쓰기까지. Android용 독립 오픈소스 한국어 키보드 새글.">
+  <meta name="description" content="17가지 한글 자판, 한/영 오타 자동복구, 초성 검색, 오프라인 국어사전, 그리고 기기 안에서만 동작하는 새글 AI까지. Android용 독립 오픈소스 한국어 키보드 새글.">
   <meta name="theme-color" content="#060e1a">
   <meta property="og:title" content="새글 | 한국어의 결을 아는 안드로이드 키보드">
-  <meta property="og:description" content="평소 한글 입력은 기기 안에서 100% 로컬 처리. AI와 음성은 내가 원할 때 내 컴퓨터와 안전하게 연결.">
+  <meta property="og:description" content="평소 한글 입력은 기기 안에서 100% 로컬 처리. AI도 내 휴대폰 안에서만 동작하고, 입력한 글은 밖으로 나가지 않습니다.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://saegul.chanpaca.net/assets/keyboard-glass.webp?v=20260731-water1">
   <link rel="canonical" href="https://saegul.chanpaca.net/">
@@ -31,7 +31,7 @@
       <div class="nav-links">
         <a href="#korean">한국어</a>
         <a href="#ai">AI 글쓰기</a>
-        <a href="#connect">내 컴퓨터 연결</a>
+        <a href="#connect">새글 AI</a>
         <a href="#privacy">개인정보</a>
         <a href="#themes">시그니처 테마</a>
         <a href="/faq/">도움말</a>
@@ -51,7 +51,7 @@
         <div class="hero-layout shell">
           <div class="hero-copy">
             <p class="eyebrow">안드로이드 한국어 키보드</p>
-            <h1 id="hero-title">한국어의 결을 아는 자판.<br>내 컴퓨터와 연결하는 AI.</h1>
+            <h1 id="hero-title">한국어의 결을 아는 자판.<br>내 폰 안에서 배우는 AI.</h1>
             <p class="hero-lede">17가지 한글 자판부터 한/영 오타 복구, 오프라인 사전, 그리고 추가 요금 없는 AI 글쓰기까지. 쓰는 곳 어디서나 바로 열립니다.</p>
             <div class="actions">
               <a class="button button-primary" href="https://github.com/yunchan8804-blip/saegeul/releases">새글 v2026 내려받기</a>
@@ -261,36 +261,36 @@
       </div>
     </section>
 
-    <!-- Connect Companion Scene -->
+    <!-- On-Device AI Scene -->
     <section class="connect-scene split-story" id="connect" aria-labelledby="connect-title">
       <div class="connect-media" aria-hidden="true">
-        <img src="/assets/computer-link.webp?v=20260731-water1" width="1672" height="941" alt="컴퓨터와 안전한 Tailscale 암호화 연결">
+        <img src="/assets/ai-flow.webp?v=20260731-water1" width="1672" height="941" alt="기기 안에서 동작하는 새글 AI">
       </div>
       <div class="connect-content">
         <div class="connect-copy-wrap">
           <div class="connect-copy liquid-glass liquid-glass-refract">
-            <h2 id="connect-title">추가 API 요금,<br><strong>0원.</strong></h2>
-            <p>이미 내 컴퓨터에 로그인된 Codex CLI 또는 Claude Code를 새글과 직접 연결합니다. 별도 API 요금제 없이 기존 구독을 그대로 사용하세요.</p>
-            <a class="text-link" href="/faq/#ai">연결 가이드 확인하기</a>
+            <h2 id="connect-title">한 번만 받으면,<br><strong>계속 오프라인.</strong></h2>
+            <p>새글 AI(Google Gemma)를 한 번 받아 두면, 그다음부터는 인터넷이 없어도 내 폰 안에서 다음 문장을 추천합니다. 입력한 글은 어디로도 보내지 않습니다.</p>
+            <a class="text-link" href="/faq/#ai">새글 AI 자세히 보기</a>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Connect Steps & Architecture -->
+    <!-- On-Device AI Steps & Architecture -->
     <section class="reader-section connect-steps" aria-labelledby="connect-steps-title">
       <div class="shell reader-head reveal">
         <div class="reader-head-grid">
-          <h2 id="connect-steps-title">내 컴퓨터와 연결하는<br>간결한 3단계.</h2>
+          <h2 id="connect-steps-title">새글 AI,<br>세 단계면 됩니다.</h2>
           <div class="reader-lede">
-            <p>휴대폰과 컴퓨터가 같은 Tailscale tailnet에 있으면 자동으로 감지합니다. 모든 통신은 기기 간 종단간 HTTPS 암호화로 보호됩니다.</p>
+            <p>모델은 한 번만 받으면 됩니다. 그다음부터는 인터넷 없이 이 휴대폰 안에서만 돌아갑니다.</p>
           </div>
         </div>
       </div>
 
       <!-- Architectural Flow Card -->
       <div class="shell companion-arch-card reveal">
-        <p class="band-label">Companion 보안 아키텍처</p>
+        <p class="band-label">새글 AI 처리 구조</p>
         <div class="arch-flow-diagram">
           <div class="arch-node">
             <strong>Android 새글</strong>
@@ -298,18 +298,13 @@
           </div>
           <div class="arch-arrow" aria-hidden="true">➔</div>
           <div class="arch-node">
-            <strong>Tailscale HTTPS</strong>
-            <span>종단간 암호화 터널</span>
-          </div>
-          <div class="arch-arrow" aria-hidden="true">➔</div>
-          <div class="arch-node">
-            <strong>Windows Companion</strong>
-            <span>로컬 시스템 트레이</span>
+            <strong>새글 AI (Gemma)</strong>
+            <span>이 휴대폰 안에서 실행</span>
           </div>
           <div class="arch-arrow" aria-hidden="true">➔</div>
           <div class="arch-node arch-node-free">
-            <strong>Codex / Claude CLI</strong>
-            <span>기존 구독 재사용 (0원)</span>
+            <strong>다음 문장 제안</strong>
+            <span>인터넷 연결 없음</span>
           </div>
         </div>
       </div>
@@ -317,23 +312,23 @@
       <ol class="shell step-grid">
         <li class="step-card reveal">
           <p class="step-index" aria-hidden="true">01</p>
-          <h3>Windows Companion 설치</h3>
-          <p>PC에서 설치 명령어를 실행해 Companion을 켭니다. 로그인된 Codex나 Claude Code CLI를 자동으로 활용합니다.</p>
+          <h3>새글 AI 설치</h3>
+          <p><strong>개인정보·AI &gt; 새글 AI</strong>에서 모델(약 2.6GB)을 받습니다. 와이파이 연결을 권장합니다.</p>
         </li>
         <li class="step-card reveal">
           <p class="step-index" aria-hidden="true">02</p>
-          <h3>휴대폰에서 내 컴퓨터 선택</h3>
-          <p>새글의 <strong>개인정보·AI &gt; 내 컴퓨터 연결</strong> 메뉴에서 같은 Tailscale 네트워크에 연결된 내 PC를 찾습니다.</p>
+          <h3>평소처럼 입력</h3>
+          <p>입력을 잠깐 멈추면, 앞에 쓴 글에 이어질 문장을 추천합니다.</p>
         </li>
         <li class="step-card reveal">
           <p class="step-index" aria-hidden="true">03</p>
-          <h3>1회 승인 후 즉시 사용</h3>
-          <p>승인한 컴퓨터만 연결됩니다. CLI의 로그인 토큰은 PC에만 남고 모바일에는 안전한 전용 권한만 저장됩니다.</p>
+          <h3>확인 후 적용</h3>
+          <p>마음에 드는 추천만 골라 넣으면 됩니다. 글은 휴대폰 밖으로 나가지 않습니다.</p>
         </li>
       </ol>
 
       <div class="shell connect-note reveal">
-        <p><strong>PC 없이 단독으로 쓰려면:</strong> OpenAI 또는 호환 엔드포인트의 API 키를 직접 등록하여 사용할 수 있습니다. 키는 Android Keystore에 암호화 보관되며 클라우드 백업에서 제외됩니다.</p>
+        <p><strong>음성 받아쓰기는 별도 기능입니다:</strong> 기본은 휴대폰 자체 받아쓰기이며, 더 정확한 전사가 필요하면 개인정보·AI 메뉴에서 OpenAI 음성 인식을 선택 기능으로 연결할 수 있습니다. 키는 Android Keystore에 암호화 보관되며 음성 전사에만 쓰입니다.</p>
       </div>
     </section>
 
@@ -688,21 +683,6 @@
           <p>입력창에서 새글을 선택하면 한글과 영어 자판이 기본 활성화되어 즉시 사용 가능합니다.</p>
         </li>
       </ol>
-
-      <!-- Multi-OS Companion Packages -->
-      <div class="shell companion-download-strip liquid-glass liquid-glass-refract reveal" style="margin-top: 32px; padding: 24px 28px; border-radius: 18px;">
-        <div style="margin-bottom: 16px;">
-          <p class="eyebrow" style="color: #38bdf8; font-weight: 600; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase;">멀티 OS 원클릭 AI 컴패니언</p>
-          <h3 style="font-size: 20px; font-weight: 700; color: #fff; margin: 4px 0 6px;">내 컴퓨터와 연결하는 데몬 패키지</h3>
-          <p style="font-size: 14px; color: rgba(255,255,255,0.75); margin: 0;">Windows, macOS, Linux 각 OS에 맞는 원클릭 설치기로 백그라운드 서비스 데몬을 즉시 가동할 수 있습니다.</p>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px;">
-          <a class="button button-ghost" href="https://github.com/yunchan8804-blip/saegeul/releases/latest" style="text-align: center; justify-content: center; font-size: 13.5px;">🪟 Windows (install.bat)</a>
-          <a class="button button-ghost" href="https://github.com/yunchan8804-blip/saegeul/releases/latest" style="text-align: center; justify-content: center; font-size: 13.5px;">🍎 macOS (install.command)</a>
-          <a class="button button-ghost" href="https://github.com/yunchan8804-blip/saegeul/releases/latest" style="text-align: center; justify-content: center; font-size: 13.5px;">🐧 Linux (install.sh)</a>
-          <a class="button button-ghost" href="https://github.com/yunchan8804-blip/saegeul/releases/latest" style="text-align: center; justify-content: center; font-size: 13.5px;">🌐 전 플랫폼 통합 ZIP</a>
-        </div>
-      </div>
 
       <!-- SHA Fingerprint Box -->
       <div class="shell sha-box liquid-glass liquid-glass-refract reveal">

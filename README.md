@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>한국어의 결을 아는 자판. 내 컴퓨터와 연결하는 AI.</strong><br>
+  <strong>한국어의 결을 아는 자판. 내 폰 안에서 배우는 AI.</strong><br>
   Android를 위한 독립 오픈소스 한국어 입력기
 </p>
 
@@ -16,7 +16,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-LGPL--2.1--or--later-blue?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-success?style=flat-square" alt="Android 8.0+">
   <img src="https://img.shields.io/badge/Offline-100%25%20On--Device%20Core-55D6A6?style=flat-square" alt="100% On-Device Core">
-  <img src="https://img.shields.io/badge/AI%20Companion-0%20Won%20Addon-79F1C2?style=flat-square" alt="0 Won AI Companion">
+  <img src="https://img.shields.io/badge/AI-On--Device%20Gemma-79F1C2?style=flat-square" alt="On-Device Gemma AI">
 </p>
 
 ---
@@ -25,7 +25,7 @@
 
 - [✨ 핵심 특징 (Key Highlights)](#-핵심-특징-key-highlights)
 - [⌨️ 17가지 한국어 자판 지원](#️-17가지-한국어-자판-지원)
-- [🖥️ AI와 내 컴퓨터 연결 (Companion 0원 아키텍처)](#️-ai와-내-컴퓨터-연결-companion-0원-아키텍처)
+- [🤖 기기 안에서 배우는 AI (On-Device Gemma)](#-기기-안에서-배우는-ai-on-device-gemma)
 - [📦 다운로드 및 설치 (Quick Start)](#-다운로드-및-설치-quick-start)
 - [🔒 개인정보 및 보안 원칙 (Data Boundary)](#-개인정보-및-보안-원칙-data-boundary)
 - [🛠️ 소스 코드 및 빌드 (Build Guide)](#️-소스-코드-및-빌드-build-guide)
@@ -42,7 +42,7 @@
 - **100% 온디바이스 한글 조합:** `libhangul` C 엔진이 기기 내 메모리에서 직접 글자를 조합하여 딜레이와 프레임 드랍이 없습니다.
 - **17가지 정밀 자판 배열:** 천지인, 나랏글, 모아키, 두벌식, 세벌식, 안마태 등 스마트폰부터 태블릿까지 완벽 대응합니다.
 - **지능형 한글 입력 도구:** 한/영 오타 자동 복구(`dkssud` ➔ `안녕`), 초성 검색, 조사 받침 자동 판별, 31,808 표제어 오프라인 표준국어대사전 내장.
-- **추가 요금 0원 AI 글쓰기:** 내 Windows PC에 로그인된 Codex CLI 또는 Claude Code를 Tailscale HTTPS 종단간 암호화로 연동하여 별도 API 비용 없이 모바일에서 바로 사용합니다.
+- **기기 안 Gemma 문장 제안:** 모델을 한 번 받아 두면 인터넷이 끊겨도 다음 문장을 추천해 줍니다. 입력 중인 글은 기기 밖으로 나가지 않습니다.
 - **기기 내 온디바이스 OCR:** 카메라나 갤러리에서 선택한 이미지 속 한글·영어 텍스트를 기기 안에서 100% 로컬 인식합니다.
 - **철저한 데이터 격리 & 0바이트 오프라인 검증:** 개발자 운영 서버와 사용자 계정 시스템이 없습니다. 전면 광고는 언어 지문 즉시 분석 완료 뒤에만 표시되며, 원클릭 완전 오프라인 모드에서는 광고를 포함한 네트워크를 차단합니다.
 - **폴더블 & 태블릿 분할 키보드:** 기기 화면을 펼치면 양손 타이핑에 최적화된 분할 키보드로 전환되며, 접힘/펼침과 가로/세로 레이아웃을 독립 기억합니다.
@@ -64,33 +64,16 @@
 
 ---
 
-## 🖥️ AI와 내 컴퓨터 연결 (Companion 0원 아키텍처)
+## 🤖 기기 안에서 배우는 AI (On-Device Gemma)
 
-새글은 추가 유료 API 키 결제 없이, 내 PC에 이미 구독 중인 Codex CLI나 Claude Code를 안전하게 끌어와 쓸 수 있습니다.
+새글의 AI 글쓰기는 기기 안 Gemma(LiteRT-LM) 모델만 씁니다. 서버로 보내는 글쓰기 API도, PC와 연결하는 프록시도 없습니다.
 
-```
-┌─────────────────┐        Tailscale Serve HTTPS         ┌─────────────────────────┐
-│   Android 새글   │ ─────────────────────────────────> │    Windows Companion    │
-│  (모바일 키보드) │ <───────────────────────────────── │  (로컬 시스템 트레이 프록시) │
-└─────────────────┘        종단간 암호화 터널 (mTLS)       └────────────┬────────────┘
-                                                                       │ 로컬 stdio/CLI
-                                                                       ▼
-                                                          ┌─────────────────────────┐
-                                                          │   Codex / Claude CLI    │
-                                                          │    (기존 구독 재사용 0원) │
-                                                          └─────────────────────────┘
-```
-
-1. **PC Companion 실행 (OS별 원클릭 설치 지원):**
-   - **Windows:** [Releases](https://github.com/yunchan8804-blip/saegeul/releases)에서 `saegeul-companion-windows.zip` 다운로드 후 `install.bat` 실행 (또는 `companion/windows/install.bat`)
-   - **macOS:** `saegeul-companion-macos.tar.gz` 다운로드 후 `install.command` 실행 (또는 `companion/macos/install.command`)
-   - **Linux:** `saegeul-companion-linux.tar.gz` 다운로드 후 `./install.sh` 실행 (systemd 자동 등록)
-2. **동일 Tailnet 자동 감지:** 휴대폰과 PC가 동일한 Tailscale 네트워크에 연결되어 있으면 새글이 자동으로 PC를 발견합니다.
-3. **1회 기기 승인:** 휴대폰에서 PC를 승인하면 즉시 글쓰기 AI(맞춤법 교정, 문체 변환, 실시간 번역, 자유 프롬프트)를 추가 비용 없이 쓸 수 있습니다.
-4. **보안 격리:** CLI 세션 토큰은 PC에만 남고 모바일로 복사되지 않으며, 통신 내용은 디스크 로그에 남지 않습니다.
+1. **모델 내려받기 (한 번만):** **개인정보·AI** 메뉴에서 Gemma 모델(약 2.6GB)을 내려받습니다. Wi-Fi 환경을 권장합니다.
+2. **문장 추천:** 자동 추천을 켜 두면, 입력을 잠깐 멈출 때 앞에 쓴 글에 이어질 문장을 추천합니다.
+3. **밖으로 나가지 않는 글:** 모델을 받은 뒤에는 인터넷이 없어도 쓸 수 있고, 쓰고 있는 글은 휴대폰 밖으로 나가지 않습니다.
 
 > [!TIP]
-> PC 없이 모바일 단독으로 사용하려는 경우, **개인정보·AI > AI 공급자** 메뉴에서 OpenAI, Anthropic 또는 호환 엔드포인트의 API 키를 직접 등록하여 사용할 수 있습니다. 등록된 키는 Android Keystore 하드웨어 암호화로 보호됩니다.
+> 음성 입력은 기본으로 휴대폰 자체 받아쓰기를 쓰며, API 키를 직접 등록하지 않습니다. 더 정확한 전사가 필요하면 **개인정보·AI > 음성 받아쓰기**에서 OpenAI 음성 인식을 선택 기능으로 연결할 수 있습니다. 이때 등록한 키는 Android Keystore 하드웨어 암호화로 보호되며 음성 전사에만 쓰입니다.
 
 ---
 

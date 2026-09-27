@@ -6,7 +6,7 @@
 - [01. 시작하기](01-Getting-Started.md)
 - [02. 17가지 한국어 자판](02-Keyboard-Layouts-and-Engine.md)
 - [03. 지능형 한글 입력](03-Korean-Smart-Input.md)
-- [04. AI 글쓰기 & PC 연동](04-AI-Writing-and-Companion.md)
+- [04. 기기 안 AI](04-On-Device-AI.md)
 
 #### 🛠️ 고급 & 미디어
 - [05. 한글 버퍼 호환 모드](05-Hangul-Buffer-Compatibility.md)
