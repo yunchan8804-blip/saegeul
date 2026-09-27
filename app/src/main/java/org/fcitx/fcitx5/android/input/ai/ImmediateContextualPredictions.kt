@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
-import org.fcitx.fcitx5.android.input.ai.rule.KoreanSpacingLint
+import org.fcitx.fcitx5.android.input.ai.rule.SuggestionQualityGate
 import org.fcitx.fcitx5.android.input.ai.sentencepack.MatchEvidence
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 
@@ -39,8 +39,7 @@ object ImmediateContextualPredictions {
         val trimmedContext = input.rawContext.trim(' ')
         generatedSpacingLookup?.invoke(trimmedContext)
             ?.takeIf { target ->
-                trimmedContext.isNotBlank() && target.isNotBlank() && target != trimmedContext &&
-                    !KoreanSpacingLint.hasSpacingIssue(target)
+                trimmedContext.isNotBlank() && target.isNotBlank() && target != trimmedContext
             }
             ?.let { target ->
                 val leadingSpaces = input.rawContext.takeWhile { it == ' ' }
@@ -73,7 +72,6 @@ object ImmediateContextualPredictions {
         if (persona != "browser" && persona != "commerce") {
             generatedSentenceLookup?.invoke(input.rawContext, input.limit)
                 ?.filter { it.evidence == MatchEvidence.PREFIX || it.evidence == MatchEvidence.CONTEXT_SUFFIX }
-                ?.filterNot { KoreanSpacingLint.hasSpacingIssue(it.suffix) }
                 ?.forEach { match ->
                     predictions += AiPrediction(
                         text = match.suffix,
@@ -90,6 +88,9 @@ object ImmediateContextualPredictions {
         return predictions
             .asSequence()
             .filter { KoreanSuggestionSurface.isDisplayable(it.text) }
+            // 최종 품질 게이트: 여기 한 곳에서 이 함수가 만든 모든 후보(문장팩·기기 AI 재료·
+            // 띄어쓰기 교정·이어쓰기)를 정본 SuggestionQualityGate로 거른다.
+            .filter { SuggestionQualityGate.accepts(it.text, input.rawContext, it.isSentenceCompletion) }
             .sortedByDescending { it.confidenceScore }
             .filter { prediction -> seen.add("${prediction.isSentenceCompletion}:${prediction.text}") }
             .toList()

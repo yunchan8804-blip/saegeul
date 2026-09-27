@@ -144,7 +144,9 @@ class PredictionQualitySweepTest {
                 .mapNotNull { line -> line.substringBefore('\t').takeIf(String::isNotBlank) }
                 .take(count)
 
-        private fun buildCases(): List<SweepCase> {
+        // internal(=제거된 private)이라 PersonalizedPredictionSweepTest가 동일한 입력 416개를 그대로
+        // 재사용한다(입력 세트를 두 번 정의하지 않는다).
+        fun buildCases(): List<SweepCase> {
             val cases = mutableListOf<SweepCase>()
 
             // (a) 기본 어휘 상위 150개 어절의 1~2음절 접두
@@ -215,7 +217,7 @@ class PredictionQualitySweepTest {
                     issues += Issue("SPACING", "KoreanSpacingLint", case, candidate)
                 }
 
-                if (hasDuplication(prediction.text)) {
+                if (PredictionQualityRules.hasDuplication(prediction.text)) {
                     issues += Issue("DUP", "음절/어절 반복", case, candidate)
                 }
 
@@ -226,13 +228,11 @@ class PredictionQualitySweepTest {
                     }
                 }
 
-                if ((strokeTrim.isNotBlank() && prediction.text == strokeTrim) ||
-                    (contextTrim.isNotBlank() && prediction.text == contextTrim)
-                ) {
+                if (PredictionQualityRules.isEcho(strokeTrim, contextTrim, prediction.text)) {
                     issues += Issue("ECHO", "입력 되풀이", case, candidate)
                 }
 
-                if (isJunk(prediction.text)) {
+                if (PredictionQualityRules.isJunk(prediction.text)) {
                     issues += Issue("JUNK", "이상 문자/자모 단독/80자 초과", case, candidate)
                 }
             }
@@ -250,20 +250,6 @@ class PredictionQualitySweepTest {
             println("[PredictionQualitySweep] $rule 위반 후보: ${issues.count { it.rule == rule }} 건")
         }
         println("=".repeat(70))
-    }
-
-    private fun hasDuplication(text: String): Boolean {
-        val words = text.split(' ', '\n').filter(String::isNotBlank)
-        if (words.zipWithNext().any { (a, b) -> a == b }) return true
-        return Regex("([가-힣])\\1{1,}").containsMatchIn(text)
-    }
-
-    private fun isJunk(text: String): Boolean {
-        if (text.length > 80) return true
-        // 호환 자모 블록(U+3131~U+318E): 단독 초성/중성/종성(ㄱ, ㅏ 등)이 섞인 경우.
-        if (text.any { it.code in 0x3131..0x318E }) return true
-        val allowed = Regex("^[가-힣a-zA-Z0-9\\s.,!?~…:;()\\[\\]{}'\"·%\\-–—/@#&*+=]*$")
-        return !allowed.matches(text)
     }
 
     private fun writeReports(caseCount: Int, candidateCount: Int, issues: List<Issue>) {

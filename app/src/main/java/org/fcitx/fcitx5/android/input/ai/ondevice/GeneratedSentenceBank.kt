@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.ai.ondevice
 
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSpacingLint
+import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
 import org.fcitx.fcitx5.android.input.ai.sentencepack.MatchEvidence
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackIndex
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
@@ -101,6 +102,10 @@ class GeneratedSentenceBank(
             }
             if (KoreanSpacingLint.hasSpacingIssue(candidate)) {
                 rejectionReasons.increment(IngestionRejectionReason.SPACING)
+                continue
+            }
+            if (!KoreanSyntaxRuleFilter.isGrammaticallySound(candidate)) {
+                rejectionReasons.increment(IngestionRejectionReason.SYNTAX)
                 continue
             }
             val rejectionReason = candidateRejectionReason(candidate)
@@ -229,6 +234,9 @@ class GeneratedSentenceBank(
             }
             if (KoreanSpacingLint.hasSpacingIssue(normalized)) {
                 throw GeneratedSentenceBankFormatException("Generated response entry $index has a spacing issue")
+            }
+            if (!KoreanSyntaxRuleFilter.isGrammaticallySound(normalized)) {
+                throw GeneratedSentenceBankFormatException("Generated response entry $index is not grammatically sound")
             }
             accepted += normalized
         }
@@ -402,6 +410,7 @@ enum class IngestionRejectionReason {
     INVALID_SENTENCE,
     MISSING_TERMINAL,
     SPACING,
+    SYNTAX,
     PREFIX_MISMATCH,
     EMPTY_CONTINUATION,
     REPEATED_PREFIX,

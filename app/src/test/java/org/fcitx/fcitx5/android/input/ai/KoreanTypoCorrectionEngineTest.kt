@@ -337,6 +337,22 @@ class KoreanTypoCorrectionEngineTest {
     }
 
     @Test
+    fun `typoEngine corrects common standard spelling mistakes`() {
+        assertTrue(typoEngine.correct("몇일").contains("며칠"))
+        assertTrue(typoEngine.correct("금새").contains("금세"))
+        assertTrue(typoEngine.correct("역활").contains("역할"))
+        assertTrue(typoEngine.correct("설겆이").contains("설거지"))
+        assertTrue(typoEngine.correct("오랫만").contains("오랜만"))
+        assertTrue(typoEngine.correct("어떻해").contains("어떡해"))
+
+        // 어간이 활용되는 오표기는 어절 전체가 아니라 어간만 바뀌어도 교정된다.
+        assertEquals("어이없어서", typoEngine.normalizeMorphologicalTypo("어의없어서"))
+        assertEquals("웬만하면", typoEngine.normalizeMorphologicalTypo("왠만하면"))
+        assertEquals("모르겠어요", typoEngine.normalizeMorphologicalTypo("몰겠어요"))
+        assertEquals("희한하네요", typoEngine.normalizeMorphologicalTypo("희안하네요"))
+    }
+
+    @Test
     fun `typoEngine correctSentence fixes 난 그걸하고 시프니까 to 난 그걸하고 싶으니까`() {
         val input = "난 그걸하고 시프니까"
         val corrected = typoEngine.correctSentence(input)

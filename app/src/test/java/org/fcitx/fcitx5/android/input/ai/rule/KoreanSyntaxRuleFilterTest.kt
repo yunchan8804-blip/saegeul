@@ -33,18 +33,13 @@ class KoreanSyntaxRuleFilterTest {
 
     @Test
     fun testAcc01CausalSubordinationMismatch() {
-        // Violations: -어서/-아서/-여서/-느라고 followed by question or imperative
+        // 2026-09-27 정밀화: 이유절은 상태/감정/사정 용언의 -아서/어서(또는 -느라고/-기에/-길래)만
+        // 인정하고, 뒤에 오는 것도 명시적 명령/청유 종결일 때만 거부한다. 의문 종결(?, 하나요? 등)은
+        // 더 이상 거부 사유가 아니다("배고파서 뭐 먹을까?" 같은 구어가 실제로 자연스럽기 때문).
         val rejectCases = listOf(
-            "답장이 늦어서 무슨 일인가요?",
-            "비가 와서 우산을 쓰세요",
-            "비가 와서 우산을 쓰십시오",
             "시간이 없어서 서두르자",
-            "회의가 길어져서 어떡하죠?",
-            "밥을 먹느라고 늦었어?",
             "날씨가 추워서 따뜻하게 입으세요",
-            "회의가 길어져서 지금 바로 가야 하나요?",
-            "차가 너무 막혀서 조심히 오세요",
-            "밥을 급하게 먹느라고 체했어?"
+            "차가 너무 막혀서 조심히 오세요"
         )
 
         for (text in rejectCases) {
@@ -55,7 +50,9 @@ class KoreanSyntaxRuleFilterTest {
             assertFalse(filter.isValid(text))
         }
 
-        // Valid cases: declarative statement with -어서, or using -으니까/-니
+        // Valid cases: declarative statement with -어서, -으니까/-니, a question after a causal
+        // clause, or a causal clause whose predicate is an action verb (오다/길어지다/먹다 등)
+        // that this filter no longer treats as a reason clause at all.
         val allowCases = listOf(
             "답장이 늦어서 죄송합니다.",
             "비가 와서 길이 미끄럽습니다.",
@@ -63,13 +60,49 @@ class KoreanSyntaxRuleFilterTest {
             "비가 오니까 무슨 일인가요?",
             "비가 오니 우산을 쓰세요",
             "시간이 없으니까 서두르자",
-            "날씨가 추우니까 따뜻하게 입으세요"
+            "날씨가 추우니까 따뜻하게 입으세요",
+            "답장이 늦어서 무슨 일인가요?",
+            "비가 와서 우산을 쓰세요",
+            "비가 와서 우산을 쓰십시오",
+            "회의가 길어져서 어떡하죠?",
+            "밥을 먹느라고 늦었어?",
+            "회의가 길어져서 지금 바로 가야 하나요?",
+            "밥을 급하게 먹느라고 체했어?"
         )
 
         for (text in allowCases) {
             val result = filter.check(text)
             assertTrue("Expected valid for: '$text', but got $result", result is RuleResult.Valid)
             assertTrue(filter.isValid(text))
+        }
+    }
+
+    @Test
+    fun testAcc01RefinedStateVerbCausalWithExplicitImperativeOnly() {
+        // 상태 용언 이유절 + 명시적 명령/청유 종결만 거부한다.
+        val rejectCases = listOf(
+            "더워서 창문 좀 열어 주세요.",
+            // 반말 축약 명령형("와.")은 명령 신호 부사("빨리")와 함께 있을 때만 명령으로 본다.
+            "늦어서 빨리 와."
+        )
+        for (text in rejectCases) {
+            val result = filter.check(text)
+            assertTrue("Expected ACC-01 violation for: '$text', but got $result", result is RuleResult.Invalid)
+            assertEquals(ViolationType.ACC_01_CAUSAL_SUBORDINATION, (result as RuleResult.Invalid).violationType)
+        }
+
+        // 동작 용언의 -아서/어서(순서·방법)나, 상태 용언 이유절 + 의문/평서 종결은 거부하지 않는다.
+        val allowCases = listOf(
+            "걸어서 갈까요?",
+            "표시해서 보내주세요.",
+            "골라서 보내주세요.",
+            "아침 일정이 있어서 일찍 나가요.",
+            "날씨가 더워서 조금 쉬어가요.",
+            "배고파서 뭐 먹을까?"
+        )
+        for (text in allowCases) {
+            val result = filter.check(text)
+            assertTrue("Expected valid for: '$text', but got $result", result is RuleResult.Valid)
         }
     }
 
@@ -202,10 +235,11 @@ class KoreanSyntaxRuleFilterTest {
 
     @Test
     fun testFilterCandidatesWithContext() {
-        // ACC-01 filtering with prefix context
+        // ACC-01 filtering with prefix context: a question after a state-verb causal clause is no
+        // longer rejected, only an explicit imperative/propositive ending is.
         val cands1 = listOf("무슨 일인가요?", "죄송합니다", "우산을 쓰세요", "내일 뵙겠습니다")
         val filtered1 = filter.filterCandidates(cands1, context = "답장이 늦어서")
-        assertEquals(listOf("죄송합니다", "내일 뵙겠습니다"), filtered1)
+        assertEquals(listOf("무슨 일인가요?", "죄송합니다", "내일 뵙겠습니다"), filtered1)
 
         // ACC-02 filtering with prefix context
         val cands2 = listOf("정말 감사해요", "전합니다", "보냅니다", "너무 고마워요")
