@@ -24,6 +24,8 @@ import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
@@ -482,11 +484,8 @@ class NumericSymbolInputLatencyDeviceTest {
             val ime = FcitxInputMethodService.activeInstance
             if (ime != null && onMain {
                     ime.matchesCurrentEditor(
-                        packageName = target.packageName,
-                        fieldId = target.fieldId,
-                        inputType = target.inputType,
-                        selectionStart = target.selectionStart,
-                        selectionEnd = target.selectionEnd,
+                        EditorIdentity(target.packageName, target.fieldId, target.inputType),
+                        EditorSelection(target.selectionStart, target.selectionEnd),
                         expectedInputSessionEpoch = ime.currentInputSessionEpoch
                     )
                 }
@@ -503,11 +502,8 @@ class NumericSymbolInputLatencyDeviceTest {
             val activeIme = FcitxInputMethodService.activeInstance
             activeIme === session.ime && activeIme.currentInputSessionEpoch == session.epoch &&
                 activeIme.matchesCurrentEditor(
-                    packageName = session.packageName,
-                    fieldId = session.fieldId,
-                    inputType = session.inputType,
-                    selectionStart = editor.selectionStart,
-                    selectionEnd = editor.selectionEnd,
+                    EditorIdentity(session.packageName, session.fieldId, session.inputType),
+                    EditorSelection(editor.selectionStart, editor.selectionEnd),
                     expectedInputSessionEpoch = session.epoch
                 )
         }

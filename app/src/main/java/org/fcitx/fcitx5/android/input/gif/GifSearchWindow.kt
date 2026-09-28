@@ -16,6 +16,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.InputFeatureBlock
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
@@ -303,11 +305,8 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         val linkTarget = target
         adapter.setActionLocked(true)
         if (!service.matchesCurrentEditor(
-                linkTarget.packageName,
-                linkTarget.fieldId,
-                linkTarget.inputType,
-                linkTarget.selectionStart,
-                linkTarget.selectionEnd,
+                EditorIdentity(linkTarget.packageName, linkTarget.fieldId, linkTarget.inputType),
+                EditorSelection(linkTarget.selectionStart, linkTarget.selectionEnd),
                 expectedInputSessionEpoch = linkTarget.inputSessionEpoch
             )
         ) {

@@ -465,11 +465,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     ): InternalPromptEditorTarget {
         val selection = currentInputSelection
         return InternalPromptEditorTarget(
-            packageName = info.packageName,
-            fieldId = info.fieldId,
-            inputType = info.inputType,
-            selectionStart = selection.start,
-            selectionEnd = selection.end,
+            identity = EditorIdentity.of(info),
+            selection = EditorSelection(selection.start, selection.end),
             inputSessionEpoch = inputSessionEpoch
         )
     }
@@ -480,11 +477,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     ): Boolean {
         val selection = currentInputSelection
         return target.matches(
-            packageName = info.packageName,
-            fieldId = info.fieldId,
-            inputType = info.inputType,
-            selectionStart = selection.start,
-            selectionEnd = selection.end,
+            identity = EditorIdentity.of(info),
+            selection = EditorSelection(selection.start, selection.end),
             inputSessionEpoch = inputSessionEpoch
         )
     }
@@ -2136,25 +2130,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return selected.isSuccess && selected.getOrNull().isNullOrEmpty()
     }
 
-    private fun matchesCurrentEditor(target: AiEditorTarget): Boolean =
-        currentInputEditorInfo.packageName == target.packageName &&
-            currentInputEditorInfo.fieldId == target.fieldId &&
-            currentInputEditorInfo.inputType == target.inputType &&
-            currentInputSelection.rangeEquals(target.selectionStart, target.selectionEnd) &&
-            inputSessionEpoch == target.inputSessionEpoch
+    private val AiEditorTarget.identity: EditorIdentity
+        get() = EditorIdentity(packageName, fieldId, inputType)
 
+    private val AiEditorTarget.selection: EditorSelection
+        get() = EditorSelection(selectionStart, selectionEnd)
+
+    /** Canonical "is this still the same editor field" check: identity, then selection, then an optional session epoch. */
     fun matchesCurrentEditor(
-        packageName: String,
-        fieldId: Int,
-        inputType: Int,
-        selectionStart: Int,
-        selectionEnd: Int,
+        identity: EditorIdentity,
+        selection: EditorSelection,
         expectedInputSessionEpoch: Long? = null
     ): Boolean =
-        currentInputEditorInfo.packageName == packageName &&
-            currentInputEditorInfo.fieldId == fieldId &&
-            currentInputEditorInfo.inputType == inputType &&
-            currentInputSelection.rangeEquals(selectionStart, selectionEnd) &&
+        EditorIdentity.of(currentInputEditorInfo).sameField(identity) &&
+            currentInputSelection.rangeEquals(selection.start, selection.end) &&
             (expectedInputSessionEpoch == null || inputSessionEpoch == expectedInputSessionEpoch)
 
     /**
@@ -2314,11 +2303,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             activeOnDeviceContextExtractedTextEpoch != capturedSessionEpoch
         ) return onDeviceContextEditorStateChanged()
         if (!matchesCurrentEditor(
-                packageName = info.packageName,
-                fieldId = info.fieldId,
-                inputType = info.inputType,
-                selectionStart = capturedSelectionStart,
-                selectionEnd = capturedSelectionEnd,
+                EditorIdentity.of(info),
+                EditorSelection(capturedSelectionStart, capturedSelectionEnd),
                 expectedInputSessionEpoch = capturedSessionEpoch
             )) {
             return onDeviceContextEditorStateChanged()
@@ -2352,7 +2338,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             snapshot.editor.selectionStart != snapshot.editor.selectionEnd ||
             snapshot.source.length !in 1..ON_DEVICE_CONTEXT_MAX_CHARS ||
             activeOnDeviceContextExtractedTextEpoch != snapshot.editor.inputSessionEpoch ||
-            !matchesCurrentEditor(snapshot.editor)
+            !matchesCurrentEditor(snapshot.editor.identity, snapshot.editor.selection, snapshot.editor.inputSessionEpoch)
         ) return false
         val connection = currentInputConnection ?: return false
         val beforeCursor = connection.getTextBeforeCursor(ON_DEVICE_CONTEXT_MAX_CHARS + 1, 0)
@@ -2362,7 +2348,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             beforeCursor.length == snapshot.editor.selectionStart &&
             afterCursor == "" &&
             activeOnDeviceContextExtractedTextEpoch == snapshot.editor.inputSessionEpoch &&
-            matchesCurrentEditor(snapshot.editor)
+            matchesCurrentEditor(snapshot.editor.identity, snapshot.editor.selection, snapshot.editor.inputSessionEpoch)
     }
 
     private fun onDeviceContextEditorStateChanged(): AiInputCaptureResult {
@@ -3182,9 +3168,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     ): Boolean {
         if (!canCaptureAutomaticSuggestionSnapshot()) return false
         val info = currentInputEditorInfo
-        if (info.packageName != snapshot.session.scope.packageName ||
-            info.fieldId != snapshot.session.scope.fieldId ||
-            info.inputType != snapshot.inputType ||
+        if (!EditorIdentity.of(info).sameField(snapshot.identity) ||
             (info.imeOptions and EditorInfo.IME_MASK_ACTION) != snapshot.imeAction ||
             inputSessionEpoch != snapshot.session.scope.editorSessionId
         ) return false
@@ -4863,9 +4847,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             .takeUnless { it.isBlank() || it == getString(R.string._not_available_) }
         engineRestartEditorRehydrationGate.onStartInput(
             inputSessionEpoch = inputSessionEpoch,
-            editorPackageName = attribute.packageName,
-            fieldId = attribute.fieldId,
-            inputType = attribute.inputType,
+            identity = EditorIdentity.of(attribute),
             capabilityFlags = flags,
             shouldFocus = !isNullType,
             isVirtualKeyboard = inputDeviceMgr.isVirtualKeyboard,
@@ -4897,9 +4879,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val viewCapabilityFlags = CapabilityFlags.fromEditorInfo(info)
         engineRestartEditorRehydrationGate.onStartInputView(
             inputSessionEpoch = inputSessionEpoch,
-            editorPackageName = info.packageName,
-            fieldId = info.fieldId,
-            inputType = info.inputType,
+            identity = EditorIdentity.of(info),
             capabilityFlags = viewCapabilityFlags,
             shouldFocus = !info.isTypeNull()
         )

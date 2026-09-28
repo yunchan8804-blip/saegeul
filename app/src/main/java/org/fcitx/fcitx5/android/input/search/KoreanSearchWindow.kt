@@ -21,6 +21,8 @@ import org.fcitx.fcitx5.android.input.emotion.EmotionCommitGate
 import org.fcitx.fcitx5.android.input.emotion.EmotionCommitResult
 import org.fcitx.fcitx5.android.input.emotion.ExplicitEmotionSearch
 import org.fcitx.fcitx5.android.input.emotion.ExplicitEmotionSearchOutcome
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.context.KoreanParticleWindow
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
@@ -242,11 +244,8 @@ class KoreanSearchWindow : InputWindow.ExtendedInputWindow<KoreanSearchWindow>()
         adapter.setActionLocked(true)
         val allowed = service.allowsTextInspectionFeatures()
         val sameEditor = allowed && service.matchesCurrentEditor(
-            target.packageName,
-            target.fieldId,
-            target.inputType,
-            target.selectionStart,
-            target.selectionEnd
+            EditorIdentity(target.packageName, target.fieldId, target.inputType),
+            EditorSelection(target.selectionStart, target.selectionEnd)
         )
         if (result.entry.source == KoreanSearchSource.Emotion) {
             val outcome = emotionCommitGate.commit(allowed, sameEditor) {

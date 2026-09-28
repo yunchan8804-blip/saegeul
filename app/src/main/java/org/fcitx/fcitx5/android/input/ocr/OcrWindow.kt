@@ -13,6 +13,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -278,11 +280,8 @@ class OcrWindow(
 
     private fun validateTarget(boundTarget: OcrEditorTarget, showError: Boolean): Boolean {
         val valid = service.allowsTextInspectionFeatures() && service.matchesCurrentEditor(
-            boundTarget.packageName,
-            boundTarget.fieldId,
-            boundTarget.inputType,
-            boundTarget.cursor,
-            boundTarget.cursor
+            EditorIdentity(boundTarget.packageName, boundTarget.fieldId, boundTarget.inputType),
+            EditorSelection.collapsed(boundTarget.cursor)
         )
         if (!valid && showError && attached) {
             if (service.allowsTextInspectionFeatures()) {

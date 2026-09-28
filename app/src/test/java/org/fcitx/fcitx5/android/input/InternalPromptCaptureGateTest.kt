@@ -13,17 +13,14 @@ class InternalPromptCaptureGateTest {
     @Test
     fun `prompt target rejects a same-metadata field from a later input session`() {
         val target = InternalPromptEditorTarget(
-            packageName = "org.example.app",
-            fieldId = 0,
-            inputType = 1,
-            selectionStart = 4,
-            selectionEnd = 4,
+            identity = EditorIdentity("org.example.app", 0, 1),
+            selection = EditorSelection(4, 4),
             inputSessionEpoch = 11
         )
 
-        assertTrue(target.matches("org.example.app", 0, 1, 4, 4, 11))
-        assertFalse(target.matches("org.example.app", 0, 1, 4, 4, 12))
-        assertFalse(target.matches("org.example.app", 0, 1, 5, 5, 11))
+        assertTrue(target.matches(EditorIdentity("org.example.app", 0, 1), EditorSelection(4, 4), 11))
+        assertFalse(target.matches(EditorIdentity("org.example.app", 0, 1), EditorSelection(4, 4), 12))
+        assertFalse(target.matches(EditorIdentity("org.example.app", 0, 1), EditorSelection(5, 5), 11))
     }
 
     @Test

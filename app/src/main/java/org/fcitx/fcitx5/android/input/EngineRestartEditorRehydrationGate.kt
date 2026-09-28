@@ -36,9 +36,7 @@ internal class EngineRestartEditorRehydrationGate {
 
     private data class Editor(
         val inputSessionEpoch: Long,
-        val packageName: String,
-        val fieldId: Int,
-        val inputType: Int,
+        val identity: EditorIdentity,
         val capabilityFlags: CapabilityFlags,
         val shouldFocus: Boolean,
         val isVirtualKeyboard: Boolean,
@@ -63,9 +61,7 @@ internal class EngineRestartEditorRehydrationGate {
     @Synchronized
     fun onStartInput(
         inputSessionEpoch: Long,
-        editorPackageName: String,
-        fieldId: Int,
-        inputType: Int,
+        identity: EditorIdentity,
         capabilityFlags: CapabilityFlags,
         shouldFocus: Boolean,
         isVirtualKeyboard: Boolean,
@@ -73,9 +69,7 @@ internal class EngineRestartEditorRehydrationGate {
     ) {
         editor = Editor(
             inputSessionEpoch,
-            editorPackageName,
-            fieldId,
-            inputType,
+            identity,
             capabilityFlags,
             shouldFocus,
             isVirtualKeyboard,
@@ -88,18 +82,14 @@ internal class EngineRestartEditorRehydrationGate {
     @Synchronized
     fun onStartInputView(
         inputSessionEpoch: Long,
-        editorPackageName: String,
-        fieldId: Int,
-        inputType: Int,
+        identity: EditorIdentity,
         capabilityFlags: CapabilityFlags,
         shouldFocus: Boolean
     ) {
         val editor = editor ?: return
         this.editor = editor.copy(
             inputSessionEpoch = inputSessionEpoch,
-            packageName = editorPackageName,
-            fieldId = fieldId,
-            inputType = inputType,
+            identity = identity,
             capabilityFlags = capabilityFlags,
             shouldFocus = editor.shouldFocus && shouldFocus
         )
@@ -177,9 +167,9 @@ internal class EngineRestartEditorRehydrationGate {
             uid = binding.uid,
             packageName = binding.packageName,
             inputSessionEpoch = editor.inputSessionEpoch,
-            editorPackageName = editor.packageName,
-            fieldId = editor.fieldId,
-            inputType = editor.inputType,
+            editorPackageName = editor.identity.packageName.orEmpty(),
+            fieldId = editor.identity.fieldId,
+            inputType = editor.identity.inputType,
             capabilityFlags = editor.capabilityFlags,
             shouldFocus = editor.shouldFocus,
             isVirtualKeyboard = editor.isVirtualKeyboard,
@@ -194,8 +184,8 @@ internal class EngineRestartEditorRehydrationGate {
         plan.revision == revision && binding?.let { it.uid == plan.uid && it.packageName == plan.packageName } == true &&
             editor?.let {
                 it.inputSessionEpoch == plan.inputSessionEpoch &&
-                    it.packageName == plan.editorPackageName &&
-                    it.fieldId == plan.fieldId &&
-                    it.inputType == plan.inputType
+                    it.identity.sameField(
+                        EditorIdentity(plan.editorPackageName, plan.fieldId, plan.inputType)
+                    )
             } == true
 }

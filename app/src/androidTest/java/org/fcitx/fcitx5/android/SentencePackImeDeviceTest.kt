@@ -19,6 +19,8 @@ import android.widget.EditText
 import androidx.test.platform.app.InstrumentationRegistry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -262,11 +264,8 @@ class SentencePackImeDeviceTest {
         val info = ime?.currentInputEditorInfo
         val selection = ime?.currentInputSelection
         val matches = ime != null && ime.matchesCurrentEditor(
-            packageName = target.packageName,
-            fieldId = target.fieldId,
-            inputType = target.inputType,
-            selectionStart = target.selectionStart,
-            selectionEnd = target.selectionEnd,
+            EditorIdentity(target.packageName, target.fieldId, target.inputType),
+            EditorSelection(target.selectionStart, target.selectionEnd),
             expectedInputSessionEpoch = ime.currentInputSessionEpoch
         )
         CurrentEditorState(

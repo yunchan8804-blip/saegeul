@@ -32,6 +32,8 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardDbEmpty
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardListeningEnabled
@@ -320,11 +322,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     private fun editorStillAllowed(): Boolean {
         val target = editorTarget ?: return false
         return service.allowsTextInspectionFeatures() && service.matchesCurrentEditor(
-            target.packageName,
-            target.fieldId,
-            target.inputType,
-            target.selectionStart,
-            target.selectionEnd
+            EditorIdentity(target.packageName, target.fieldId, target.inputType),
+            EditorSelection(target.selectionStart, target.selectionEnd)
         )
     }
 

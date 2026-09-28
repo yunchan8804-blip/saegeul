@@ -27,6 +27,8 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationScheduler
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationStore
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.AiSuggestionApplyResult
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
@@ -721,7 +723,12 @@ class GemmaAutomaticImeDeviceTest {
         val deadline = SystemClock.elapsedRealtime() + SHORT_TIMEOUT_MS
         while (SystemClock.elapsedRealtime() < deadline) {
             val ime = FcitxInputMethodService.activeInstance
-            if (ime != null && ime.matchesCurrentEditor(target.packageName, target.fieldId, target.inputType, target.selectionStart, target.selectionEnd, ime.currentInputSessionEpoch)) return ime
+            if (ime != null && ime.matchesCurrentEditor(
+                    EditorIdentity(target.packageName, target.fieldId, target.inputType),
+                    EditorSelection(target.selectionStart, target.selectionEnd),
+                    ime.currentInputSessionEpoch
+                )
+            ) return ime
             SystemClock.sleep(POLL_INTERVAL_MS)
         }
         throw AssertionError("새글 IME가 debug editor에 연결되지 않았습니다.")

@@ -11,6 +11,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.InputFeatureBlock
 import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
@@ -258,11 +260,8 @@ class MeetingTranscriptionWindow(
     private fun validateTarget(boundTarget: VoiceEditorTarget, showError: Boolean): Boolean {
         if (!validatePolicy(profile)) return false
         val valid = service.matchesCurrentEditor(
-            boundTarget.packageName,
-            boundTarget.fieldId,
-            boundTarget.inputType,
-            boundTarget.cursor,
-            boundTarget.cursor
+            EditorIdentity(boundTarget.packageName, boundTarget.fieldId, boundTarget.inputType),
+            EditorSelection.collapsed(boundTarget.cursor)
         )
         if (!valid && showError && attached) {
             showBlocked(context.getString(R.string.meeting_editor_changed))
