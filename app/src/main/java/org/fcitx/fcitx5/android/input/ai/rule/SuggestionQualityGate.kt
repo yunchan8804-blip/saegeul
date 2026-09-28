@@ -14,7 +14,8 @@ import org.fcitx.fcitx5.android.input.ai.KoreanTypoCorrectionEngine
  *
  * 검사 순서(먼저 걸리는 사유가 최종 사유):
  * 1. [RejectionReason.UNGRAMMATICAL] — 문장 후보([KoreanSyntaxRuleFilter.isGrammaticallySound])만 검사.
- * 2. [RejectionReason.SPACING] — [KoreanSpacingLint.hasSpacingIssue].
+ * 2. [RejectionReason.SPACING] — [KoreanSpacingLint.hasSpacingIssue], 또는 후보를 문맥 뒤에 이어
+ *    붙이면 '-드리다'가 앞 명사와 띄어지는 경우([KoreanSpacingLint.detachesDeurida]).
  * 3. [RejectionReason.DUPLICATED_WORD] — 공백으로 나눈 어절이 바로 이어서 같은 문자열로 반복.
  * 4. [RejectionReason.MIXED_JAMO] — 한 어절 안에서 한글 음절 뒤에 호환 자모가 붙은 경우
  *    ("안녕ㅎ", "고마워ㅜ" 등). 어절 전체가 호환 자모만인 것("ㅋㅋ", "ㅠㅠ", "ㅇㅋ")은 허용.
@@ -31,7 +32,8 @@ object SuggestionQualityGate {
 
     /**
      * [candidate]가 게이트를 통과하지 못하는 이유를 돌려준다(통과하면 null).
-     * [context]는 문장 후보일 때만 [KoreanSyntaxRuleFilter]에 넘겨 문맥 포함 문법 검사를 한다.
+     * [context]는 문장 후보일 때 [KoreanSyntaxRuleFilter]에 넘겨 문맥 포함 문법 검사를 하고,
+     * 모든 후보에 대해 문맥 뒤에 이어 붙였을 때의 띄어쓰기 검사에 쓴다.
      */
     fun evaluate(candidate: String, context: String = "", isSentenceCompletion: Boolean = false): RejectionReason? {
         if (candidate.isBlank()) return null
@@ -40,7 +42,7 @@ object SuggestionQualityGate {
             return RejectionReason.UNGRAMMATICAL
         }
 
-        if (KoreanSpacingLint.hasSpacingIssue(candidate)) {
+        if (KoreanSpacingLint.hasSpacingIssue(candidate) || KoreanSpacingLint.detachesDeurida(context, candidate)) {
             return RejectionReason.SPACING
         }
 
