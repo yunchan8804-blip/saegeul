@@ -100,7 +100,6 @@ import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
 import org.fcitx.fcitx5.android.input.ai.AiSuggestionApplyResult
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.input.ai.TypingDnaCommitSink
 import org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector
 import org.fcitx.fcitx5.android.input.ai.learning.CollectionFeedbackEvent
 import org.fcitx.fcitx5.android.input.ai.learning.PersonalLearningController
@@ -354,9 +353,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     val recentSentSentences: RecentSentSentences
         get() = personalLearning.recentSentSentences
-
-    private val typingDnaCommitSink: TypingDnaCommitSink
-        get() = personalLearning.typingDnaCommitSink
 
     private val correctionSessionTracker: CorrectionSessionTracker
         get() = personalLearning.correctionSessionTracker
@@ -860,7 +856,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                             } else {
                                 null
                             }
-                            typingDnaCommitSink.onEditorContinuityLost(
+                            personalLearning.typingDnaCommitSink.onEditorContinuityLost(
                                 currentInputEditorInfo?.packageName,
                                 dnaRemovedText,
                                 dnaInspectionAllowed
@@ -989,7 +985,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             } else {
                 null
             }
-            typingDnaCommitSink.onEditorContinuityLost(
+            personalLearning.typingDnaCommitSink.onEditorContinuityLost(
                 currentInputEditorInfo?.packageName,
                 dnaRemovedText,
                 dnaInspectionAllowed
@@ -1018,7 +1014,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             null
         }
-        typingDnaCommitSink.onEditorContinuityLost(
+        personalLearning.typingDnaCommitSink.onEditorContinuityLost(
             currentInputEditorInfo?.packageName,
             dnaRemovedText,
             dnaInspectionAllowed
@@ -2403,7 +2399,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         bufferedHangulSessionActive = nextBufferedHangulSessionActive
         inputView?.refreshBufferedHangulPreedit()
-        typingDnaCommitSink.onEditorSessionStarted(attribute.packageName, attribute.fieldId, restarting)
+        personalLearning.typingDnaCommitSink.onEditorSessionStarted(attribute.packageName, attribute.fieldId, restarting)
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
@@ -2606,7 +2602,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (bufferedHangulSessionActive) {
             if (!selection.consume(newSelStart, newSelEnd)) {
-                typingDnaCommitSink.onEditorContinuityLost(
+                personalLearning.typingDnaCommitSink.onEditorContinuityLost(
                     currentInputEditorInfo?.packageName,
                     null,
                     allowsTextInspectionFeatures()
@@ -2639,7 +2635,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             // cursor update can't match any prediction: it's treated as a user input
             if (composing.isEmpty() || newSelStart != newSelEnd || !composing.contains(newSelStart)) {
-                typingDnaCommitSink.onEditorContinuityLost(
+                personalLearning.typingDnaCommitSink.onEditorContinuityLost(
                     currentInputEditorInfo?.packageName,
                     null,
                     allowsTextInspectionFeatures()
