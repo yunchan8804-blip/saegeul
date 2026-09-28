@@ -98,6 +98,69 @@ class KeyboardFrameTest {
     }
 
     @Test
+    fun `K20 fold unfolded width centers a 480dp mobile hangul surface regardless of orientation`() {
+        // Fold6 unfolded: 1856px at density 2.625 ~= 707dp, well past the 600dp threshold.
+        val insets = KeyboardFrame.compute(
+            windowWidthPx = 1856,
+            density = 2.625f,
+            isLandscape = false,
+            userSidePaddingPx = 0,
+            oneHandMode = OneHandMode.Off,
+            isSplitActive = false,
+            isMobileHangulLayout = true
+        )
+        // maxWidthPx = 480 * 2.625 = 1260; extra = (1856 - 1260) / 2 = 298 on each side
+        assertEquals(298, insets.startPx)
+        assertEquals(298, insets.endPx)
+    }
+
+    @Test
+    fun `K20 fold unfolded width leaves a dubeolsik surface unchanged in portrait`() {
+        val insets = KeyboardFrame.compute(
+            windowWidthPx = 1856,
+            density = 2.625f,
+            isLandscape = false,
+            userSidePaddingPx = 0,
+            oneHandMode = OneHandMode.Off,
+            isSplitActive = false,
+            isMobileHangulLayout = false
+        )
+        assertEquals(0, insets.startPx)
+        assertEquals(0, insets.endPx)
+    }
+
+    @Test
+    fun `K20 mobile hangul cap takes priority over the landscape 640dp centering`() {
+        val insets = KeyboardFrame.compute(
+            windowWidthPx = 1856,
+            density = 2.625f,
+            isLandscape = true,
+            userSidePaddingPx = 0,
+            oneHandMode = OneHandMode.Off,
+            isSplitActive = false,
+            isMobileHangulLayout = true
+        )
+        assertEquals(298, insets.startPx)
+        assertEquals(298, insets.endPx)
+    }
+
+    @Test
+    fun `K20 mobile hangul under the 600dp threshold stays at the user's own padding`() {
+        // A regular phone: 1080px at density 2.625 ~= 411dp, below the 600dp threshold.
+        val insets = KeyboardFrame.compute(
+            windowWidthPx = 1080,
+            density = 2.625f,
+            isLandscape = false,
+            userSidePaddingPx = 20,
+            oneHandMode = OneHandMode.Off,
+            isSplitActive = false,
+            isMobileHangulLayout = true
+        )
+        assertEquals(20, insets.startPx)
+        assertEquals(20, insets.endPx)
+    }
+
+    @Test
     fun `split keyboard active ignores one-hand mode entirely`() {
         val insets = KeyboardFrame.compute(
             windowWidthPx = 1000,

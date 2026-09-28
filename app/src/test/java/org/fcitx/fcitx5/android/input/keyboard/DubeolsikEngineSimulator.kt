@@ -41,6 +41,14 @@ class DubeolsikEngineSimulator {
     fun committedText(): String = committed.toString()
 
     /**
+     * The still-open syllable's precomposed character, when it is a complete Hangul syllable
+     * (has both a choseong and a jungseong) — what a real host's client-preedit signal would
+     * report as still composing. Feed this into [MobileHangulComposer.setComposingSyllable]
+     * after every [apply] to mimic that signal in tests (K21).
+     */
+    fun composingSyllable(): Char? = openText().singleOrNull()?.takeIf { it.code in 0xAC00..0xD7A3 }
+
+    /**
      * Flattens [text] into its underlying sequence of choseong/jungseong/jongseong compatibility
      * jamo, breaking every compound vowel or batchim down into its base components (e.g. ㅘ ->
      * ㅗ,ㅏ; ㄶ -> ㄴ,ㅎ). A character outside the precomposed Hangul syllable block — a space, a

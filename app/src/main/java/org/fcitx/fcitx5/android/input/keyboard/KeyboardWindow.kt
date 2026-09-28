@@ -16,6 +16,7 @@ import androidx.transition.Slide
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
@@ -96,6 +97,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     var onKeyboardSurfaceChanged: (() -> Unit)? = null
 
     fun currentBaseRowCount(): Int = currentKeyboard?.baseRowCount ?: 4
+
+    /** Whether the attached surface is a phone-keypad-style mobile Hangul keyboard (K20). */
+    fun isMobileHangulLayout(): Boolean = currentKeyboardName.startsWith("MobileHangul:")
 
     private fun keyboard(name: String): BaseKeyboard? = keyboards[name] ?: keyboardFactories[name]?.invoke()?.also {
         keyboards[name] = it
@@ -309,6 +313,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
         currentKeyboard?.onPreeditEmptyStateUpdate(empty)
+    }
+
+    override fun onClientPreeditUpdate(data: FormattedText) {
+        currentKeyboard?.onClientPreeditUpdate(data)
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {

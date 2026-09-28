@@ -410,7 +410,8 @@ class InputView(
             isLandscape = landscape,
             userSidePaddingPx = keyboardSidePaddingPx,
             oneHandMode = mode,
-            isSplitActive = splitActive
+            isSplitActive = splitActive,
+            isMobileHangulLayout = keyboardWindow.isMobileHangulLayout()
         )
         applyFrameInsets(insets)
         updateOneHandControls(if (splitActive) OneHandMode.Off else mode, insets)

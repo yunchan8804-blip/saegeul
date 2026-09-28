@@ -9,6 +9,7 @@ import android.content.Context
 import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
@@ -507,6 +508,10 @@ class MobileHangulKeyboard(
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
         router.onPreeditEmptyStateUpdate(empty)
+    }
+
+    override fun onClientPreeditUpdate(data: FormattedText) {
+        router.onClientPreeditUpdate(data.toString())
     }
 
     override fun onReturnDrawableUpdate(returnDrawable: Int) {

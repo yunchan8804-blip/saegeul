@@ -198,9 +198,18 @@ object MobileLayoutTypingPlanner {
         atMillis: Long
     ) {
         when (val action = key.action) {
-            is PlanAction.Composer -> engine.apply(composer.press(action.token, atMillis))
+            is PlanAction.Composer -> {
+                engine.apply(composer.press(action.token, atMillis))
+                // K21: mirrors the host feeding the client-preedit signal back into the composer
+                // after every key press, so a later replace/transform can recover a batchim
+                // libhangul already committed.
+                composer.setComposingSyllable(engine.composingSyllable())
+            }
             is PlanAction.ComposerSequence ->
-                action.tokens.forEach { token -> engine.apply(composer.press(token, atMillis)) }
+                action.tokens.forEach { token ->
+                    engine.apply(composer.press(token, atMillis))
+                    composer.setComposingSyllable(engine.composingSyllable())
+                }
             is PlanAction.Literal -> {
                 // Mirrors MobileHangulActionRouter's `else` branch: a raw/literal key resets the
                 // composer's own bookkeeping and is forwarded as-is, not through the composer.

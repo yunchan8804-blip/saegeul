@@ -14,6 +14,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
 import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
@@ -607,6 +608,11 @@ abstract class BaseKeyboard(
     }
 
     open fun onPreeditEmptyStateUpdate(empty: Boolean) {
+        // do nothing by default
+    }
+
+    /** The client preedit (composing) text changed (K21: mobile Hangul reads it for context). */
+    open fun onClientPreeditUpdate(data: FormattedText) {
         // do nothing by default
     }
 

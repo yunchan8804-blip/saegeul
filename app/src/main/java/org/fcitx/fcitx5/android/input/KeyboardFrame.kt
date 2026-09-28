@@ -30,13 +30,20 @@ object KeyboardFrame {
     /** Landscape keyboard max width, matching the app's max reading-area width. */
     private const val LANDSCAPE_MAX_WIDTH_DP = 640
 
+    /** K20: phone-keypad mobile Hangul surfaces cap out at this width once the screen is wide. */
+    private const val MOBILE_HANGUL_MAX_WIDTH_DP = 480
+
+    /** K20: below this screen width, a mobile Hangul surface uses the full width as usual. */
+    private const val MOBILE_HANGUL_WIDTH_THRESHOLD_DP = 600
+
     fun compute(
         windowWidthPx: Int,
         density: Float,
         isLandscape: Boolean,
         userSidePaddingPx: Int,
         oneHandMode: OneHandMode,
-        isSplitActive: Boolean
+        isSplitActive: Boolean,
+        isMobileHangulLayout: Boolean = false
     ): Insets {
         // A split keyboard already claims the width between its two halves; one-hand mode and the
         // landscape max-width centering would fight it over the same space, so both are skipped.
@@ -45,6 +52,11 @@ object KeyboardFrame {
         }
         if (oneHandMode != OneHandMode.Off) {
             return oneHandInsets(windowWidthPx, userSidePaddingPx, oneHandMode)
+        }
+        // K20: a phone-keypad mobile Hangul surface (chunjiin/vega/naratgul/danmoum/moakey) caps
+        // its own width regardless of orientation, unlike QWERTY-style surfaces below.
+        if (isMobileHangulLayout) {
+            mobileHangulMaxWidthInsets(windowWidthPx, density, userSidePaddingPx)?.let { return it }
         }
         if (isLandscape) {
             return landscapeMaxWidthInsets(windowWidthPx, density, userSidePaddingPx)
@@ -63,6 +75,20 @@ object KeyboardFrame {
             // The user's own margin already keeps the keyboard under the max width; don't add more.
             return Insets(userSidePaddingPx, userSidePaddingPx)
         }
+        val extra = (available - maxWidthPx) / 2
+        return Insets(userSidePaddingPx + extra, userSidePaddingPx + extra)
+    }
+
+    private fun mobileHangulMaxWidthInsets(
+        windowWidthPx: Int,
+        density: Float,
+        userSidePaddingPx: Int
+    ): Insets? {
+        val widthThresholdPx = MOBILE_HANGUL_WIDTH_THRESHOLD_DP * density
+        if (windowWidthPx <= widthThresholdPx) return null
+        val available = (windowWidthPx - userSidePaddingPx * 2).coerceAtLeast(0)
+        val maxWidthPx = (MOBILE_HANGUL_MAX_WIDTH_DP * density).roundToInt()
+        if (available <= maxWidthPx) return null
         val extra = (available - maxWidthPx) / 2
         return Insets(userSidePaddingPx + extra, userSidePaddingPx + extra)
     }

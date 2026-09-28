@@ -69,6 +69,16 @@ class MobileHangulActionRouter(private val composer: MobileHangulComposer) {
     }
 
     /**
+     * Forwarded from [BaseKeyboard.onClientPreeditUpdate] (K21): tells the composer which
+     * syllable is still composing, so a later multitap/transform key can recover a batchim
+     * libhangul already committed. Only the preedit's last, complete Hangul syllable matters; a
+     * bare open jamo or punctuation carries nothing usable and clears it instead.
+     */
+    fun onClientPreeditUpdate(text: String) {
+        composer.setComposingSyllable(text.lastOrNull()?.takeIf { it in '가'..'힣' })
+    }
+
+    /**
      * Forwarded from [BaseKeyboard.onSelectionUpdate]. Resets the composer for a real user/engine
      * selection change, but not for the echo of an output this router just dispatched itself.
      */
