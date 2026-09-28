@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -86,6 +87,7 @@ class TypingDnaVault(
             deque.removeFirst()
         }
 
+        // A failed save keeps the sentence in memory, so the next successful save writes it too.
         persistStaging()
 
         if (deque.size >= thresholdPerCategory) {
@@ -134,8 +136,14 @@ class TypingDnaVault(
 
     /**
      * Processes current pending sentences under the vault lock.
-     * A category is removed only after [processor] returns normally. New records wait for the
-     * current processor and remain pending for a subsequent call.
+     * A category leaves the pending buffers only once [processor] returns normally: it is removed
+     * and the staging file saved before [processor] runs, and both are rolled back if [processor]
+     * throws. A single failure therefore neither drops nor double-processes a batch; a batch can
+     * be lost only if [processor] fails, the rollback save also fails, and the process then dies
+     * before the next successful save. New records wait for the current processor and remain
+     * pending for a subsequent call.
+     * Throws [TypingDnaPersistenceException], without running [processor], if the removal cannot
+     * be saved; a [processor] failure is rethrown as is, with any rollback save failure suppressed.
      */
     @Synchronized
     fun processPending(
@@ -148,12 +156,22 @@ class TypingDnaVault(
         }
         var processedCount = 0
         for (currentCategory in categories) {
-            val sentences = categoryBuffers[currentCategory]?.toList().orEmpty()
+            val buffer = categoryBuffers[currentCategory] ?: continue
+            val sentences = buffer.toList()
             if (sentences.isEmpty()) continue
 
-            processor(currentCategory, sentences)
             categoryBuffers.remove(currentCategory)
-            persistStaging()
+            persistStaging()?.let { failure ->
+                categoryBuffers[currentCategory] = buffer
+                throw TypingDnaPersistenceException(failure)
+            }
+            try {
+                processor(currentCategory, sentences)
+            } catch (failure: Throwable) {
+                categoryBuffers[currentCategory] = buffer
+                persistStaging()?.let(failure::addSuppressed)
+                throw failure
+            }
             processedCount += sentences.size
         }
         return processedCount
@@ -178,22 +196,32 @@ class TypingDnaVault(
     /**
      * Zero-Knowledge Purge:
      * Irreversibly purges the raw staging buffers once knowledge has been compiled.
+     * Throws [TypingDnaPersistenceException] if the staging file cannot be rewritten; the purged
+     * buffers are then restored, so memory keeps matching the file that still holds them.
      */
     @Synchronized
     fun purge(category: String? = null) {
+        val purged = HashMap<String, ArrayDeque<String>>()
         if (category != null) {
-            categoryBuffers[category]?.clear()
-            categoryBuffers.remove(category)
+            categoryBuffers.remove(category)?.let { purged[category] = it }
         } else {
-            categoryBuffers.values.forEach { it.clear() }
+            purged.putAll(categoryBuffers)
             categoryBuffers.clear()
         }
-        persistStaging()
+        persistStaging()?.let { failure ->
+            categoryBuffers.putAll(purged)
+            throw TypingDnaPersistenceException(failure)
+        }
+        purged.values.forEach { it.clear() }
     }
 
-    private fun persistStaging() {
-        val vf = vaultFile ?: return
-        runCatching {
+    /**
+     * Writes the buffers to the staging file. A failure is logged and returned rather than thrown,
+     * so each caller decides whether to keep its in-memory change or roll it back and report it.
+     */
+    private fun persistStaging(): Exception? {
+        val vf = vaultFile ?: return null
+        return try {
             val root = JSONObject()
             categoryBuffers.forEach { (category, deque) ->
                 val arr = JSONArray()
@@ -201,6 +229,10 @@ class TypingDnaVault(
                 root.put(category, arr)
             }
             vf.writeText(root.toString())
+            null
+        } catch (exception: Exception) {
+            Timber.w(exception, "Typing DNA staging save failed")
+            exception
         }
     }
 

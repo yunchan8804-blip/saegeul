@@ -211,12 +211,22 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                             .setPositiveButton(R.string.delete) { _, _ ->
                                 val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
                                 app.typingDnaRepository.clear()
-                                app.typingDnaVault.purge()
+                                val stagingPurged = try {
+                                    app.typingDnaVault.purge()
+                                    true
+                                } catch (_: org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException) {
+                                    false
+                                }
                                 app.personalNgramModel.clear()
                                 app.personalSentenceVault.clear()
                                 org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.recentSentSentences?.clear()
                                 refreshSummaries()
-                                Toast.makeText(ctx, R.string.privacy_ai_typing_dna_cleared_toast, Toast.LENGTH_SHORT).show()
+                                val resultMessage = if (stagingPurged) {
+                                    R.string.privacy_ai_typing_dna_cleared_toast
+                                } else {
+                                    R.string.privacy_ai_typing_dna_clear_failed_toast
+                                }
+                                Toast.makeText(ctx, resultMessage, Toast.LENGTH_SHORT).show()
                             }
                             .setNegativeButton(android.R.string.cancel, null)
                             .show()

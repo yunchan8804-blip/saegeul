@@ -24,6 +24,7 @@
     <string name="privacy_ai_typing_dna_clear_dialog_title">Reset language fingerprint</string>
     <string name="privacy_ai_typing_dna_clear_dialog_message">Completely delete the learned tone, sentence endings, and personal expressions from this device?</string>
     <string name="privacy_ai_typing_dna_cleared_toast">Language fingerprint has been safely reset.</string>
+    <string name="privacy_ai_typing_dna_clear_failed_toast">Couldn\'t erase your personal records. Please try again.</string>
     <string name="privacy_ai_typing_dna_no_data_summary">No language fingerprint has been learned yet. It\'s learned automatically as you use the keyboard.</string>
     <string name="privacy_ai_typing_dna_stats_summary">Lv.%1$d %2$s · %3$d sentences · %4$d word pairs · %5$d endings</string>
     <string name="privacy_ai_typing_dna_sync_done_toast">Language fingerprint analysis complete (%1$d sentences analyzed)</string>
