@@ -15,6 +15,7 @@ import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
 import org.fcitx.fcitx5.android.R
+import timber.log.Timber
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -153,6 +154,7 @@ class FcitxDataProvider : DocumentsProvider() {
                 throw FileNotFoundException("createDocument id=${newFile.path} failed")
             }
         } catch (e: IOException) {
+            Timber.w(e, "FcitxDataProvider createDocument failed id=%s", newFile.path)
             throw FileNotFoundException("createDocument id=${newFile.path} failed: ${e.message}")
         }
         return newFile.docId
@@ -195,6 +197,7 @@ class FcitxDataProvider : DocumentsProvider() {
                     throw FileNotFoundException("copyDocument id=$sourceDocumentId to ${newFile.docId} failed")
                 }
             } catch (e: Exception) {
+                Timber.w(e, "FcitxDataProvider copyDocument failed id=%s to=%s", sourceDocumentId, newFile.docId)
                 throw FileNotFoundException("copyDocument id=$sourceDocumentId to ${newFile.docId} failed: ${e.message}")
             }
         }

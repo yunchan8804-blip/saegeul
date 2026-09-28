@@ -10,6 +10,8 @@ import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseProfileSto
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.SensitivePhrase
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.SensitivePhraseCommitGate
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.SensitivePhrasePolicy
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -60,11 +62,8 @@ class SensitivePhraseWindow(
         pendingAuthResume?.let { resume ->
             pendingAuthResume = null
             if (!service.matchesCurrentEditor(
-                    editor.packageName,
-                    editor.fieldId,
-                    editor.inputType,
-                    editor.selectionStart,
-                    editor.selectionEnd
+                    EditorIdentity(editor.packageName, editor.fieldId, editor.inputType),
+                    EditorSelection(editor.selectionStart, editor.selectionEnd)
                 )
             ) {
                 SensitivePhraseSession.lock()
@@ -81,11 +80,8 @@ class SensitivePhraseWindow(
             return
         }
         if (!service.matchesCurrentEditor(
-                editor.packageName,
-                editor.fieldId,
-                editor.inputType,
-                editor.selectionStart,
-                editor.selectionEnd
+                EditorIdentity(editor.packageName, editor.fieldId, editor.inputType),
+                EditorSelection(editor.selectionStart, editor.selectionEnd)
             )
         ) {
             SensitivePhraseSession.lock()
@@ -109,11 +105,8 @@ class SensitivePhraseWindow(
     private fun unlock() {
         if (!service.allowsTextInspectionFeatures() ||
             !service.matchesCurrentEditor(
-                editor.packageName,
-                editor.fieldId,
-                editor.inputType,
-                editor.selectionStart,
-                editor.selectionEnd
+                EditorIdentity(editor.packageName, editor.fieldId, editor.inputType),
+                EditorSelection(editor.selectionStart, editor.selectionEnd)
             )
         ) {
             ui.showError(context.getString(R.string.secret_vault_editor_changed))
@@ -178,11 +171,8 @@ class SensitivePhraseWindow(
 
     private fun currentAllowedItem(id: String): SensitivePhrase? {
         if (!service.allowsTextInspectionFeatures() || !service.matchesCurrentEditor(
-                editor.packageName,
-                editor.fieldId,
-                editor.inputType,
-                editor.selectionStart,
-                editor.selectionEnd
+                EditorIdentity(editor.packageName, editor.fieldId, editor.inputType),
+                EditorSelection(editor.selectionStart, editor.selectionEnd)
             )
         ) {
             SensitivePhraseSession.lock()

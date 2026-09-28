@@ -343,7 +343,7 @@ class GemmaGraphEnrichmentWorker(
         // individual chunk's wall time (below) was waiting rather than actually generating - see
         // PersonalGraphEnrichmentStagingStore.State.lastWaitMs's doc.
         var totalWaitMs = 0L
-        val session = GemmaGraphGenerationSession(applicationContext)
+        val session = GemmaGraphGenerationSession()
         // Persists the waiting/not-waiting transition into the staging checkpoint so the dashboard
         // (which reads the staging file for its progress text) can show a distinct "waiting for
         // another on-device task" message instead of looking stuck mid-chunk, and updates the
@@ -571,6 +571,7 @@ class GemmaGraphEnrichmentWorker(
                             try {
                                 text = session.generate(prompt)
                             } catch (lost: GemmaGraphGenerationSession.LeaseLostException) {
+                                // lost 자체는 신호일 뿐이다: 무엇이 임차권을 뺏었는지는 아래에서 다시 평가해 재시도/일시정지를 결정한다.
                                 if (isStopped) throw CancellationException("WorkManager stopped the graph enrichment worker")
                                 session.close()
                                 val waitReason = GemmaGenerationEligibility.evaluate(

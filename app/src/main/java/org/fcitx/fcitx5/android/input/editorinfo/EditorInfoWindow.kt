@@ -68,5 +68,6 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
         ui.setValues(propertyMap)
     }
 
+    // 의도적으로 비움: 뗄 때 따로 정리할 상태가 없다.
     override fun onDetached() {}
 }

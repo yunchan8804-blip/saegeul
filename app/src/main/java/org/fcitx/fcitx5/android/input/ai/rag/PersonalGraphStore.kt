@@ -20,8 +20,7 @@ import java.io.File
  */
 class PersonalGraphStore(
     private val storeFile: File? = null,
-    private val cipher: VaultCipher = PlainVaultCipher,
-    private val clock: () -> Long = System::currentTimeMillis
+    private val cipher: VaultCipher = PlainVaultCipher
 ) {
 
     data class Node(val id: String, val tags: List<String>, val weight: Float)

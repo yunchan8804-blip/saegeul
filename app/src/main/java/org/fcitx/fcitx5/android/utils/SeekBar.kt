@@ -9,7 +9,9 @@ import android.widget.SeekBar
 
 fun SeekBar.setOnChangeListener(listener: SeekBar.(progress: Int) -> Unit) {
     setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+        // 의도적으로 비움: 이 헬퍼는 진행값 변경만 넘긴다.
         override fun onStartTrackingTouch(seekBar: SeekBar) {}
+        // 의도적으로 비움: 이 헬퍼는 진행값 변경만 넘긴다.
         override fun onStopTrackingTouch(seekBar: SeekBar) {}
         override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
             listener.invoke(seekBar, progress)

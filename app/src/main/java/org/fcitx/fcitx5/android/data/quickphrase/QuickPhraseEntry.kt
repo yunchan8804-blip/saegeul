@@ -27,6 +27,7 @@ data class QuickPhraseEntry(val keyword: String, val phrase: String) {
                 val key = text.substring(0, pos)
                 QuickPhraseEntry(key, wordString)
             } catch (e: Exception) {
+                // 형식이 잘못된 줄은 건너뛴다(fcitx5 quickphrase 파일은 줄 단위로 관대하게 파싱한다).
                 null
             }
         }

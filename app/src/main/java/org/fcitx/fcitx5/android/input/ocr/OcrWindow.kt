@@ -13,6 +13,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -21,6 +23,7 @@ import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
+import timber.log.Timber
 
 /** Local Korean OCR with one-shot image access, explicit review, and exactly-once insertion. */
 class OcrWindow(
@@ -101,6 +104,7 @@ class OcrWindow(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                Timber.w(exception, "OcrWindow model check failed")
                 modelInstalled = false
                 if (attached) showModelMissing(failed = true)
             }
@@ -128,6 +132,7 @@ class OcrWindow(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                Timber.w(exception, "OcrWindow model download failed")
                 modelInstalled = false
                 if (attached) showModelMissing(failed = true)
             } finally {
@@ -185,6 +190,7 @@ class OcrWindow(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                Timber.w(exception, "OcrWindow resume-after-picker recognition failed")
                 if (attached) {
                     clearReviewState(keepTarget = true)
                     ui.showRecognitionError(R.string.ocr_failed, canRetry = true)
@@ -274,11 +280,8 @@ class OcrWindow(
 
     private fun validateTarget(boundTarget: OcrEditorTarget, showError: Boolean): Boolean {
         val valid = service.allowsTextInspectionFeatures() && service.matchesCurrentEditor(
-            boundTarget.packageName,
-            boundTarget.fieldId,
-            boundTarget.inputType,
-            boundTarget.cursor,
-            boundTarget.cursor
+            EditorIdentity(boundTarget.packageName, boundTarget.fieldId, boundTarget.inputType),
+            EditorSelection.collapsed(boundTarget.cursor)
         )
         if (!valid && showError && attached) {
             if (service.allowsTextInspectionFeatures()) {

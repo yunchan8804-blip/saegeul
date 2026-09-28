@@ -710,6 +710,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             add(normalRoot, lParams(matchParent, matchParent))
             add(titleUi.root, lParams(matchParent, matchParent))
             addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                // 의도적으로 비움: 붙을 때는 할 일이 없고, 뗄 때만 정리하면 된다.
                 override fun onViewAttachedToWindow(v: View) {}
                 override fun onViewDetachedFromWindow(v: View) {
                     cancelCandidateRowCollapse()

@@ -1344,7 +1344,9 @@ class CustomThemeActivity : AppCompatActivity() {
         }
         refreshRadiusValue()
         radiusSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                 refreshRadiusValue()
@@ -1378,7 +1380,9 @@ class CustomThemeActivity : AppCompatActivity() {
 
     private fun setupSeekBars() {
         ambientSpeedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
@@ -1391,7 +1395,9 @@ class CustomThemeActivity : AppCompatActivity() {
         })
 
         ambientIntensitySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
@@ -1404,7 +1410,9 @@ class CustomThemeActivity : AppCompatActivity() {
         })
 
         keyTranslucencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
@@ -1417,7 +1425,9 @@ class CustomThemeActivity : AppCompatActivity() {
         })
 
         particleCountSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
@@ -1430,7 +1440,9 @@ class CustomThemeActivity : AppCompatActivity() {
         })
 
         particleLifetimeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
@@ -1443,7 +1455,9 @@ class CustomThemeActivity : AppCompatActivity() {
         })
 
         particleSpeedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
@@ -1456,7 +1470,9 @@ class CustomThemeActivity : AppCompatActivity() {
         })
 
         glowRadiusSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
@@ -1588,7 +1604,9 @@ class CustomThemeActivity : AppCompatActivity() {
         }
 
         brightnessSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStartTrackingTouch(bar: SeekBar) {}
+            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
             override fun onStopTrackingTouch(bar: SeekBar) {}
 
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {

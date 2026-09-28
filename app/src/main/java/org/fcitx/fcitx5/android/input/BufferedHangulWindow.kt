@@ -244,9 +244,11 @@ class BufferedHangulWindow : InputWindow.ExtendedInputWindow<BufferedHangulWindo
         }
     }
 
+    // 의도적으로 비움: 이 창은 붙거나 뗄 때 따로 할 일이 없다.
     override fun onAttached() {
     }
 
+    // 의도적으로 비움: 이 창은 붙거나 뗄 때 따로 할 일이 없다.
     override fun onDetached() {
     }
 }

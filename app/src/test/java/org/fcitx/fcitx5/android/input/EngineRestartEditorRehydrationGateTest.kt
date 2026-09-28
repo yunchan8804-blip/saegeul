@@ -61,9 +61,7 @@ class EngineRestartEditorRehydrationGateTest {
 
         gate.onStartInputView(
             inputSessionEpoch = 11,
-            editorPackageName = "org.example.editor",
-            fieldId = 12,
-            inputType = 99,
+            identity = EditorIdentity("org.example.editor", 12, 99),
             capabilityFlags = CapabilityFlags(789u),
             shouldFocus = false
         )
@@ -86,18 +84,14 @@ class EngineRestartEditorRehydrationGateTest {
         gate.onBindInput(88, "org.example.next")
         gate.onStartInput(
             inputSessionEpoch = 12,
-            editorPackageName = "org.example.next",
-            fieldId = 4,
-            inputType = 1,
+            identity = EditorIdentity("org.example.next", 4, 1),
             capabilityFlags = latestFlags,
             shouldFocus = false,
             isVirtualKeyboard = false
         )
         gate.onStartInputView(
             inputSessionEpoch = 12,
-            editorPackageName = "org.example.next",
-            fieldId = 9,
-            inputType = 2,
+            identity = EditorIdentity("org.example.next", 9, 2),
             capabilityFlags = CapabilityFlags(456u),
             shouldFocus = false
         )
@@ -136,9 +130,7 @@ class EngineRestartEditorRehydrationGateTest {
 
         gate.onStartInput(
             inputSessionEpoch = 13,
-            editorPackageName = "org.example.editor",
-            fieldId = 7,
-            inputType = 0,
+            identity = EditorIdentity("org.example.editor", 7, 0),
             capabilityFlags = CapabilityFlags.DefaultFlags,
             shouldFocus = false,
             isVirtualKeyboard = true
@@ -158,9 +150,7 @@ class EngineRestartEditorRehydrationGateTest {
             onBindInput(42, "org.example.editor")
             onStartInput(
                 inputSessionEpoch = 11,
-                editorPackageName = "org.example.editor",
-                fieldId = 7,
-                inputType = 1,
+                identity = EditorIdentity("org.example.editor", 7, 1),
                 capabilityFlags = CapabilityFlags.DefaultFlags,
                 shouldFocus = true,
                 isVirtualKeyboard = true,

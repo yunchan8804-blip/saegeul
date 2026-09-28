@@ -48,6 +48,7 @@ abstract class ClipboardAdapter(
          * @param lines max output lines
          * @param chars max chars per output line
          */
+        @Suppress("UnusedPrivateProperty")
         fun excerptText(
             str: String,
             mask: Boolean = false,

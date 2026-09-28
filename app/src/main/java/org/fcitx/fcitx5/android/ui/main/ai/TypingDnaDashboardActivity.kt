@@ -66,6 +66,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import kotlin.math.roundToInt
 
 /**
@@ -399,6 +400,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         try {
             startActivity(intent)
         } catch (e: ActivityNotFoundException) {
+            // 백업 화면이 없는 빌드(일부 플레이버)에서는 안내만 하고 조용히 넘어간다.
             Toast.makeText(this, R.string.vault_storage_backup_unavailable, Toast.LENGTH_SHORT).show()
         }
     }
@@ -573,6 +575,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            Timber.w(error, "TypingDnaDashboardActivity Gemma snapshot refresh failed")
             if (requestGeneration != gemmaStateGeneration || isFinishing || isDestroyed) return
             gemmaVaultError.setText(R.string.gemma_vault_state_read_failed)
             gemmaVaultError.visibility = View.VISIBLE
@@ -593,6 +596,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
+                Timber.w(error, "TypingDnaDashboardActivity Gemma automatic-enabled toggle failed")
                 gemmaTransientError = getString(R.string.gemma_vault_action_failed)
             } finally {
                 gemmaMutationInProgress = false
@@ -1262,6 +1266,7 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
+                Timber.w(error, "TypingDnaDashboardActivity graph enrichment action failed action=%s", action)
                 Toast.makeText(this@TypingDnaDashboardActivity, R.string.gemma_vault_action_failed, Toast.LENGTH_SHORT).show()
             } finally {
                 graphActionInFlight = false

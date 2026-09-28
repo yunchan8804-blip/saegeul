@@ -27,7 +27,7 @@ class PersonalGraphStoreTest {
 
     @Test
     fun replaceGraphAndStatsReflectStoredCounts() {
-        val store = PersonalGraphStore(clock = { 5000L })
+        val store = PersonalGraphStore()
         store.replaceGraph(
             nodes = listOf(
                 PersonalGraphStore.Node("회의", listOf("업무"), 3.0f),

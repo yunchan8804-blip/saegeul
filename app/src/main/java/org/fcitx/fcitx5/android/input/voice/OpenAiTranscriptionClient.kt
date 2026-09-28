@@ -54,6 +54,7 @@ class OpenAiTranscriptionClient(
                     request = request
                 )
             } catch (exception: AiHttpStatusException) {
+                // exception.message를 도메인 예외 메시지로 그대로 옮긴다; 상태 코드별 분류가 목적이라 원본은 버린다.
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
                     throw VoiceAuthenticationException("OpenAI rejected the STT API key")
                 }

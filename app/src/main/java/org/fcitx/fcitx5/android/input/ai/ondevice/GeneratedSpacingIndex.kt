@@ -22,7 +22,7 @@ class GeneratedSpacingIndex private constructor(
             entries.forEach { target ->
                 if (!isAcceptedSentence(target) || target != target.trim(' ')) return@forEach
                 val key = target.withoutSpaces()
-                when (val existing = targets[key]) {
+                when (targets[key]) {
                     null -> if (!targets.containsKey(key)) targets[key] = target
                     target -> Unit
                     else -> targets[key] = null

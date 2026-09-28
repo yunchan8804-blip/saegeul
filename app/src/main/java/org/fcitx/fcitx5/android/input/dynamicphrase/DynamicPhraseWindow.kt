@@ -14,6 +14,8 @@ import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseResolution
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseTemplate
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseValues
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseVariable
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -79,11 +81,8 @@ class DynamicPhraseWindow(
     private fun insert() {
         val result = resolution?.takeIf { it.canInsert } ?: return
         if (!service.matchesCurrentEditor(
-                editor.packageName,
-                editor.fieldId,
-                editor.inputType,
-                editor.selectionStart,
-                editor.selectionEnd
+                EditorIdentity(editor.packageName, editor.fieldId, editor.inputType),
+                EditorSelection(editor.selectionStart, editor.selectionEnd)
             )
         ) {
             ui.showError(context.getString(R.string.dynamic_phrase_editor_changed))

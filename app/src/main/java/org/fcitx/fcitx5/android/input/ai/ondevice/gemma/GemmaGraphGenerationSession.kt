@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.ai.ondevice.gemma
 
-import android.content.Context
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Conversation
 import kotlinx.coroutines.CancellationException
@@ -32,7 +31,7 @@ import java.io.File
  * backend, falling back to CPU once via [OnDeviceBackendFallbackPolicy] (the same policy the automatic
  * suggestion engine uses).
  */
-class GemmaGraphGenerationSession(private val context: Context) {
+class GemmaGraphGenerationSession {
 
     /**
      * A generation was interrupted mid-flight ([cancel] called, either the keyboard preempting the

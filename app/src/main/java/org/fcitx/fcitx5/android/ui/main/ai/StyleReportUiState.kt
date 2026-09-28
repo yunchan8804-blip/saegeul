@@ -47,8 +47,7 @@ data class StyleReportUiState(
         fun from(
             stats: TypingDnaStats,
             vaultCategoryCounts: Map<String, Int>,
-            metrics: PredictionMetricsStore.Summary,
-            nowMs: Long
+            metrics: PredictionMetricsStore.Summary
         ): StyleReportUiState {
             if (stats.totalSentences <= 0) {
                 return StyleReportUiState(

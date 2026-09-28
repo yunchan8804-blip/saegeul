@@ -10,6 +10,8 @@ import androidx.core.content.FileProvider
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 
 data class GifEditorTarget(
@@ -65,11 +67,8 @@ class RichContentCommitter(private val service: FcitxInputMethodService) {
     fun commit(result: GifResult, file: java.io.File, target: GifEditorTarget): GifCommitResult {
         if (!service.allowsNetworkInputFeatures()) return GifCommitResult.SensitiveEditor
         if (!service.matchesCurrentEditor(
-                target.packageName,
-                target.fieldId,
-                target.inputType,
-                target.selectionStart,
-                target.selectionEnd,
+                EditorIdentity(target.packageName, target.fieldId, target.inputType),
+                EditorSelection(target.selectionStart, target.selectionEnd),
                 expectedInputSessionEpoch = target.inputSessionEpoch
             )
         ) {

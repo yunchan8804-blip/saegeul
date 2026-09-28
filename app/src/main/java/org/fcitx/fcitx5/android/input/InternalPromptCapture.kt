@@ -59,26 +59,17 @@ internal sealed interface InternalPromptFinishResult {
  * a queued prompt callback cannot reopen a GIF surface against a later field.
  */
 internal data class InternalPromptEditorTarget(
-    val packageName: String?,
-    val fieldId: Int,
-    val inputType: Int,
-    val selectionStart: Int,
-    val selectionEnd: Int,
+    val identity: EditorIdentity,
+    val selection: EditorSelection,
     val inputSessionEpoch: Long
 ) {
     fun matches(
-        packageName: String?,
-        fieldId: Int,
-        inputType: Int,
-        selectionStart: Int,
-        selectionEnd: Int,
+        identity: EditorIdentity,
+        selection: EditorSelection,
         inputSessionEpoch: Long
     ): Boolean =
-        this.packageName == packageName &&
-            this.fieldId == fieldId &&
-            this.inputType == inputType &&
-            this.selectionStart == selectionStart &&
-            this.selectionEnd == selectionEnd &&
+        this.identity.sameField(identity) &&
+            this.selection == selection &&
             this.inputSessionEpoch == inputSessionEpoch
 }
 

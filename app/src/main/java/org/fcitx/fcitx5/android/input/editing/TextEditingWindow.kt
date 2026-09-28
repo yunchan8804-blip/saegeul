@@ -105,6 +105,7 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
         onSelectionUpdate(range.start, range.end)
     }
 
+    // 의도적으로 비움: 뗄 때 따로 정리할 상태가 없다.
     override fun onDetached() {}
 
     override fun onSelectionUpdate(start: Int, end: Int) {

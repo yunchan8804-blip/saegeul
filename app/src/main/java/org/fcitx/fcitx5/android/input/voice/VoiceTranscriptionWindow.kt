@@ -16,6 +16,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.InputFeatureBlock
 import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
@@ -450,11 +452,8 @@ class VoiceTranscriptionWindow(
     private fun validateTarget(boundTarget: VoiceEditorTarget, showError: Boolean): Boolean {
         if (!validatePolicy()) return false
         val valid = service.matchesCurrentEditor(
-            boundTarget.packageName,
-            boundTarget.fieldId,
-            boundTarget.inputType,
-            boundTarget.cursor,
-            boundTarget.cursor
+            EditorIdentity(boundTarget.packageName, boundTarget.fieldId, boundTarget.inputType),
+            EditorSelection.collapsed(boundTarget.cursor)
         )
         if (!valid && showError && attached) {
             ui.showError(context.getString(R.string.voice_editor_changed), canRetry = false)

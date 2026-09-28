@@ -199,6 +199,7 @@ object VaultBackup {
 
             ExportResult.Success(manifest.toSummary(emptyList()), encrypted.size.toLong())
         } catch (e: IOException) {
+            Timber.w(e, "VaultBackup export failed")
             ExportResult.Failure("IO_ERROR")
         } finally {
             password.fill('\u0000')
@@ -243,6 +244,7 @@ object VaultBackup {
                     staged += stagingFile to targetFile
                 }
             } catch (e: Exception) {
+                Timber.w(e, "VaultBackup import staging write failed")
                 staged.forEach { (staging, _) -> staging.delete() }
                 return@withContext ImportResult.Failure("STAGE_WRITE_FAILED")
             }
@@ -266,6 +268,7 @@ object VaultBackup {
                 // PersonalGraphEnrichmentStagingStore's own code is untouched - this only deletes its file.
                 clearTarget(File(filesDir, GRAPH_ENRICHMENT_STAGING_FILE_NAME))
             } catch (e: Exception) {
+                Timber.w(e, "VaultBackup import commit failed")
                 return@withContext ImportResult.Failure("COMMIT_FAILED")
             } finally {
                 staged.forEach { (staging, _) -> staging.delete() }
@@ -348,6 +351,7 @@ object VaultBackup {
         val manifest = try {
             json.decodeFromString(ManifestJson.serializer(), unpacked.manifestJson)
         } catch (e: Exception) {
+            Timber.w(e, "VaultBackup manifest decode failed")
             return OpenOutcome.Corrupted
         }
         if (manifest.formatVersion > VaultBackupCrypto.CURRENT_FORMAT_VERSION) return OpenOutcome.NewerVersion
