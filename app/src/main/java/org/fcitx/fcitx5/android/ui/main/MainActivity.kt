@@ -31,7 +31,6 @@ import androidx.navigation.fragment.NavHostFragment
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.ads.DashboardBannerController
 import org.fcitx.fcitx5.android.databinding.ActivityMainBinding
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.SentencePackDialog
@@ -53,7 +52,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navController: NavController
     private lateinit var rootView: ViewGroup
     private lateinit var bannerContainer: ViewGroup
-    private lateinit var banner: DashboardBannerController
     private var sentencePackPromptScheduled = false
     private var sentencePackPromptAwaitingFirstFrame = false
     private var notificationPermissionPromptVisible = false
@@ -75,11 +73,10 @@ class MainActivity : AppCompatActivity() {
             bannerContainer.updatePadding(bottom = navBars.bottom)
             windowInsets
         }
+        // Settings screens carry no ads: the ad design forbids them on settings entry, first launch,
+        // permission prompts and delete confirmations (docs/business/ad-monetization-avenue-operations.md),
+        // so this slot stays gone and no banner is requested here.
         bannerContainer = binding.bannerAdContainer
-        banner = DashboardBannerController(this, bannerContainer)
-        banner.attach(object : DashboardBannerController.VisibilityListener {
-            override fun onBannerVisibilityChanged(visible: Boolean) = Unit
-        })
         setContentView(binding.root)
         // always show toolbar back arrow icon
         // https://android.googlesource.com/platform/frameworks/support/+/32e643112d0217619237a0d7101b50919c6caf51/navigation/navigation-ui/src/main/java/androidx/navigation/ui/AbstractAppBarOnDestinationChangedListener.kt#80

@@ -28,8 +28,8 @@ internal object LocalAvenueCatalog {
 
     val typingDnaDashboardBanner = AdVenue(
         id = TYPING_DNA_DASHBOARD_BANNER,
-        screen = "메인 설정 화면과 AI 언어 지문 대시보드",
-        trigger = "앱 하단 배너 노출",
+        screen = "AI 언어 지문 대시보드",
+        trigger = "대시보드 하단 배너 노출",
         format = AdFormat.BANNER,
         requiresConsent = true
     )
