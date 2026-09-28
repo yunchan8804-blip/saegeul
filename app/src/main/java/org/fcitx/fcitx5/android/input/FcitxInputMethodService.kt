@@ -4262,7 +4262,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             FcitxKeyMapping.FcitxKey_BackSpace,
             FcitxKeyMapping.FcitxKey_Return,
             FcitxKeyMapping.FcitxKey_Left,
-            FcitxKeyMapping.FcitxKey_Right -> true
+            FcitxKeyMapping.FcitxKey_Right,
+            FcitxKeyMapping.FcitxKey_Up,
+            FcitxKeyMapping.FcitxKey_Down,
+            FcitxKeyMapping.FcitxKey_Home,
+            FcitxKeyMapping.FcitxKey_End,
+            FcitxKeyMapping.FcitxKey_Page_Up,
+            FcitxKeyMapping.FcitxKey_Page_Down,
+            FcitxKeyMapping.FcitxKey_Tab -> true
             else -> data.unicode > 0
         }
         if (!bufferedKey) return false
@@ -4293,12 +4300,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 if (hasPendingBufferedHangul()) submitBufferedHangul() else handleReturnKey()
                 true
             }
-            FcitxKeyMapping.FcitxKey_Left -> {
-                if (submitBufferedHangul()) sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT)
-                true
-            }
-            FcitxKeyMapping.FcitxKey_Right -> {
-                if (submitBufferedHangul()) sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT)
+            // Navigation moves the target cursor, and an unexpected selection change discards the
+            // pending segment. Submit it first, then perform the navigation.
+            FcitxKeyMapping.FcitxKey_Left,
+            FcitxKeyMapping.FcitxKey_Right,
+            FcitxKeyMapping.FcitxKey_Up,
+            FcitxKeyMapping.FcitxKey_Down,
+            FcitxKeyMapping.FcitxKey_Home,
+            FcitxKeyMapping.FcitxKey_End,
+            FcitxKeyMapping.FcitxKey_Page_Up,
+            FcitxKeyMapping.FcitxKey_Page_Down,
+            FcitxKeyMapping.FcitxKey_Tab -> {
+                if (submitBufferedHangul()) sendDownUpKeyEvents(data.sym.keyCode)
                 true
             }
             else -> if (data.unicode > 0) {
