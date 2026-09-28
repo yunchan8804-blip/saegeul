@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="graph_enrichment_failure_invalid_response">The AI response format was invalid, so enrichment could not finish. Please try again.</string>
-    <string name="graph_enrichment_failure_reauth_required">Enrichment could not finish. Please try again.</string>
-    <string name="graph_enrichment_failure_provider_busy">Saegeul AI is handling another task right now. Please try again shortly.</string>
-    <string name="graph_enrichment_failure_timeout">The AI response took too long. Please try again.</string>
-    <string name="graph_enrichment_failure_network">Something went wrong, so enrichment could not finish. Please try again.</string>
-    <string name="graph_enrichment_failure_provider_error">Saegeul AI could not process the request. Please try again shortly.</string>
     <string name="graph_enrichment_failure_storage">Could not save the enrichment result on this device.</string>
     <string name="graph_enrichment_failure_model_unavailable">The Saegeul AI model is not ready yet. Please download it first.</string>
     <string name="graph_enrichment_failure_device_busy">Saegeul AI is busy with another task (like preparing sentence material). Enrichment will continue once it finishes.</string>

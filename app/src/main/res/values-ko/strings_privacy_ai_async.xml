@@ -24,6 +24,7 @@
     <string name="privacy_ai_typing_dna_clear_dialog_title">언어 지문 초기화</string>
     <string name="privacy_ai_typing_dna_clear_dialog_message">학습된 말투, 종결 어미, 나만의 표현을 기기에서 완전히 삭제하시겠습니까?</string>
     <string name="privacy_ai_typing_dna_cleared_toast">언어 지문이 안전하게 초기화되었습니다.</string>
+    <string name="privacy_ai_typing_dna_clear_failed_toast">개인 기록을 지우지 못했어요. 다시 시도해 주세요.</string>
     <string name="privacy_ai_typing_dna_no_data_summary">아직 학습된 언어 지문이 없습니다. 키보드를 사용하면 자동으로 내 말투가 학습됩니다.</string>
     <string name="privacy_ai_typing_dna_stats_summary">Lv.%1$d %2$s · 문장 %3$d개 · 단어쌍 %4$d개 · 어미 %5$d개</string>
     <string name="privacy_ai_typing_dna_sync_done_toast">언어 지문 분석 완료 (분석 문장: %1$d개)</string>

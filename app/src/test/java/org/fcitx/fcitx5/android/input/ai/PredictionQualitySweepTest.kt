@@ -37,6 +37,7 @@ class PredictionQualitySweepTest {
         private lateinit var predictor: AiContextualPredictor
         private lateinit var syntaxFilter: KoreanSyntaxRuleFilter
         private lateinit var semanticPredictor: KoreanSemanticSentencePredictor
+        private lateinit var sentencePackIndex: SentencePackIndex
         private lateinit var appDir: File
 
         // scripts/eval-ko-everyday-probes.py 의 PROBES와 동일한 목록(60개, 2026-09-27 확인).
@@ -76,6 +77,11 @@ class PredictionQualitySweepTest {
             "나 지금 ", "너 어디야? 나 ", "잘 자 내일 ", "고마워 진짜 ", "괜찮아 걱정마 "
         )
 
+        // 기본 팩 + 빈 금고에서 문장 후보가 비는지 보려는 일상 입력. 끝 공백까지 입력한 그대로다.
+        private val EVERYDAY_INPUTS = listOf(
+            "안녕하세요", "지금 뭐해", "저녁 먹", "확인 부탁 ", "고마워", "오늘 회의 끝났어요. "
+        )
+
         // 흔한 띄어쓰기 오류 패턴 검사는 정본 KoreanSpacingLint를 그대로 쓴다(중복 규칙 금지).
 
         private fun findAsset(vararg candidates: String): File =
@@ -111,7 +117,7 @@ class PredictionQualitySweepTest {
                 "../src/main/assets/sentence-packs/ko-basic-v1.txt"
             )
             val sentences = sentencePackFile.readLines(Charsets.UTF_8).mapNotNull(SentencePackText::normalizeAccepted)
-            val sentencePackIndex = SentencePackIndex.build(sentences)
+            sentencePackIndex = SentencePackIndex.build(sentences)
 
             val vocabulary = BaseKoreanVocabulary { vocabFile.reader(Charsets.UTF_8) }
             vocabulary.load()
@@ -250,6 +256,68 @@ class PredictionQualitySweepTest {
             println("[PredictionQualitySweep] $rule 위반 후보: ${issues.count { it.rule == rule }} 건")
         }
         println("=".repeat(70))
+    }
+
+    /**
+     * [EVERYDAY_INPUTS]를 모두 확정한 뒤(조합 중 글자 없음)의 후보를 보고한다. 예측기 결과와
+     * 즉시 후보(담화 이어쓰기·문장팩, 품질 관문 통과분)를 따로 적고, 관문 전 문장팩 원본 일치와
+     * 서비스처럼 예측기 결과가 비었을 때만 즉시 후보를 내보낸 목록도 함께 적는다. 결과를 고정하지
+     * 않는 진단용이다.
+     */
+    @Test
+    fun reportCandidatesForEverydayInputs() {
+        val limit = 8
+        val md = buildString {
+            appendLine("# 일상 입력 후보 보고서 (기본 팩 + 빈 금고)")
+            appendLine()
+            appendLine("| 입력 | stroke | context | 단어 후보 | 문장 후보 | 즉시 후보 | 문장팩 원본 | 게시 |")
+            appendLine("|---|---|---|---|---|---|---|---|")
+            EVERYDAY_INPUTS.forEach { input ->
+                val resolved = ContextualPredictionInput.resolve(input, composingText = "")
+                val predictions = predictor.predict(
+                    currentStroke = resolved.stroke,
+                    contextBeforeCursor = resolved.context,
+                    packageName = "com.example.sweep",
+                    limit = limit
+                )
+                val rawContext = ContextualPredictionInput.rawFullContext(resolved.stroke, resolved.context)
+                val packMatches = sentencePackIndex.complete(rawContext, limit)
+                val immediate = ImmediateContextualPredictions.collect(
+                    input = ImmediateContextualPredictions.Input(
+                        rawContext = rawContext,
+                        packageName = "com.example.sweep",
+                        inputSessionEpoch = 0L,
+                        limit = limit
+                    ),
+                    sentencePackLookup = sentencePackIndex::complete
+                )
+                val published = if (predictions.isEmpty()) immediate else predictions
+                fun List<AiPrediction>.describe(): String =
+                    if (isEmpty()) "(없음)" else joinToString(", ") { "${it.text} [${it.source}]" }
+                val words = predictions.filterNot { it.isSentenceCompletion }
+                val sentenceCandidates = predictions.filter { it.isSentenceCompletion }
+                println("[EverydayInput] '$input' stroke='${resolved.stroke}' context='${resolved.context}'")
+                println("[EverydayInput]   단어: ${words.describe()}")
+                println("[EverydayInput]   문장: ${sentenceCandidates.describe()}")
+                println("[EverydayInput]   즉시: ${immediate.describe()}")
+                val packDescription = if (packMatches.isEmpty()) {
+                    "(없음)"
+                } else {
+                    packMatches.joinToString(", ") { "${it.suffix} [${it.evidence}/${it.joinMode}]" }
+                }
+                println("[EverydayInput]   문장팩 원본: $packDescription")
+                println("[EverydayInput]   게시: ${published.describe()}")
+                appendLine(
+                    "| ${input.escapeMd()} | ${resolved.stroke.escapeMd()} | ${resolved.context.escapeMd()} | " +
+                        "${words.describe().escapeMd()} | ${sentenceCandidates.describe().escapeMd()} | " +
+                        "${immediate.describe().escapeMd()} | ${packDescription.escapeMd()} | " +
+                        "${published.describe().escapeMd()} |"
+                )
+            }
+        }
+        val reportsDir = File(appDir, "build/reports")
+        reportsDir.mkdirs()
+        File(reportsDir, "prediction-sweep-everyday.md").writeText(md, Charsets.UTF_8)
     }
 
     private fun writeReports(caseCount: Int, candidateCount: Int, issues: List<Issue>) {

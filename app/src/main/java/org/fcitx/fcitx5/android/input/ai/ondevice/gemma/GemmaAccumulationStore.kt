@@ -171,6 +171,16 @@ class GemmaAccumulationStore private constructor(context: Context) {
         }
     }
 
+    /**
+     * Returns the next open-context plan, or null when the current run should stop. Null covers
+     * two cases that the worker ends the same way, as a successful run:
+     * - generation is no longer allowed (neither [GemmaAccumulationState.enabled] nor
+     *   [GemmaAccumulationState.manualRequested]); nothing is written. The worker checks this
+     *   right before calling, so it only happens when accumulation is turned off in between.
+     * - an automatic run reached [GemmaOpenMaterialTransition.MAX_CONSECUTIVE_UNPRODUCTIVE]
+     *   unproductive attempts in a row; the finished state from [GemmaOpenMaterialTransition.finish]
+     *   is persisted before returning.
+     */
     suspend fun nextOpenPlan(): GemmaOpenMaterialPlan? = onIo {
         mutex.withLock {
             loadLocked()

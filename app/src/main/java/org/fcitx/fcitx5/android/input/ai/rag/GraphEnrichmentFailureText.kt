@@ -17,11 +17,6 @@ object GraphEnrichmentFailureText {
     @StringRes
     fun resourceIdFor(failure: GraphEnrichmentFailure): Int = when (failure) {
         GraphEnrichmentFailure.INVALID_RESPONSE -> R.string.graph_enrichment_failure_invalid_response
-        GraphEnrichmentFailure.REAUTH_REQUIRED -> R.string.graph_enrichment_failure_reauth_required
-        GraphEnrichmentFailure.PROVIDER_BUSY -> R.string.graph_enrichment_failure_provider_busy
-        GraphEnrichmentFailure.TIMEOUT -> R.string.graph_enrichment_failure_timeout
-        GraphEnrichmentFailure.NETWORK -> R.string.graph_enrichment_failure_network
-        GraphEnrichmentFailure.PROVIDER_ERROR -> R.string.graph_enrichment_failure_provider_error
         GraphEnrichmentFailure.STORAGE -> R.string.graph_enrichment_failure_storage
         GraphEnrichmentFailure.MODEL_UNAVAILABLE -> R.string.graph_enrichment_failure_model_unavailable
         GraphEnrichmentFailure.DEVICE_BUSY -> R.string.graph_enrichment_failure_device_busy
@@ -30,23 +25,4 @@ object GraphEnrichmentFailureText {
     }
 
     fun of(failure: GraphEnrichmentFailure, ctx: Context): String = ctx.getString(resourceIdFor(failure))
-
-    fun requiresReauth(failure: GraphEnrichmentFailure): Boolean =
-        failure == GraphEnrichmentFailure.REAUTH_REQUIRED
-
-    /**
-     * True for the failure kinds the old external AI-provider enrichment path used to record
-     * (network, OAuth, provider HTTP errors). These can still be decoded from prefs written before
-     * the on-device Gemma migration; the dashboard treats them as if enrichment had never run
-     * rather than showing a stale provider-connection error the user can no longer act on.
-     */
-    fun isLegacyProviderFailure(failure: GraphEnrichmentFailure): Boolean = failure in LEGACY_PROVIDER_FAILURES
-
-    private val LEGACY_PROVIDER_FAILURES = setOf(
-        GraphEnrichmentFailure.PROVIDER_ERROR,
-        GraphEnrichmentFailure.PROVIDER_BUSY,
-        GraphEnrichmentFailure.NETWORK,
-        GraphEnrichmentFailure.REAUTH_REQUIRED,
-        GraphEnrichmentFailure.TIMEOUT
-    )
 }

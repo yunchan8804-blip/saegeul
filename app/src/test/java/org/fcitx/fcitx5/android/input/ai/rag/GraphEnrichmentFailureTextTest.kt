@@ -6,14 +6,12 @@ package org.fcitx.fcitx5.android.input.ai.rag
 
 import org.fcitx.fcitx5.android.R
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Exercises [GraphEnrichmentFailureText.resourceIdFor] directly (no Android
  * [android.content.res.Resources] instance is available in a plain JVM unit test) to fix the
- * failure-to-string mapping, and [GraphEnrichmentFailureText.requiresReauth].
+ * failure-to-string mapping.
  */
 class GraphEnrichmentFailureTextTest {
 
@@ -22,26 +20,6 @@ class GraphEnrichmentFailureTextTest {
         assertEquals(
             R.string.graph_enrichment_failure_invalid_response,
             GraphEnrichmentFailureText.resourceIdFor(GraphEnrichmentFailure.INVALID_RESPONSE)
-        )
-        assertEquals(
-            R.string.graph_enrichment_failure_reauth_required,
-            GraphEnrichmentFailureText.resourceIdFor(GraphEnrichmentFailure.REAUTH_REQUIRED)
-        )
-        assertEquals(
-            R.string.graph_enrichment_failure_provider_busy,
-            GraphEnrichmentFailureText.resourceIdFor(GraphEnrichmentFailure.PROVIDER_BUSY)
-        )
-        assertEquals(
-            R.string.graph_enrichment_failure_timeout,
-            GraphEnrichmentFailureText.resourceIdFor(GraphEnrichmentFailure.TIMEOUT)
-        )
-        assertEquals(
-            R.string.graph_enrichment_failure_network,
-            GraphEnrichmentFailureText.resourceIdFor(GraphEnrichmentFailure.NETWORK)
-        )
-        assertEquals(
-            R.string.graph_enrichment_failure_provider_error,
-            GraphEnrichmentFailureText.resourceIdFor(GraphEnrichmentFailure.PROVIDER_ERROR)
         )
         assertEquals(
             R.string.graph_enrichment_failure_storage,
@@ -67,36 +45,5 @@ class GraphEnrichmentFailureTextTest {
             R.string.enrichment_status_failed,
             GraphEnrichmentFailureText.resourceIdFor(GraphEnrichmentFailure.UNKNOWN)
         )
-    }
-
-    @Test
-    fun legacyProviderFailuresAreExactlyTheOldExternalProviderKinds() {
-        val legacy = setOf(
-            GraphEnrichmentFailure.PROVIDER_ERROR,
-            GraphEnrichmentFailure.PROVIDER_BUSY,
-            GraphEnrichmentFailure.NETWORK,
-            GraphEnrichmentFailure.REAUTH_REQUIRED,
-            GraphEnrichmentFailure.TIMEOUT
-        )
-        GraphEnrichmentFailure.entries.forEach { failure ->
-            assertEquals(
-                "$failure legacy-provider classification",
-                failure in legacy,
-                GraphEnrichmentFailureText.isLegacyProviderFailure(failure)
-            )
-        }
-    }
-
-    @Test
-    fun onlyReauthRequiredNeedsTheReauthAction() {
-        assertTrue(GraphEnrichmentFailureText.requiresReauth(GraphEnrichmentFailure.REAUTH_REQUIRED))
-        GraphEnrichmentFailure.entries
-            .filter { it != GraphEnrichmentFailure.REAUTH_REQUIRED }
-            .forEach { failure ->
-                assertFalse(
-                    "$failure should not require reauth",
-                    GraphEnrichmentFailureText.requiresReauth(failure)
-                )
-            }
     }
 }

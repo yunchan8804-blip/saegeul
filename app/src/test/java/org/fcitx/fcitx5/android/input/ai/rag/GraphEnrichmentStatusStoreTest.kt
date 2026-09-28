@@ -27,6 +27,36 @@ class GraphEnrichmentStatusStoreTest {
     }
 
     @Test
+    fun failedStatusFromTheRemovedExternalProviderLoadsAsNeverRun() {
+        listOf("REAUTH_REQUIRED", "PROVIDER_BUSY", "TIMEOUT", "NETWORK", "PROVIDER_ERROR").forEach { legacyFailure ->
+            val prefs = MemorySharedPreferences().apply {
+                preset("phase", GraphEnrichmentPhase.FAILED.name)
+                preset("failure", legacyFailure)
+                preset("last_applied_ms", 20L)
+                preset("nodes", 2)
+            }
+            val snapshot = GraphEnrichmentStatusStore(prefs, Unit).snapshot()
+
+            assertEquals(legacyFailure, GraphEnrichmentPhase.NEVER, snapshot.phase)
+            assertEquals(legacyFailure, GraphEnrichmentFailure.NONE, snapshot.failure)
+            assertEquals(legacyFailure, 20L, snapshot.lastAppliedMs)
+            assertEquals(legacyFailure, 2, snapshot.nodes)
+        }
+    }
+
+    @Test
+    fun unrecognizedStoredFailureStillLoadsAsUnknown() {
+        val prefs = MemorySharedPreferences().apply {
+            preset("phase", GraphEnrichmentPhase.FAILED.name)
+            preset("failure", "NOT_A_KNOWN_FAILURE")
+        }
+        val snapshot = GraphEnrichmentStatusStore(prefs, Unit).snapshot()
+
+        assertEquals(GraphEnrichmentPhase.FAILED, snapshot.phase)
+        assertEquals(GraphEnrichmentFailure.UNKNOWN, snapshot.failure)
+    }
+
+    @Test
     fun recordIncrementalApplyUpdatesCountsWithoutLeavingRunning() {
         val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
         store.recordStarted(10L)
@@ -163,7 +193,7 @@ class GraphEnrichmentStatusStoreTest {
         assertEquals(2, store.snapshot().nodes)
 
         store.recordStarted(70L)
-        store.recordFailure(80L, interrupted = true, failure = GraphEnrichmentFailure.NETWORK)
+        store.recordFailure(80L, interrupted = true, failure = GraphEnrichmentFailure.STORAGE)
         assertEquals(GraphEnrichmentPhase.INTERRUPTED, store.snapshot().phase)
         assertEquals(GraphEnrichmentFailure.NONE, store.snapshot().failure)
         assertEquals(20L, store.snapshot().lastAppliedMs)
@@ -177,10 +207,10 @@ class GraphEnrichmentStatusStoreTest {
         store.recordResult(PersonalGraphEnricher.EnrichResult(true, "ok", 2, 1, 1), 20L)
 
         store.recordStarted(30L)
-        store.recordFailure(40L, failure = GraphEnrichmentFailure.NETWORK)
+        store.recordFailure(40L, failure = GraphEnrichmentFailure.STORAGE)
 
         assertEquals(GraphEnrichmentPhase.FAILED, store.snapshot().phase)
-        assertEquals(GraphEnrichmentFailure.NETWORK, store.snapshot().failure)
+        assertEquals(GraphEnrichmentFailure.STORAGE, store.snapshot().failure)
         assertEquals(20L, store.snapshot().lastAppliedMs)
         assertEquals(2, store.snapshot().nodes)
         assertEquals(1, store.snapshot().edges)

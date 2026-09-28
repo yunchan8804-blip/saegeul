@@ -22,11 +22,6 @@ enum class GraphEnrichmentPhase {
 enum class GraphEnrichmentFailure {
     NONE,
     INVALID_RESPONSE,
-    REAUTH_REQUIRED,
-    PROVIDER_BUSY,
-    TIMEOUT,
-    NETWORK,
-    PROVIDER_ERROR,
     STORAGE,
     UNKNOWN,
     /** 검증된 Gemma 모델이 기기에 없거나 검증에 실패했다. */
@@ -60,11 +55,21 @@ class GraphEnrichmentStatusStore private constructor(
 
     private val listenerWrappers = mutableMapOf<() -> Unit, SharedPreferences.OnSharedPreferenceChangeListener>()
 
+    /**
+     * A failure recorded by the removed external AI-provider enrichment path reads back as
+     * [GraphEnrichmentPhase.NEVER], since there is nothing left for the user to act on for it.
+     */
     fun snapshot(): GraphEnrichmentStatus {
-        val phase = prefs.getString(KEY_PHASE, null)
+        val storedPhase = prefs.getString(KEY_PHASE, null)
             ?.let { stored -> GraphEnrichmentPhase.entries.firstOrNull { it.name == stored } }
             ?: GraphEnrichmentPhase.NEVER
-        val failure = prefs.getString(KEY_FAILURE, null)
+        val storedFailure = prefs.getString(KEY_FAILURE, null)
+        val phase = if (storedPhase == GraphEnrichmentPhase.FAILED && storedFailure in LEGACY_PROVIDER_FAILURES) {
+            GraphEnrichmentPhase.NEVER
+        } else {
+            storedPhase
+        }
+        val failure = storedFailure
             ?.let { stored -> GraphEnrichmentFailure.entries.firstOrNull { it.name == stored } }
             ?: if (phase == GraphEnrichmentPhase.FAILED) GraphEnrichmentFailure.UNKNOWN else GraphEnrichmentFailure.NONE
         return GraphEnrichmentStatus(
@@ -242,5 +247,11 @@ class GraphEnrichmentStatusStore private constructor(
         const val KEY_TOPICS = "topics"
         const val KEY_FAILURE = "failure"
         const val KEY_FAILURE_DETAIL = "failure_detail"
+
+        /**
+         * Failure names stored by the external AI-provider path, still recognized in records written
+         * before its 2026-09-24 removal.
+         */
+        val LEGACY_PROVIDER_FAILURES = setOf("REAUTH_REQUIRED", "PROVIDER_BUSY", "TIMEOUT", "NETWORK", "PROVIDER_ERROR")
     }
 }
