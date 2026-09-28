@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
 import org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -312,7 +313,7 @@ class ImmediateSentenceLatencyDeviceTest {
         candidateSource: String,
         startedAt: Long,
         result: LatencyResult
-    ): FcitxInputMethodService.ContextualCandidate {
+    ): ContextualCandidate {
         val deadline = startedAt + CASE_DEADLINE_MS
         while (SystemClock.elapsedRealtime() < deadline) {
             result.snapshotPollCount += 1

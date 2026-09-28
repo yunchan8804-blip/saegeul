@@ -64,8 +64,8 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.FoldKeyboardProfileResolver
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardViewportReader
 import org.fcitx.fcitx5.android.input.keyboard.ThumbSplitPreferences
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualAppendSnapshot
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualReplacementSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionWarmupState
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceFailureText
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator

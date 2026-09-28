@@ -53,21 +53,15 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
@@ -114,11 +108,6 @@ import org.fcitx.fcitx5.android.input.ai.AiSourceScope
 import org.fcitx.fcitx5.android.input.ai.AiSuggestionApplyResult
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.input.ai.AiContextualPredictor
-import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
-import org.fcitx.fcitx5.android.input.ai.ContextualAppend
-import org.fcitx.fcitx5.android.input.ai.ContextualReplacement
-import org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor
 import org.fcitx.fcitx5.android.input.ai.TypingDnaCommitSink
 import org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector
 import org.fcitx.fcitx5.android.input.ai.learning.CollectionFeedbackEvent
@@ -138,6 +127,10 @@ import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionSession
 import org.fcitx.fcitx5.android.input.ai.ondevice.RecentSentSentences
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidateSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualPredictionController
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionSessionTracker
 import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
@@ -264,7 +257,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val appProfileStore by lazy { AppKeyboardProfileStore(this) }
     @Volatile
     private var effectiveAppProfile: EffectiveAppKeyboardProfile? = null
-    private val featurePolicy = InputFeaturePolicy(
+    private val featurePolicy: InputFeaturePolicy = InputFeaturePolicy(
         isDirectBootMode = { isDirectBootInputMode },
         editorInfo = { currentInputEditorInfo },
         capabilityFlags = { capabilityFlags },
@@ -314,7 +307,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var snippetCatalog = SnippetCatalog.builtIns()
     private var snippetRefreshJob: Job? = null
 
-    private val internalPrompt = InternalPromptController(
+    private val internalPrompt: InternalPromptController = InternalPromptController(
         InternalPromptController.Host(
             engineGeneration = { fcitx.engineGeneration.value },
             isEngineReady = { fcitx.runImmediately { isReady } },
@@ -337,11 +330,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     )
     private var inputSessionEpoch = 0L
 
-    private val personalLearning = PersonalLearningController(
+    private val personalLearning: PersonalLearningController = PersonalLearningController(
         PersonalLearningController.Host(
             filesDir = { filesDir },
-            collocationModel = { contextualPredictor.collocationModel },
-            advancePredictionEpoch = { predictionEpoch++ },
+            collocationModel = { contextualPrediction.contextualPredictor.collocationModel },
+            advancePredictionEpoch = { contextualPrediction.advancePredictionEpoch() },
             allowsTextInspection = ::allowsTextInspectionFeatures,
             editorInfo = { currentInputEditorInfo },
             inputConnection = { currentInputConnection },
@@ -372,6 +365,44 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun currentWordBeforeCursor(): String = personalLearning.currentWordBeforeCursor()
 
     private fun observeCommittedEditorText(text: String) = personalLearning.observeCommittedEditorText(text)
+
+    private val contextualPrediction: ContextualPredictionController = ContextualPredictionController(
+        ContextualPredictionController.Host(
+            lifecycleScope = { lifecycleScope },
+            inputView = { inputView },
+            allowsTextInspection = ::allowsTextInspectionFeatures,
+            editorInfo = { currentInputEditorInfo },
+            capabilityFlags = { capabilityFlags },
+            inputConnection = { currentInputConnection },
+            selection = { currentInputSelection },
+            inputSessionEpoch = { inputSessionEpoch },
+            activePreedit = ::activePreeditForContextualInput,
+            finishCompositionForDirectAction = ::finishCompositionForDirectAction,
+            commitTextToEditor = { text, cursor -> commitTextToEditor(text, cursor) },
+            replaceAiRange = ::replaceAiRange,
+            commitAiTextAtCursor = ::commitAiTextAtCursor,
+            predictSelection = { position -> selection.predict(position) },
+            morphologyEngine = { personalLearning.morphologyEngine },
+            personalizedStore = { personalLearning.personalizedStore },
+            personalNgramModel = { personalLearning.personalNgramModel },
+            typoCorrector = { personalLearning.typoCorrector },
+            baseKoreanVocabulary = { personalLearning.baseKoreanVocabulary },
+            correctionPatternStore = { personalLearning.correctionPatternStore },
+            personalSentenceVault = { personalLearning.personalSentenceVault },
+            personalGraphStore = { personalLearning.personalGraphStore },
+            reinforcementTracker = { personalLearning.reinforcementTracker },
+            enqueuePersonalLearning = { action -> personalLearning.enqueuePersonalLearning(action = action) },
+            enqueueContextualSelectionFeedback = { context, selected, reinforced, packageName ->
+                personalLearning.enqueueContextualSelectionFeedback(context, selected, reinforced, packageName)
+            },
+            scheduleNgramSave = { personalLearning.scheduleNgramSave() },
+            observeCommittedEditorText = { text -> personalLearning.observeCommittedEditorText(text) },
+            captureCorrectionBoundarySnapshot = { personalLearning.captureCorrectionBoundarySnapshot() },
+            onEditorSuffixDeleted = { packageName, removedText, inspectionAllowed ->
+                personalLearning.typingDnaCommitSink.onEditorSuffixDeleted(packageName, removedText, inspectionAllowed)
+            }
+        )
+    )
 
     val isInternalPromptCaptureActive: Boolean
         get() = internalPrompt.isInternalPromptCaptureActive
@@ -717,7 +748,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
         }
         super.onCreate()
-        observeSentencePackRevision()
+        contextualPrediction.observeSentencePackRevision()
         decorView = window.window!!.decorView
         contentView = decorView.findViewById(android.R.id.content)
         lastKnownConfig = resources.configuration
@@ -2595,342 +2626,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             ) == suffix
     }
 
-    @Volatile
-    private var predictionEpoch = 0L
-
-    private data class ContextualPredictionMemoKey(
-        val stroke: String,
-        val context: String,
-        val packageName: String,
-        val epoch: Long,
-        val sentencePackRevision: Long,
-        val generatedSentenceRevision: Long
-    )
-
-    data class ContextualAppendSnapshot(
-        val append: ContextualAppend,
-        val inputSessionEpoch: Long
-    )
-
-    data class ContextualReplacementSnapshot(
-        val replacement: ContextualReplacement,
-        val inputSessionEpoch: Long,
-        val cursor: Int
-    )
-
-    data class ContextualCandidate(
-        val word: CandidateWord,
-        val metricsCandidate: PredictionMetricsSession.Candidate?,
-        val appendSnapshot: ContextualAppendSnapshot? = null,
-        val replacementSnapshot: ContextualReplacementSnapshot? = null
-    )
-
-    data class ContextualCandidateSnapshot(
-        val words: List<ContextualCandidate>,
-        val sentences: List<ContextualCandidate>
-    )
-
-    private data class CachedContextualPredictions(
-        val key: ContextualPredictionMemoKey,
-        val generation: Long,
-        val predictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>
-    )
-
-    private data class ResolvedContextualPredictions(
-        val predictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>,
-        val generation: Long?
-    )
-
-    private fun mergeGeneratedSentencePredictions(
-        predictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>,
-        generatedPredictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>
-    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
-        val seen = mutableSetOf<String>()
-        return (predictions + generatedPredictions)
-            .asSequence()
-            .sortedByDescending { it.confidenceScore }
-            .filter { prediction -> seen.add("${prediction.isSentenceCompletion}:${prediction.text}") }
-            .toList()
-    }
-
-    @Volatile
-    private var contextualResultCache: CachedContextualPredictions? = null
-
-    private var contextualPredictKey: ContextualPredictionMemoKey? = null
-    private var contextualPredictJob: Job? = null
-    private var sentencePackRevisionJob: Job? = null
-    private var observedSentencePackRevision = Long.MIN_VALUE
-    private var nextContextualPredictionGeneration = 0L
-    private val predictionScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val predictionMetricsSession = PredictionMetricsSession()
-
-    private fun observeSentencePackRevision() {
-        val sentencePacks = FcitxApplication.getInstance().sentencePacks
-        sentencePacks.prepare()
-        observedSentencePackRevision = sentencePacks.revision
-        sentencePackRevisionJob?.cancel()
-        sentencePackRevisionJob = lifecycleScope.launch {
-            sentencePacks.status
-                .map { it.revision }
-                .distinctUntilChanged()
-                .collect { revision ->
-                    if (revision == observedSentencePackRevision) return@collect
-                    observedSentencePackRevision = revision
-                    contextualPredictJob?.cancel()
-                    contextualPredictJob = null
-                    contextualPredictKey = null
-                    contextualResultCache = null
-                    predictionEpoch++
-                    inputView?.refreshContextualCandidates()
-                }
-        }
-    }
-
     private var automaticSuggestionTtlRunnable: Runnable? = null
     private var automaticSuggestionHideRunnable: Runnable? = null
-
-    val contextualPredictor: org.fcitx.fcitx5.android.input.ai.AiContextualPredictor by lazy {
-        org.fcitx.fcitx5.android.input.ai.AiContextualPredictor(
-            morphology = personalLearning.morphologyEngine,
-            semanticPredictor = org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor(),
-            personalizedStore = personalLearning.personalizedStore,
-            ngram = personalLearning.personalNgramModel,
-            typoCorrector = personalLearning.typoCorrector,
-            baseVocabulary = personalLearning.baseKoreanVocabulary,
-            correctionStore = personalLearning.correctionPatternStore,
-            personalSentenceVault = personalLearning.personalSentenceVault,
-            personalGraphStore = personalLearning.personalGraphStore,
-            sentencePackLookup = FcitxApplication.getInstance().sentencePacks::complete,
-            bundledNgram = { FcitxApplication.getInstance().bundledKoreanNgram }
-        )
-    }
-
-    private fun getEmailDomainPredictions(
-        beforeCursor: String,
-        activePreedit: String,
-        limit: Int
-    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
-        val emailDomains = listOf(
-            "gmail.com",
-            "naver.com",
-            "kakao.com",
-            "daum.net",
-            "icloud.com",
-            "outlook.com"
-        )
-        val trimmedBefore = beforeCursor.trim()
-        val atIndex = trimmedBefore.lastIndexOf('@')
-
-        val results = mutableListOf<org.fcitx.fcitx5.android.input.ai.AiPrediction>()
-
-        if (atIndex >= 0) {
-            val queryDomain = (trimmedBefore.substring(atIndex + 1) + activePreedit).trim().lowercase()
-            val matched = if (queryDomain.isEmpty()) {
-                emailDomains
-            } else {
-                emailDomains.filter { it.startsWith(queryDomain) }
-            }
-            matched.take(limit).forEachIndexed { idx, domain ->
-                results.add(
-                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
-                        text = domain,
-                        confidenceScore = 0.99f - (idx * 0.01f),
-                        isSentenceCompletion = false,
-                        source = "email_domain",
-                        badge = "📧"
-                    )
-                )
-            }
-        } else {
-            emailDomains.take(limit).forEachIndexed { idx, domain ->
-                results.add(
-                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
-                        text = "@$domain",
-                        confidenceScore = 0.98f - (idx * 0.01f),
-                        isSentenceCompletion = false,
-                        source = "email_domain",
-                        badge = "📧"
-                    )
-                )
-            }
-        }
-        return results
-    }
-
-    private fun getUrlDomainPredictions(
-        beforeCursor: String,
-        activePreedit: String,
-        limit: Int
-    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
-        val tlds = listOf(".com", ".co.kr", ".net", ".kr", ".org")
-        val results = mutableListOf<org.fcitx.fcitx5.android.input.ai.AiPrediction>()
-        val trimmed = (beforeCursor.trim() + activePreedit.trim()).lowercase()
-        val lastDotIndex = trimmed.lastIndexOf('.')
-        val queryExt = if (lastDotIndex >= 0 && lastDotIndex >= trimmed.length - 6) {
-            trimmed.substring(lastDotIndex)
-        } else {
-            ""
-        }
-        val matched = if (queryExt.isNotEmpty() && queryExt != ".") {
-            tlds.filter { it.startsWith(queryExt) }
-        } else {
-            tlds
-        }
-        if (!tlds.any { trimmed.endsWith(it) }) {
-            matched.take(limit).forEachIndexed { idx, tld ->
-                results.add(
-                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
-                        text = tld,
-                        confidenceScore = 0.95f - (idx * 0.01f),
-                        isSentenceCompletion = false,
-                        source = "url_tld",
-                        badge = ""
-                    )
-                )
-            }
-        }
-        return results
-    }
-
-    private fun getRawContextualPredictions(limit: Int): ResolvedContextualPredictions {
-        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-
-        val isEmail = EditorPrivacyPolicy.isEmailAddressField(currentInputEditorInfo, capabilityFlags)
-        val isPhone = EditorPrivacyPolicy.isPhoneField(currentInputEditorInfo, capabilityFlags)
-        val isNumeric = EditorPrivacyPolicy.isNumericField(currentInputEditorInfo, capabilityFlags)
-        val isUrl = EditorPrivacyPolicy.isUrlField(currentInputEditorInfo, capabilityFlags)
-        val isConversational = EditorPrivacyPolicy.isConversationalTextField(currentInputEditorInfo, capabilityFlags)
-
-        // 1. Phone or pure numeric inputs -> strictly no conversational predictions
-        if (isPhone || isNumeric) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-
-        val ic = currentInputConnection ?: run {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-        val beforeCursor = ic.getTextBeforeCursor(128, 0)?.toString().orEmpty()
-
-        val activePreedit = activePreeditForContextualInput()
-
-        // 2. Email field -> smart email domain suggestions, zero sentence completions
-        if (isEmail) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(getEmailDomainPredictions(beforeCursor, activePreedit, limit), null)
-        }
-
-        // 3. URL field -> web domain suggestions, zero sentence completions
-        if (isUrl) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(getUrlDomainPredictions(beforeCursor, activePreedit, limit), null)
-        }
-
-        // 4. Non-conversational text field (e.g. search filter with NO_SUGGESTIONS) -> emptyList()
-        if (!isConversational) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-
-        val pkgName = currentInputEditorInfo.packageName
-        val resolved = org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput.resolve(beforeCursor, activePreedit)
-        // 진짜 유휴(스트로크도 없고 커서 앞 문맥도 비어 있음)일 때만 예측을 건너뛴다. 그래야
-        // 후보 영역이 접혀 도구 줄만 남는다. 단어를 치고 스페이스를 눌러 스트로크가 비었어도
-        // 커서 앞에 문맥이 있으면(예: "회의 참석 ") 다음 단어·입력 이어쓰기(회의 참석하겠습니다)를
-        // 계속 제시한다.
-        if (resolved.stroke.isBlank() && resolved.context.isBlank()) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-
-        val application = FcitxApplication.getInstance()
-        val memoKey = ContextualPredictionMemoKey(
-            resolved.stroke,
-            resolved.context,
-            pkgName,
-            predictionEpoch,
-            application.sentencePacks.revision,
-            if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank.revision else 0L
-        )
-        val inputSessionEpoch = currentInputSessionEpoch
-        contextualResultCache?.let { cached ->
-            if (cached.key == memoKey) {
-                return ResolvedContextualPredictions(cached.predictions, cached.generation)
-            }
-        }
-        predictionMetricsSession.reset()
-
-        val rawFullContext = org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput.rawFullContext(
-            resolved.stroke,
-            resolved.context
-        )
-        val immediateResults = org.fcitx.fcitx5.android.input.ai.ImmediateContextualPredictions.collect(
-            input = org.fcitx.fcitx5.android.input.ai.ImmediateContextualPredictions.Input(
-                rawContext = rawFullContext,
-                packageName = pkgName,
-                inputSessionEpoch = inputSessionEpoch,
-                limit = limit
-            ),
-            sentencePackLookup = application.sentencePacks::complete,
-            generatedSentenceLookup = if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank::complete else null,
-            generatedSpacingLookup = if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank::suggestSpacing else null
-        )
-        val immediateGeneration = ++nextContextualPredictionGeneration
-        contextualResultCache = CachedContextualPredictions(
-            key = memoKey,
-            generation = immediateGeneration,
-            predictions = immediateResults
-        )
-        if (contextualPredictKey != memoKey) {
-            contextualPredictJob?.cancel()
-            contextualPredictKey = memoKey
-            contextualPredictJob = predictionScope.launch {
-                val results = contextualPredictor.predict(
-                    currentStroke = resolved.stroke,
-                    contextBeforeCursor = resolved.context,
-                    packageName = pkgName,
-                    limit = limit,
-                    inputSessionEpoch = inputSessionEpoch
-                )
-                withContext(Dispatchers.Main) {
-                    val currentFieldIsConversational =
-                        !EditorPrivacyPolicy.isEmailAddressField(currentInputEditorInfo, capabilityFlags) &&
-                            !EditorPrivacyPolicy.isPhoneField(currentInputEditorInfo, capabilityFlags) &&
-                            !EditorPrivacyPolicy.isNumericField(currentInputEditorInfo, capabilityFlags) &&
-                            !EditorPrivacyPolicy.isUrlField(currentInputEditorInfo, capabilityFlags) &&
-                            EditorPrivacyPolicy.isConversationalTextField(currentInputEditorInfo, capabilityFlags)
-                    if (
-                        contextualPredictKey == memoKey &&
-                        currentInputConnection != null &&
-                        currentInputSessionEpoch == inputSessionEpoch &&
-                        allowsTextInspectionFeatures() &&
-                        currentInputSelection.isEmpty() &&
-                        currentFieldIsConversational
-                    ) {
-                        val generatedImmediateResults = immediateResults.filter {
-                            it.source == "ondevice_generated"
-                        }
-                        val publishedResults = when {
-                            results.isEmpty() && immediateResults.isNotEmpty() -> immediateResults
-                            generatedImmediateResults.isEmpty() -> results
-                            else -> mergeGeneratedSentencePredictions(results, generatedImmediateResults)
-                        }
-                        contextualResultCache = CachedContextualPredictions(
-                            key = memoKey,
-                            generation = ++nextContextualPredictionGeneration,
-                            predictions = publishedResults
-                        )
-                        inputView?.refreshContextualCandidates()
-                    }
-                }
-            }
-        }
-        return ResolvedContextualPredictions(immediateResults, immediateGeneration)
-    }
 
     private fun activePreeditForContextualInput(): String {
         val clientPreedit = composingText.toString()
@@ -2953,389 +2650,35 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
     }
 
-    fun getContextualSentencePredictions(limit: Int = 2): List<CandidateWord> {
-        val predictions = getRawContextualPredictions(limit = 10).predictions
-        return predictions.filter { it.isSentenceCompletion }.take(limit).mapIndexed { index, pred ->
-            CandidateWord(
-                label = (index + 1).toString(),
-                text = pred.text,
-                comment = pred.badge
-            )
-        }
-    }
+    fun getContextualSentencePredictions(limit: Int = 2): List<CandidateWord> =
+        contextualPrediction.getContextualSentencePredictions(limit)
 
-    fun getContextualWordPredictions(limit: Int = 4): List<CandidateWord> {
-        val predictions = getRawContextualPredictions(limit = 10).predictions
-        return predictions.filter { !it.isSentenceCompletion }.take(limit).mapIndexed { index, pred ->
-            CandidateWord(
-                label = (index + 1).toString(),
-                text = pred.text,
-                comment = pred.badge
-            )
-        }
-    }
+    fun getContextualWordPredictions(limit: Int = 4): List<CandidateWord> =
+        contextualPrediction.getContextualWordPredictions(limit)
 
-    /**
-     * Provides one immutable cache generation to the candidate UI so metrics preserve the source
-     * that produced each rendered candidate instead of resolving a source from current text later.
-     */
-    fun getContextualCandidateSnapshot(wordLimit: Int = 4, sentenceLimit: Int = 2): ContextualCandidateSnapshot {
-        val resolved = getRawContextualPredictions(limit = 10)
-        val generation = resolved.generation
-        if (generation != null) {
-            predictionMetricsSession.activate(generation)
-        }
-        fun toCandidate(prediction: org.fcitx.fcitx5.android.input.ai.AiPrediction, index: Int): ContextualCandidate =
-            ContextualCandidate(
-                word = CandidateWord(
-                    label = index.toString(),
-                    text = prediction.text,
-                    comment = prediction.badge
-                ),
-                metricsCandidate = generation?.let {
-                    PredictionMetricsSession.Candidate(it, prediction.text, prediction.source)
-                },
-                appendSnapshot = prediction.append?.let { append ->
-                    ContextualAppendSnapshot(append, inputSessionEpoch)
-                },
-                replacementSnapshot = prediction.replacement?.let { replacement ->
-                    ContextualReplacementSnapshot(
-                        replacement = replacement,
-                        inputSessionEpoch = inputSessionEpoch,
-                        cursor = currentInputSelection.start
-                    )
-                }
-            )
+    fun getContextualCandidateSnapshot(wordLimit: Int = 4, sentenceLimit: Int = 2): ContextualCandidateSnapshot =
+        contextualPrediction.getContextualCandidateSnapshot(wordLimit, sentenceLimit)
 
-        val words = resolved.predictions.filter { !it.isSentenceCompletion }
-            .take(wordLimit)
-            .mapIndexed { index, prediction -> toCandidate(prediction, index + 1) }
-        val sentences = resolved.predictions.filter { it.isSentenceCompletion }
-            .take(sentenceLimit)
-            .mapIndexed { index, prediction -> toCandidate(prediction, index + 1) }
-        return ContextualCandidateSnapshot(words = words, sentences = sentences)
-    }
+    fun recordContextualCandidateShown(candidate: PredictionMetricsSession.Candidate?) =
+        contextualPrediction.recordContextualCandidateShown(candidate)
 
-    fun recordContextualCandidateShown(candidate: PredictionMetricsSession.Candidate?) {
-        if (candidate == null) return
-        if (!allowsTextInspectionFeatures()) {
-            predictionMetricsSession.reset()
-            return
-        }
-        if (predictionMetricsSession.recordShown(candidate)) {
-            FcitxApplication.getInstance().applicationScope.launch {
-                FcitxApplication.getInstance().predictionMetricsStore.recordShown(1)
-                withContext(Dispatchers.Main) {
-                    personalLearning.scheduleNgramSave()
-                }
-            }
-        }
-    }
+    fun recordContextualCandidatesIgnored(offeredSentences: List<String>) =
+        contextualPrediction.recordContextualCandidatesIgnored(offeredSentences)
 
-    private fun recordContextualCandidateAccepted(candidate: PredictionMetricsSession.Candidate?, committed: Boolean) {
-        if (candidate == null) return
-        if (!allowsTextInspectionFeatures()) {
-            predictionMetricsSession.reset()
-            return
-        }
-        if (predictionMetricsSession.recordAccepted(candidate, committed)) {
-            FcitxApplication.getInstance().applicationScope.launch {
-                if (OnDeviceAiSupport.isSupported && candidate.source == "ondevice_generated") {
-                    try {
-                        FcitxApplication.getInstance().generatedSentenceBank.recordAcceptedSuffix(candidate.text)
-                    } catch (error: Exception) {
-                        Timber.w("Generated material acceptance save failed: ${error.javaClass.simpleName}")
-                    }
-                }
-                FcitxApplication.getInstance().predictionMetricsStore.recordAccepted(candidate.source, savedKeystrokes = 0)
-                withContext(Dispatchers.Main) {
-                    personalLearning.scheduleNgramSave()
-                }
-            }
-        }
-    }
-
-    fun recordContextualCandidatesIgnored(offeredSentences: List<String>) {
-        if (!allowsTextInspectionFeatures() || offeredSentences.isEmpty()) return
-        val capturedSentences = offeredSentences.toList()
-        personalLearning.enqueuePersonalLearning {
-            personalLearning.reinforcementTracker.onCandidatesIgnored(capturedSentences)
-        }
-    }
-
-    fun recordContextualCandidateRejected(sentence: String, heavyPenalty: Boolean = true) {
-        if (!allowsTextInspectionFeatures()) return
-        val capturedSentence = sentence
-        personalLearning.enqueuePersonalLearning {
-            personalLearning.reinforcementTracker.onCandidateRejected(capturedSentence, heavyPenalty)
-        }
-    }
-
-    /** 마지막으로 만든 예측 결과 메모에서 텍스트가 같은 후보의 replaceLength를 찾는다. */
-    private fun replaceLengthForCandidate(sentence: String): Int =
-        contextualResultCache?.predictions?.firstOrNull { it.text == sentence }?.replaceLength ?: 0
-
-    private fun commitContextualCandidateText(
-        connection: InputConnection,
-        replaceLength: Int,
-        textToCommit: String
-    ): Boolean {
-        if (replaceLength <= 0) {
-            return commitTextToEditor(textToCommit, textToCommit.length)
-        }
-        val start = currentInputSelection.start
-        val end = currentInputSelection.end
-        if (start != end || start < replaceLength) return false
-        val removedText = connection.getTextBeforeCursor(replaceLength, 0)?.toString() ?: return false
-        if (removedText.length != replaceLength || !currentInputSelection.rangeEquals(start, end)) {
-            return false
-        }
-        personalLearning.captureCorrectionBoundarySnapshot()
-        val replacementStart = start - replaceLength
-        if (!replaceAiRange(
-                connection = connection,
-                start = replacementStart,
-                end = start,
-                replacement = textToCommit,
-                restoreStart = start,
-                restoreEnd = end
-            )
-        ) {
-            return false
-        }
-        typingDnaCommitSink.onEditorSuffixDeleted(
-            currentInputEditorInfo?.packageName,
-            removedText,
-            allowsTextInspectionFeatures()
-        )
-        observeCommittedEditorText(textToCommit)
-        selection.predict(replacementStart + textToCommit.length)
-        inputView?.postRefreshContextualCandidates(16L)
-        return true
-    }
-
-    private fun commitConfirmedContextualAppend(
-        sentence: String,
-        appendSnapshot: ContextualAppendSnapshot,
-        metricsCandidate: PredictionMetricsSession.Candidate?
-    ): Boolean {
-        if (!allowsTextInspectionFeatures()) return false
-        if (sentence != appendSnapshot.append.suffix || appendSnapshot.inputSessionEpoch != inputSessionEpoch) {
-            return false
-        }
-        if (!finishCompositionForDirectAction()) return false
-        if (appendSnapshot.inputSessionEpoch != inputSessionEpoch) return false
-        val cursor = currentInputSelection.start
-        if (cursor != currentInputSelection.end) return false
-        val connection = currentInputConnection ?: return false
-        val beforeCursor = connection.getTextBeforeCursor(1024, 0)?.toString() ?: return false
-        if (appendSnapshot.inputSessionEpoch != inputSessionEpoch ||
-            !currentInputSelection.rangeEquals(cursor, cursor)
-        ) {
-            return false
-        }
-        val textToCommit = appendSnapshot.append.insertionFor(beforeCursor) ?: return false
-        personalLearning.captureCorrectionBoundarySnapshot()
-        if (!commitAiTextAtCursor(connection, cursor, textToCommit, cursor, cursor)) return false
-
-        observeCommittedEditorText(textToCommit)
-        selection.predict(cursor + textToCommit.length)
-        inputView?.postRefreshContextualCandidates(16L)
-        personalLearning.enqueueContextualSelectionFeedback(
-            contextBeforeReinforce = beforeCursor.takeLast(64),
-            selectedSentence = sentence,
-            reinforcedSentence = appendSnapshot.append.suffix,
-            packageName = currentInputEditorInfo.packageName
-        )
-        predictionEpoch++
-        recordContextualCandidateAccepted(metricsCandidate?.takeIf { it.text == sentence }, committed = true)
-        return true
-    }
-
-    private fun commitConfirmedContextualReplacement(
-        sentence: String,
-        replacementSnapshot: ContextualReplacementSnapshot,
-        metricsCandidate: PredictionMetricsSession.Candidate?
-    ): Boolean {
-        val replacement = replacementSnapshot.replacement
-        if (!allowsTextInspectionFeatures() ||
-            !EditorPrivacyPolicy.isConversationalTextField(currentInputEditorInfo, capabilityFlags) ||
-            sentence != replacement.replacement ||
-            replacementSnapshot.inputSessionEpoch != inputSessionEpoch
-        ) {
-            return false
-        }
-        val capturedCursor = currentInputSelection.start
-        if (capturedCursor != currentInputSelection.end ||
-            capturedCursor != replacementSnapshot.cursor ||
-            capturedCursor != replacement.expectedContext.length
-        ) {
-            return false
-        }
-        if (!finishCompositionForDirectAction() || replacementSnapshot.inputSessionEpoch != inputSessionEpoch) {
-            return false
-        }
-        val cursor = currentInputSelection.start
-        if (cursor != currentInputSelection.end ||
-            cursor != replacementSnapshot.cursor ||
-            cursor != replacement.expectedContext.length
-        ) {
-            return false
-        }
-        val connection = currentInputConnection ?: return false
-        val beforeCursor = connection.getTextBeforeCursor(replacement.expectedContext.length + 1, 0)
-            ?.toString() ?: return false
-        if (beforeCursor != replacement.expectedContext ||
-            replacementSnapshot.inputSessionEpoch != inputSessionEpoch ||
-            !currentInputSelection.rangeEquals(cursor, cursor)
-        ) {
-            return false
-        }
-        if (!replaceAiRange(
-                connection = connection,
-                start = 0,
-                end = replacement.expectedContext.length,
-                replacement = replacement.replacement,
-                restoreStart = cursor,
-                restoreEnd = cursor
-            )
-        ) {
-            return false
-        }
-        selection.predict(replacement.replacement.length)
-        inputView?.postRefreshContextualCandidates(16L)
-        predictionEpoch++
-        recordContextualCandidateAccepted(metricsCandidate?.takeIf { it.text == sentence }, committed = true)
-        return true
-    }
+    fun recordContextualCandidateRejected(sentence: String, heavyPenalty: Boolean = true) =
+        contextualPrediction.recordContextualCandidateRejected(sentence, heavyPenalty)
 
     fun commitContextualSentence(
         sentence: String,
         metricsCandidate: PredictionMetricsSession.Candidate? = null,
         appendSnapshot: ContextualAppendSnapshot? = null,
         replacementSnapshot: ContextualReplacementSnapshot? = null
-    ): Boolean {
-        if (!allowsTextInspectionFeatures()) return false
-        if (replacementSnapshot != null) {
-            return commitConfirmedContextualReplacement(sentence, replacementSnapshot, metricsCandidate)
-        }
-        if (appendSnapshot != null) {
-            return commitConfirmedContextualAppend(sentence, appendSnapshot, metricsCandidate)
-        }
-        if (!finishCompositionForDirectAction()) return false
-        val ic = currentInputConnection ?: return false
-        val beforeCursor = ic.getTextBeforeCursor(512, 0)?.toString().orEmpty()
-        val capturedMetricsCandidate = metricsCandidate?.takeIf { it.text == sentence }
-
-        val replaceLength = replaceLengthForCandidate(sentence)
-        if (replaceLength > 0) {
-            val contextBeforeReinforce = beforeCursor.dropLast(replaceLength).takeLast(64)
-            val shouldAppendSpace = !sentence.endsWith(" ") && !sentence.endsWith("\n")
-            val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
-            val committed = commitContextualCandidateText(ic, replaceLength, textToCommit)
-            if (committed) {
-                personalLearning.enqueueContextualSelectionFeedback(
-                    contextBeforeReinforce = contextBeforeReinforce,
-                    selectedSentence = sentence,
-                    reinforcedSentence = sentence,
-                    packageName = currentInputEditorInfo.packageName
-                )
-                predictionEpoch++
-                recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
-            }
-            return committed
-        }
-
-        if (!sentence.contains(" ")) {
-            val lastSentence = beforeCursor
-                .substringAfterLast('.')
-                .substringAfterLast('?')
-                .substringAfterLast('!')
-                .substringAfterLast('\n')
-                .trim()
-            if (lastSentence.isNotEmpty()) {
-                val typoPairs = contextualPredictor.typoEngine.findTypoCorrectionsInSentence(lastSentence)
-                val matchingPair = typoPairs.firstOrNull { it.second == sentence }
-                if (matchingPair != null && !lastSentence.endsWith(matchingPair.first)) {
-                    val correctedSentence = contextualPredictor.typoEngine.correctSentence(lastSentence)
-                    if (correctedSentence != null) {
-                        val trailingSpaces = beforeCursor.length - beforeCursor.trimEnd().length
-                        val replacementLength = lastSentence.length + trailingSpaces
-                        val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
-                        val textToCommit = if (correctedSentence.endsWith(" ") || correctedSentence.endsWith("\n")) correctedSentence else "$correctedSentence "
-                        val committed = commitContextualCandidateText(ic, replacementLength, textToCommit)
-                        if (committed) {
-                            personalLearning.enqueueContextualSelectionFeedback(
-                                contextBeforeReinforce = contextBeforeReinforce,
-                                selectedSentence = sentence,
-                                reinforcedSentence = correctedSentence,
-                                packageName = currentInputEditorInfo.packageName
-                            )
-                            predictionEpoch++
-                            recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
-                        }
-                        return committed
-                    }
-                }
-            }
-        }
-
-        val isEmailField = EditorPrivacyPolicy.isEmailAddressField(currentInputEditorInfo, capabilityFlags)
-        val isEmailDomain = sentence.startsWith("@") || sentence.endsWith(".com") || sentence.endsWith(".net") || sentence.endsWith(".co.kr") || sentence.endsWith(".io") || sentence.endsWith(".org")
-        val isUrlField = EditorPrivacyPolicy.isUrlField(currentInputEditorInfo, capabilityFlags)
-        val isUrlTld = sentence.startsWith(".") && (sentence.endsWith(".com") || sentence.endsWith(".net") || sentence.endsWith(".org") || sentence.endsWith(".kr") || sentence.endsWith(".co.kr") || sentence.endsWith(".io"))
-        val urlReplaceLength = if (isUrlField && isUrlTld && beforeCursor.endsWith(".")) 1 else 0
-
-        if (isEmailField && beforeCursor.contains("@")) {
-            val afterAt = beforeCursor.substringAfterLast('@')
-            val replacementLength = if (sentence.startsWith("@")) {
-                afterAt.length + 1
-            } else if (afterAt.isNotEmpty() && sentence.startsWith(afterAt)) {
-                afterAt.length
-            } else {
-                0
-            }
-            val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
-            val committed = commitContextualCandidateText(ic, replacementLength, sentence)
-            if (committed) {
-                personalLearning.enqueueContextualSelectionFeedback(
-                    contextBeforeReinforce = contextBeforeReinforce,
-                    selectedSentence = sentence,
-                    reinforcedSentence = sentence,
-                    packageName = currentInputEditorInfo.packageName
-                )
-                predictionEpoch++
-                recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
-            }
-            return committed
-        }
-
-        val overlapLengthInBeforeCursor = if (isEmailField || isUrlField) {
-            0
-        } else {
-            contextualPredictor.typoEngine.calculateReplacementOverlap(beforeCursor, sentence)
-        }
-        val replacementLength = if (overlapLengthInBeforeCursor > 0) {
-            overlapLengthInBeforeCursor
-        } else {
-            urlReplaceLength
-        }
-        val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
-        val shouldAppendSpace = !isEmailField && !isUrlField && !isEmailDomain && !isUrlTld && !sentence.endsWith(" ") && !sentence.endsWith("\n")
-        val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
-        val committed = commitContextualCandidateText(ic, replacementLength, textToCommit)
-        if (committed) {
-            personalLearning.enqueueContextualSelectionFeedback(
-                contextBeforeReinforce = contextBeforeReinforce,
-                selectedSentence = sentence,
-                reinforcedSentence = sentence,
-                packageName = currentInputEditorInfo.packageName
-            )
-            predictionEpoch++
-            recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
-        }
-        return committed
-    }
+    ): Boolean = contextualPrediction.commitContextualSentence(
+        sentence,
+        metricsCandidate,
+        appendSnapshot,
+        replacementSnapshot
+    )
 
     fun captureTypoRecoverySnapshot(): TypoRecoverySnapshot? {
         if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return null
@@ -4023,8 +3366,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         notifyOnDeviceContextSnapshotInvalidated()
         inputSessionEpoch += 1
         personalLearning.onStartInput()
-        predictionEpoch++
-        predictionMetricsSession.reset()
+        contextualPrediction.onStartInput()
         correctionSessionTracker.onEditorChanged()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.onEditorChanged(
@@ -4546,7 +3888,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             submitBufferedHangul()
         }
         personalLearning.flushTypingDnaForCurrentEditor()
-        predictionMetricsSession.reset()
+        contextualPrediction.onFinishInput()
         personalLearning.onFinishInput()
         bufferedHangulSessionActive = false
         bufferedHangul.clear()
@@ -4599,9 +3941,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         clearAutomaticSuggestionTtl()
         OnDeviceGenerationControl.onKeyboardVisibilityChanged(false)
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
-        sentencePackRevisionJob?.cancel()
-        sentencePackRevisionJob = null
-        predictionScope.cancel()
+        contextualPrediction.onDestroy()
         personalLearning.onDestroy()
         if (activeInstance === this) {
             activeInstance = null
