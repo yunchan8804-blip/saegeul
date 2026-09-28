@@ -185,15 +185,17 @@ class GemmaAccumulationWorker(
         BackgroundProgressNotifier.progress(
             applicationContext,
             BackgroundProgressNotifier.ID_GEMMA_ACCUMULATION,
-            applicationContext.getString(R.string.gemma_accumulation_notify_progress_title),
-            applicationContext.getString(
-                R.string.gemma_accumulation_notify_progress_text,
-                current,
-                total,
-                store.state.value.stored
-            ),
-            current,
-            total
+            BackgroundProgressNotifier.ProgressSpec(
+                title = applicationContext.getString(R.string.gemma_accumulation_notify_progress_title),
+                text = applicationContext.getString(
+                    R.string.gemma_accumulation_notify_progress_text,
+                    current,
+                    total,
+                    store.state.value.stored
+                ),
+                current = current,
+                total = total
+            )
         )
     }
 

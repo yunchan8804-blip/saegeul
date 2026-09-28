@@ -262,11 +262,13 @@ class GemmaGraphEnrichmentWorker(
         )
         val notification = BackgroundProgressNotifier.buildProgressNotification(
             applicationContext,
-            uiState.title(applicationContext),
-            uiState.detail(applicationContext) ?: uiState.title(applicationContext),
-            uiState.progressCurrent,
-            uiState.progressTotal,
-            stopAction
+            BackgroundProgressNotifier.ProgressSpec(
+                title = uiState.title(applicationContext),
+                text = uiState.detail(applicationContext) ?: uiState.title(applicationContext),
+                current = uiState.progressCurrent,
+                total = uiState.progressTotal,
+                action = stopAction
+            )
         )
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ForegroundInfo(
