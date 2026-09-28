@@ -7,8 +7,7 @@ package org.fcitx.fcitx5.android.input.ai
 /**
  * 존댓말/반말/업무체 톤 판정의 정본(single source of truth).
  *
- * [KoreanSemanticSentencePredictor.inferTone]/[KoreanSemanticSentencePredictor.inferToneInternal]은
- * 이 객체를 부르는 한 줄 위임으로만 남는다.
+ * [KoreanSemanticSentencePredictor.inferTone]은 이 객체를 부르는 한 줄 위임으로만 남는다.
  *
  * 문장을 나눠 마지막 문장은 3배, 그 앞 최대 3문장은 1배 가중해 존댓말/반말 점수를 매긴다.
  * 점수는 두 갈래로 더해진다:

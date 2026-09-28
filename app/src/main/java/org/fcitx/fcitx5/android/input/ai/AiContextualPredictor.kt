@@ -419,11 +419,6 @@ class AiContextualPredictor(
         val deferredDiscoursePredictions = immediatePredictions
             .filter { it.source == "discourse_continuation" }
 
-        // 2. semantic_sentence is intentionally NOT consumed here: KoreanSemanticSentencePredictor's
-        // intent-classified proposals are fixed content templates unrelated to what the user typed,
-        // so they never reach the sentence line. semanticPredictor.inferTone() below is
-        // still used for tone inference, which is not a content template.
-
         val isInformal = semanticPredictor.inferTone(normalizedFullContext) == KoreanTone.Informal
 
         // 1. Choseong Abbreviation Instant Expansion (e.g. ㄱㅅ -> 감사합니다, ㅈㅅ -> 죄송합니다, ㅇㅋ -> 알겠습니다)
