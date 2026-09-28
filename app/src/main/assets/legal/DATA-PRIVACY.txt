@@ -5,7 +5,7 @@ PRIVACY & DATA / 개인정보·데이터 안내
 일반 입력
 - 이 키보드는 사용자가 입력하는 일반 텍스트를 개발자 서버로 보내지 않습니다.
 - 비밀번호, 민감 입력창, 개인화 학습 금지 입력창에서는 텍스트 검사와 네트워크 입력 기능을 차단합니다.
-- 전체 오프라인 모드를 켜면 온라인 음성 전사, 네트워크 GIF, OCR 모델 다운로드, Google AdMob 광고(대시보드 배너, 전면 광고, 테마 상점 보상형 광고)를 차단합니다.
+- 전체 오프라인 모드를 켜면 새글 AI 모델 받기, 선택 문장팩 받기, 온라인 음성 전사, 네트워크 GIF, OCR 모델 다운로드, Google AdMob 광고(대시보드 배너, 전면 광고, 테마 상점 보상형 광고)를 차단합니다.
 
 기기 안에만 남는 데이터
 - 클립보드 기록은 새 설치에서 기본으로 꺼져 있습니다. 사용자가 직접 켜면 앱 전용 데이터베이스에 저장됩니다. Android 클라우드 백업, 기기 이전, 새 사용자 데이터 ZIP 내보내기, 네트워크 전송에서 제외되며 앱에서 지울 수 있습니다.
@@ -41,7 +41,7 @@ English
 General input
 - The keyboard does not send ordinary typed text to a developer-operated server.
 - Password, sensitive, and no-personalized-learning fields block text inspection and network input features.
-- Completely offline mode blocks online speech transcription, network GIF providers, OCR model downloads, and Google AdMob ads (the dashboard banner, interstitial ads, and theme shop rewarded ads).
+- Completely offline mode blocks Saegeul AI model downloads, optional sentence pack downloads, online speech transcription, network GIF providers, OCR model downloads, and Google AdMob ads (the dashboard banner, interstitial ads, and theme shop rewarded ads).
 
 On-device data
 - Clipboard history is off by default on a new install. If enabled, it is stored in an app-private database. It is excluded from Android cloud backup, device transfer, new user-data ZIP exports, and network transmission, and can be cleared in the app.
