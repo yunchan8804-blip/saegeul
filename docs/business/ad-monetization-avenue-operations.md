@@ -4,6 +4,21 @@
 > 상태: 제품·정책·기술 설계 완료. 광고 SDK는 앱에 연결됨(`play-services-ads`, `app/src/main/java/org/fcitx/fcitx5/android/ads/`의 전면(`acc14aee`)·배너·보상형(`ec872659`) 컨트롤러, 2026-09-28 확인). 운영 백엔드는 아직 미연결(앱은 번들 카탈로그 `LocalAvenueCatalog`만 쓰고 원격 설정을 받지 않음, `admin/`은 로컬 데모)
 > 관리자 UI: `admin/`의 로컬 운영 데모
 
+## 2026-09-28 코드 대조
+
+설계 본문은 그대로 두고, 지금 코드(`app/src/main/java/org/fcitx/fcitx5/android/ads/`)와 다른 점만 적는다.
+
+- **설정 화면 배너 제거**: 1장의 설정 진입 광고 금지에 맞춰 2026-09-28 `MainActivity`의 배너 요청을 없앴다(`98891004`). 지금 광고는 대시보드 배너(`typing-dna-dashboard-banner`), 대시보드 동기화 뒤 전면(`typing-dna-sync-complete`), 테마 상점 보상형(`theme-point-earn`) 세 가지다.
+- **배너 크기**: 13.2절 4번은 앵커 적응형 배너만 허용하지만 `DashboardBannerController`는 `AdSize.BANNER`(320x50 고정)를 쓴다.
+- **첫 세션 광고 금지 없음**: 13.3절의 첫 3~5세션 광고 금지와 4.5절의 최소 7세션 조건이 없다. `AdVenue`에 `minSessions`가 없고 세션 수를 세지 않는다.
+- **모든 venue 빈도 제한 아님**: 13.3절은 모든 venue에 상한을 요구하지만 대시보드 배너는 `dailyCap`·`cooldownMinutes`가 없어 대시보드를 열 때마다 요청한다.
+- **UMP 동의 흐름 없음**: 4.3절·13.2절 1번의 UMP SDK 의존성과 동의 코드가 없다. venue의 `requiresConsent = true`는 카탈로그 표시일 뿐 실제 동의를 확인하지 않는다.
+- **서명된 원격 설정 없음**: 3.2절의 "원격 구성이 없거나 서명 검증 실패면 `allow=false`"가 실제로는 적용되지 않는다. 앱은 번들 `LocalAvenueCatalog.defaultConfig()`(서명 문자열 `local-demo`, 만료를 실행 시각 기준으로 새로 계산)를 써서 설정 검사를 항상 통과한다.
+- **IME 프로세스와 SDK 분리 없음**: 4.6절과 달리 앱은 단일 프로세스이고 SDK의 `MobileAdsInitProvider`가 매니페스트에 자동 병합된다. 앱이 `MobileAds.initialize`를 부르는 곳은 대시보드 Activity와 테마 상점 구매 창뿐이다.
+- **전면 파일럿 조건 일부만 구현**: 4.5절 조건 중 일 1회·24시간 간격·기능 3회 사용만 있다. 최소 7세션, 1% 홀드아웃, 지표 악화 시 자동 중지가 없고, 위치도 3.1절의 `theme-export-complete`가 아니라 대시보드 동기화 뒤다.
+- **14.1절 레벨 보너스 미연결**: `TypingDnaLevelCurve.rewardBonusPoints`는 테스트에서만 쓰이고, 보상형 적립은 `PointPricing.POINTS_PER_AD`(1점)만 준다.
+- **낡은 문장**: 4.4절의 개발자 응원 화면 “응원하고 광고 보기” 흐름은 구현되지 않았고 실제 보상형은 테마 상점 「광고 보고 +1」이다. 2.2절은 공개 문서가 광고 SDK 없음을 약속한다고 적고 `privacy-data-safety-contract.json`을 가리키지만, 지금 공개 문서는 AdMob을 고지하고 계약 파일은 `play-data-safety-declaration.json`이다. 8장 끝 문장(목표 연령 미확정, 공개 약속이 “광고 SDK 없음”)도 지금과 다르다. 대상 연령은 13세 이상으로 정했다(`docs/independent-fork/privacy-data-safety.md`의 `DONE-PRIVACY-05`).
+
 ## 1. 결론
 
 설정 화면을 열 때 가끔 전면 광고를 보여주는 방식은 채택하면 안 된다. 사용자가 설정을 눌렀다면 다음에 나와야 하는 것은 설정이다. Google Play는 사용자가 다른 행동을 선택한 직후 예기치 않게 나타나는 전면 삽입 광고를 허용하지 않으며, 키보드는 다른 앱 위에서 동작하는 IME라 신뢰 손실도 일반 앱보다 크다.
