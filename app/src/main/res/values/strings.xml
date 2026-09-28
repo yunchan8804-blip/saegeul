@@ -894,7 +894,7 @@
     <string name="vault_metric_personal_hits" tools:ignore="MissingTranslation">Personal record usage</string>
     <string name="vault_metric_keystrokes_saved" tools:ignore="MissingTranslation">Keystrokes saved</string>
     <string name="vault_metric_typos_fixed" tools:ignore="MissingTranslation">Typos fixed</string>
-    <string name="vault_metric_measurement_pending" tools:ignore="MissingTranslation">Measurement pending</string>
+    <string name="vault_metric_keystrokes_saved_value" tools:ignore="MissingTranslation">%1$d</string>
     <string name="vault_metric_not_recorded" tools:ignore="MissingTranslation">Not recorded</string>
     <string name="vault_integrity_empty" tools:ignore="MissingTranslation">Recording starts when a contextual recommendation is displayed. Selected recommendations count toward the acceptance rate.</string>
     <string name="vault_timeline_title" tools:ignore="MissingTranslation">Sentences learned from typing (last 30 days)</string>
