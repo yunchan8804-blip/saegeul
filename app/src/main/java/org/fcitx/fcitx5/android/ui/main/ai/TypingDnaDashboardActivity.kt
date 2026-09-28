@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -478,8 +479,19 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
                 if (personalResult == null) {
                     Toast.makeText(this@TypingDnaDashboardActivity, feedbackMessage, Toast.LENGTH_SHORT).show()
                 }
-                interstitial.showAfterAction()
-                continueWithEnrichment()
+                val guide = try {
+                    continueWithEnrichment()
+                } catch (error: Throwable) {
+                    // No guide was shown, so the ad keeps its place right after the sync.
+                    if (error !is CancellationException) interstitial.showAfterAction()
+                    throw error
+                }
+                // The ad waits until the enrichment guide is closed so it never covers the guide.
+                if (guide == null) {
+                    interstitial.showAfterAction()
+                } else {
+                    guide.setOnDismissListener { interstitial.showAfterAction() }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: TypingDnaPersistenceException) {
@@ -526,27 +538,22 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun continueWithEnrichment() {
+    /** Requests graph enrichment after a sync and returns the guide dialog it shows, if any. */
+    private suspend fun continueWithEnrichment(): AlertDialog? {
         val controller = gemmaPreparationController
-        if (controller == null) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.sync_done_title)
-                .setMessage(R.string.enrichment_unavailable_release_build)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-            return
-        }
+            ?: return showGuide(R.string.sync_done_title, R.string.enrichment_unavailable_release_build)
         ensureNotificationPermission()
         val scheduled = withContext(Dispatchers.IO) { controller.requestGraphEnrichment() }
         requestEnrichmentRefresh()
-        if (scheduled) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.enrich_bg_title)
-                .setMessage(R.string.enrich_bg_message)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-        }
+        return if (scheduled) showGuide(R.string.enrich_bg_title, R.string.enrich_bg_message) else null
     }
+
+    private fun showGuide(@StringRes title: Int, @StringRes message: Int): AlertDialog =
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
 
     private fun renderDashboard(snapshot: DashboardSnapshot, animate: Boolean) {
         levelHero.render(snapshot)
