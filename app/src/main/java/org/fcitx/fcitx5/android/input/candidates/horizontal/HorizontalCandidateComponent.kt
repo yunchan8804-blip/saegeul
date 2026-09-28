@@ -73,7 +73,7 @@ import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionSession
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
-import org.fcitx.fcitx5.android.input.CollectionFeedbackEvent
+import org.fcitx.fcitx5.android.input.ai.learning.CollectionFeedbackEvent
 import org.fcitx.fcitx5.android.input.context.KoreanParticleKind
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSuggester
 import org.mechdancer.dependency.DynamicScope

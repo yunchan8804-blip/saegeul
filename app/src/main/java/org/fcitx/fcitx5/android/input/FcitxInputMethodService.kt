@@ -62,9 +62,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
@@ -121,6 +119,10 @@ import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
 import org.fcitx.fcitx5.android.input.ai.ContextualAppend
 import org.fcitx.fcitx5.android.input.ai.ContextualReplacement
 import org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor
+import org.fcitx.fcitx5.android.input.ai.TypingDnaCommitSink
+import org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector
+import org.fcitx.fcitx5.android.input.ai.learning.CollectionFeedbackEvent
+import org.fcitx.fcitx5.android.input.ai.learning.PersonalLearningController
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.fcitx.fcitx5.android.input.ai.ondevice.AiRuntimeStatusStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
@@ -135,6 +137,8 @@ import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSharedEngine
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionSession
+import org.fcitx.fcitx5.android.input.ai.ondevice.RecentSentSentences
+import org.fcitx.fcitx5.android.input.ai.typo.CorrectionSessionTracker
 import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
@@ -180,42 +184,9 @@ private const val AUTOMATIC_SUGGESTION_WARMUP_IDLE_MS = 1_500L
 // 차가운 엔진의 워밍업이 키보드가 숨겨지기를 기다리며 확인하는 간격.
 private const val AUTOMATIC_SUGGESTION_WARMUP_HIDDEN_POLL_MS = 500L
 
-/** A transient collection-progress hint for the keyboard's status row (see [FcitxInputMethodService.collectionFeedback]). */
-data class CollectionFeedbackEvent(
-    val category: String,
-    val pendingCount: Int,
-    val threshold: Int,
-    val compiled: Boolean,
-    val atMs: Long
-)
-
 class FcitxInputMethodService : LifecycleInputMethodService() {
 
-    /**
-     * UI 경로용 비동기 즉시 동기화다. collector flush는 predictionEpoch·policy·handler에
-     * 접근하므로 Main.immediate에서 수행하고, vault 동기화·컴파일·저장은 IO에서 수행한다.
-     */
-    suspend fun triggerInstantTypingDnaSyncAsync() {
-        val pendingPersonalLearning = withContext(Dispatchers.Main.immediate) {
-            userTypingContextCollector.flushAllPending()
-            personalLearningTail
-        }
-        pendingPersonalLearning?.join()
-        withContext(Dispatchers.IO) {
-            persistInstantTypingDnaSync()
-        }
-    }
-
-    private fun persistInstantTypingDnaSync() {
-        val before = typingDnaVault.totalBufferedCount()
-        typingDnaInstantSync.syncNow()
-        if (before == 0) {
-            runCatching {
-                typingDnaCompiler.compileFullProfile(typingDnaRepository.load())
-            }
-        }
-        personalizedStore.save()
-    }
+    suspend fun triggerInstantTypingDnaSyncAsync() = personalLearning.triggerInstantTypingDnaSyncAsync()
 
     val isDirectBootInputMode: Boolean
         get() = FcitxApplication.getInstance().isDirectBootMode
@@ -366,21 +337,41 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     )
     private var inputSessionEpoch = 0L
 
-    /** Avoids logging a "privacy" collection drop on every keystroke of the same editor session. */
-    private var collectionPrivacyDropLogged = false
-
-    /** Whether the first Typing DNA sentence of the current editor session already gave feedback. */
-    private var collectionFeedbackEmittedForSession = false
-
-    private val mutableCollectionFeedback = MutableStateFlow<CollectionFeedbackEvent?>(null)
+    private val personalLearning = PersonalLearningController(
+        PersonalLearningController.Host(
+            filesDir = { filesDir },
+            collocationModel = { contextualPredictor.collocationModel },
+            advancePredictionEpoch = { predictionEpoch++ },
+            allowsTextInspection = ::allowsTextInspectionFeatures,
+            editorInfo = { currentInputEditorInfo },
+            inputConnection = { currentInputConnection },
+            activePreedit = ::activePreeditForContextualInput,
+            appPersona = { effectiveAppProfile?.source?.persona },
+            isDestroyed = { lifecycle.currentState == Lifecycle.State.DESTROYED },
+            lifecycleScope = { lifecycleScope },
+            inputView = { inputView }
+        )
+    )
 
     /** A transient collection-progress hint for the keyboard's status row. */
-    val collectionFeedback: StateFlow<CollectionFeedbackEvent?> = mutableCollectionFeedback.asStateFlow()
+    val collectionFeedback: StateFlow<CollectionFeedbackEvent?>
+        get() = personalLearning.collectionFeedback
 
-    private fun publishCollectionFeedbackIfEnabled(event: CollectionFeedbackEvent) {
-        if (!AppPrefs.getInstance().internal.collectionFeedbackInKeyboard.getValue()) return
-        mutableCollectionFeedback.value = event
-    }
+    val userTypingContextCollector: UserTypingContextCollector
+        get() = personalLearning.userTypingContextCollector
+
+    val recentSentSentences: RecentSentSentences
+        get() = personalLearning.recentSentSentences
+
+    private val typingDnaCommitSink: TypingDnaCommitSink
+        get() = personalLearning.typingDnaCommitSink
+
+    private val correctionSessionTracker: CorrectionSessionTracker
+        get() = personalLearning.correctionSessionTracker
+
+    private fun currentWordBeforeCursor(): String = personalLearning.currentWordBeforeCursor()
+
+    private fun observeCommittedEditorText(text: String) = personalLearning.observeCommittedEditorText(text)
 
     val isInternalPromptCaptureActive: Boolean
         get() = internalPrompt.isInternalPromptCaptureActive
@@ -731,35 +722,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         contentView = decorView.findViewById(android.R.id.content)
         lastKnownConfig = resources.configuration
         refreshSnippetCatalog()
-        attachTypingDnaBatchCompiler()
-    }
-
-    private fun attachTypingDnaBatchCompiler() {
-        typingDnaVault.setOnBatchReady { category, sentences ->
-            FcitxApplication.getInstance().collectionDiagnostics.batchReady(category, sentences.size)
-            lifecycleScope.launch(Dispatchers.IO) {
-                try {
-                    typingDnaInstantSync.syncNow(category)
-                    personalizedStore.save()
-                    FcitxApplication.getInstance().collectionDiagnostics.compiled(category, ok = true)
-                    publishCollectionFeedbackIfEnabled(
-                        CollectionFeedbackEvent(
-                            category = category,
-                            pendingCount = 0,
-                            threshold = typingDnaVault.thresholdPerCategory,
-                            compiled = true,
-                            atMs = System.currentTimeMillis()
-                        )
-                    )
-                } catch (exception: org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException) {
-                    android.util.Log.w(
-                        "SaegeulAI",
-                        "Typing DNA persistence failed: ${exception.javaClass.simpleName}"
-                    )
-                    FcitxApplication.getInstance().collectionDiagnostics.compiled(category, ok = false)
-                }
-            }
-        }
+        personalLearning.attachTypingDnaBatchCompiler()
     }
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
@@ -886,7 +849,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         }
                         currentInputConnection?.sendKeyEvent(keyEvent)
                         if (keyEvent.action == KeyEvent.ACTION_DOWN) {
-                            observeForwardedKeyIfPrintable(keyEvent.keyCode, keyEvent.unicodeChar, keyEvent.metaState)
+                            personalLearning.observeForwardedKeyIfPrintable(keyEvent.keyCode, keyEvent.unicodeChar, keyEvent.metaState)
                         }
                         if (KeyEvent.isModifierKey(keyEvent.keyCode)) {
                             when (keyEvent.action) {
@@ -1079,14 +1042,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             inputView?.submitInternalPromptInput()
             return
         }
-        flushTypingDnaForCurrentEditor()
-        finalizeCorrectionSessionAtBoundary()
+        personalLearning.flushTypingDnaForCurrentEditor()
+        personalLearning.finalizeCorrectionSessionAtBoundary()
         currentInputEditorInfo.run {
             if (inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL ||
                 imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_ENTER_ACTION)
             ) {
                 sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-                observeForwardedKeyIfPrintable(KeyEvent.KEYCODE_ENTER, 0, 0)
+                personalLearning.observeForwardedKeyIfPrintable(KeyEvent.KEYCODE_ENTER, 0, 0)
                 return
             }
             if (actionLabel?.isNotEmpty() == true && actionId != EditorInfo.IME_ACTION_UNSPECIFIED) {
@@ -1097,7 +1060,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 EditorInfo.IME_ACTION_UNSPECIFIED,
                 EditorInfo.IME_ACTION_NONE -> {
                     sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-                    observeForwardedKeyIfPrintable(KeyEvent.KEYCODE_ENTER, 0, 0)
+                    personalLearning.observeForwardedKeyIfPrintable(KeyEvent.KEYCODE_ENTER, 0, 0)
                 }
                 else -> currentInputConnection.performEditorAction(action)
             }
@@ -1362,109 +1325,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         postFcitxJob { reset() }
         return true
-    }
-
-    /** Text-inspection actions do not read password/private editors, even when fully offline. */
-    private fun flushTypingDnaForCurrentEditor() {
-        typingDnaCommitSink.onEditorFinished(
-            currentInputEditorInfo?.packageName,
-            allowsTextInspectionFeatures()
-        )
-    }
-
-    /**
-     * A chat app's own send button clears the editor without ever calling our return-key or
-     * finish-input handlers, so Typing DNA would otherwise sit unflushed until the editor closes.
-     * Detect the "just emptied" selection and flush pending text for that package.
-     */
-    private fun flushTypingDnaIfEditorEmptied(newSelStart: Int, newSelEnd: Int) {
-        if (newSelStart != 0 || newSelEnd != 0) return
-        val pkg = currentInputEditorInfo?.packageName ?: return
-        if (!userTypingContextCollector.hasPending(pkg)) return
-        if (!allowsTextInspectionFeatures()) return
-        val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(1, 0)
-        val after = ic.getTextAfterCursor(1, 0)
-        if (!before.isNullOrEmpty() || !after.isNullOrEmpty()) return
-        flushTypingDnaForCurrentEditor()
-    }
-
-    private fun observeCommittedEditorText(text: String) {
-        if (!allowsTextInspectionFeatures()) {
-            if (!collectionPrivacyDropLogged) {
-                collectionPrivacyDropLogged = true
-                FcitxApplication.getInstance().collectionDiagnostics.dropped("privacy")
-            }
-            return
-        }
-        handleCorrectionWordBoundary(text)
-        if (text.isEmpty()) return
-        val pkg = currentInputEditorInfo?.packageName ?: return
-        typingDnaCommitSink.onEditorTextCommitted(pkg, text, true)
-    }
-
-    /**
-     * 우리 커밋 경로(commitTextToEditor)를 거치지 않고 raw KeyEvent로 곧장 편집기에 전달되는
-     * 스페이스·문장부호·엔터 등을 관찰한다. 개행은 실제로 개행이 삽입되는 멀티라인 편집기에서만
-     * 문장 종결로 취급해 관찰한다.
-     */
-    private fun observeForwardedKeyIfPrintable(keyCode: Int, unicodeChar: Int, metaState: Int) {
-        if (!allowsTextInspectionFeatures()) return
-        val printable = ForwardedKeyObserver.printableText(keyCode, unicodeChar, metaState) ?: return
-        if (printable == "\n" &&
-            currentInputEditorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE == 0
-        ) return
-        observeCommittedEditorText(printable)
-    }
-
-    /**
-     * 커서 바로 앞의 "쓰고 있는 어절"을 계산한다. 아직 편집기에 커밋되지 않은 조합/프리에딧과
-     * 한글 버퍼드 입력 모드의 미전송 세그먼트까지 이어붙여 판단한다.
-     */
-    private fun currentWordBeforeCursor(): String {
-        val ic = currentInputConnection ?: return ""
-        val beforeCursor = ic.getTextBeforeCursor(64, 0)?.toString().orEmpty()
-        val activePreedit = activePreeditForContextualInput()
-        return org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput.resolve(beforeCursor, activePreedit).stroke
-    }
-
-    /** 어절 경계 커밋(observeCommittedEditorText)이 실제 IC 변경 직전에 잡아 둔 스냅샷. */
-    private var correctionBoundarySnapshot: String = ""
-
-    /** 세션이 활성일 때만 IPC를 태워 현재 어절을 스냅샷한다. IPC 절약을 위해 비활성이면 빈 문자열. */
-    private fun captureCorrectionBoundarySnapshot() {
-        correctionBoundarySnapshot = if (correctionSessionTracker.isActive() && allowsTextInspectionFeatures()) {
-            currentWordBeforeCursor()
-        } else {
-            ""
-        }
-    }
-
-    private fun recordCorrectionPairIfPresent(pair: Pair<String, String>?) {
-        val (typed, corrected) = pair ?: return
-        if (correctionPatternStore.recordCorrection(typed, corrected)) {
-            typoCorrector.addWord(
-                corrected,
-                org.fcitx.fcitx5.android.input.ai.PersonalNgramModel.personalPrior(
-                    personalNgramModel.unigramCount(corrected)
-                )
-            )
-            scheduleCorrectionSave()
-        }
-    }
-
-    /** 공백/문장 종결 부호로 끝나는 커밋을 어절 경계로 보고, 지운-다시쓴 쌍이 있으면 학습한다. */
-    private fun handleCorrectionWordBoundary(text: String) {
-        if (text.isEmpty() || !correctionSessionTracker.isActive()) return
-        val isBoundary = text.first().isWhitespace() || text.last() in correctionSentenceTerminators
-        if (!isBoundary) return
-        recordCorrectionPairIfPresent(correctionSessionTracker.onWordBoundary(correctionBoundarySnapshot))
-    }
-
-    /** 엔터·입력 종료처럼 observeCommittedEditorText를 거치지 않는 경계에서 직접 호출한다. */
-    private fun finalizeCorrectionSessionAtBoundary() {
-        if (!allowsTextInspectionFeatures() || !correctionSessionTracker.isActive()) return
-        recordCorrectionPairIfPresent(correctionSessionTracker.onWordBoundary(currentWordBeforeCursor()))
     }
 
     fun allowsTextInspectionFeatures(): Boolean = featurePolicy.allowsTextInspectionFeatures()
@@ -1800,52 +1660,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return commitTextToEditor(text, 1)
     }
 
-    val morphologyEngine by lazy { org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine() }
-
-    val personalizedStore by lazy {
-        val file = java.io.File(filesDir, "personalized_sentences.json")
-        org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore(
-            storageFile = file,
-            morphology = morphologyEngine,
-            cipher = org.fcitx.fcitx5.android.FcitxApplication.getInstance().vaultCipher
-        ).apply {
-            load()
-        }
-    }
-
-    val reinforcementTracker by lazy {
-        org.fcitx.fcitx5.android.input.ai.ReinforcementTracker(store = personalizedStore)
-    }
-
-    val typingDnaRepository: org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typingDnaRepository
-
-    val typingDnaProfiler by lazy { org.fcitx.fcitx5.android.input.ai.TypingDnaProfiler() }
-
-    val typingDnaCompiler: org.fcitx.fcitx5.android.input.ai.TypingDnaCompiler by lazy {
-        org.fcitx.fcitx5.android.input.ai.TypingDnaCompiler(
-            collocationModel = contextualPredictor.collocationModel,
-            sentenceStore = personalizedStore,
-            repository = typingDnaRepository
-        ).apply {
-            runCatching {
-                compileFullProfile(typingDnaRepository.load())
-            }
-        }
-    }
-
-    val typingDnaVault: org.fcitx.fcitx5.android.input.ai.TypingDnaVault
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typingDnaVault
-
-    val typingDnaInstantSync by lazy {
-        org.fcitx.fcitx5.android.input.ai.TypingDnaInstantSync(
-            vault = typingDnaVault,
-            repository = typingDnaRepository,
-            profiler = typingDnaProfiler,
-            compiler = typingDnaCompiler
-        )
-    }
-
     /** Captures only a complete, bounded editor prefix with a collapsed cursor at its end. */
     fun captureOnDeviceContextSnapshot(): AiInputCaptureResult {
         clearOnDeviceContextExtractedTextMonitor()
@@ -2135,7 +1949,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /**
-     * Adds up to 3 similar past sentences from [personalSentenceVault] to [input] as style
+     * Adds up to 3 similar past sentences from [PersonalLearningController.personalSentenceVault] to [input] as style
      * examples. Runs off the main thread (the coordinator dispatches this call on
      * [kotlinx.coroutines.Dispatchers.Default]); this function itself does no dispatching.
      */
@@ -2143,7 +1957,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         input: OnDeviceSuggestionPolicy.Input
     ): OnDeviceSuggestionPolicy.Input {
         val currentText = input.textBeforeCursor.trim()
-        val styleExamples = personalSentenceVault.retrieve(input.textBeforeCursor, input.packageName, limit = 5)
+        val styleExamples = personalLearning.personalSentenceVault.retrieve(input.textBeforeCursor, input.packageName, limit = 5)
             .map { it.sentence.trim() }
             .filter {
                 it.isNotEmpty() && it != currentText && it.length <= 80 &&
@@ -2529,11 +2343,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             inputView?.postRefreshContextualCandidates(16L)
         }
         automaticSuggestionTtlRunnable = runnable
-        ngramSaveHandler.postDelayed(runnable, AUTOMATIC_SUGGESTION_TTL_MS)
+        automaticSuggestionMainHandler.postDelayed(runnable, AUTOMATIC_SUGGESTION_TTL_MS)
     }
 
     private fun clearAutomaticSuggestionTtl() {
-        automaticSuggestionTtlRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
+        automaticSuggestionTtlRunnable?.let { automaticSuggestionMainHandler.removeCallbacks(it) }
         automaticSuggestionTtlRunnable = null
         automaticSuggestionTtlCandidate = null
     }
@@ -2546,11 +2360,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             OnDeviceGenerationControl.onKeyboardVisibilityChanged(false)
         }
         automaticSuggestionHideRunnable = runnable
-        ngramSaveHandler.postDelayed(runnable, AUTOMATIC_SUGGESTION_HIDE_GRACE_MS)
+        automaticSuggestionMainHandler.postDelayed(runnable, AUTOMATIC_SUGGESTION_HIDE_GRACE_MS)
     }
 
     private fun cancelAutomaticSuggestionHideClose() {
-        automaticSuggestionHideRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
+        automaticSuggestionHideRunnable?.let { automaticSuggestionMainHandler.removeCallbacks(it) }
         automaticSuggestionHideRunnable = null
     }
 
@@ -2781,34 +2595,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             ) == suffix
     }
 
-    val personalNgramModel: org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalNgramModel
-
-    val personalSentenceVault: org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalSentenceVault
-
-    /**
-     * In-memory-only record of sentences this user recently sent, per app package. Owned by this
-     * service instance (never persisted), used only to enrich the automatic suggestion prompt with
-     * "what I just said in this app".
-     */
-    val recentSentSentences = org.fcitx.fcitx5.android.input.ai.ondevice.RecentSentSentences()
-
-    val personalGraphStore: org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalGraphStore
-
-    val typoCorrector: org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typoCorrector
-
-    val baseKoreanVocabulary: org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().baseKoreanVocabulary
-
-    val correctionPatternStore: org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().correctionPatternStore
-
-    private val correctionSessionTracker = org.fcitx.fcitx5.android.input.ai.typo.CorrectionSessionTracker()
-    private val correctionSentenceTerminators = charArrayOf('.', '?', '!', '\n')
-
     @Volatile
     private var predictionEpoch = 0L
 
@@ -2872,7 +2658,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var contextualPredictKey: ContextualPredictionMemoKey? = null
     private var contextualPredictJob: Job? = null
-    private var personalLearningTail: Job? = null
     private var sentencePackRevisionJob: Job? = null
     private var observedSentencePackRevision = Long.MIN_VALUE
     private var nextContextualPredictionGeneration = 0L
@@ -2901,152 +2686,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    private val ngramSaveHandler = Handler(Looper.getMainLooper())
-    private var pendingNgramSaveRunnable: Runnable? = null
-    private var pendingCorrectionSaveRunnable: Runnable? = null
     private var automaticSuggestionTtlRunnable: Runnable? = null
     private var automaticSuggestionHideRunnable: Runnable? = null
 
-    private fun scheduleNgramSave() {
-        pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        val runnable = Runnable { launchPersonalModelSave() }
-        pendingNgramSaveRunnable = runnable
-        ngramSaveHandler.postDelayed(runnable, 1500L)
-    }
-
-    private fun enqueuePersonalLearning(
-        afterLearningOnMain: (() -> Unit)? = null,
-        action: () -> Unit
-    ) {
-        val previous = personalLearningTail
-        personalLearningTail = FcitxApplication.getInstance().applicationScope.launch {
-            previous?.join()
-            action()
-            val persistAfterDestroyed = withContext(Dispatchers.Main) {
-                predictionEpoch++
-                if (lifecycle.currentState == Lifecycle.State.DESTROYED) {
-                    true
-                } else {
-                    scheduleNgramSave()
-                    inputView?.postRefreshContextualCandidates(16L)
-                    afterLearningOnMain?.invoke()
-                    false
-                }
-            }
-            if (persistAfterDestroyed) {
-                personalizedStore.save()
-                personalNgramModel.save()
-                personalSentenceVault.save()
-                FcitxApplication.getInstance().predictionMetricsStore.save()
-            }
-        }
-    }
-
-    private fun enqueueContextualSelectionFeedback(
-        contextBeforeReinforce: String,
-        selectedSentence: String,
-        reinforcedSentence: String,
-        packageName: String
-    ) {
-        enqueuePersonalLearning {
-            reinforcementTracker.onCandidateSelected(selectedSentence, packageName)
-            personalNgramModel.reinforce(contextBeforeReinforce, reinforcedSentence, packageName)
-        }
-    }
-
-    /** Persists the on-device personal learning stores (n-gram model + sentence RAG vault) off the main thread. */
-    private fun launchPersonalModelSave() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            personalNgramModel.save()
-            personalSentenceVault.save()
-            FcitxApplication.getInstance().predictionMetricsStore.save()
-        }
-    }
-
-    private fun scheduleCorrectionSave() {
-        pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        val runnable = Runnable {
-            lifecycleScope.launch(Dispatchers.IO) { correctionPatternStore.save() }
-        }
-        pendingCorrectionSaveRunnable = runnable
-        ngramSaveHandler.postDelayed(runnable, 1500L)
-    }
-
-    private val typingDnaCommitSink by lazy {
-        org.fcitx.fcitx5.android.input.ai.TypingDnaCommitSink(userTypingContextCollector)
-    }
-
-    val userTypingContextCollector by lazy {
-        org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector(
-            onSentenceCommitted = { pkg, sentence ->
-                val capturedPackageName = pkg
-                val capturedSentence = sentence
-                // Computed once here (not inside the queued action below) so a profile change
-                // that happens while this commit is still queued can't retroactively change
-                // which persona it gets attributed to.
-                val capturedPersona = org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry.classify(
-                    capturedPackageName, effectiveAppProfile?.source?.persona
-                )
-                val trackLearnedMetrics = allowsTextInspectionFeatures()
-                var feedbackCategory: String? = null
-                var feedbackPendingCount = 0
-                enqueuePersonalLearning(
-                    afterLearningOnMain = {
-                        val category = feedbackCategory
-                        if (category != null && !collectionFeedbackEmittedForSession) {
-                            collectionFeedbackEmittedForSession = true
-                            publishCollectionFeedbackIfEnabled(
-                                CollectionFeedbackEvent(
-                                    category = category,
-                                    pendingCount = feedbackPendingCount,
-                                    threshold = typingDnaVault.thresholdPerCategory,
-                                    compiled = false,
-                                    atMs = System.currentTimeMillis()
-                                )
-                            )
-                        }
-                    }
-                ) {
-                    typingDnaVault.recordSentence(capturedPackageName, capturedSentence, personaOverride = capturedPersona)
-                    feedbackCategory = capturedPersona
-                    feedbackPendingCount = typingDnaVault.pendingByCategory()[capturedPersona] ?: 0
-                    val beforeLearning = if (trackLearnedMetrics) personalNgramModel.stats() else null
-                    personalNgramModel.learn(capturedSentence, capturedPackageName, personaOverride = capturedPersona)
-                    beforeLearning?.let { before ->
-                        val after = personalNgramModel.stats()
-                        val learnedSentences = (after.learnedSentences - before.learnedSentences).coerceAtLeast(0)
-                        val learnedWords = (after.unigrams - before.unigrams).coerceAtLeast(0)
-                        if (learnedSentences > 0 || learnedWords > 0) {
-                            FcitxApplication.getInstance().predictionMetricsStore.recordLearned(learnedSentences, learnedWords)
-                        }
-                    }
-                    personalSentenceVault.record(capturedSentence, capturedPackageName, personaOverride = capturedPersona)
-                    recentSentSentences.record(capturedPackageName, capturedSentence)
-                    org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer.tokenize(capturedSentence).forEach { token ->
-                        typoCorrector.addWord(
-                            token,
-                            org.fcitx.fcitx5.android.input.ai.PersonalNgramModel.personalPrior(
-                                personalNgramModel.unigramCount(token)
-                            )
-                        )
-                    }
-                }
-            },
-            diagnostics = FcitxApplication.getInstance().collectionDiagnostics
-        )
-    }
-
     val contextualPredictor: org.fcitx.fcitx5.android.input.ai.AiContextualPredictor by lazy {
         org.fcitx.fcitx5.android.input.ai.AiContextualPredictor(
-            morphology = morphologyEngine,
+            morphology = personalLearning.morphologyEngine,
             semanticPredictor = org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor(),
-            personalizedStore = personalizedStore,
-            ngram = personalNgramModel,
-            typoCorrector = typoCorrector,
-            baseVocabulary = baseKoreanVocabulary,
-            correctionStore = correctionPatternStore,
-            personalSentenceVault = personalSentenceVault,
-            personalGraphStore = personalGraphStore,
+            personalizedStore = personalLearning.personalizedStore,
+            ngram = personalLearning.personalNgramModel,
+            typoCorrector = personalLearning.typoCorrector,
+            baseVocabulary = personalLearning.baseKoreanVocabulary,
+            correctionStore = personalLearning.correctionPatternStore,
+            personalSentenceVault = personalLearning.personalSentenceVault,
+            personalGraphStore = personalLearning.personalGraphStore,
             sentencePackLookup = FcitxApplication.getInstance().sentencePacks::complete,
             bundledNgram = { FcitxApplication.getInstance().bundledKoreanNgram }
         )
@@ -3373,7 +3026,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             FcitxApplication.getInstance().applicationScope.launch {
                 FcitxApplication.getInstance().predictionMetricsStore.recordShown(1)
                 withContext(Dispatchers.Main) {
-                    scheduleNgramSave()
+                    personalLearning.scheduleNgramSave()
                 }
             }
         }
@@ -3396,7 +3049,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
                 FcitxApplication.getInstance().predictionMetricsStore.recordAccepted(candidate.source, savedKeystrokes = 0)
                 withContext(Dispatchers.Main) {
-                    scheduleNgramSave()
+                    personalLearning.scheduleNgramSave()
                 }
             }
         }
@@ -3405,16 +3058,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun recordContextualCandidatesIgnored(offeredSentences: List<String>) {
         if (!allowsTextInspectionFeatures() || offeredSentences.isEmpty()) return
         val capturedSentences = offeredSentences.toList()
-        enqueuePersonalLearning {
-            reinforcementTracker.onCandidatesIgnored(capturedSentences)
+        personalLearning.enqueuePersonalLearning {
+            personalLearning.reinforcementTracker.onCandidatesIgnored(capturedSentences)
         }
     }
 
     fun recordContextualCandidateRejected(sentence: String, heavyPenalty: Boolean = true) {
         if (!allowsTextInspectionFeatures()) return
         val capturedSentence = sentence
-        enqueuePersonalLearning {
-            reinforcementTracker.onCandidateRejected(capturedSentence, heavyPenalty)
+        personalLearning.enqueuePersonalLearning {
+            personalLearning.reinforcementTracker.onCandidateRejected(capturedSentence, heavyPenalty)
         }
     }
 
@@ -3437,7 +3090,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (removedText.length != replaceLength || !currentInputSelection.rangeEquals(start, end)) {
             return false
         }
-        captureCorrectionBoundarySnapshot()
+        personalLearning.captureCorrectionBoundarySnapshot()
         val replacementStart = start - replaceLength
         if (!replaceAiRange(
                 connection = connection,
@@ -3482,13 +3135,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             return false
         }
         val textToCommit = appendSnapshot.append.insertionFor(beforeCursor) ?: return false
-        captureCorrectionBoundarySnapshot()
+        personalLearning.captureCorrectionBoundarySnapshot()
         if (!commitAiTextAtCursor(connection, cursor, textToCommit, cursor, cursor)) return false
 
         observeCommittedEditorText(textToCommit)
         selection.predict(cursor + textToCommit.length)
         inputView?.postRefreshContextualCandidates(16L)
-        enqueueContextualSelectionFeedback(
+        personalLearning.enqueueContextualSelectionFeedback(
             contextBeforeReinforce = beforeCursor.takeLast(64),
             selectedSentence = sentence,
             reinforcedSentence = appendSnapshot.append.suffix,
@@ -3581,7 +3234,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
             val committed = commitContextualCandidateText(ic, replaceLength, textToCommit)
             if (committed) {
-                enqueueContextualSelectionFeedback(
+                personalLearning.enqueueContextualSelectionFeedback(
                     contextBeforeReinforce = contextBeforeReinforce,
                     selectedSentence = sentence,
                     reinforcedSentence = sentence,
@@ -3612,7 +3265,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         val textToCommit = if (correctedSentence.endsWith(" ") || correctedSentence.endsWith("\n")) correctedSentence else "$correctedSentence "
                         val committed = commitContextualCandidateText(ic, replacementLength, textToCommit)
                         if (committed) {
-                            enqueueContextualSelectionFeedback(
+                            personalLearning.enqueueContextualSelectionFeedback(
                                 contextBeforeReinforce = contextBeforeReinforce,
                                 selectedSentence = sentence,
                                 reinforcedSentence = correctedSentence,
@@ -3645,7 +3298,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
             val committed = commitContextualCandidateText(ic, replacementLength, sentence)
             if (committed) {
-                enqueueContextualSelectionFeedback(
+                personalLearning.enqueueContextualSelectionFeedback(
                     contextBeforeReinforce = contextBeforeReinforce,
                     selectedSentence = sentence,
                     reinforcedSentence = sentence,
@@ -3672,7 +3325,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
         val committed = commitContextualCandidateText(ic, replacementLength, textToCommit)
         if (committed) {
-            enqueueContextualSelectionFeedback(
+            personalLearning.enqueueContextualSelectionFeedback(
                 contextBeforeReinforce = contextBeforeReinforce,
                 selectedSentence = sentence,
                 reinforcedSentence = sentence,
@@ -3745,7 +3398,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     ): Boolean {
         if (isInternalPromptInputOwned && !allowPromptStart) return false
         val ic = currentInputConnection ?: return false
-        captureCorrectionBoundarySnapshot()
+        personalLearning.captureCorrectionBoundarySnapshot()
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
             val c = if (cursor == -1) text.length else cursor
@@ -4369,8 +4022,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // restart: dropping a draft is safer than sending a later GIF/AI action to the wrong field.
         notifyOnDeviceContextSnapshotInvalidated()
         inputSessionEpoch += 1
-        collectionPrivacyDropLogged = false
-        collectionFeedbackEmittedForSession = false
+        personalLearning.onStartInput()
         predictionEpoch++
         predictionMetricsSession.reset()
         correctionSessionTracker.onEditorChanged()
@@ -4528,7 +4180,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             cursorUpdateIndex
         )
         inputView?.updateSelection(newSelStart, newSelEnd)
-        flushTypingDnaIfEditorEmptied(newSelStart, newSelEnd)
+        personalLearning.flushTypingDnaIfEditorEmptied(newSelStart, newSelEnd)
     }
 
     override fun onUpdateExtractedText(token: Int, text: ExtractedText?) {
@@ -4860,7 +4512,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (wasBufferedHangul) {
             submitBufferedHangul()
         }
-        flushTypingDnaForCurrentEditor()
+        personalLearning.flushTypingDnaForCurrentEditor()
         if (finishingInput) {
             bufferedHangulSessionActive = false
             bufferedHangul.clear()
@@ -4886,21 +4538,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
         scheduleAutomaticSuggestionHideClose()
         engineRestartEditorRehydrationGate.onFinishInput()
-        finalizeCorrectionSessionAtBoundary()
+        personalLearning.finalizeCorrectionSessionAtBoundary()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()
         val wasBufferedHangul = bufferedHangulSessionActive
         if (wasBufferedHangul) {
             submitBufferedHangul()
         }
-        flushTypingDnaForCurrentEditor()
+        personalLearning.flushTypingDnaForCurrentEditor()
         predictionMetricsSession.reset()
-        pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        pendingNgramSaveRunnable = null
-        launchPersonalModelSave()
-        pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        pendingCorrectionSaveRunnable = null
-        lifecycleScope.launch(Dispatchers.IO) { correctionPatternStore.save() }
+        personalLearning.onFinishInput()
         bufferedHangulSessionActive = false
         bufferedHangul.clear()
         postFcitxJob {
@@ -4955,11 +4602,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         sentencePackRevisionJob?.cancel()
         sentencePackRevisionJob = null
         predictionScope.cancel()
-        typingDnaVault.setOnBatchReady(null)
-        pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        pendingNgramSaveRunnable = null
-        pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        pendingCorrectionSaveRunnable = null
+        personalLearning.onDestroy()
         if (activeInstance === this) {
             activeInstance = null
         }
