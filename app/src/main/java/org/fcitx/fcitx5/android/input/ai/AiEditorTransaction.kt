@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.EditorSelection
+
 data class AiEditorTarget(
     val packageName: String,
     val fieldId: Int,
@@ -81,16 +83,15 @@ sealed class AiSuggestionApplyResult {
  * The Android remote InputConnection protocol acknowledges that a command was delivered, not
  * that the editor applied it. Therefore [confirmCommit] must check the editor's visible state
  * after a successful dispatch. A rejected or unconfirmed command restores the exact selection
- * that was visible before this protocol moved it. The caller intentionally owns the connection
- * and does not expose it outside the IME.
+ * that was visible before this protocol moved it, passed in as `restore`. The caller intentionally
+ * owns the connection and does not expose it outside the IME.
  */
 internal object AiEditorTransaction {
     fun replaceRange(
         start: Int,
         end: Int,
         replacement: String,
-        restoreStart: Int,
-        restoreEnd: Int,
+        restore: EditorSelection,
         setSelection: (Int, Int) -> Boolean,
         commitText: (String) -> Boolean,
         confirmCommit: (String) -> Boolean
@@ -100,15 +101,14 @@ internal object AiEditorTransaction {
         }
         val committed = runCatching { commitText(replacement) }.getOrDefault(false)
         if (committed && runCatching { confirmCommit(replacement) }.getOrDefault(false)) return true
-        runCatching { setSelection(restoreStart, restoreEnd) }
+        runCatching { setSelection(restore.start, restore.end) }
         return false
     }
 
     fun commitAtCursor(
         cursor: Int,
         text: String,
-        restoreStart: Int,
-        restoreEnd: Int,
+        restore: EditorSelection,
         setSelection: (Int, Int) -> Boolean,
         commitText: (String) -> Boolean,
         confirmCommit: (String) -> Boolean
@@ -118,7 +118,7 @@ internal object AiEditorTransaction {
         }
         val committed = runCatching { commitText(text) }.getOrDefault(false)
         if (committed && runCatching { confirmCommit(text) }.getOrDefault(false)) return true
-        runCatching { setSelection(restoreStart, restoreEnd) }
+        runCatching { setSelection(restore.start, restore.end) }
         return false
     }
 }
@@ -167,18 +167,17 @@ object AiTextSource {
     /**
      * [android.view.inputmethod.ExtractedText] is authoritative about the editor selection at
      * the instant it was read. Never combine its text with a different IME selection snapshot:
-     * doing so can calculate a replacement range for the wrong cursor.
+     * doing so can calculate a replacement range for the wrong cursor. [extracted] is relative to
+     * [startOffset], as ExtractedText reports it; [captured] is in editor coordinates.
      */
     fun matchesExtractedSelection(
         startOffset: Int,
-        capturedSelectionStart: Int,
-        capturedSelectionEnd: Int,
-        extractedSelectionStart: Int,
-        extractedSelectionEnd: Int
-    ): Boolean = extractedSelectionStart >= 0 &&
-        extractedSelectionEnd >= 0 &&
-        startOffset + extractedSelectionStart == capturedSelectionStart &&
-        startOffset + extractedSelectionEnd == capturedSelectionEnd
+        captured: EditorSelection,
+        extracted: EditorSelection
+    ): Boolean = extracted.start >= 0 &&
+        extracted.end >= 0 &&
+        startOffset + extracted.start == captured.start &&
+        startOffset + extracted.end == captured.end
 
     /**
      * Returns the complete nearby text when it fits the privacy and request bound. For longer

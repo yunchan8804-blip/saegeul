@@ -1403,14 +1403,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         start: Int,
         end: Int,
         replacement: String,
-        restoreStart: Int,
-        restoreEnd: Int
+        restore: EditorSelection
     ): Boolean = AiEditorTransaction.replaceRange(
         start = start,
         end = end,
         replacement = replacement,
-        restoreStart = restoreStart,
-        restoreEnd = restoreEnd,
+        restore = restore,
         setSelection = connection::setSelection,
         commitText = { text -> connection.commitText(text, 1) },
         confirmCommit = { text ->
@@ -1426,13 +1424,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         connection: android.view.inputmethod.InputConnection,
         cursor: Int,
         text: String,
-        restoreStart: Int,
-        restoreEnd: Int
+        restore: EditorSelection
     ): Boolean = AiEditorTransaction.commitAtCursor(
         cursor = cursor,
         text = text,
-        restoreStart = restoreStart,
-        restoreEnd = restoreEnd,
+        restore = restore,
         setSelection = connection::setSelection,
         commitText = { committed -> connection.commitText(committed, 1) },
         confirmCommit = { committed ->

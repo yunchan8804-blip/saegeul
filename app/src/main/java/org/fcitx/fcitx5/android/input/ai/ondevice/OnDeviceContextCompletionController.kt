@@ -44,8 +44,7 @@ class OnDeviceContextCompletionController(
             connection: InputConnection,
             cursor: Int,
             text: String,
-            restoreStart: Int,
-            restoreEnd: Int
+            restore: EditorSelection
         ) -> Boolean,
         val predictSelection: (position: Int) -> Unit,
         /** Runs after every snapshot invalidation, once this controller has updated itself. */
@@ -207,7 +206,7 @@ class OnDeviceContextCompletionController(
         }
         val connection = host.inputConnection() ?: return AiSuggestionApplyResult.NotApplied
         val cursor = host.selection().start
-        if (!host.commitAiTextAtCursor(connection, cursor, suffix, cursor, cursor)) {
+        if (!host.commitAiTextAtCursor(connection, cursor, suffix, EditorSelection.collapsed(cursor))) {
             return AiSuggestionApplyResult.NotApplied
         }
         val end = cursor + suffix.length

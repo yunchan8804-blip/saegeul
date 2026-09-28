@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -80,19 +81,15 @@ class AiTextSourceTest {
         assertTrue(
             AiTextSource.matchesExtractedSelection(
                 startOffset = 0,
-                capturedSelectionStart = 4,
-                capturedSelectionEnd = 4,
-                extractedSelectionStart = 4,
-                extractedSelectionEnd = 4
+                captured = EditorSelection(4, 4),
+                extracted = EditorSelection(4, 4)
             )
         )
         assertTrue(
             !AiTextSource.matchesExtractedSelection(
                 startOffset = 0,
-                capturedSelectionStart = 4,
-                capturedSelectionEnd = 4,
-                extractedSelectionStart = 2,
-                extractedSelectionEnd = 2
+                captured = EditorSelection(4, 4),
+                extracted = EditorSelection(2, 2)
             )
         )
     }

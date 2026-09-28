@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.ai.AiContextualPredictor
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
@@ -89,15 +90,13 @@ class ContextualPredictionController(private val host: Host) {
             start: Int,
             end: Int,
             replacement: String,
-            restoreStart: Int,
-            restoreEnd: Int
+            restore: EditorSelection
         ) -> Boolean,
         val commitAiTextAtCursor: (
             connection: InputConnection,
             cursor: Int,
             text: String,
-            restoreStart: Int,
-            restoreEnd: Int
+            restore: EditorSelection
         ) -> Boolean,
         val predictSelection: (position: Int) -> Unit,
         val morphologyEngine: () -> ChoseongMorphologyEngine,
@@ -602,8 +601,7 @@ class ContextualPredictionController(private val host: Host) {
                 start = replacementStart,
                 end = start,
                 replacement = textToCommit,
-                restoreStart = start,
-                restoreEnd = end
+                restore = EditorSelection(start, end)
             )
         ) {
             return false
@@ -641,7 +639,7 @@ class ContextualPredictionController(private val host: Host) {
         }
         val textToCommit = appendSnapshot.append.insertionFor(beforeCursor) ?: return false
         host.captureCorrectionBoundarySnapshot()
-        if (!host.commitAiTextAtCursor(connection, cursor, textToCommit, cursor, cursor)) return false
+        if (!host.commitAiTextAtCursor(connection, cursor, textToCommit, EditorSelection.collapsed(cursor))) return false
 
         host.observeCommittedEditorText(textToCommit)
         host.predictSelection(cursor + textToCommit.length)
@@ -701,8 +699,7 @@ class ContextualPredictionController(private val host: Host) {
                 start = 0,
                 end = replacement.expectedContext.length,
                 replacement = replacement.replacement,
-                restoreStart = cursor,
-                restoreEnd = cursor
+                restore = EditorSelection.collapsed(cursor)
             )
         ) {
             return false
@@ -847,9 +844,8 @@ class ContextualPredictionController(private val host: Host) {
         start: Int,
         end: Int,
         replacement: String,
-        restoreStart: Int,
-        restoreEnd: Int
-    ): Boolean = host.replaceAiRange(connection, start, end, replacement, restoreStart, restoreEnd)
+        restore: EditorSelection
+    ): Boolean = host.replaceAiRange(connection, start, end, replacement, restore)
 
     private fun enqueueContextualSelectionFeedback(
         contextBeforeReinforce: String,
