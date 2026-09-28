@@ -30,7 +30,7 @@
       </a>
       <div class="nav-links">
         <a href="#korean">한국어</a>
-        <a href="#ai">AI 글쓰기</a>
+        <a href="#ai">AI 추천</a>
         <a href="#connect">새글 AI</a>
         <a href="#privacy">개인정보</a>
         <a href="#themes">시그니처 테마</a>
@@ -52,7 +52,7 @@
           <div class="hero-copy">
             <p class="eyebrow">안드로이드 한국어 키보드</p>
             <h1 id="hero-title">한국어의 결을 아는 자판.<br>내 폰 안에서 배우는 AI.</h1>
-            <p class="hero-lede">17가지 한글 자판부터 한/영 오타 복구, 오프라인 사전, 그리고 추가 요금 없는 AI 글쓰기까지. 쓰는 곳 어디서나 바로 열립니다.</p>
+            <p class="hero-lede">17가지 한글 자판부터 한/영 오타 복구, 오프라인 사전, 그리고 추가 요금 없이 기기 안에서 도는 AI 문장 추천까지. 쓰는 곳 어디서나 바로 열립니다.</p>
             <div class="actions">
               <a class="button button-primary" href="https://github.com/yunchan8804-blip/saegeul/releases">새글 v2026 내려받기</a>
               <a class="button button-ghost liquid-glass liquid-glass-refract" href="#korean">차별점 살펴보기</a>
@@ -179,13 +179,13 @@
     <section class="ai-scene story-scene" id="ai" aria-labelledby="ai-title">
       <div class="story-frame">
         <div class="scene-media" aria-hidden="true">
-          <img src="/assets/ai-flow.webp?v=20260731-water1" width="1672" height="941" alt="새글 AI 글쓰기 인터페이스">
+          <img src="/assets/ai-flow.webp?v=20260731-water1" width="1672" height="941" alt="기기 안에서 문장을 추천하는 새글 AI">
         </div>
         <div class="scene-shade scene-shade-wide"></div>
         <div class="scene-copy shell">
           <div class="scene-copy-panel liquid-glass liquid-glass-refract">
-            <h2 id="ai-title">부탁하면,<br>문장이 된다.</h2>
-            <p>맞춤법 교정부터 문체 변환, 답장 초안, 다국어 번역까지. 앱을 오가며 복사해 붙이지 않고 키보드 안에서 즉시 완성합니다.</p>
+            <h2 id="ai-title">잠깐 멈추면,<br>다음 문장이 보인다.</h2>
+            <p>쓰다가 잠깐 멈추면 앞에 쓴 글에 이어질 단어와 문장을 후보 줄에 보여 줍니다. 고른 것만 들어가고, 글은 휴대폰 밖으로 나가지 않습니다.</p>
           </div>
         </div>
       </div>
@@ -195,68 +195,62 @@
     <section class="reader-section ai-actions" aria-labelledby="ai-actions-title">
       <div class="shell reader-head reveal">
         <div class="reader-head-grid">
-          <h2 id="ai-actions-title">여섯 가지 AI 글쓰기.<br>정확한 4대 확정.</h2>
+          <h2 id="ai-actions-title">기기 안 AI가<br>하는 네 가지.</h2>
           <div class="reader-lede">
-            <p>새글의 AI는 백그라운드에서 상시 감시하지 않습니다. 사용자가 AI 버튼을 누른 그 순간에만 현재 문장을 확인하고, 결과는 화면에서 검토한 뒤 적용합니다.</p>
-            <p class="reader-note">비밀번호 입력창과 전체 오프라인 모드에서는 AI 기능이 완전히 차단됩니다.</p>
+            <p>새글 AI(Google Gemma)는 이 휴대폰 안에서만 돌아갑니다. 추천은 후보로 보여 줄 뿐이고, 사용자가 고른 것만 입력칸에 들어갑니다.</p>
+            <p class="reader-note">비밀번호·민감 입력칸과, 앱별 설정에서 AI를 막은 앱에서는 동작하지 않습니다. 인터넷이 필요 없어 전체 오프라인 모드에서도 그대로 씁니다.</p>
           </div>
         </div>
       </div>
 
-      <!-- AI Interactive Diff Simulator -->
+      <!-- On-Device Continuation Example -->
       <div class="shell ai-interactive-bento reveal">
         <div class="ai-diff-card">
-          <p class="eyebrow">실시간 문맥 디프(Diff) 체험</p>
-          <div class="ai-tone-selector" role="tablist" aria-label="AI 문체 변환 시연">
-            <button class="ai-tone-btn is-active" role="tab" aria-selected="true" data-tone-key="correct">교정 &amp; 맞춤법</button>
-            <button class="ai-tone-btn" role="tab" aria-selected="false" data-tone-key="business">업무 메일체</button>
-            <button class="ai-tone-btn" role="tab" aria-selected="false" data-tone-key="polite_reject">정중한 거절</button>
-            <button class="ai-tone-btn" role="tab" aria-selected="false" data-tone-key="casual">카톡체</button>
-          </div>
+          <p class="eyebrow">이어쓰기 예시</p>
           <div class="ai-diff-container">
             <div class="ai-diff-row">
               <div class="diff-box diff-before">
                 <span class="diff-label">입력 원문</span>
-                <p>내일 봬요! 이번 프로젝트 정말 수고하셧어요</p>
+                <p>창문으로 햇빛이 들어와서</p>
               </div>
               <div class="diff-arrow" aria-hidden="true">→</div>
               <div class="diff-box diff-after">
                 <span class="diff-label">새글 AI 제안</span>
-                <p>내일 <span class="diff-highlight-add">봬요</span>! 이번 프로젝트 정말 수고<span class="diff-highlight-add">하셨어요</span>.</p>
+                <p>창문으로 햇빛이 들어와서 <span class="diff-highlight-add">방 안이 환해졌다.</span></p>
               </div>
             </div>
-            <p class="ai-action-note">틀린 맞춤법과 띄어쓰기만 짚어내고 기존 문맥을 온전히 보존합니다.</p>
+            <p class="ai-action-note">실제 휴대폰에서 기기 안 Gemma가 낸 추천입니다. 쓰던 글은 그대로 두고 뒤에 붙일 부분만 제안하며, 추천은 쓰던 글과 내 말투에 따라 달라집니다.</p>
           </div>
         </div>
 
         <div class="ai-support-grid">
           <div class="ai-action-tile">
-            <h4>01. 문장 3개 생성</h4>
-            <p>빈 입력창에서도 아이디어 키워드만 넣으면 서로 다른 어조의 3가지 완성 문장을 제안합니다.</p>
+            <h4>01. 자동 문장 추천</h4>
+            <p>쓰다가 잠깐 멈추면 후보 줄에 다음 단어와 이어질 문장을 보여 줍니다. 원문과 추천은 파일로 저장하지 않고 키보드를 닫으면 지웁니다.</p>
           </div>
           <div class="ai-action-tile">
-            <h4>02. 상황별 답장 초안</h4>
-            <p>받은 메시지를 붙여넣으면 적절한 답장 초안을 생성합니다. 클립보드 원문은 5분 뒤 자동 소멸합니다.</p>
+            <h4>02. 이어쓰기</h4>
+            <p>툴바의 이어쓰기 버튼을 누르면 지금까지 쓴 글 뒤에 붙일 문장 후보를 만듭니다. 마음에 들면 이어 붙이고, 아니면 취소하면 됩니다.</p>
           </div>
           <div class="ai-action-tile">
-            <h4>03. 다국어 실시간 번역</h4>
-            <p>한국어, 영어, 일본어, 중국어 간의 자연스러운 번역을 키보드 안에서 즉시 치환합니다.</p>
+            <h4>03. 내 말투 배우기</h4>
+            <p>일반 입력칸에서 쓴 문장으로 내 말투를 배워 추천에 반영합니다. 배운 내용은 Android Keystore로 암호화해 기기에 두고, 언제든 지울 수 있습니다.</p>
           </div>
           <div class="ai-action-tile">
-            <h4>04. 자유 지시 (Custom Prompt)</h4>
-            <p>요약, 글머리 기호 정리 등 사용자가 원하는 프롬프트를 쓰던 키보드 높이 그대로 지시합니다.</p>
+            <h4>04. 쉬는 동안 준비</h4>
+            <p>키보드를 쓰지 않을 때 추천 문장을 미리 준비합니다. 입력 중이거나, 배터리가 부족하거나, 절전·심한 발열·메모리 부족 상태면 멈춥니다.</p>
           </div>
         </div>
       </div>
 
       <!-- Result Confirmation Strip -->
       <div class="shell result-strip reveal">
-        <p class="strip-label">결과 검토 후 4가지 선택</p>
+        <p class="strip-label">넣기 전에 늘 고릅니다</p>
         <ul>
-          <li>교체 (기존 글 치환)</li>
-          <li>뒤에 넣기 (이어 쓰기)</li>
-          <li>클립보드 복사</li>
+          <li>후보 줄에서 눌러 넣기</li>
+          <li>이어쓰기 창에서 이어 붙이기</li>
           <li>취소 (원문 유지)</li>
+          <li>개인정보·AI 설정에서 끄기</li>
         </ul>
       </div>
     </section>
@@ -346,8 +340,8 @@
             <span>기기 안 100% 로컬 libhangul 엔진 조합</span>
           </article>
           <article class="control-line liquid-glass liquid-glass-refract">
-            <strong>AI 글쓰기 &amp; 음성</strong>
-            <span>사용자가 실행 버튼을 누른 순간에만 1회 전송</span>
+            <strong>새글 AI &amp; 온라인 음성</strong>
+            <span>AI는 기기 안에서만 · 온라인 음성은 버튼을 누른 순간에만 전송</span>
           </article>
           <article class="control-line liquid-glass liquid-glass-refract">
             <strong>사용 내역 &amp; 인증키</strong>
@@ -373,7 +367,7 @@
         <article class="bento-card bento-card-featured reveal">
           <p class="eyebrow">검증된 0바이트</p>
           <h3>완전 오프라인 모드</h3>
-          <p>원클릭으로 AI, 온라인 음성, GIF 검색, OCR 모델 다운로드를 모두 차단합니다. 통신량이 0바이트임을 시스템 통계로 검증했습니다.</p>
+          <p>원클릭으로 새글 AI 모델 받기, 온라인 음성, GIF 검색, OCR 모델 다운로드를 모두 차단합니다. 통신량이 0바이트임을 시스템 통계로 검증했습니다. 이미 받아 둔 기기 안 AI는 그대로 씁니다.</p>
         </article>
         <article class="bento-card reveal">
           <p class="eyebrow">민감 영역 보호</p>
@@ -563,7 +557,7 @@
                 <button type="button" class="vk-tool-btn active">ㄱ가 자판</button>
                 <button type="button" class="vk-tool-btn">클립보드</button>
                 <button type="button" class="vk-tool-btn">상용구</button>
-                <button type="button" class="vk-tool-btn">AI 교정</button>
+                <button type="button" class="vk-tool-btn">이어쓰기</button>
                 <button type="button" class="vk-tool-btn">테마 설정</button>
               </div>
               
@@ -715,7 +709,7 @@
       <div class="shell final-layout">
         <div class="final-copy liquid-glass liquid-glass-refract">
           <h2 id="cta-title">지금,<br>새글로 타이핑하세요.</h2>
-          <p>Android에서 가장 정밀한 한국어 입력과 AI 글쓰기를 경험해보세요.</p>
+          <p>Android에서 가장 정밀한 한국어 입력과 기기 안 AI 추천을 경험해보세요.</p>
           <div class="actions">
             <a class="button button-primary" href="https://github.com/yunchan8804-blip/saegeul/releases">새글 내려받기 (GitHub)</a>
             <a class="button button-ghost" href="/faq/">설치 및 연결 도움말</a>
