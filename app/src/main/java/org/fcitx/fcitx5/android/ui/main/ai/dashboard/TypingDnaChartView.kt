@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.ui.main.ai
+package org.fcitx.fcitx5.android.ui.main.ai.dashboard
 
 import android.animation.ValueAnimator
 import android.content.Context
@@ -16,7 +16,7 @@ import android.util.TypedValue
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaStats
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import splitties.dimensions.dp
 import kotlin.math.min

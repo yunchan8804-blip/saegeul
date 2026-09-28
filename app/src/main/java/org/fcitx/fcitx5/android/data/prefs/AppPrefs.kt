@@ -12,7 +12,7 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode
-import org.fcitx.fcitx5.android.input.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
 import org.fcitx.fcitx5.android.input.KeyTextScale
 import org.fcitx.fcitx5.android.input.OneHandMode
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle

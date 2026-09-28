@@ -17,7 +17,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import org.fcitx.fcitx5.android.input.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
 import java.io.File
 

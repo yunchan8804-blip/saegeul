@@ -9,7 +9,6 @@ import android.view.View
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
-import org.fcitx.fcitx5.android.ui.main.ai.AcceptanceCardUiState
 
 /** "추천이 도움이 됐나요" card: acceptance rate and how much of it came from the user's own recorded sentences. */
 internal class FeedbackCardSection(private val activity: Activity) {

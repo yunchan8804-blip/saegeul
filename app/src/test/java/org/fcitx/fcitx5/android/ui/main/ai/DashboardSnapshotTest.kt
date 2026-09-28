@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.ui.main.ai
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentFailure
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPhase
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatus
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.effectiveEnrichmentPhase
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

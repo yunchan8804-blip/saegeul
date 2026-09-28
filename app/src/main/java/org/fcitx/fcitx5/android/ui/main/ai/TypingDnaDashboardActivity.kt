@@ -33,7 +33,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ads.DashboardBannerController
 import org.fcitx.fcitx5.android.ads.TypingDnaInterstitialController
 import org.fcitx.fcitx5.android.data.points.LevelRewardStore
-import org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaPersistenceException
 import org.fcitx.fcitx5.android.input.ai.ondevice.AiRuntimeStatusStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPhase
@@ -41,8 +41,16 @@ import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatusStore
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentUiState
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.ActivityStatusSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DeveloperSection
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardSnapshot
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardEnrichmentSnapshot
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardSnapshotReader
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardStatusText
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.EnrichmentCardSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.FeedbackCardSection
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaPreparationController
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaPreparationFactory
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaPreparationSnapshot
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.LearningStatusUiState
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaInstallCardSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaVaultSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.LearningCardSection

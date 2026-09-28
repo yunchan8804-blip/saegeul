@@ -11,8 +11,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
-import org.fcitx.fcitx5.android.ui.main.ai.DashboardSnapshot
-import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaChartView
 import kotlin.math.roundToInt
 
 /** Developer cards with the learned-data counts: summary tiles, n-gram progress, chart, and categories. */

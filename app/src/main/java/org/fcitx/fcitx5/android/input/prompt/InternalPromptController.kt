@@ -17,14 +17,6 @@ import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.InputView
-import org.fcitx.fcitx5.android.input.InternalPromptCaptureGate
-import org.fcitx.fcitx5.android.input.InternalPromptCaptureSession
-import org.fcitx.fcitx5.android.input.InternalPromptDirectCommitQueue
-import org.fcitx.fcitx5.android.input.InternalPromptDirectCommitResult
-import org.fcitx.fcitx5.android.input.InternalPromptEditorTarget
-import org.fcitx.fcitx5.android.input.InternalPromptFeature
-import org.fcitx.fcitx5.android.input.InternalPromptFinishResult
-import org.fcitx.fcitx5.android.input.InternalPromptSpec
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import java.util.concurrent.atomic.AtomicBoolean
 

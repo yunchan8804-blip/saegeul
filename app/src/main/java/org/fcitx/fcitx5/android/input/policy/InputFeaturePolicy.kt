@@ -7,9 +7,8 @@ package org.fcitx.fcitx5.android.input.policy
 import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
-import org.fcitx.fcitx5.android.input.DirectBootInputPolicy
 import org.fcitx.fcitx5.android.input.InputFeatureBlock
-import org.fcitx.fcitx5.android.input.InternalPromptFeature
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptFeature
 import org.fcitx.fcitx5.android.input.profile.AppFeaturePolicy
 import org.fcitx.fcitx5.android.input.profile.EffectiveAppKeyboardProfile
 

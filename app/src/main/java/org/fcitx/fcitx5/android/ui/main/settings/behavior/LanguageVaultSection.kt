@@ -26,8 +26,8 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
-import org.fcitx.fcitx5.android.input.ai.TypingDnaInstantSync
-import org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaInstantSync
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaPersistenceException
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaModelInstaller
 import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaDashboardActivity

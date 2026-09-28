@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.input.ai.rag
 import org.fcitx.fcitx5.android.input.ai.HalfLifeDecay
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
-import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
@@ -195,7 +195,7 @@ class PersonalSentenceVault(
     /**
      * The actual number of stored sentences per app category (the category each sentence was
      * recorded under, via [record]'s [packageName] - see [TypingDnaVault.categorizePackage]). Unlike
-     * [org.fcitx.fcitx5.android.input.ai.TypingDnaStats.categoryCounts], which is a weighted count
+     * [org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaStats.categoryCounts], which is a weighted count
      * derived from compiled persona profiles, this is a plain tally of actual sentences and is the
      * source of truth for "which app do I mostly type in".
      */

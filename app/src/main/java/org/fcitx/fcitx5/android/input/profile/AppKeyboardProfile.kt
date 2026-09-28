@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.profile
 
-import org.fcitx.fcitx5.android.input.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
 
 enum class AppFeaturePolicy {

@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
-import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

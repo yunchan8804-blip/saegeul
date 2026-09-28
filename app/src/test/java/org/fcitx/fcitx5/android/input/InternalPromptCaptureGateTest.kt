@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptCaptureGate
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptEditorTarget
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

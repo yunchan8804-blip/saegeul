@@ -15,8 +15,6 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceFailureText
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
-import org.fcitx.fcitx5.android.ui.main.ai.DashboardSnapshot
-import org.fcitx.fcitx5.android.ui.main.ai.DashboardStatusText
 
 /** "Right now" status card: engine, graph enrichment, notifications, and today's collection. */
 internal class ActivityStatusSection(

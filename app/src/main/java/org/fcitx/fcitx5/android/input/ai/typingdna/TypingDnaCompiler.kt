@@ -2,8 +2,13 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.input.ai
+package org.fcitx.fcitx5.android.input.ai.typingdna
 
+import org.fcitx.fcitx5.android.input.ai.ContextualIntent
+import org.fcitx.fcitx5.android.input.ai.KoreanCollocationModel
+import org.fcitx.fcitx5.android.input.ai.KoreanTone
+import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceRecord
+import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
 
 /**

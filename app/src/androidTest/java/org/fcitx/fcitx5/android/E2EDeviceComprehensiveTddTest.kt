@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
-import org.fcitx.fcitx5.android.input.BufferedInputController
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
 import org.fcitx.fcitx5.android.media.MediaFavoritesManager
 import org.fcitx.fcitx5.android.media.MediaItem
 import org.fcitx.fcitx5.android.media.MediaRetryQueue

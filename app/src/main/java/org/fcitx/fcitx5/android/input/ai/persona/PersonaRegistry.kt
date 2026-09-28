@@ -20,7 +20,7 @@ data class PersonaCategory(
 
 /**
  * Registry of app personas used to bucket typing context for Typing DNA collection.
- * Ids are persisted as [org.fcitx.fcitx5.android.input.ai.TypingDnaProfile] map keys and must
+ * Ids are persisted as [org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaProfile] map keys and must
  * never change once shipped.
  */
 object PersonaRegistry {

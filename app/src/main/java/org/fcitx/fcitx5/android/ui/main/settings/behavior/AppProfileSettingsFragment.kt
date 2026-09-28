@@ -17,7 +17,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.preference.Preference
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
 import org.fcitx.fcitx5.android.input.profile.AppFeaturePolicy
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfile

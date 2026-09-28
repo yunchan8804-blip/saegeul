@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android
 
-import org.fcitx.fcitx5.android.input.ai.TypingDnaLevelCurve
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaLevelCurve
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.junit.Assert.assertEquals

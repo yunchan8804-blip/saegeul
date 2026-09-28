@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.ai
 
 import org.fcitx.fcitx5.android.input.ai.ondevice.AiRuntimeStatusStore
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardStatusText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

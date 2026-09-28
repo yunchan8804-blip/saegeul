@@ -13,7 +13,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.button.MaterialButton
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.ui.main.ai.DashboardSecurity
 
 /** Storage card: where the data lives, on-demand detail, backup, and full reset. */
 internal class StorageCardSection(

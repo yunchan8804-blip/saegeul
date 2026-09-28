@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input
+package org.fcitx.fcitx5.android.input.policy
 
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.input.EditorIdentity
 
 /**
  * Remembers the current Android editor long enough to rebuild Fcitx's native InputContext after

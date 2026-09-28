@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.ui.setup
 import android.content.Context
 import androidx.core.text.HtmlCompat
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.ui.main.ai.GemmaPreparationFactory
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaPreparationFactory
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 
 enum class SetupPage {

@@ -2,17 +2,17 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.ui.main.ai
+package org.fcitx.fcitx5.android.ui.main.ai.dashboard
 
 import android.content.Context
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.points.PointLedger
 import org.fcitx.fcitx5.android.input.ai.KoreanSuggestionSurface
-import org.fcitx.fcitx5.android.input.ai.TypingDnaInstantSync
-import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaInstantSync
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaStats
 import org.fcitx.fcitx5.android.input.ai.VaultHabitState
 import org.fcitx.fcitx5.android.input.ai.VaultHabitStore
-import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatusStore
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaSyncStatusStore
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPhase
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentFailure
@@ -36,7 +36,7 @@ internal data class DashboardSnapshot(
     val frequentWords: List<String>,
     /** Registry persona id -> pending (not-yet-compiled) sentence count in the vault. */
     val categoryPending: Map<String, Int>,
-    /** Sentences needed per category before a batch compiles; [org.fcitx.fcitx5.android.input.ai.TypingDnaVault.thresholdPerCategory]. */
+    /** Sentences needed per category before a batch compiles; [org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault.thresholdPerCategory]. */
     val categoryPendingThreshold: Int,
     val security: DashboardSecurity,
     val lastSyncMs: Long,

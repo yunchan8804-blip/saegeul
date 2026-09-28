@@ -36,9 +36,9 @@ import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackRepository
 import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher
 import org.fcitx.fcitx5.android.data.points.LevelRewardStore
-import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.VaultHabitStore
-import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
@@ -300,7 +300,7 @@ class FcitxApplication : Application() {
             }
             // Creating the controller re-registers the on-device graph enrichment schedule, on any
             // device OnDeviceAiSupport reports as supported (create() returns null otherwise).
-            org.fcitx.fcitx5.android.ui.main.ai.GemmaPreparationFactory.create(this)
+            org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaPreparationFactory.create(this)
         }
     }
 

@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android
 
-import org.fcitx.fcitx5.android.input.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
 import org.fcitx.fcitx5.android.input.profile.AppFeaturePolicy
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardGlobalDefaults

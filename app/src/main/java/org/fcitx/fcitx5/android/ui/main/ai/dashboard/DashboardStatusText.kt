@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.ui.main.ai
+package org.fcitx.fcitx5.android.ui.main.ai.dashboard
 
 import org.fcitx.fcitx5.android.input.ai.ondevice.AiRuntimeStatusStore
 

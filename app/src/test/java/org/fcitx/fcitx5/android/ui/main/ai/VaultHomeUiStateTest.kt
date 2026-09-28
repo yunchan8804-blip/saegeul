@@ -11,6 +11,9 @@ import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPhase
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPauseReason
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentUiState
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnrichmentStagingStore
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.AcceptanceCardUiState
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.LearningStatusUiState
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.VaultStyleChips
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

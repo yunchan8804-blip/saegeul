@@ -4,9 +4,10 @@
  */
 package org.fcitx.fcitx5.android.ui.main.ai
 
-import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaStats
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaChartView
 import kotlin.math.roundToInt
 
 /**

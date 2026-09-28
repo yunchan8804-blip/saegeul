@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rag
 
-import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.vault.AesGcmVaultCipher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

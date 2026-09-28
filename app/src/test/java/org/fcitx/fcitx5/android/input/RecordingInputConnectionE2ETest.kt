@@ -16,6 +16,11 @@ import android.view.inputmethod.InputContentInfo
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.input.buffered.BufferedHangulMode
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.buffered.BufferDiscardReason
+import org.fcitx.fcitx5.android.input.buffered.BufferedSessionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

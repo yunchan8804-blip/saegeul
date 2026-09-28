@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.ui.main.ai
 
-import org.fcitx.fcitx5.android.input.ai.TopBigramStat
-import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
+import org.fcitx.fcitx5.android.input.ai.typingdna.TopBigramStat
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaStats
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.junit.Assert.assertEquals

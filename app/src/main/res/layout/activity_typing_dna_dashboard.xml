@@ -888,7 +888,7 @@
                                 android:textSize="13sp"
                                 tools:text="최근 30일 58문장 · 하루 최대 8문장" />
 
-                            <org.fcitx.fcitx5.android.ui.main.ai.VaultTimelineView
+                            <org.fcitx.fcitx5.android.ui.main.ai.dashboard.VaultTimelineView
                                 android:id="@+id/vault_timeline_view"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -1156,7 +1156,7 @@
                             android:orientation="vertical"
                             android:padding="16dp">
 
-                            <org.fcitx.fcitx5.android.ui.main.ai.TypingDnaChartView
+                            <org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaChartView
                                 android:id="@+id/chart_view"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"

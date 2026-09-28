@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.typingdna.*
+
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank
 import org.fcitx.fcitx5.android.input.ai.ondevice.IngestionReport
 import org.fcitx.fcitx5.android.input.ai.ondevice.IngestionRejectionReason

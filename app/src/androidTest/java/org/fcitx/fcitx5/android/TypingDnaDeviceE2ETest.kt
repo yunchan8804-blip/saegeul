@@ -8,16 +8,16 @@ import android.content.Context
 import android.content.Intent
 import android.widget.TextView
 import androidx.test.platform.app.InstrumentationRegistry
-import org.fcitx.fcitx5.android.input.ai.DynamicBigram
+import org.fcitx.fcitx5.android.input.ai.typingdna.DynamicBigram
 import org.fcitx.fcitx5.android.input.ai.KoreanCollocationModel
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
-import org.fcitx.fcitx5.android.input.ai.PersonaDna
+import org.fcitx.fcitx5.android.input.ai.typingdna.PersonaDna
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore
-import org.fcitx.fcitx5.android.input.ai.TypingDnaCompiler
-import org.fcitx.fcitx5.android.input.ai.TypingDnaProfiler
-import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
-import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
-import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaChartView
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaCompiler
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaProfiler
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaRepository
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaChartView
 import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaDashboardActivity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -214,7 +214,10 @@ class TypingDnaDeviceE2ETest {
             assertEquals("2", bigrams.text.toString())
             assertNotNull(chart)
             assertNotNull(sync)
-            assertTrue(chart.contentDescription?.contains("레벨 2") == true)
+            val expectedChartDescription = activity.getString(R.string.typing_dna_chart_accessibility_header) + " " +
+                activity.getString(R.string.typing_dna_chart_accessibility_accumulation, 15, 2, 2, 1) + " " +
+                activity.getString(R.string.typing_dna_chart_accessibility_privacy, 100)
+            assertEquals(expectedChartDescription, chart.contentDescription?.toString())
 
             activity.finish()
         } finally {

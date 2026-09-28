@@ -11,6 +11,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
+import org.fcitx.fcitx5.android.input.policy.VirtualKeyboardResumeGate
 import org.fcitx.fcitx5.android.utils.isTypeNull
 
 class InputDeviceManager(private val onChange: (Boolean) -> Unit) {

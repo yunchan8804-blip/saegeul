@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.input.policy.DirectBootInputPolicy
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

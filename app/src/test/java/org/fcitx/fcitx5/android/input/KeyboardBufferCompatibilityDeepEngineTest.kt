@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.input
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.input.buffered.BufferedHangulMode
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

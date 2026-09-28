@@ -28,6 +28,11 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.policy.ImeTouchableTopPolicy
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptFinishResult
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptInputBar
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptSpec
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptSpecs
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionIndicator
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster

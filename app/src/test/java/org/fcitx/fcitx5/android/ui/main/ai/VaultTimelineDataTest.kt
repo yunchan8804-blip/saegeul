@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.ai
 
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.VaultTimelineData
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

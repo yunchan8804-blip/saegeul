@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input
+package org.fcitx.fcitx5.android.input.policy
 
 /**
  * Direct Boot may render the keyboard before credential-encrypted storage is available.

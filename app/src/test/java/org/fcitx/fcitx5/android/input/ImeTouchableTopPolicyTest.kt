@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.input.policy.ImeTouchableTopPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

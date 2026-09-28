@@ -53,4 +53,6 @@ K(자판 수정) → R0 → R8 → R9 → R1·R4·R7(서로 다른 영역, 순�
 
 - 끝남: 자판 버그 수정(K1~K19, 실기기 A35 확인), 추천 품질 정리 — 말투 판정 정본 `KoreanToneClassifier`, 붙여쓰기 검사 정본 `KoreanSpacingLint`, 모든 추천이 거치는 정본 관문 `SuggestionQualityGate`, 이유절 문법 규칙(ACC-01) 오탐 수정, 오타 사전 보강. 대량 점검 하네스 `PredictionQualitySweepTest`·`PersonalizedPredictionSweepTest`.
 - 진단 도구: `MobileLayoutTypingCampaignTest`(자판별 단어 타이핑, `CAMPAIGN=true`일 때만). 2,000어절 기준 천지인 97.6%, 천지인 플러스·단모음 100%, 베가 96.6%, 나랏글 97.7%, 모아키 78.9%. 남은 실패는 계획기가 ㄵ→ㄶ 같은 중간 상태를 버리는 한계와 실제 자판 문제가 섞여 있어 아직 가르지 않았다. 다음 라운드 첫 과제.
-- 남음: R0~R11 전부.
+- 구현 완료·통합됨: R0~R10. R6의 후보 소스 분리와 문맥 뒤 `드리다` 띄어쓰기 보정은 분리 브랜치를 거쳐 병합 커밋 `493cf326`으로 통합했다. 이 단위의 실제 물리 기기 입력 확인은 아직 남아 있다.
+- R11: `input/buffered` 4개, `input/prompt` 2개, `input/policy` 4개, `input/ai/typingdna` 10개, `ui/main/ai/dashboard` 보조 파일 8개 이동과 레이아웃 XML의 FQCN 7곳 보정을 완료했다. `input/ai/typo`는 기존 패키지를 유지하고, `utils/` 전체·설정 파일의 광범위한 이동은 하지 않는다. `UnifiedTabExtensionWindow`는 사용 중이므로 삭제 대상이 아니다. 통합 단위 테스트는 1,877개 중 실패·오류 0, skip 2로 통과했고, `:app:assembleDebug :plugin:hangul:assembleDebug`와 `:app:assembleDebugAndroidTest`도 통과했다. 검증 중 드러난 `matchesCurrentEditor`의 null editor NPE는 `false` 반환으로 보정했고 같은 실패 시나리오 재실행도 통과했다. emulator-5554에서 `TypingDnaCardGeometry`·`TypingDnaDashboardResponsiveness`·시드된 dashboard E2E·Gemma 비의존 `ContextualReplacement` 5개를 각각 1/1로 확인했다.
+- 남음: R6 물리 기기 입력 확인, 저장된 공개 Gemma 재료가 없어 확인하지 못한 여섯 번째 Gemma 기반 후보 테스트, 이번 검증에서 직접 열지 못한 `StyleReportActivity` 전체 레이아웃 진입. 진단 도구에서 분리하지 못한 계획기 중간 상태와 실제 자판 문제도 다음 라운드에서 구분한다.

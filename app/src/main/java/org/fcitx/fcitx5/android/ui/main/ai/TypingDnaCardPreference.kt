@@ -26,7 +26,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.points.PointLedger
-import org.fcitx.fcitx5.android.input.ai.TypingDnaStats
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaStats
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaCardSnapshot
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaCardSnapshotReader
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaChartView
 
 /**
  * Embedded home card preference for MainFragment.

@@ -10,9 +10,9 @@ import androidx.test.runner.AndroidJUnit4
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationEligibility
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationSnapshot
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationWaitReason
-import org.fcitx.fcitx5.android.input.ai.DynamicBigram
-import org.fcitx.fcitx5.android.input.ai.PersonaDna
-import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
+import org.fcitx.fcitx5.android.input.ai.typingdna.DynamicBigram
+import org.fcitx.fcitx5.android.input.ai.typingdna.PersonaDna
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionSession
 import org.fcitx.fcitx5.android.input.ai.vault.AesGcmVaultCipher

@@ -10,8 +10,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
-import org.fcitx.fcitx5.android.ui.main.ai.DashboardSecurity
-import org.fcitx.fcitx5.android.ui.main.ai.VaultTimelineView
 import kotlin.math.roundToInt
 
 /** Developer cards with the raw numbers: key storage kind, suggestion metrics, and the growth timeline. */

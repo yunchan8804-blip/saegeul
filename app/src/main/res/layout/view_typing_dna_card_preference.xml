@@ -99,7 +99,7 @@
             android:layout_height="wrap_content"
             android:visibility="gone">
 
-            <org.fcitx.fcitx5.android.ui.main.ai.TypingDnaChartView
+            <org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaChartView
                 android:id="@+id/mini_chart"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

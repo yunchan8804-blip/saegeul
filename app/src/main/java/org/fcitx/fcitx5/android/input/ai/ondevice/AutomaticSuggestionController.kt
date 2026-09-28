@@ -22,7 +22,7 @@ import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
-import org.fcitx.fcitx5.android.input.DirectBootInputPolicy
+import org.fcitx.fcitx5.android.input.policy.DirectBootInputPolicy
 import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.InputView

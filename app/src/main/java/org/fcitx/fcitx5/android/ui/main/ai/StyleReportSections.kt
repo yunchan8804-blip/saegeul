@@ -14,6 +14,8 @@ import com.google.android.material.chip.ChipGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaChartView
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.VaultTimelineView
 
 /**
  * Binds `res/layout/view_style_report_sections.xml` (accumulated records, last 30 days, where I
@@ -24,7 +26,7 @@ class StyleReportSections(root: View) {
 
     data class Data(
         val state: StyleReportUiState,
-        val stats: org.fcitx.fcitx5.android.input.ai.TypingDnaStats,
+        val stats: org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaStats,
         val metrics: PredictionMetricsStore.Summary
     )
 

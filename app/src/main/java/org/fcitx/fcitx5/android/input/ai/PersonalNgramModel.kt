@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile

@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.data.points.LevelRewardStore
-import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher

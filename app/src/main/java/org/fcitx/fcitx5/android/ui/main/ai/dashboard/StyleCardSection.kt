@@ -18,7 +18,6 @@ import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.fcitx.fcitx5.android.ui.main.ai.StyleReportSections
-import org.fcitx.fcitx5.android.ui.main.ai.VaultStyleChips
 
 /** "내 말투" card plus the style report sections shown under it on the home. */
 internal class StyleCardSection(private val activity: AppCompatActivity) {

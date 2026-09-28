@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptCaptureSession
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptDirectCommitQueue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

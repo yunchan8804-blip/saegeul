@@ -11,7 +11,7 @@ import org.fcitx.fcitx5.android.data.theme.CustomThemeSerializer
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.ai.KoreanDiscourseContinuation
-import org.fcitx.fcitx5.android.input.ai.TypingDnaLevelCurve
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaLevelCurve
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulComposer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

@@ -11,8 +11,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatus
-import org.fcitx.fcitx5.android.ui.main.ai.GemmaPreparationSnapshot
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaSyncStatus
 
 /** Gemma material card: automatic switch, last run, stored count, and the manual run controls. */
 internal class GemmaVaultSection(private val activity: Activity) {

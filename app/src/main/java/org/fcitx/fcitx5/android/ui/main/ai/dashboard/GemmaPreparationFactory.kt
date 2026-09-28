@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.ui.main.ai
+package org.fcitx.fcitx5.android.ui.main.ai.dashboard
 
 import android.content.Context
 import androidx.work.WorkInfo
@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.ui.main.ai.GemmaModelManagementLauncher
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationScheduler

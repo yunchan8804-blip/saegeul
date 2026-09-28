@@ -16,7 +16,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardPreference
-import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaChartView
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaChartView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

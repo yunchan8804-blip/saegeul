@@ -8,9 +8,9 @@ import androidx.test.filters.MediumTest
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.AndroidJUnit4
 import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
-import org.fcitx.fcitx5.android.input.ai.DynamicBigram
-import org.fcitx.fcitx5.android.input.ai.PersonaDna
-import org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
+import org.fcitx.fcitx5.android.input.ai.typingdna.DynamicBigram
+import org.fcitx.fcitx5.android.input.ai.typingdna.PersonaDna
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.morphology.KoreanMorphologicalEndingAnalyzer
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine.FLAG_HAS_BATCHIM

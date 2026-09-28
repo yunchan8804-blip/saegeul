@@ -16,6 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.points.LevelRewardStore
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardSnapshot
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardSnapshotReader
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

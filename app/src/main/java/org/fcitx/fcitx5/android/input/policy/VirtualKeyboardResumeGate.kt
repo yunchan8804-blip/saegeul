@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input
+package org.fcitx.fcitx5.android.input.policy
 
 /**
  * Restores the software keyboard exactly once after an IME-owned settings activity interrupts

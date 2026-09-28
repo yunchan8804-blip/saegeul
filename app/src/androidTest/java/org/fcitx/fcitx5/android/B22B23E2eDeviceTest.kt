@@ -7,8 +7,8 @@ package org.fcitx.fcitx5.android
 import androidx.test.runner.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import org.fcitx.fcitx5.android.input.ai.KoreanSentenceEndingExtractor
-import org.fcitx.fcitx5.android.input.ai.TypingDnaProfiler
-import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaProfiler
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector
 import org.fcitx.fcitx5.android.input.ai.morphology.KoreanMorphologicalEndingAnalyzer
 import org.junit.Assert.assertEquals

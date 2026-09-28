@@ -9,9 +9,8 @@ import android.view.View
 import android.widget.TextView
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.ai.TypingDnaLevelCurve
+import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaLevelCurve
 import org.fcitx.fcitx5.android.input.ai.VaultHabitState
-import org.fcitx.fcitx5.android.ui.main.ai.DashboardSnapshot
 
 /** Hero card: current level, progress toward the next one, and total sentences learned. */
 internal class LevelHeroSection(private val activity: Activity) {

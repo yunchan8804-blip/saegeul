@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.input
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.data.clipboard.TRANSIENT_BUFFERED_PASTE_LABEL
+import org.fcitx.fcitx5.android.input.buffered.BufferedHangulMode
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

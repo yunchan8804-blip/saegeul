@@ -16,11 +16,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaChartView
 
 /**
  * "내 말투 리포트": the detail screen the vault home's "내 말투" card links out to. All numbers and
  * lists shown here come from a single [StyleReportUiState.from] call; this activity only resolves
- * string resources and binds views to it, plus feeds the raw [org.fcitx.fcitx5.android.input.ai.TypingDnaStats]
+ * string resources and binds views to it, plus feeds the raw [org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaStats]
  * into the two [TypingDnaChartView] sections it reuses (accumulation bars, tone balance) since that
  * view already draws those directly from stats.
  */

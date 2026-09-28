@@ -54,7 +54,7 @@
 
 - **끝에서 끝까지 성공**: 재연결된 폴드6에서 「지금 즉시 분석 및 동기화」 → 컴패니언 로그 `[REQ] model='agy'` → `[OK] normalized_len=986`. agy(gemini-3.8-flash-high)가 그래프를 만들고 컴패니언이 앱으로 반환. 커밋 0fbffe92(그래프 객체 직접 반환 수용)로 마지막 벽 제거.
 - **B14 (P2) — 컴패니언 단일 슬롯 429 경쟁**: **폐기(2026-09-24 외부 AI 제거, ec872659·fd0f6748)** `BoundedSemaphore(1)`이라 강화(≈12~46s 슬롯 점유)와 프리페처(키 입력마다 발사)가 겹치면 `already processing`(429)로 한쪽 실패. 강화 중 프리페치 실패, 또는 프리페치 중 강화 시작 시 강화 실패. 프리페처는 단일 pump로 최신 desired만 직렬 생성하고 clear·짧은 입력의 stale은 폐기하며 cache의 app/session scope를 유지하도록 수정됐다. focused 6개 테스트 42건(pass 42·fail/error/skip 0, `BUILD SUCCESSFUL` 17초)은 코드·로그·Prefetcher XML로 확인됐다. 실제 provider 경합 E2E는 미완료이므로 전체 B14 완료로 표시하지 않는다. | `scripts/ai-provider-companion.py`, `AiSentenceCompletionPrefetcher`, `GraphEnrichmentRunner` | 중, P2 |
-- **B15 (P3) — 동기화 후 AdMob 광고가 강화 안내 다이얼로그를 가림**: **2026-09-28 결정: 안내 창을 닫은 뒤 광고를 띄운다. 이번 라운드에 다른 작업에서 고친다.** 순서 조정(광고를 다이얼로그 뒤로/생략). | `TypingDnaDashboardActivity`, `TypingDnaInterstitialController` | 소, P3 |
+- **B15 (P3) — 동기화 후 AdMob 광고가 강화 안내 다이얼로그를 가림**: **코드 완료/기기 확인 대기(2026-09-28, e9f1623b·7f6f2c48·2ab64281)**. 동기화 직후 광고 집계는 하고, 강화 안내 창을 닫은 뒤에 광고를 표시한다. `PostSyncAdSequenceTest` 단위 테스트가 이 순서를 검증하지만 실제 화면 순서는 아직 기기에서 확인하지 않았다. | `TypingDnaDashboardActivity`, `TypingDnaInterstitialController` | 소, P3 |
 
 ## Phase 3 항목(완료)
 
@@ -118,7 +118,7 @@ boundary-regression은 최초 잘못된 runner 패키지의 instrumentation 오�
 ### 신규 백로그
 
 - **B27 (P1) — 컴패니언 게이트웨이 무감시 중단**: **폐기(2026-09-24 외부 AI 제거, ec872659·fd0f6748)** 예약 작업이 `Ready`인데도(트레이 종료 등) 앱은 `PROVIDER_ERROR`만 기록하고 사용자에게 원인을 알리지 않는다. 앱의 상태 화면이 `/health` 실패를 ''내 컴퓨터의 AI 공급자 프로그램이 꺼져 있음''으로 구분해 안내하고, 예약 작업에 재시작·감시(주기 health 확인)를 붙이는 방향 검토. | `graph_enrichment_status.xml`, `companion/windows/install.ps1`, `GraphEnrichmentRunner` | 중 |
-- **B28 (P2) — `절약한 타자` 지표 미배선**: **R9 뒤에 처리한다.** 화면은 ''측정 준비 중'' 고정, 기록은 항상 0. | `TypingDnaDashboardActivity.kt:814`, `FcitxInputMethodService.kt:4084` | 소 |
+- **B28 (P2) — `절약한 타자` 지표 미배선**: **코드 완료/기기 확인 대기(2026-09-28, 52161b60·b98c6bb0)**. 후보 선택으로 절약한 두벌식 타수를 기록하고 금고 대시보드에 표시한다. 단위 테스트는 기록·표시 구현 범위만 검증했으며 실제 기기에서 수치와 표시를 아직 확인하지 않았다. | `PredictionMetricsStore`, `ContextualPredictionController`, `VaultMetricsSection` | 소 |
 - **B29 (P2) — 백스페이스로 끝난 입력이 전부 학습 배제**: **결정 대기.** 오늘 dropped의 74%가 `backspace`다. 교정 전 문장을 통째로 버리는 대신 교정 결과(오타 쌍)만이라도 학습하는 경로 검토. | `CollectionDiagnostics` drop 사유, 수집 파이프라인 | 중 |
 - **B30 (P2) — Gemma 누적 중복률 54%**: **결정 대기.** `duplicates 1671 / added 1405`. 시드·프롬프트 구성과 중복 판정 임계 재점검. | `GemmaAccumulationStore`·`GemmaMaterialGenerator` | 중 |
 
@@ -147,8 +147,8 @@ boundary-regression은 최초 잘못된 runner 패키지의 instrumentation 오�
 
 - **폐기**: B2, B3, B6, B11, B12, B13, B14, B24, B25, B26, B27, B31, B32, B33. 모두 외부 AI나 컴패니언이 있어야 의미가 있는 항목이라 할 일이 없어졌다. 항목마다 지운 커밋을 적었다.
 - **완료**: B1(Phase 3-d), B8, B9, B17, B18, Phase 3 항목 4개.
-- **결정 대기**: B5(TPO 문맥 조건화), B7(소스 간 점수 정규화), B10(네임스페이스 치환), B29(백스페이스로 끝난 입력 학습), B30(Gemma 누적 중복률). B15(광고 순서)는 "안내 창을 닫은 뒤 광고"로 정했고 이번 라운드에 다른 작업에서 고친다. B28(절약한 타자)은 R9 뒤에 처리한다.
-- **기기 확인 대기**: B4, B16, B19, B20, B21, B22, B23. 코드와 단위 테스트는 있지만 실제 기기에서 처음부터 끝까지 확인하지 않았다.
+- **결정 대기**: B5(TPO 문맥 조건화), B7(소스 간 점수 정규화), B10(네임스페이스 치환), B29(백스페이스로 끝난 입력 학습), B30(Gemma 누적 중복률).
+- **기기 확인 대기**: B4, B15, B16, B19, B20, B21, B22, B23, B28. 코드와 단위 테스트는 있지만 실제 기기에서 처음부터 끝까지 확인하지 않았다.
 
 ### 이번 라운드 결과
 

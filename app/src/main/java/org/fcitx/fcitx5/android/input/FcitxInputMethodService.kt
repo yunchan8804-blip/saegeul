@@ -6,6 +6,14 @@
 package org.fcitx.fcitx5.android.input
 
 import org.fcitx.fcitx5.android.BuildConfig
+import org.fcitx.fcitx5.android.input.buffered.BufferedHangulMode
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.policy.DirectBootInputPolicy
+import org.fcitx.fcitx5.android.input.policy.EngineRestartEditorRehydrationGate
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptDirectCommitResult
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptFinishResult
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptSpec
 import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.ClipData
@@ -1484,7 +1492,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         selection: EditorSelection,
         expectedInputSessionEpoch: Long? = null
     ): Boolean =
-        EditorIdentity.of(currentInputEditorInfo).sameField(identity) &&
+        currentInputEditorInfo?.let(EditorIdentity::of)?.sameField(identity) == true &&
             currentInputSelection.rangeEquals(selection.start, selection.end) &&
             (expectedInputSessionEpoch == null || inputSessionEpoch == expectedInputSessionEpoch)
 

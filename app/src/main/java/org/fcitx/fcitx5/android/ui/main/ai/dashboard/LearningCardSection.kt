@@ -12,7 +12,6 @@ import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentUiState
-import org.fcitx.fcitx5.android.ui.main.ai.LearningStatusUiState
 
 /** "새글이 배우는 중" card: one status line, its progress, a single action, and the automatic switch. */
 internal class LearningCardSection(

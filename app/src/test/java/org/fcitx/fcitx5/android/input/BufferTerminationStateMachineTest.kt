@@ -4,6 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
+import org.fcitx.fcitx5.android.input.buffered.BufferDiscardReason
+import org.fcitx.fcitx5.android.input.buffered.BufferTerminationEvent
+import org.fcitx.fcitx5.android.input.buffered.BufferTerminationResult
+import org.fcitx.fcitx5.android.input.buffered.BufferedSessionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

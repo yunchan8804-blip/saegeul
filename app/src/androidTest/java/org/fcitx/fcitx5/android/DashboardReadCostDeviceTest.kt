@@ -6,10 +6,10 @@ package org.fcitx.fcitx5.android
 
 import android.os.Bundle
 import androidx.test.platform.app.InstrumentationRegistry
-import org.fcitx.fcitx5.android.ui.main.ai.DashboardSnapshot
-import org.fcitx.fcitx5.android.ui.main.ai.DashboardSnapshotReader
-import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardSnapshot
-import org.fcitx.fcitx5.android.ui.main.ai.TypingDnaCardSnapshotReader
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardSnapshot
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.DashboardSnapshotReader
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaCardSnapshot
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.TypingDnaCardSnapshotReader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

@@ -17,7 +17,7 @@ import java.util.Locale
  * surface shows - the vault home card, the "개인정보·AI" settings row, the onboarding page, the
  * product model-management screen ([org.fcitx.fcitx5.android.ui.main.ai.install.GemmaModelActivity])
  * and the keyboard's continue-writing prompt. Kept Context-free (string resource ids + plain
- * args) like [org.fcitx.fcitx5.android.ui.main.ai.LearningStatusUiState] so [from] stays a
+ * args) like [org.fcitx.fcitx5.android.ui.main.ai.dashboard.LearningStatusUiState] so [from] stays a
  * plain-JVM-testable pure function; each surface resolves [titleRes]/[detailRes]/[buttonRes] with
  * a [android.content.Context]. Do not change wording or which button fires which action without
  * updating every surface that reads this.

@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * stays alongside it in the main source set so the dashboard can read [isRunning] on every
  * variant, on devices [org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport] reports as
  * unsupported included, matching the same pattern
- * [org.fcitx.fcitx5.android.ui.main.ai.GemmaPreparationController] uses for the rest of the Gemma
+ * [org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaPreparationController] uses for the rest of the Gemma
  * pipeline.
  */
 object GraphEnrichmentRunner {
