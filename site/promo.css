@@ -1136,37 +1136,6 @@ h1 {
     rgb(6 20 36 / 52%);
 }
 
-.ai-tone-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 24px;
-}
-
-.ai-tone-btn {
-  padding: 7px 16px;
-  border: 1px solid rgb(235 247 255 / 14%);
-  border-radius: 999px;
-  color: rgb(235 245 255 / 75%);
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  transition: all 180ms ease;
-}
-
-.ai-tone-btn:hover {
-  color: var(--ink);
-  border-color: rgb(121 241 194 / 40%);
-}
-
-.ai-tone-btn.is-active {
-  color: #041f17;
-  background: var(--jade-bright);
-  border-color: var(--jade-bright);
-  font-weight: 780;
-  box-shadow: 0 4px 16px rgb(85 214 166 / 25%);
-}
-
 .ai-diff-container {
   display: grid;
   gap: 16px;
