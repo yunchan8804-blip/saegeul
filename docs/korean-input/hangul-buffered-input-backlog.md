@@ -46,7 +46,7 @@
 - 내부 표시에는 확정 prefix와 현재 Hangul engine preedit를 결합한다.
 - Backspace는 engine preedit가 비었을 때 버퍼의 마지막 글자(grapheme cluster) 하나를 삭제한다(2026-09-28 전에는 code point 하나).
 - Space, 숫자, 문장부호 같은 전달 가능한 구분자는 현재 구간에 포함한 뒤 제출한다.
-- Return, 방향키(상하좌우), Home/End, PageUp/PageDown, Tab은 버퍼를 먼저 제출한 뒤 원래 editor action을 수행한다(2026-09-28 전에는 좌우 화살표만 그랬다. 2.5절 참고).
+- Return은 2단계로 처리한다. 방향키(상하좌우), Home/End, PageUp/PageDown과 제어 문자 키(Tab·Escape·Delete 등)는 버퍼에 붙이지 않고 먼저 제출한 뒤 Shift·Ctrl·Alt 상태를 보존해 원래 키를 보낸다(2026-09-28 전에는 좌우 화살표만 먼저 제출했다. 2.5절 참고).
 - 전달 방식은 System paste, Ctrl+V, Direct commit 중 사용자가 명시적으로 선택한다.
 - System paste 및 Ctrl+V는 임시 clipboard entry를 만들고, Fcitx 자체 clipboard history에는 이 entry가 저장되지 않게 표시한다.
 - Android가 지원하는 경우 임시 clipboard entry를 sensitive로 표시한다.
@@ -97,17 +97,20 @@ plugin assembly와 plugin lint를 같은 Gradle invocation에 넣으면 당시 t
 | 완료 | P0-05, P0-06, P1-02, P2-01, P2-02, P2-03, P2-03A, P3-03 (각 항목 첫 줄에 근거 커밋) |
 | 폐기 | P3-01, P3-04 (각 항목 첫 줄에 이유) |
 | 서비스 연결 대기 | P0-02, P0-03, P1-03. 상태 모델은 있으나 서비스에 연결되지 않았다. 서비스 분할(R9) 뒤 상태 머신 설계와 알림 UX 결정이 필요하다 |
-| 기기 검증 대기 | P0-01, P1-04, P1-05와 이번 라운드의 탐색 키 변경 |
+| 기기 검증 대기 | P0-01, P1-04, P1-05와 이번 라운드의 탐색 키·제어 문자 키·보조키 변경 |
 
 이번 라운드에서 한 일:
 
 | 작업 | 결과 |
 | --- | --- |
-| 탐색 키 선제출 | 버퍼 모드에서 Up/Down/Home/End/PageUp/PageDown/Tab도 Left/Right처럼 버퍼를 먼저 제출한 뒤 같은 키를 보낸다. 전에는 Up/Down/Home/End/PageUp/PageDown이 editor로 바로 가서 커서가 움직이면 외부 selection 경로에서 버퍼가 조용히 버려졌다. Tab은 fcitx가 unicode 9를 주므로 탭 문자로 버퍼에 붙어 함께 제출됐다. JVM 테스트로 덮을 수 없는 서비스 경로라 컴파일과 전체 JVM 테스트만 확인했고 실기기 검증은 대기다 |
-| 글자 단위 삭제 | 버퍼 안 Backspace가 `java.text.BreakIterator.getCharacterInstance()`로 grapheme cluster 하나를 지운다. surrogate pair, ZWJ emoji, 국기, 결합 문자, 완성형·조합형 한글 JVM 테스트를 넣었다. ZWJ·국기 테스트는 JDK 20 이상에서만 통과한다(JDK 17의 BreakIterator는 쪼갠다). 기기는 ICU 규칙을 따른다 |
+| 탐색 키 선제출 | 버퍼 모드에서 Up/Down/Home/End/PageUp/PageDown도 Left/Right처럼 버퍼를 먼저 제출한 뒤 같은 키를 보낸다. 전에는 editor로 바로 가서 커서가 움직이면 외부 selection 경로에서 버퍼가 조용히 버려졌다. 실기기 검증은 대기다 |
+| 제어 문자 규칙 | Return·Backspace를 뺀 키 중 unicode가 제어 문자(0x01~0x1F, 0x7F)이거나 unicode 0인 탐색 키는 버퍼에 붙이지 않고 먼저 제출한 뒤 원래 키를 보낸다. 판정은 `BufferedHangulMode.submitsBeforeForwarding`이 맡고 `BufferedHangulModeTest`가 확인한다. unicode 0은 fcitx에서 '글자 없음'이라 탐색 키만 이 규칙에 든다 |
+| Tab 동작 변경 | Tab은 전에는 fcitx가 unicode 9를 주므로 탭 문자로 버퍼에 붙어 함께 붙여넣기됐다. 지금은 먼저 제출한 뒤 Tab 키(KEYCODE_TAB)로 보낸다. Escape·Delete도 제어 문자로 버퍼에 붙지 않고 원래 키로 간다 |
+| 보조키 보존 | 먼저 제출한 뒤 보내는 키는 `sendCombinationKeyEvents`로 Shift·Ctrl·Alt 상태를 함께 보낸다(Shift+방향키 선택, Shift+Tab). 전에는 좌우 화살표도 보조키를 버렸다 |
+| 글자 단위 삭제 | 버퍼 안 Backspace(`deleteLastCharacter`, 옛 이름 `deleteLastCodePoint`)가 `java.text.BreakIterator.getCharacterInstance()`로 grapheme cluster 하나를 지운다. 기기(ICU)·JDK 20 이상에서는 ZWJ emoji·국기도 한 글자로 지운다. JDK 17 JVM은 확장 grapheme을 지원하지 않아 ZWJ·국기는 JVM 테스트에서 뺐다. JVM 테스트는 두 JDK의 결과가 같은 surrogate pair, 결합 문자, 완성형·조합형 한글, surrogate 경계만 다룬다 |
 | 장문 스트레스 | `BufferedInputControllerLongInputTest`가 1만 글자의 추가·추출·한 글자씩 삭제·제출·실패 보존과 surrogate 경계를 확인한다. 버퍼 상한은 만들지 않았다(제품 결정 대기, P2-05) |
 | 설정 문구 | Direct commit 설명을 실제 동작(구간 전체를 클립보드 없이 한 번에 입력)으로 고치고, System paste·Ctrl+V 설명에 복사해 둔 내용이 사라지고 보낸 글이 clipboard에 남는다는 고지를 넣었다(P0-04, P2-04) |
-| 죽은 코드 제거 | 보류. `BufferedHangulMode.isKnownCompatibilityTarget`은 제품 코드에서 호출이 없지만 기기 테스트(`E2EDeviceComprehensiveTddTest`)도 부르고 있어 범위 확정 뒤 지운다 |
+| 죽은 코드 제거 | 제품 코드에서 호출이 없던 `BufferedHangulMode.isKnownCompatibilityTarget`과 접두어 목록을 지우고, 이를 검사하던 JVM 테스트 부분과 기기 테스트 메서드 하나만 지웠다. 앱별 transport는 P1-02 profile이 맡는다 |
 | task graph | `DataDescriptorPlugin`이 lint 모델·lint 분석 task를 `generateDataDescriptor` 뒤에 돌도록 의존을 선언한다. 출력 경로는 그대로다. `:plugin:hangul:assembleDebug :plugin:hangul:lintDebug`가 한 invocation에서 PASS다(P1-06) |
 
 ## 3. 우선순위 정의
@@ -413,7 +416,7 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 
 **현재 상태**
 
-- Space, 숫자, 문장부호, Return, 방향키·Home/End·PageUp/PageDown·Tab과 lifecycle이 제출을 유발한다.
+- Space, 숫자, 문장부호, Return, 방향키·Home/End·PageUp/PageDown·제어 문자 키(Tab·Escape·Delete 등)와 lifecycle이 제출을 유발한다.
 - 실패 시 내부적으로 buffer를 보존할 수 있지만 사용자가 retry 상태를 알기 어렵다.
 - keyboard bar에 dedicated submit/retry/cancel control이 없다.
 
@@ -537,7 +540,7 @@ System paste는 표준 editor에 적합하고 Ctrl+V는 remote/raw-key surface�
 
 **현재 상태**
 
-- forwarded text/navigation key 처리 코드가 있다. 2026-09-28부터 방향키·Home/End·PageUp/PageDown·Tab은 버퍼를 먼저 제출한 뒤 전달한다. Shift 같은 modifier는 좌우 화살표와 마찬가지로 이 경로에서 전달되지 않는다.
+- forwarded text/navigation key 처리 코드가 있다. 2026-09-28부터 방향키·Home/End·PageUp/PageDown·제어 문자 키는 버퍼를 먼저 제출한 뒤 Shift·Ctrl·Alt 상태를 보존해 전달한다.
 - Ctrl, Alt, Meta, Super shortcut 전에 Direct commit으로 pending Hangul을 정리한다.
 - handled physical key의 release를 추적하는 집합이 있다.
 - 실제 물리 키보드 검증은 하지 않았다.

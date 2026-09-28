@@ -215,7 +215,7 @@ Backspace 규칙은 다음과 같다.
 - 엔진 preedit이 비었고 prefix가 있으면 prefix의 마지막 글자(grapheme cluster) 하나를 지운다.
 - 둘 다 비었으면 대상 editor의 일반 Backspace로 전달한다.
 
-2026-09-28부터 `java.text.BreakIterator.getCharacterInstance()`로 사용자가 한 글자로 보는 단위를 지운다. surrogate pair emoji, ZWJ emoji(👨‍👩‍👧), 국기(🇰🇷), 결합 문자(e+U+0301), 조합형 한글 자모도 한 번에 지운다. 기기에서는 ICU 규칙을 따르고, JVM 테스트는 JDK 20 이상에서만 ZWJ·국기를 한 글자로 본다(JDK 17은 쪼갠다).
+2026-09-28부터 `java.text.BreakIterator.getCharacterInstance()`로 사용자가 한 글자로 보는 단위를 지운다. surrogate pair emoji, ZWJ emoji(👨‍👩‍👧), 국기(🇰🇷), 결합 문자(e+U+0301), 조합형 한글 자모도 한 번에 지운다. 기기에서는 ICU 규칙을 따른다. ZWJ·국기는 기기(ICU)와 JDK 20 이상에서만 한 글자다. JDK 17 JVM은 확장 grapheme을 지원하지 않으므로 JVM 테스트는 두 JDK의 결과가 같은 경우만 다룬다. 메서드 이름은 `deleteLastCharacter`다(옛 이름 `deleteLastCodePoint`).
 
 ### 4.4 구간 제출 경계
 
@@ -223,13 +223,13 @@ Backspace 규칙은 다음과 같다.
 
 - Hangul 엔진이 소비하지 않고 forward한 Unicode 문자: 해당 문자를 prefix에 붙인 뒤 제출한다. 일반적으로 공백, 숫자, 문장부호가 여기에 들어간다.
 - Return: 먼저 제출에 성공한 뒤 기존 Return 동작을 실행한다.
-- 방향키(상하좌우), Home/End, PageUp/PageDown, Tab: 먼저 제출에 성공한 뒤 같은 키를 `sendDownUpKeyEvents`로 보낸다. 2026-09-28 전에는 Left/Right만 이렇게 했다.
+- 방향키(상하좌우), Home/End, PageUp/PageDown과 제어 문자 키(Tab·Escape·Delete 등, `BufferedHangulMode.submitsBeforeForwarding`): 버퍼에 붙이지 않고 먼저 제출에 성공한 뒤 같은 키를 `sendCombinationKeyEvents`로 Shift·Ctrl·Alt 상태와 함께 보낸다. Android key code가 없는 키는 제출 뒤 일반 forward 경로로 넘긴다. 2026-09-28 전에는 Left/Right만 먼저 제출했고 보조키는 버렸다.
 - 툴바·emoji·클립보드 항목 등 `service.commitText()`를 직접 호출하는 삽입: 기존 버퍼를 먼저 제출하고 직접 삽입한다.
 - 입력기 전환, input view 종료, input 종료: 누수 방지를 위해 제출을 시도하고 엔진을 reset한다.
 - 버퍼 모드 설정 끄기: 기존 editor-owned composing을 끝내고 버퍼를 제출한 뒤 capability를 갱신한다.
 - Ctrl/Alt/Meta/Super/Hyper shortcut: 보류 중 한글을 `DirectCommit`으로 먼저 비우고 shortcut을 전달한다.
 
-2026-09-28 전에는 Up/Down, Home/End, PageUp/PageDown이 버퍼 대상이 아니어서 editor로 바로 넘어갔고, 커서가 움직이면 외부 selection 경로에서 버퍼가 조용히 버려졌다. Tab은 fcitx `keySymToUnicode`가 9를 돌려주므로 탭 문자로 버퍼에 붙어 함께 제출됐다. 지금은 모두 Left/Right와 같이 먼저 제출한다. Shift+방향키 같은 선택 확장은 이 경로에서 modifier를 전달하지 않으므로 아직 정의되지 않았다. 실기기 검증은 대기 중이다.
+2026-09-28 전에는 Up/Down, Home/End, PageUp/PageDown이 버퍼 대상이 아니어서 editor로 바로 넘어갔고, 커서가 움직이면 외부 selection 경로에서 버퍼가 조용히 버려졌다. Tab·Escape·Delete는 fcitx `keySymToUnicode`가 제어 문자(9, 27, 127)를 돌려주므로 그 문자로 버퍼에 붙어 함께 제출됐다. 지금은 모두 Left/Right와 같이 먼저 제출하고, Tab은 탭 문자가 아니라 Tab 키로 간다. 실기기 검증은 대기 중이다.
 
 ### 4.5 엔진 reset 경합 방지
 
@@ -366,7 +366,7 @@ Caps Lock을 normal label로 두는 이유는 앞서 설명한 것처럼 fcitx5-
 | `app/src/main/java/org/fcitx/fcitx5/android/data/clipboard/ClipboardManager.kt` | transient buffered paste clip을 Fcitx 자체 history에서 제외 | system clipboard나 타사 history까지 막지는 못함 |
 | `app/src/main/java/org/fcitx/fcitx5/android/data/clipboard/ClipboardMarkers.kt` | transient label 상수와 판별 extension 추가 | label은 보안 토큰이 아니라 내부 분류 표식임 |
 | `app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt` | Advanced에 enable switch와 transport enum preference 추가 | 기본값은 off, 기본 transport는 SystemPaste |
-| `app/src/main/java/org/fcitx/fcitx5/android/input/BufferedHangulMode.kt` | 활성화 정책, Preedit capability 제거, 민감 필드 판단 | 가능한 한 pure policy로 유지해 unit test 가능하게 할 것 |
+| `app/src/main/java/org/fcitx/fcitx5/android/input/BufferedHangulMode.kt` | 활성화 정책, Preedit capability 제거, 민감 필드 판단, 먼저 제출할 키 판정 | 가능한 한 pure policy로 유지해 unit test 가능하게 할 것 |
 | `app/src/main/java/org/fcitx/fcitx5/android/input/BufferedInputController.kt` | finalized prefix 누적·snapshot·글자(grapheme) 단위 삭제·clear | editor나 Android API를 넣지 말고 순수 상태 객체로 유지 |
 | `app/src/main/java/org/fcitx/fcitx5/android/input/BufferedInputTransport.kt` | SystemPaste/CtrlV/DirectCommit enum과 문자열 리소스 연결 | 자동 fallback 순서를 나타내는 enum이 아님 |
 | `app/src/main/java/org/fcitx/fcitx5/android/input/FcitxInputMethodService.kt` | 버퍼 세션, event interception, UI decoration, 세 transport, selection 예측, lifecycle, shortcut·physical key 처리 | 가장 위험한 파일. 변경 전 상태 전이와 중복/누수 시나리오를 테스트로 고정할 것 |
@@ -383,8 +383,8 @@ Caps Lock을 normal label로 두는 이유는 앞서 설명한 것처럼 fcitx5-
 | 파일 | 검증 내용 |
 | --- | --- |
 | `app/src/test/java/org/fcitx/fcitx5/android/core/CapabilityFlagsTest.kt` | 숫자 비밀번호가 Password capability로 분류되는지 |
-| `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedHangulModeTest.kt` | Hangul에서만 활성화, Preedit만 제거, Password/Sensitive clipboard 금지 |
-| `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedInputControllerTest.kt` | prefix+preedit 결합, 글자(grapheme) 단위 삭제(surrogate pair·ZWJ·국기·결합 문자·한글), clear |
+| `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedHangulModeTest.kt` | Hangul에서만 활성화, Preedit만 제거, Password/Sensitive clipboard 금지, 탐색 키·제어 문자 선제출 판정 |
+| `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedInputControllerTest.kt` | prefix+preedit 결합, 글자(grapheme) 단위 삭제(surrogate pair·결합 문자·완성형·조합형 한글), clear |
 | `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedInputControllerLongInputTest.kt` | 1만 글자 입력의 추가·추출·한 글자씩 삭제·제출·실패 보존, surrogate 경계 |
 | `app/src/test/java/org/fcitx/fcitx5/android/input/keyboard/HangulKeyLegendsTest.kt` | 두벌식 normal/Shift mapping, unsupported fallback, 언어·addon 판별 |
 | `docs/korean-input/hangul-buffered-input.md` | 사용자·개발자용 요약, 빌드 절차, test matrix, 알려진 위험 |
@@ -1098,7 +1098,7 @@ Debug APK는 개발·검증용이다. release 배포에는 release signing, upda
 - Ctrl+V main key-down 1회와 modifier 순서
 - Direct commit 1회
 - Password/Sensitive/Numeric password에서 clipboard 변경 0회
-- Return·방향키·Home/End·PageUp/PageDown·Tab은 flush 성공 뒤 editor action
+- Return·방향키·Home/End·PageUp/PageDown·제어 문자 키는 flush 성공 뒤 editor action
 - physical key down/up이 중복 전달되지 않음
 - input restart/finish/unbind에서 cross-editor leak 없음
 - 예상 selection과 외부 selection 변화 분리
