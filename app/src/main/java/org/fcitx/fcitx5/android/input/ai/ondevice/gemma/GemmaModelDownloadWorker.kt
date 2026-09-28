@@ -197,11 +197,13 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
         val progressCurrent = if (total <= 0L) 0 else ((downloadedBytes * 100L) / total).toInt()
         val notification = BackgroundProgressNotifier.buildProgressNotification(
             applicationContext,
-            applicationContext.getString(R.string.gemma_install_notify_progress_title),
-            text,
-            progressCurrent,
-            100,
-            pauseAction
+            BackgroundProgressNotifier.ProgressSpec(
+                title = applicationContext.getString(R.string.gemma_install_notify_progress_title),
+                text = text,
+                current = progressCurrent,
+                total = 100,
+                action = pauseAction
+            )
         )
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ForegroundInfo(BackgroundProgressNotifier.ID_GEMMA_INSTALL, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)

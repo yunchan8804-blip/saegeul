@@ -117,7 +117,6 @@ import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidateSnapshot
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualPredictionController
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionSessionTracker
 import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
@@ -353,13 +352,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     val recentSentSentences: RecentSentSentences
         get() = personalLearning.recentSentSentences
-
-    private val correctionSessionTracker: CorrectionSessionTracker
-        get() = personalLearning.correctionSessionTracker
-
-    private fun currentWordBeforeCursor(): String = personalLearning.currentWordBeforeCursor()
-
-    private fun observeCommittedEditorText(text: String) = personalLearning.observeCommittedEditorText(text)
 
     private val contextualPrediction: ContextualPredictionController = ContextualPredictionController(
         ContextualPredictionController.Host(
@@ -842,7 +834,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                             keyEvent.action == KeyEvent.ACTION_DOWN &&
                             allowsTextInspectionFeatures()
                         ) {
-                            correctionSessionTracker.onBackspace(currentWordBeforeCursor())
+                            personalLearning.correctionSessionTracker.onBackspace(personalLearning.currentWordBeforeCursor())
                         }
                         if (keyEvent.action == KeyEvent.ACTION_DOWN &&
                             (keyEvent.keyCode == KeyEvent.KEYCODE_DEL ||
@@ -1020,7 +1012,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             dnaInspectionAllowed
         )
         if (dnaInspectionAllowed) {
-            correctionSessionTracker.onBackspace(currentWordBeforeCursor())
+            personalLearning.correctionSessionTracker.onBackspace(personalLearning.currentWordBeforeCursor())
         }
         val lastSelection = selection.latest
         if (lastSelection.isNotEmpty()) {
@@ -1411,14 +1403,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         start: Int,
         end: Int,
         replacement: String,
-        restoreStart: Int,
-        restoreEnd: Int
+        restore: EditorSelection
     ): Boolean = AiEditorTransaction.replaceRange(
         start = start,
         end = end,
         replacement = replacement,
-        restoreStart = restoreStart,
-        restoreEnd = restoreEnd,
+        restore = restore,
         setSelection = connection::setSelection,
         commitText = { text -> connection.commitText(text, 1) },
         confirmCommit = { text ->
@@ -1434,13 +1424,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         connection: android.view.inputmethod.InputConnection,
         cursor: Int,
         text: String,
-        restoreStart: Int,
-        restoreEnd: Int
+        restore: EditorSelection
     ): Boolean = AiEditorTransaction.commitAtCursor(
         cursor = cursor,
         text = text,
-        restoreStart = restoreStart,
-        restoreEnd = restoreEnd,
+        restore = restore,
         setSelection = connection::setSelection,
         commitText = { committed -> connection.commitText(committed, 1) },
         confirmCommit = { committed ->
@@ -1756,7 +1744,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 dispatched = ic.finishComposingText() && dispatched
             }
             if (dispatched) {
-                observeCommittedEditorText(text)
+                personalLearning.observeCommittedEditorText(text)
                 inputView?.postRefreshContextualCandidates(16L)
             }
             return dispatched
@@ -1780,7 +1768,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (dispatchedResult) {
             onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
-            observeCommittedEditorText(text)
+            personalLearning.observeCommittedEditorText(text)
             inputView?.postRefreshContextualCandidates(16L)
         }
         return dispatchedResult
@@ -1842,7 +1830,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 val preeditEmpty = fcitx.runImmediately { inputPanelCached.preedit.isEmpty() }
                 if (preeditEmpty) {
                     if (allowsTextInspectionFeatures()) {
-                        correctionSessionTracker.onBackspace(currentWordBeforeCursor())
+                        personalLearning.correctionSessionTracker.onBackspace(personalLearning.currentWordBeforeCursor())
                     }
                     if (bufferedHangul.deleteLastCharacter()) {
                         inputView?.refreshBufferedHangulPreedit()
@@ -1997,7 +1985,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         currentInputConnection?.performContextMenuAction(android.R.id.paste) == true
                     if (dispatched) {
                         predictBufferedInsertion(text)
-                        observeCommittedEditorText(text)
+                        personalLearning.observeCommittedEditorText(text)
                     }
                     dispatched
                 } catch (exception: RuntimeException) {
@@ -2014,7 +2002,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 )
                 if (dispatched) {
                     predictBufferedInsertion(text)
-                    observeCommittedEditorText(text)
+                    personalLearning.observeCommittedEditorText(text)
                 }
                 dispatched
             }
@@ -2379,7 +2367,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         inputSessionEpoch += 1
         personalLearning.onStartInput()
         contextualPrediction.onStartInput()
-        correctionSessionTracker.onEditorChanged()
+        personalLearning.correctionSessionTracker.onEditorChanged()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.onEditorChanged(
             DynamicPhraseEditorTarget(

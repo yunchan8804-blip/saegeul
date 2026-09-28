@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.ai.AiContextualPredictor
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
@@ -32,6 +33,7 @@ import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore
 import org.fcitx.fcitx5.android.input.ai.ReinforcementTracker
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
+import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
@@ -89,15 +91,13 @@ class ContextualPredictionController(private val host: Host) {
             start: Int,
             end: Int,
             replacement: String,
-            restoreStart: Int,
-            restoreEnd: Int
+            restore: EditorSelection
         ) -> Boolean,
         val commitAiTextAtCursor: (
             connection: InputConnection,
             cursor: Int,
             text: String,
-            restoreStart: Int,
-            restoreEnd: Int
+            restore: EditorSelection
         ) -> Boolean,
         val predictSelection: (position: Int) -> Unit,
         val morphologyEngine: () -> ChoseongMorphologyEngine,
@@ -537,13 +537,24 @@ class ContextualPredictionController(private val host: Host) {
         }
     }
 
-    private fun recordContextualCandidateAccepted(candidate: PredictionMetricsSession.Candidate?, committed: Boolean) {
+    /**
+     * [committedText] is what accepting [candidate] put into the editor, and [replacedText] the
+     * already-typed text it took the place of (empty for a pure append); together they give the
+     * keystrokes the candidate saved.
+     */
+    private fun recordContextualCandidateAccepted(
+        candidate: PredictionMetricsSession.Candidate?,
+        committed: Boolean,
+        committedText: String,
+        replacedText: String
+    ) {
         if (candidate == null) return
         if (!host.allowsTextInspection()) {
             predictionMetricsSession.reset()
             return
         }
         if (predictionMetricsSession.recordAccepted(candidate, committed)) {
+            val savedKeystrokes = PredictionMetricsStore.savedKeystrokes(committedText, replacedText)
             FcitxApplication.getInstance().applicationScope.launch {
                 if (OnDeviceAiSupport.isSupported && candidate.source == "ondevice_generated") {
                     try {
@@ -552,7 +563,7 @@ class ContextualPredictionController(private val host: Host) {
                         Timber.w("Generated material acceptance save failed: ${error.javaClass.simpleName}")
                     }
                 }
-                FcitxApplication.getInstance().predictionMetricsStore.recordAccepted(candidate.source, savedKeystrokes = 0)
+                FcitxApplication.getInstance().predictionMetricsStore.recordAccepted(candidate.source, savedKeystrokes)
                 withContext(Dispatchers.Main) {
                     host.scheduleNgramSave()
                 }
@@ -602,8 +613,7 @@ class ContextualPredictionController(private val host: Host) {
                 start = replacementStart,
                 end = start,
                 replacement = textToCommit,
-                restoreStart = start,
-                restoreEnd = end
+                restore = EditorSelection(start, end)
             )
         ) {
             return false
@@ -641,7 +651,7 @@ class ContextualPredictionController(private val host: Host) {
         }
         val textToCommit = appendSnapshot.append.insertionFor(beforeCursor) ?: return false
         host.captureCorrectionBoundarySnapshot()
-        if (!host.commitAiTextAtCursor(connection, cursor, textToCommit, cursor, cursor)) return false
+        if (!host.commitAiTextAtCursor(connection, cursor, textToCommit, EditorSelection.collapsed(cursor))) return false
 
         host.observeCommittedEditorText(textToCommit)
         host.predictSelection(cursor + textToCommit.length)
@@ -653,7 +663,12 @@ class ContextualPredictionController(private val host: Host) {
             packageName = currentInputEditorInfo.packageName
         )
         predictionEpoch++
-        recordContextualCandidateAccepted(metricsCandidate?.takeIf { it.text == sentence }, committed = true)
+        recordContextualCandidateAccepted(
+            metricsCandidate?.takeIf { it.text == sentence },
+            committed = true,
+            committedText = textToCommit,
+            replacedText = ""
+        )
         return true
     }
 
@@ -701,8 +716,7 @@ class ContextualPredictionController(private val host: Host) {
                 start = 0,
                 end = replacement.expectedContext.length,
                 replacement = replacement.replacement,
-                restoreStart = cursor,
-                restoreEnd = cursor
+                restore = EditorSelection.collapsed(cursor)
             )
         ) {
             return false
@@ -710,7 +724,12 @@ class ContextualPredictionController(private val host: Host) {
         host.predictSelection(replacement.replacement.length)
         host.inputView()?.postRefreshContextualCandidates(16L)
         predictionEpoch++
-        recordContextualCandidateAccepted(metricsCandidate?.takeIf { it.text == sentence }, committed = true)
+        recordContextualCandidateAccepted(
+            metricsCandidate?.takeIf { it.text == sentence },
+            committed = true,
+            committedText = replacement.replacement,
+            replacedText = replacement.expectedContext
+        )
         return true
     }
 
@@ -746,7 +765,12 @@ class ContextualPredictionController(private val host: Host) {
                     packageName = currentInputEditorInfo.packageName
                 )
                 predictionEpoch++
-                recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
+                recordContextualCandidateAccepted(
+                    capturedMetricsCandidate,
+                    committed = true,
+                    committedText = textToCommit,
+                    replacedText = beforeCursor.takeLast(replaceLength)
+                )
             }
             return committed
         }
@@ -777,7 +801,12 @@ class ContextualPredictionController(private val host: Host) {
                                 packageName = currentInputEditorInfo.packageName
                             )
                             predictionEpoch++
-                            recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
+                            recordContextualCandidateAccepted(
+                                capturedMetricsCandidate,
+                                committed = true,
+                                committedText = textToCommit,
+                                replacedText = beforeCursor.takeLast(replacementLength)
+                            )
                         }
                         return committed
                     }
@@ -810,7 +839,12 @@ class ContextualPredictionController(private val host: Host) {
                     packageName = currentInputEditorInfo.packageName
                 )
                 predictionEpoch++
-                recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
+                recordContextualCandidateAccepted(
+                    capturedMetricsCandidate,
+                    committed = true,
+                    committedText = sentence,
+                    replacedText = beforeCursor.takeLast(replacementLength)
+                )
             }
             return committed
         }
@@ -837,7 +871,12 @@ class ContextualPredictionController(private val host: Host) {
                 packageName = currentInputEditorInfo.packageName
             )
             predictionEpoch++
-            recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
+            recordContextualCandidateAccepted(
+                capturedMetricsCandidate,
+                committed = true,
+                committedText = textToCommit,
+                replacedText = beforeCursor.takeLast(replacementLength)
+            )
         }
         return committed
     }
@@ -847,9 +886,8 @@ class ContextualPredictionController(private val host: Host) {
         start: Int,
         end: Int,
         replacement: String,
-        restoreStart: Int,
-        restoreEnd: Int
-    ): Boolean = host.replaceAiRange(connection, start, end, replacement, restoreStart, restoreEnd)
+        restore: EditorSelection
+    ): Boolean = host.replaceAiRange(connection, start, end, replacement, restore)
 
     private fun enqueueContextualSelectionFeedback(
         contextBeforeReinforce: String,

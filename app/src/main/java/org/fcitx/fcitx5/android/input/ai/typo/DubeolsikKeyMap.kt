@@ -42,6 +42,9 @@ object DubeolsikKeyMap {
         'ㅃ' to 'Q', 'ㅉ' to 'W', 'ㄸ' to 'E', 'ㄲ' to 'R', 'ㅆ' to 'T', 'ㅒ' to 'O', 'ㅖ' to 'P'
     )
 
+    // 시프트를 함께 눌러야 하는 키. 한글이 아닌 문자는 keySequence에서 소문자가 되므로 섞이지 않는다.
+    private val SHIFTED_KEYS: Set<Char> = JAMO_TO_KEY.values.filter { it.isUpperCase() }.toSet()
+
     // 복합 모음은 두 개의 단모음 키 입력으로 조합된다.
     private val COMPOUND_VOWEL_SPLIT: Map<Char, String> = mapOf(
         'ㅘ' to "ㅗㅏ", 'ㅙ' to "ㅗㅐ", 'ㅚ' to "ㅗㅣ",
@@ -72,6 +75,15 @@ object DubeolsikKeyMap {
             appendKeysForChar(sb, c)
         }
         return sb.toString()
+    }
+
+    /**
+     * 텍스트를 두벌식으로 칠 때 누르는 횟수. [keySequence]의 키 하나가 1타이고, 쌍자음 ㄲㄸㅃㅆㅉ와
+     * ㅒ·ㅖ는 시프트까지 2타다. 한글이 아닌 글자는 글자(코드 포인트) 하나당 1타로 센다.
+     */
+    fun keystrokeCount(text: String): Int {
+        val keys = keySequence(text)
+        return keys.codePointCount(0, keys.length) + keys.count { it in SHIFTED_KEYS }
     }
 
     private fun appendKeysForChar(sb: StringBuilder, c: Char) {

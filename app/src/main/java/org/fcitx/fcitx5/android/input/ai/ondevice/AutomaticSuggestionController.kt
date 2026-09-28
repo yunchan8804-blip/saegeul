@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.DirectBootInputPolicy
 import org.fcitx.fcitx5.android.input.EditorIdentity
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.ai.AiAppliedEdit
 import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
@@ -88,8 +89,7 @@ class AutomaticSuggestionController(
             connection: InputConnection,
             cursor: Int,
             text: String,
-            restoreStart: Int,
-            restoreEnd: Int
+            restore: EditorSelection
         ) -> Boolean,
         val predictSelection: (position: Int) -> Unit
     )
@@ -887,7 +887,7 @@ class AutomaticSuggestionController(
         }
         val connection = host.inputConnection() ?: return AiSuggestionApplyResult.NotApplied
         val cursor = host.selection().start
-        if (!host.commitAiTextAtCursor(connection, cursor, suffix, cursor, cursor)) {
+        if (!host.commitAiTextAtCursor(connection, cursor, suffix, EditorSelection.collapsed(cursor))) {
             return AiSuggestionApplyResult.NotApplied
         }
         val end = cursor + suffix.length

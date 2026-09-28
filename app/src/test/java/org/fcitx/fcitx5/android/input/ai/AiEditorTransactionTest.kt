@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.EditorSelection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,8 +19,7 @@ class AiEditorTransactionTest {
             start = 4,
             end = 9,
             replacement = "교정문",
-            restoreStart = 2,
-            restoreEnd = 7,
+            restore = EditorSelection(2, 7),
             setSelection = { start, end ->
                 calls += start to end
                 true
@@ -39,8 +39,7 @@ class AiEditorTransactionTest {
         val committed = AiEditorTransaction.commitAtCursor(
             cursor = 11,
             text = "\n제안문",
-            restoreStart = 3,
-            restoreEnd = 8,
+            restore = EditorSelection(3, 8),
             setSelection = { start, end ->
                 calls += start to end
                 true
@@ -61,8 +60,7 @@ class AiEditorTransactionTest {
             start = 24,
             end = 46,
             replacement = "교정문",
-            restoreStart = 24,
-            restoreEnd = 46,
+            restore = EditorSelection(24, 46),
             setSelection = { start, end ->
                 calls += start to end
                 true
@@ -83,8 +81,7 @@ class AiEditorTransactionTest {
             start = 24,
             end = 46,
             replacement = "",
-            restoreStart = 24,
-            restoreEnd = 46,
+            restore = EditorSelection(24, 46),
             setSelection = { start, end ->
                 calls += start to end
                 true

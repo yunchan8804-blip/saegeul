@@ -9,6 +9,7 @@ import android.os.Looper
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,7 +45,32 @@ import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionSessionTracker
 import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+import timber.log.Timber
 import java.io.File
+
+/**
+ * Logs a failed learning task instead of letting it reach the process's uncaught exception
+ * handler, which would kill the keyboard. Cancellation never reaches a [CoroutineExceptionHandler],
+ * so it is not reported.
+ */
+private val personalLearningFailureHandler = CoroutineExceptionHandler { _, throwable ->
+    Timber.e(throwable, "Personal learning task failed")
+}
+
+/**
+ * Launches [task] in [scope] once [previous] has finished, so learning tasks run one at a time in
+ * enqueue order. [Job.join] returns however [previous] ended, so a failed task never stalls the
+ * ones queued behind it; the failure is logged by [personalLearningFailureHandler], which only
+ * receives it when [scope] is supervised like [FcitxApplication.applicationScope].
+ */
+internal fun launchSerializedLearning(
+    scope: CoroutineScope,
+    previous: Job?,
+    task: suspend CoroutineScope.() -> Unit
+): Job = scope.launch(personalLearningFailureHandler) {
+    previous?.join()
+    task()
+}
 
 /** A transient collection-progress hint for the keyboard's status row (see [PersonalLearningController.collectionFeedback]). */
 data class CollectionFeedbackEvent(
@@ -366,8 +392,7 @@ class PersonalLearningController(private val host: Host) {
         action: () -> Unit
     ) {
         val previous = personalLearningTail
-        personalLearningTail = FcitxApplication.getInstance().applicationScope.launch {
-            previous?.join()
+        personalLearningTail = launchSerializedLearning(FcitxApplication.getInstance().applicationScope, previous) {
             action()
             val persistAfterDestroyed = withContext(Dispatchers.Main) {
                 host.advancePredictionEpoch()

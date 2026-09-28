@@ -76,21 +76,26 @@ object BackgroundProgressNotifier {
         manager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
     }
 
-    fun progress(
-        ctx: Context,
-        id: Int,
-        title: String,
-        text: String,
-        current: Int,
-        total: Int,
-        action: NotificationCompat.Action? = null
-    ) {
+    /**
+     * What an ongoing progress notification shows: [current] of [total] (indeterminate when [total]
+     * is not positive), plus an optional [action] button (e.g. a "Stop" action wired to
+     * `WorkManager.createCancelPendingIntent`).
+     */
+    data class ProgressSpec(
+        val title: String,
+        val text: String,
+        val current: Int,
+        val total: Int,
+        val action: NotificationCompat.Action? = null
+    )
+
+    fun progress(ctx: Context, id: Int, spec: ProgressSpec) {
         val granted = hasPermission(ctx)
         if (!shouldPost(Kind.PROGRESS, granted, prefEnabled())) {
             if (!granted) recordBlocked(ctx)
             return
         }
-        ctx.notificationManager.notify(id, buildProgressNotification(ctx, title, text, current, total, action))
+        ctx.notificationManager.notify(id, buildProgressNotification(ctx, spec))
     }
 
     /**
@@ -99,28 +104,20 @@ object BackgroundProgressNotifier {
      * `startForeground`/`setForeground` unconditionally (the OS, not this notifier, decides whether
      * it is actually shown without `POST_NOTIFICATIONS`). Posting a later update through [progress]
      * or this same id updates the one currently shown as the foreground notification in place.
-     * [action] is an optional button (e.g. a "Stop" action wired to
-     * `WorkManager.createCancelPendingIntent`).
      */
-    fun buildProgressNotification(
-        ctx: Context,
-        title: String,
-        text: String,
-        current: Int,
-        total: Int,
-        action: NotificationCompat.Action? = null
-    ): android.app.Notification = NotificationCompat.Builder(ctx, CHANNEL_PROGRESS)
-        .setSmallIcon(R.drawable.ic_baseline_sync_24)
-        .setContentTitle(title)
-        .setContentText(text)
-        .setPriority(NotificationCompat.PRIORITY_LOW)
-        .setOngoing(true)
-        .setAutoCancel(false)
-        .setOnlyAlertOnce(true)
-        .setProgress(total, current, total <= 0)
-        .setContentIntent(mainActivityPendingIntent(ctx))
-        .apply { action?.let { addAction(it) } }
-        .build()
+    fun buildProgressNotification(ctx: Context, spec: ProgressSpec): android.app.Notification =
+        NotificationCompat.Builder(ctx, CHANNEL_PROGRESS)
+            .setSmallIcon(R.drawable.ic_baseline_sync_24)
+            .setContentTitle(spec.title)
+            .setContentText(spec.text)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
+            .setProgress(spec.total, spec.current, spec.total <= 0)
+            .setContentIntent(mainActivityPendingIntent(ctx))
+            .apply { spec.action?.let { addAction(it) } }
+            .build()
 
     fun done(ctx: Context, id: Int, title: String, text: String, contentIntent: PendingIntent? = null) {
         val granted = hasPermission(ctx)
