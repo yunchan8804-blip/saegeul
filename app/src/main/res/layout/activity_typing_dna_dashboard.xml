@@ -785,8 +785,7 @@
                                             android:id="@+id/tv_vault_keystrokes_saved"
                                             android:layout_width="wrap_content"
                                             android:layout_height="wrap_content"
-                                            android:contentDescription="절약한 타자 측정 준비 중"
-                                            android:text="측정 준비 중"
+                                            android:text="@string/vault_metric_not_recorded"
                                             android:textColor="?attr/colorPrimary"
                                             android:textSize="16sp"
                                             android:textStyle="bold" />

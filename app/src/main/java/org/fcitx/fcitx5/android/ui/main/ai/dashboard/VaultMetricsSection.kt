@@ -57,7 +57,11 @@ internal class VaultMetricsSection(private val activity: Activity) {
         } else {
             activity.getString(R.string.vault_metric_not_recorded)
         }
-        keystrokesSaved.setText(R.string.vault_metric_measurement_pending)
+        keystrokesSaved.text = if (metrics.keystrokesSaved > 0) {
+            activity.getString(R.string.vault_metric_keystrokes_saved_value, metrics.keystrokesSaved)
+        } else {
+            activity.getString(R.string.vault_metric_not_recorded)
+        }
         typosFixed.text = "${metrics.typoCorrected}"
         integrityEmpty.visibility = if (metrics.totalShown == 0) {
             View.VISIBLE

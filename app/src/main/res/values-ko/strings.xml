@@ -888,7 +888,7 @@
     <string name="vault_metric_personal_hits">개인 기록 활용 비율</string>
     <string name="vault_metric_keystrokes_saved">절약한 타자</string>
     <string name="vault_metric_typos_fixed">오타 교정</string>
-    <string name="vault_metric_measurement_pending">측정 준비 중</string>
+    <string name="vault_metric_keystrokes_saved_value">%1$d타</string>
     <string name="vault_metric_not_recorded">기록 전</string>
     <string name="vault_integrity_empty">문맥 추천이 표시되면 기록을 시작합니다. 선택한 추천은 수락률에 반영됩니다.</string>
     <string name="vault_timeline_title">입력 학습 문장 (최근 30일)</string>

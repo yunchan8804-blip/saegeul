@@ -35,8 +35,13 @@ class TypingDnaInterstitialController(
         ensureInitialized { loadAd() }
     }
 
-    fun showAfterAction() {
+    /** Counts one finished sync toward the venue's minimum-actions rule; call once, right when it ends. */
+    fun recordAction() {
         frequencyStore.recordAction(LocalAvenueCatalog.TYPING_DNA_SYNC_COMPLETE)
+    }
+
+    /** Shows the ad when the gate allows it now, or as soon as it finishes loading. */
+    fun showIfAllowed() {
         if (!gateAllows()) return
         val ad = interstitialAd
         if (ad == null) {
