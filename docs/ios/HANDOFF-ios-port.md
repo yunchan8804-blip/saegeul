@@ -41,7 +41,7 @@
 | 아이폰 | iPhone 14 Pro Max, CoreDevice `8364243E-3479-5C43-B825-E11EED1A4A37`, UDID `00008120-000E09462238C01E`, iOS 26.6.2, paired/available |
 | 시뮬레이터 | iPhone 17 (26.5) `F800E1B5-5A65-4E5C-B916-682EF3372C31` (꺼져 있을 수 있음) |
 | 맥 작업 경로 | `/Users/yunchan/workspace/saegeul-ios` (Windows 저장소 `ios/`를 동기화) |
-| Windows 저장소 | `D:\workspace\Saegul` 브랜치 `YunChan/korean-accuracy-followup` |
+| Windows 저장소 | `D:\workspace\Saegul`. 작업 브랜치는 `main`에서 딴 `YunChan/<topic>`(예전에 적혀 있던 `YunChan/korean-accuracy-followup`은 지금 없다) |
 | 디스크 | 맥 미니 `/` 여유 ~24GB. DerivedData 남용 금지 |
 | brew/cmake | 없음. libhangul은 clang/SPM C 타깃으로 |
 
@@ -52,7 +52,7 @@
 현재 상태: iPhone 17 시뮬레이터 XCUITest **6/6 통과**(두벌식 `가`, 높이 안정, 라틴·기호 층, 롱프레스 대체 문자·스페이스 스와이프, 천지인 "안녕"+온보딩 상단, 보안 필드). `swift test` 45/45. 확장 UI는 UIKit, 온보딩은 체크리스트 3단계 자동 감지.
 
 1. 이 문서 끝 "마지막 워커 보고"에서 진행 중이던 패킷(자판 전환 시트 디자인 · 나랏글 · 단모음)의 완료 정도를 확인한다. 미완성이면 그 지점부터 같은 설계(격차표 4절·백로그 IOS-2-03/2-07)로 잇는다. 시뮬레이터 XCUITest는 기존 6개가 통과하는 상태여야 한다.
-2. 그다음 격차표(`docs/ios-port-parity/ios-gap-table.md`) 4절 순서: 천지인 플러스 → 베가 → 세벌식(전각 그리드 설계 결정 필요: 가로 모드 전용 또는 2층 시프트) → 옛글·안마태 → Phase 3 로컬 스마트 입력(후보 바 → 오타 복구 → 조사 → 자동완성 사전).
+2. 그다음 격차표(`docs/ios/ios-port-parity/ios-gap-table.md`) 4절 순서: 천지인 플러스 → 베가 → 세벌식(전각 그리드 설계 결정 필요: 가로 모드 전용 또는 2층 시프트) → 옛글·안마태 → Phase 3 로컬 스마트 입력(후보 바 → 오타 복구 → 조사 → 자동완성 사전).
 3. 스파이크 잔여: IOS-0-13 확장 메모리 측정(시뮬레이터에서 `xcrun simctl spawn … log stream` 또는 Instruments), IOS-0-GO 판정 기록.
 4. 릴리스 전 확인: `ContentView`의 DEBUG 진단 라벨(`diag.inputModes`)이 release에서 빠지는지, 온보딩 카피 검토.
 5. 맥 디스크: `/` 여유가 1GB 미만이다. 세션 시작 시 `outputs/*.xcresult`와 `DerivedData*`를 정리한다. 시뮬레이터 `hangulLayout` plist 오염이 의심되면 두벌식으로 되돌린다(테스트 teardown이 복원하지만 중단 시 남을 수 있다).
@@ -73,7 +73,7 @@
   - 남은 일: IOS-0-13 메모리 측정, IOS-0-GO 판정, 시뮬레이터 두벌식(IOS-0-10, 설정 자동화가 시뮬레이터 설정 앱 구조와 달라 미완), 릴리스 전 `ContentView`의 DEBUG 진단 라벨 제거 확인, 격차표 4절 순서로 Phase 1.
 - 기기에 실험용 `com.chanpaca.saegeul.ios`가 설치돼 있다. 블로커 해소 후 `xcrun devicectl device uninstall app --device <id> com.chanpaca.saegeul.ios`로 지운다. 맥 `saegeul-ios-verify` 트리는 일회용 실험 복사본이다.
 - 호스트 앱 첫 화면은 온보딩 체크리스트(`ios/App/Onboarding/*`, `ios/App/Theme/SaegeulPalette.swift`)다. 1단계(설정 추가)는 `AppleKeyboards` 목록으로 자동 감지되고 실기기에서 동작 확인. 2단계는 입력 모드 클래스명(`…ExtensionInputMode`)+언어로 판별, 3단계는 한글 음절 입력.
-- Android 1:1 이식 기준 문서: `docs/ios-port-parity/android-inventory-*.md`(3개), 격차표 `docs/ios-port-parity/ios-gap-table.md`. 다음 개발 순서는 격차표 4절.
+- Android 1:1 이식 기준 문서: `docs/ios/ios-port-parity/android-inventory-*.md`(3개), 격차표 `docs/ios/ios-port-parity/ios-gap-table.md`. 다음 개발 순서는 격차표 4절.
 
 ## 실기기 무선 디버깅(Tailscale) 시도 절차 — 아직 미검증 (2026-09-14 기록)
 
@@ -145,5 +145,6 @@ ssh vd-mac "cd /Users/yunchan/workspace/saegeul-ios/HangulCore && swift test"
 - 검증: `swift test` 83/83, iPhone 17 시뮬레이터 XCUITest **7/7**(`outputs/sim-p4-final.xcresult`), Windows·맥 md5 일치, 맥 디스크 여유 806Mi.
 - 스크린샷: `outputs/ios-sim-p4/layout-switcher-sheet.png`, `naratgul-layout.png`, `danmoum-layout.png`, `space-shows-layout-switcher-arrow.png`.
 - **오케스트레이터 감사에서 잡힌 결함(다음 세션 1순위)**: 전환 시트의 두벌식 행 가운데에 정체불명의 파란 사각형이 떠 있고, 4번째 항목(단모음)이 키보드 높이(260)에 잘려 보이지 않는다. 행 높이 44로 줄이고 목록을 스크롤 가능하게 하거나 시트 높이를 늘려라. 파란 사각형은 `UIButton` 서브뷰(체크마크 `UIImageView`) 배치 실수로 추정.
+- **2026-09-28 코드 확인: 위 결함은 아직 고쳐지지 않았다.** `ios/`는 저장소에 `ec872659`(2026-09-26)로 한 번 들어온 뒤 바뀌지 않았다. `ios/Keyboard/KeyboardView.swift:860`에서 행 높이가 48로 고정돼 있고, 목록을 담는 스크롤 뷰가 없으며, 시트는 키보드 뷰(세로 260·가로 200) 전체에 붙어 있다. 행은 `UIButton(type: .system)`(879행)에 `isSelected`(884행)를 켜는 방식이라, 시스템 버튼이 선택 상태에서 그리는 틴트 색 배경이 파란 사각형일 가능성이 있다(추정, 실행해서 확인하지 않음).
 - 미해결: 시뮬레이터 `hangulLayout` plist에 원인 불명의 "naratgul"이 남아 있던 일이 한 번 있었다(teardown이 복원하지만 중단 시 오염 가능).
 

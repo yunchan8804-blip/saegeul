@@ -1,7 +1,7 @@
 # 새글 키보드 광고 수익화와 AVENUE 운영 설계
 
 > 조사 기준일: 2026-08-22
-> 상태: 제품·정책·기술 설계 완료, 광고 SDK와 운영 백엔드는 아직 미연결
+> 상태: 제품·정책·기술 설계 완료. 광고 SDK는 앱에 연결됨(`play-services-ads`, `app/src/main/java/org/fcitx/fcitx5/android/ads/`의 전면(`acc14aee`)·배너·보상형(`ec872659`) 컨트롤러, 2026-09-28 확인). 운영 백엔드는 아직 미연결(앱은 번들 카탈로그 `LocalAvenueCatalog`만 쓰고 원격 설정을 받지 않음, `admin/`은 로컬 데모)
 > 관리자 UI: `admin/`의 로컬 운영 데모
 
 ## 1. 결론

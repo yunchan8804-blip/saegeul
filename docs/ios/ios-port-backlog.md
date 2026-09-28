@@ -221,6 +221,8 @@ Go: 11+12+13 통과, golden 통과.
 No-go: 조합이 호스트 절반에서 깨지거나 빈 키면 jetsam.
 판정은 오케스트레이터. 워커는 증거만.
 
+**0-GO 사후 판정 필요 (2026-09-28 확인)**: IOS-1-01·IOS-2-01·IOS-2-03은 IOS-0-GO에 막혀 있어야 하는데 0-GO가 `pending`인 채로 `done`이 됐다. 상태는 그대로 두고, 오케스트레이터가 IOS-0-13(메모리) 측정 뒤 0-GO를 사후에 판정한다.
+
 ---
 
 ## Phase 1 — 호스트 셸
@@ -229,7 +231,7 @@ No-go: 조합이 호스트 절반에서 깨지거나 빈 키면 jetsam.
 |---|---|---|---|
 | IOS-1-01 | done | 온보딩: 시스템 설정에서 키보드 추가 안내 | IOS-0-GO |
 | IOS-1-02 | pending | 앱 안 개인정보 안내 (오프라인 기본, FA 설명) | IOS-1-01 |
-| IOS-1-03 | in_progress | `UIKeyboardType` 이메일/URL/숫자 키면 | IOS-0-07 |
+| IOS-1-03 | pending | `UIKeyboardType` 이메일/URL/숫자 키면 | IOS-0-07 |
 | IOS-1-04 | done | 높이 constraint 단일 진실 (폭주 버그 방지) | IOS-0-07 |
 | IOS-1-05 | pending | 비행기 모드 입력 | IOS-0-09 |
 | IOS-1-06 | pending | 마킹(setMarkedText) ON/OFF 설정. 기본 ON | IOS-0-08 |
@@ -240,7 +242,7 @@ No-go: 조합이 호스트 절반에서 깨지거나 빈 키면 jetsam.
 
 - IOS-1-01: `UIApplication.openSettingsURLString`은 가이드 4.4.1이 Settings를 허용. 다른 앱 실행 금지. 온보딩 3스텝: 키보드 추가 / 허용 / 입력창에서 새글 선택.
 - IOS-1-02: Full Access를 켜라고 강요하지 않음. 시스템 경고 문구를 덮지 않음.
-- IOS-1-03: numberPad/phonePad는 시스템이 가로챌 수 있음. phonePad는 시스템 강제 — 문서화만.
+- IOS-1-03: numberPad/phonePad는 시스템이 가로챌 수 있음. phonePad는 시스템 강제 — 문서화만. 2026-09-28: `ios/`에 `keyboardType`·`UIKeyboardType` 코드가 한 줄도 없어 `in_progress`에서 `pending`으로 되돌림.
 - IOS-1-04: 높이 한 constraint. 스마트보드·한글10키 선례(무한 증가) 회귀 테스트: appear 3회 높이가 같음.
 - IOS-1-06: OFF면 delete+insert 시뮬레이션. 기본 ON.
 
@@ -320,15 +322,17 @@ Romaja(`ro`)는 제품 17종에 없음. 넣지 않음.
 | ID | 상태 | 제목 |
 |---|---|---|
 | IOS-5-01 | pending | Full Access 목적 문자열 = 실제 호출 |
-| IOS-5-02 | pending | 컴패니언 redirect URI allowlist iOS 스킴 |
-| IOS-5-03 | pending | 호스트 OAuth/BYOK. 확장은 삽입만 |
-| IOS-5-04 | pending | `store=false` 강제 |
+| IOS-5-02 | cancelled | 컴패니언 redirect URI allowlist iOS 스킴 |
+| IOS-5-03 | cancelled | 호스트 OAuth/BYOK. 확장은 삽입만 |
+| IOS-5-04 | cancelled | `store=false` 강제 |
 | IOS-5-05 | pending | 오프라인 모드가 소켓보다 먼저 |
 | IOS-5-06 | pending | OCR 호스트 앱 (Vision). 키보드에서 카메라 실행 금지 |
 | IOS-5-07 | pending | STT 호스트 앱 |
 | IOS-5-08 | pending | GIF는 더 뒤. Noto 로컬만 후보 |
 
 타자마다 서버 예측 금지 (4.4.1).
+
+IOS-5-02·5-03·5-04 취소 사유: 2026-09-24 외부 AI 제거(기기 안 Gemma만). 컴패니언 스크립트 `scripts/ai-provider-companion.py`는 `fd0f6748`에서 지웠다.
 
 ---
 
@@ -339,6 +343,8 @@ Romaja(`ro`)는 제품 17종에 없음. 넣지 않음.
 | IOS-6-01 | pending | 호스트 LiteRT-LM Swift 또는 Foundation Models |
 | IOS-6-02 | pending | 확장 조회만. 확장 로드 금지 |
 | IOS-6-03 | pending | 입력 중 문맥 완성 1차 이후에도 기본 끔 |
+
+IOS-6-01 결정 대기: 제품 AI는 기기 안 Gemma만 쓰기로 정했다(2026-09-24). "LiteRT-LM 또는 Foundation Models" 중 무엇을 쓸지는 이 방향에 맞춰 오케스트레이터가 다시 정해야 한다.
 
 ---
 

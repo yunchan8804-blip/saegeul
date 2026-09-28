@@ -1,5 +1,7 @@
 # 젬마 자동 추천 — 에뮬레이터 개발 핸드오프 (2026-09-14)
 
+> 2026-09-28 메모: 29항 lease 선점·웜 엔진 공유(4-a, `OnDeviceSharedEngine`)·release 지원(4-c, `OnDeviceAiSupport`)은 반영 완료(`ec872659`). 남은 것은 에뮬레이터·실기기 E2E와 예산 결정이다. 아래 브랜치·미커밋 서술은 당시 상태다.
+
 이 파일을 먼저 읽는다. 설계를 바꾸지 않는다. 설계 정본은 `docs/gemma-automatic-context-2026-09-12.md`(20~29항이 오늘 분). 이전 핸드오프는 메모리 `ai-suggestion-handoff-2026-09-13`.
 
 ## 한 줄 상태
