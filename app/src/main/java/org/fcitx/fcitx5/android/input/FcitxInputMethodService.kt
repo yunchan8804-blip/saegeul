@@ -140,6 +140,7 @@ import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSuggester
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
+import org.fcitx.fcitx5.android.input.policy.InputFeaturePolicy
 import org.fcitx.fcitx5.android.input.profile.AppFeaturePolicy
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardGlobalDefaults
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileResolver
@@ -292,6 +293,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val appProfileStore by lazy { AppKeyboardProfileStore(this) }
     @Volatile
     private var effectiveAppProfile: EffectiveAppKeyboardProfile? = null
+    private val featurePolicy = InputFeaturePolicy(
+        isDirectBootMode = { isDirectBootInputMode },
+        editorInfo = { currentInputEditorInfo },
+        capabilityFlags = { capabilityFlags },
+        offlineMode = { offlineMode },
+        appProfile = { effectiveAppProfile }
+    )
     private var onDeviceContextSnapshotInvalidationListener: (() -> Unit)? = null
     private var nextOnDeviceContextExtractedTextToken = -1
     private var activeOnDeviceContextExtractedTextToken: Int? = null
@@ -1373,7 +1381,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         onStarted: (token: Long) -> Unit,
         onChanged: (token: Long, committed: String, preedit: String) -> Unit
     ): Long? {
-        if (!allowsInternalPromptFeature(spec.feature)) return null
+        if (!featurePolicy.allowsInternalPromptFeature(spec.feature)) return null
         // SharedFlow has replay=0. Do not enqueue a control marker until this service has an
         // active subscription for the current Fcitx generation to observe it.
         if (!isFcitxEventCollectorReady) return null
@@ -1568,10 +1576,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         reset()
         return true
-    }
-
-    private fun allowsInternalPromptFeature(feature: InternalPromptFeature): Boolean = when (feature) {
-        InternalPromptFeature.GifSearch -> allowsNetworkInputFeatures()
     }
 
     private fun captureInternalPromptCommit(text: String): Boolean {
@@ -1871,23 +1875,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         recordCorrectionPairIfPresent(correctionSessionTracker.onWordBoundary(currentWordBeforeCursor()))
     }
 
-    fun allowsTextInspectionFeatures(): Boolean =
-        DirectBootInputPolicy.allowsTextInspection(
-            isDirectBootMode = isDirectBootInputMode,
-            editorAllowsTextInspection = !EditorPrivacyPolicy.forbidsTextInspection(
-                currentInputEditorInfo,
-                capabilityFlags
-            )
-        )
+    fun allowsTextInspectionFeatures(): Boolean = featurePolicy.allowsTextInspectionFeatures()
 
-    /** Network-backed input features must never inspect or contact a server for private editors. */
-    fun allowsNetworkInputFeatures(): Boolean =
-        allowsTextInspectionFeatures() && !offlineMode &&
-            effectiveAppProfile?.source?.networkPolicy != AppFeaturePolicy.Block
+    fun allowsNetworkInputFeatures(): Boolean = featurePolicy.allowsNetworkInputFeatures()
 
-    /** Explicit local completion never opens a network path, but uses the same privacy and AI policy gates. */
     fun allowsOnDeviceContextCompletionFeatures(): Boolean =
-        allowsTextInspectionFeatures() && effectiveAppProfile?.source?.aiPolicy != AppFeaturePolicy.Block
+        featurePolicy.allowsOnDeviceContextCompletionFeatures()
 
     /** Only the active local completion window may receive invalidation events. */
     fun setOnDeviceContextSnapshotInvalidationListener(listener: (() -> Unit)?) {
@@ -1982,17 +1975,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (clientChanged || panelChanged) notifyAutomaticSuggestionSnapshotInvalidated()
     }
 
-    /**
-     * Which of the three gates in [allowsNetworkInputFeatures] is closed, so a panel can
-     * name the real cause and point at the setting that reopens it. Null when allowed.
-     */
-    fun networkInputBlock(): InputFeatureBlock? = when {
-        !allowsTextInspectionFeatures() -> InputFeatureBlock.PrivateEditor
-        offlineMode -> InputFeatureBlock.OfflineMode
-        effectiveAppProfile?.source?.networkPolicy == AppFeaturePolicy.Block ->
-            InputFeatureBlock.AppPolicy
-        else -> null
-    }
+    fun networkInputBlock(): InputFeatureBlock? = featurePolicy.networkInputBlock()
 
 
     fun effectiveMobileHangulLayout(global: MobileHangulLayout): MobileHangulLayout =
