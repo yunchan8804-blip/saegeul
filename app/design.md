@@ -161,7 +161,7 @@ Gemma 준비 화면은 밝음·어두움·글꼴 200%·800dp 창에서 단일 �
 ### 진행 기록 (2026-09-26)
 
 - K1 수용(1회 반려: 영문 모드 대소문자 프리셋 회귀 → 수정). `input/popup/AlphabetPopupLegends.kt`, `PopupAction.ShowKeyboardAction.keysOverride/labelsOverride`. 에뮬레이터에서 ㅃ+ㅏ→"빠" 조합 확인(`after-k1/`). `[全]` → 텍스트 탭 "전각"(`PickerData.kt`), 실제 화면 확인은 통합 검증 대상.
-- K2·K3 수용. `input/KeyboardFrame.kt`(KeyboardFrame, OneHandMode, KeyTextScale), 설정 `one_hand_mode`, `key_text_scale`. 한손 모드 쪽 기억은 키보드 재시작 시 기본(오른쪽)으로 돌아간다. 캡처 `after-k2k3/`.
+- K2·K3 수용. `input/KeyboardFrame.kt`(KeyboardFrame, OneHandMode, KeyTextScale), 설정 `one_hand_mode`, `key_text_scale`. 한손 모드 쪽 기억은 키보드 재시작 시 기본(오른쪽)으로 돌아갔다 → 고침(ddeb9bca): 숨은 설정 `last_one_hand_mode_side`에 저장. 캡처 `after-k2k3/`.
 - 테마 데이터 수용. `SaegeulIvory`/`SaegeulNavy` 기본값, `Oklch.kt`, `ThemeColorGenerator.kt`, `ThemeContrast.kt`, `input/keyboard/effects/EffectGate.kt`. 생성기 48조합 대비 4.5 이상 테스트.
 - 발견(3라운드 후보): AI 후보 칩 앞 ✨ 이모지, 좁은 폭에서 안내 칩 두 줄 감김(K5에 포함).
 
