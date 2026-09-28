@@ -57,6 +57,7 @@ import org.fcitx.fcitx5.android.input.keyboard.FoldKeyboardProfileResolver
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardViewportReader
 import org.fcitx.fcitx5.android.input.keyboard.ThumbSplitPreferences
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidate
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceFailureText
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator
@@ -437,7 +438,7 @@ class HorizontalCandidateComponent :
     }
 
     // Shows that on-device generation is still running even while a sentence candidate is
-    // already displayed (see renderCandidates' generatingSpinner visibility calc): the status row
+    // already displayed (see renderTwoRows' generatingSpinner visibility calc): the status row
     // itself goes blank the moment a sentence candidate exists (computeStatusRowContent returns
     // null for hasAutomaticSentence=true), so this small spinner rides next to the sentence row
     // instead. Reuses the same IndeterminateRingDrawable as statusProgressBar.
@@ -453,7 +454,7 @@ class HorizontalCandidateComponent :
 
     // Wraps sentenceRecyclerView so generatingSpinner can sit at its right edge without disturbing
     // the sentence-row-height contract (see KawaiiBarComponent.candidateRowFixedHeight): this row's
-    // own height is what renderCandidates sets, sentenceRecyclerView just fills the remaining width.
+    // own height is what renderTwoRows sets, sentenceRecyclerView just fills the remaining width.
     private val sentenceRow: LinearLayout by lazy {
         LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -474,8 +475,8 @@ class HorizontalCandidateComponent :
     }
 
     // Overlay chip shown in place of the word row when it has no candidates at all, so the
-    // always-two-row candidate bar (see HorizontalCandidateComponent.renderCandidates showTwoRows
-    // branch) never collapses to an empty row. Never part of wordAdapter's data set.
+    // always-two-row candidate bar (see renderTwoRows) never collapses to an empty row. Never part
+    // of wordAdapter's data set.
     private val wordPlaceholder: TextView by lazy {
         TextView(context).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -733,15 +734,11 @@ class HorizontalCandidateComponent :
     /**
      * Shows [resource] in the shared connection-hint row. When [clickable] is false, this is
      * actually the sentence-row empty-state placeholder chip riding on the same view (see
-     * renderCandidates' showTwoRows branch): dimmed text, no click/long-press.
+     * [showSentenceRowFallback]): dimmed text, no click/long-press.
      */
     private fun setConnectionHint(resource: Int?, clickable: Boolean = true) {
         val visible = resource != null
-        connectionHintView.visibility = if (visible) View.VISIBLE else View.GONE
-        connectionHintView.updateLayoutParams<LinearLayout.LayoutParams> {
-            height = if (visible) context.dp(KawaiiBarComponent.HEIGHT) else 0
-            weight = 0f
-        }
+        connectionHintView.showRow(visible, context.dp(KawaiiBarComponent.HEIGHT))
         if (visible) connectionHintView.setText(resource)
         connectionHintView.isClickable = clickable
         connectionHintView.isFocusable = clickable
@@ -862,12 +859,48 @@ class HorizontalCandidateComponent :
             statusProgressBar.visibility =
                 if (shouldShowStatusSpinner(content.spinner, disableAnimation)) View.VISIBLE else View.GONE
         }
-        statusRowView.visibility = if (visible) View.VISIBLE else View.GONE
-        statusRowView.updateLayoutParams<LinearLayout.LayoutParams> {
-            height = if (visible) context.dp(KawaiiBarComponent.HEIGHT) else 0
-            weight = 0f
-        }
+        statusRowView.showRow(visible, context.dp(KawaiiBarComponent.HEIGHT))
         bar.candidateStatusRowVisible = visible
+    }
+
+    /**
+     * Candidates gathered for one [renderCandidates] pass: the on-device automatic suggestions,
+     * the native candidates they do not already show, and the contextual words/sentences left after
+     * dropping what an automatic (or, for sentences, a native) candidate already shows.
+     */
+    private class CandidateSources(
+        val automatic: AutomaticCandidates,
+        val displayNative: List<CandidateWord>,
+        val contextualWords: List<CandidateWord>,
+        val contextualSentences: List<CandidateWord>
+    ) {
+        val hasSentences: Boolean
+            get() = automatic.sentences.isNotEmpty() || contextualSentences.isNotEmpty()
+
+        /** Word row of the two-row bar and of the landscape single row. */
+        fun wordRow(addressField: Boolean): Array<CandidateWord> = HorizontalCandidateMerger.prependAutomatic(
+            automatic.words,
+            HorizontalCandidateMerger.merge(displayNative, contextualWords, emptyList(), addressField)
+        )
+
+        /** Sentence row of the two-row bar; its first item is the landscape single row's sentence chip. */
+        fun sentenceRow(): Array<CandidateWord> =
+            HorizontalCandidateMerger.prependAutomatic(automatic.sentences, contextualSentences.toTypedArray())
+
+        /** The one-row bar shows words and sentences together. */
+        fun oneRow(addressField: Boolean): Array<CandidateWord> = HorizontalCandidateMerger.prependAutomatic(
+            automatic.words + automatic.sentences,
+            HorizontalCandidateMerger.merge(displayNative, contextualWords, contextualSentences, addressField)
+        )
+    }
+
+    /** Which candidate bar layout a [renderCandidates] pass draws. */
+    private enum class CandidateRowLayout { SINGLE_ROW_LANDSCAPE, TWO_ROWS, ONE_ROW }
+
+    private class StatusRowDecision(val content: StatusRowContent?, val active: Boolean) {
+        /** A spinner status (WARMUP/GENERATING) keeps the one-row bar up on its own. */
+        val forcesBar: Boolean
+            get() = active && content?.spinner == true
     }
 
     private fun renderCandidates(data: FcitxEvent.CandidateListEvent.Data? = null) {
@@ -877,6 +910,24 @@ class HorizontalCandidateComponent :
             nativeCandidates = data.candidates.toList()
             nativeCandidateCount = nativeCandidates.size
         }
+        val sources = collectCandidateSources()
+        val addressField = isAddressField()
+        val layout = resolveRowLayout(addressField)
+        val statusRow = resolveStatusRow(sources, showTwoRows = layout == CandidateRowLayout.TWO_ROWS)
+
+        // wordRow is a permanent structural wrapper (see K5); only the single-row-landscape
+        // PLACEHOLDER state collapses it, and that branch below sets it back to GONE explicitly.
+        wordRow.visibility = View.VISIBLE
+
+        when (layout) {
+            CandidateRowLayout.SINGLE_ROW_LANDSCAPE -> renderSingleRowLandscape(sources, addressField)
+            CandidateRowLayout.TWO_ROWS -> renderTwoRows(sources, statusRow, addressField)
+            CandidateRowLayout.ONE_ROW -> renderOneRow(sources, statusRow, addressField)
+        }
+        scheduleCandidateVisibilityMeasurement()
+    }
+
+    private fun collectCandidateSources(): CandidateSources {
         val automaticCandidates = getAutomaticCandidates()
         bar.hasAutomaticCandidates = automaticCandidates.isNotEmpty
         val automaticTexts = automaticCandidates.texts
@@ -891,10 +942,20 @@ class HorizontalCandidateComponent :
                     nativeCandidates.any { it.text == contextual.word.text }
             }
             .map { it.word }
+        rememberContextualCommitSnapshots(contextualSnapshot.words + contextualSnapshot.sentences, automaticTexts)
+        return CandidateSources(automaticCandidates, displayNativeCandidates, contextualWords, contextualSentences)
+    }
+
+    /**
+     * Keeps the metrics/append/replacement snapshots that a tap on each offered contextual
+     * candidate commits with. Candidates an automatic or native candidate already shows are never
+     * offered, so they get none.
+     */
+    private fun rememberContextualCommitSnapshots(candidates: List<ContextualCandidate>, automaticTexts: Set<String>) {
         contextualMetricsCandidates.clear()
         contextualAppendSnapshots.clear()
         contextualReplacementSnapshots.clear()
-        (contextualSnapshot.words + contextualSnapshot.sentences).forEach { candidate ->
+        candidates.forEach { candidate ->
             if (candidate.word.text !in automaticTexts &&
                 nativeCandidates.none { it.text == candidate.word.text }
             ) {
@@ -903,12 +964,16 @@ class HorizontalCandidateComponent :
                 contextualReplacementSnapshots[candidate.word] = candidate.replacementSnapshot
             }
         }
+    }
 
+    private fun isAddressField(): Boolean {
         val flags = if (currentCapFlags != CapabilityFlags.DefaultFlags) currentCapFlags else service.capabilityFlags
         val isEmail = EditorPrivacyPolicy.isEmailAddressField(service.currentInputEditorInfo, flags)
         val isUrl = EditorPrivacyPolicy.isUrlField(service.currentInputEditorInfo, flags)
-        val addressField = isEmail || isUrl
+        return isEmail || isUrl
+    }
 
+    private fun resolveRowLayout(addressField: Boolean): CandidateRowLayout {
         // K5: landscape while not thumb-split overrides the two-row preference entirely with the
         // fixed 48dp single row (see CandidateBarModePolicy.isHorizontalSingleRow / design.md K5).
         val singleRowLandscape = CandidateBarModePolicy.isHorizontalSingleRow(
@@ -916,208 +981,169 @@ class HorizontalCandidateComponent :
             thumbSplitActive = isThumbSplitActive()
         )
         bar.candidateSingleRowLandscape = singleRowLandscape
-        val showTwoRows = twoRowCandidateBar && !isEmail && !isUrl && !singleRowLandscape
-        // The always-two-row candidate bar never collapses; see the showTwoRows branch below.
+        val showTwoRows = twoRowCandidateBar && !addressField && !singleRowLandscape
+        // The always-two-row candidate bar never collapses; see renderTwoRows.
         bar.candidateRowFixedHeight = showTwoRows
+        return when {
+            singleRowLandscape -> CandidateRowLayout.SINGLE_ROW_LANDSCAPE
+            showTwoRows -> CandidateRowLayout.TWO_ROWS
+            else -> CandidateRowLayout.ONE_ROW
+        }
+    }
+
+    private fun resolveStatusRow(sources: CandidateSources, showTwoRows: Boolean): StatusRowDecision {
         // 다른 소스(문장팩·네트워크·개인화)의 문장 후보가 있으면 상태 행이 그 행을 가리지 않는다.
-        val statusRowContent = computeStatusRowContent(
-            automaticCandidates.sentences.isNotEmpty() || contextualSentences.isNotEmpty()
-        )
+        val content = computeStatusRowContent(sources.hasSentences)
         // A spinner-less status (NO_CANDIDATE/ERROR) may only occupy the row when the bar is
         // already non-empty for some other reason; it must never be the sole thing keeping the
         // bar from collapsing. A spinner status (WARMUP/GENERATING) is allowed to force the bar
-        // to stay up on its own, tracked separately as statusRowForcesBar below. The always-two-row
-        // bar has a fixed-height row to show it in either way, so this constraint is 1-row only.
-        val barAlreadyNonEmpty = !(preeditEmpty && nativeCandidates.isEmpty()) || automaticCandidates.isNotEmpty
-        var statusRowActive = statusRowContent != null
-        if (!showTwoRows && statusRowActive && statusRowContent?.spinner == false && !barAlreadyNonEmpty) {
-            statusRowActive = false
+        // to stay up on its own, tracked separately as StatusRowDecision.forcesBar. The
+        // always-two-row bar has a fixed-height row to show it in either way, so this constraint
+        // is 1-row only.
+        var active = content != null
+        if (!showTwoRows && active && content?.spinner == false && !barHasNonContextualContent(sources.automatic)) {
+            active = false
         }
-        val statusRowForcesBar = statusRowActive && statusRowContent?.spinner == true
+        return StatusRowDecision(content, active)
+    }
 
-        // wordRow is a permanent structural wrapper (see K5); only the single-row-landscape
-        // PLACEHOLDER state collapses it, and that branch below sets it back to GONE explicitly.
-        wordRow.visibility = View.VISIBLE
+    /** Whether something other than contextual candidates (preedit, native or automatic) fills the bar. */
+    private fun barHasNonContextualContent(automatic: AutomaticCandidates): Boolean =
+        !(preeditEmpty && nativeCandidates.isEmpty()) || automatic.isNotEmpty
 
-        if (singleRowLandscape) {
-            renderSingleRowLandscape(
-                automaticCandidates,
-                displayNativeCandidates,
-                contextualWords,
-                contextualSentences,
-                addressField
-            )
-        } else if (showTwoRows) {
-            val topCandidates = HorizontalCandidateMerger.prependAutomatic(
-                automaticCandidates.words,
-                HorizontalCandidateMerger.merge(displayNativeCandidates, contextualWords, emptyList(), addressField)
-            )
-            val bottomCandidates = if (
-                automaticCandidates.sentences.isNotEmpty() || contextualSentences.isNotEmpty()
-            ) {
-                HorizontalCandidateMerger.prependAutomatic(
-                    automaticCandidates.sentences,
-                    contextualSentences.toTypedArray()
-                )
-            } else {
-                emptyArray()
-            }
+    /**
+     * Portrait (or thumb-split) always-two-row bar. The word and sentence rows always occupy
+     * exactly HEIGHT each (see KawaiiBarComponent.candidateRowFixedHeight): an empty row shows a
+     * placeholder chip in the same spot instead of shrinking, so the bar never resizes.
+     */
+    private fun renderTwoRows(sources: CandidateSources, statusRow: StatusRowDecision, addressField: Boolean) {
+        val topCandidates = sources.wordRow(addressField)
+        val bottomCandidates = sources.sentenceRow()
 
-            // The word and sentence rows always occupy exactly HEIGHT each (see
-            // KawaiiBarComponent.candidateRowFixedHeight): an empty row shows a placeholder chip
-            // in the same spot instead of shrinking, so the bar never resizes.
-            singleRowSentenceContainer.visibility = View.GONE
-            singleRowGeneratingSpinner.visibility = View.GONE
-            wordAdapter.updateCandidates(topCandidates, topCandidates.size)
-            wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
-            val wordRowHasCandidates = topCandidates.isNotEmpty()
-            wordRecyclerView.visibility = if (wordRowHasCandidates) View.VISIBLE else View.GONE
-            wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
-                height = if (wordRowHasCandidates) context.dp(wordAdapter.rowHeightDp) else 0
-                weight = 0f
-            }
-            wordPlaceholder.visibility = if (wordRowHasCandidates) View.GONE else View.VISIBLE
-            wordPlaceholder.updateLayoutParams<LinearLayout.LayoutParams> {
-                height = if (wordRowHasCandidates) 0 else context.dp(KawaiiBarComponent.HEIGHT)
-                weight = 0f
-            }
+        singleRowSentenceContainer.visibility = View.GONE
+        singleRowGeneratingSpinner.visibility = View.GONE
+        showTwoRowWords(topCandidates)
+        showTwoRowSentences(bottomCandidates)
+        showSentenceRowFallback(sentenceRowHasCandidates = bottomCandidates.isNotEmpty(), statusRow = statusRow)
+        // A sentence candidate already on screen makes computeStatusRowContent go blank
+        // (hasAutomaticSentence short-circuits it to null), so DEBOUNCING/GENERATING would
+        // otherwise show nothing while a fresh suggestion is being generated. This spinner
+        // covers that gap; it stays hidden whenever the status row itself is already showing
+        // a spinner (StatusRowDecision.forcesBar), so the two never double up.
+        val generating = StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
+        generatingSpinner.visibility = if (generating && !statusRow.forcesBar) View.VISIBLE else View.GONE
+        showHairlineDivider()
 
-            sentenceAdapter.updateCandidates(bottomCandidates, bottomCandidates.size)
-            sentenceAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
-            val sentenceRowHasCandidates = bottomCandidates.isNotEmpty()
-            sentenceRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
-                width = 0
-                weight = 1f
-            }
-            sentenceRow.visibility = if (sentenceRowHasCandidates) View.VISIBLE else View.GONE
-            sentenceRow.updateLayoutParams<LinearLayout.LayoutParams> {
-                height = if (sentenceRowHasCandidates) context.dp(sentenceAdapter.rowHeightDp) else 0
-                weight = 0f
-            }
+        bar.isCandidateTwoRow = true
+        // The row height and visibility never collapse in this mode, so the bar always counts
+        // as non-empty and visible.
+        pushCandidateEmpty(false)
+        applyFillStyle(topCandidates.size)
+        setHasVisibleCandidates(true)
+    }
 
-            // Sentence row empty-state priority: real candidates > status row >
-            // "no sentences" placeholder (reusing connectionHintView, non-clickable).
-            when {
-                sentenceRowHasCandidates -> {
-                    setConnectionHint(null)
-                    setStatusRow(false, null)
-                }
-                statusRowActive -> {
-                    setConnectionHint(null)
-                    setStatusRow(true, statusRowContent)
-                }
-                else -> {
-                    setStatusRow(false, null)
-                    setConnectionHint(R.string.candidate_placeholder_no_sentences, clickable = false)
-                }
-            }
-            // A sentence candidate already on screen makes computeStatusRowContent go blank
-            // (hasAutomaticSentence short-circuits it to null), so DEBOUNCING/GENERATING would
-            // otherwise show nothing while a fresh suggestion is being generated. This spinner
-            // covers that gap; it stays hidden whenever the status row itself is already showing
-            // a spinner (statusRowForcesBar), so the two never double up.
-            val generating = StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
-            generatingSpinner.visibility = if (generating && !statusRowForcesBar) View.VISIBLE else View.GONE
+    private fun showTwoRowWords(topCandidates: Array<CandidateWord>) {
+        wordAdapter.updateCandidates(topCandidates, topCandidates.size)
+        wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
+        val wordRowHasCandidates = topCandidates.isNotEmpty()
+        wordRecyclerView.visibility = if (wordRowHasCandidates) View.VISIBLE else View.GONE
+        wordRow.setRowHeight(if (wordRowHasCandidates) context.dp(wordAdapter.rowHeightDp) else 0)
+        wordPlaceholder.showRow(!wordRowHasCandidates, context.dp(KawaiiBarComponent.HEIGHT))
+    }
 
-            hairlineDivider.visibility = View.VISIBLE
-            hairlineDivider.updateLayoutParams<LinearLayout.LayoutParams> {
-                height = max(1, context.dp(1))
-                weight = 0f
-            }
+    private fun showTwoRowSentences(bottomCandidates: Array<CandidateWord>) {
+        sentenceAdapter.updateCandidates(bottomCandidates, bottomCandidates.size)
+        sentenceAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
+        sentenceRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
+            width = 0
+            weight = 1f
+        }
+        sentenceRow.showRow(bottomCandidates.isNotEmpty(), context.dp(sentenceAdapter.rowHeightDp))
+    }
 
-            bar.isCandidateTwoRow = true
-            // The row height and visibility never collapse in this mode, so the bar always counts
-            // as non-empty and visible.
-            bar.barStateMachine.push(
-                KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
-                KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
-            )
-            applyFillStyle(topCandidates.size)
-            setHasVisibleCandidates(true)
-        } else {
-            val candidates = HorizontalCandidateMerger.merge(
-                displayNativeCandidates,
-                contextualWords,
-                contextualSentences,
-                addressField
-            ).let { legacy ->
-                HorizontalCandidateMerger.prependAutomatic(
-                    automaticCandidates.words + automaticCandidates.sentences,
-                    legacy
-                )
-            }
-            wordAdapter.updateCandidates(candidates, candidates.size)
-            sentenceAdapter.updateCandidates(emptyArray(), 0)
-
-            singleRowSentenceContainer.visibility = View.GONE
-            singleRowGeneratingSpinner.visibility = View.GONE
-            val hasCandidates = candidates.isNotEmpty()
-            if (hasCandidates) {
+    /**
+     * Sentence row empty-state priority: real candidates > status row > "no sentences"
+     * placeholder (reusing connectionHintView, non-clickable).
+     */
+    private fun showSentenceRowFallback(sentenceRowHasCandidates: Boolean, statusRow: StatusRowDecision) {
+        when {
+            sentenceRowHasCandidates -> {
                 setConnectionHint(null)
                 setStatusRow(false, null)
-                wordRecyclerView.visibility = View.VISIBLE
-                wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
-                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = ViewGroup.LayoutParams.MATCH_PARENT
-                    weight = 0f
-                }
-                hairlineDivider.visibility = View.GONE
-                sentenceRecyclerView.visibility = View.GONE
-                bar.isCandidateTwoRow = false
-                // 유휴 상태(preedit 없음)에서 native 후보도 없다면, 문맥 후보만으로 CandidateEmpty를
-                // false로 밀어붙이지 않는다(이중 안전장치). native 후보가 있는 경로는 그대로 둔다.
-                if (!(preeditEmpty && nativeCandidates.isEmpty()) || automaticCandidates.isNotEmpty) {
-                    bar.barStateMachine.push(
-                        KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
-                        KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
-                    )
-                }
-                applyFillStyle(candidates.size)
-                setHasVisibleCandidates(true)
-            } else if (statusRowForcesBar) {
+            }
+            statusRow.active -> {
                 setConnectionHint(null)
-                wordRecyclerView.visibility = View.VISIBLE
-                wordAdapter.rowHeightDp = 28
-                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = context.dp(wordAdapter.rowHeightDp)
-                    weight = 0f
-                }
-                hairlineDivider.visibility = View.VISIBLE
-                hairlineDivider.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = max(1, context.dp(1))
-                    weight = 0f
-                }
-                sentenceRecyclerView.visibility = View.GONE
-                sentenceRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = 0
-                    weight = 0f
-                }
-                setStatusRow(true, statusRowContent)
-                bar.isCandidateTwoRow = true
-                bar.barStateMachine.push(
-                    KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
-                    KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
-                )
-                applyFillStyle(candidates.size)
-                setHasVisibleCandidates(true)
-            } else {
-                setConnectionHint(null)
+                setStatusRow(true, statusRow.content)
+            }
+            else -> {
                 setStatusRow(false, null)
-                wordRecyclerView.visibility = View.GONE
-                singleRowSentenceContainer.visibility = View.GONE
-                singleRowGeneratingSpinner.visibility = View.GONE
-                hairlineDivider.visibility = View.GONE
-                sentenceRecyclerView.visibility = View.GONE
-                bar.isCandidateTwoRow = false
-                setHasVisibleCandidates(false)
-                bar.barStateMachine.push(
-                    KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
-                    KawaiiBarStateMachine.BooleanKey.CandidateEmpty to true
-                )
-                refreshExpanded(0)
+                setConnectionHint(R.string.candidate_placeholder_no_sentences, clickable = false)
             }
         }
-        scheduleCandidateVisibilityMeasurement()
+    }
+
+    /**
+     * One-row bar (two-row preference off, or an email/URL field): automatic, native and contextual
+     * candidates share the word row. With none of them, a spinner status row may still hold the
+     * bar up; otherwise the bar collapses.
+     */
+    private fun renderOneRow(sources: CandidateSources, statusRow: StatusRowDecision, addressField: Boolean) {
+        val candidates = sources.oneRow(addressField)
+        wordAdapter.updateCandidates(candidates, candidates.size)
+        sentenceAdapter.updateCandidates(emptyArray(), 0)
+
+        singleRowSentenceContainer.visibility = View.GONE
+        singleRowGeneratingSpinner.visibility = View.GONE
+        when {
+            candidates.isNotEmpty() -> showOneRowCandidates(candidates.size, sources.automatic)
+            statusRow.forcesBar -> showOneRowStatus(candidates.size, statusRow)
+            else -> collapseOneRow()
+        }
+    }
+
+    private fun showOneRowCandidates(candidateCount: Int, automatic: AutomaticCandidates) {
+        setConnectionHint(null)
+        setStatusRow(false, null)
+        wordRecyclerView.visibility = View.VISIBLE
+        wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
+        wordRow.setRowHeight(ViewGroup.LayoutParams.MATCH_PARENT)
+        hairlineDivider.visibility = View.GONE
+        sentenceRecyclerView.visibility = View.GONE
+        bar.isCandidateTwoRow = false
+        // 유휴 상태(preedit 없음)에서 native 후보도 없다면, 문맥 후보만으로 CandidateEmpty를
+        // false로 밀어붙이지 않는다(이중 안전장치). native 후보가 있는 경로는 그대로 둔다.
+        if (barHasNonContextualContent(automatic)) {
+            pushCandidateEmpty(false)
+        }
+        applyFillStyle(candidateCount)
+        setHasVisibleCandidates(true)
+    }
+
+    private fun showOneRowStatus(candidateCount: Int, statusRow: StatusRowDecision) {
+        setConnectionHint(null)
+        wordRecyclerView.visibility = View.VISIBLE
+        wordAdapter.rowHeightDp = 28
+        wordRow.setRowHeight(context.dp(wordAdapter.rowHeightDp))
+        showHairlineDivider()
+        sentenceRecyclerView.visibility = View.GONE
+        sentenceRecyclerView.setRowHeight(0)
+        setStatusRow(true, statusRow.content)
+        bar.isCandidateTwoRow = true
+        pushCandidateEmpty(false)
+        applyFillStyle(candidateCount)
+        setHasVisibleCandidates(true)
+    }
+
+    private fun collapseOneRow() {
+        setConnectionHint(null)
+        setStatusRow(false, null)
+        wordRecyclerView.visibility = View.GONE
+        hairlineDivider.visibility = View.GONE
+        sentenceRecyclerView.visibility = View.GONE
+        bar.isCandidateTwoRow = false
+        setHasVisibleCandidates(false)
+        pushCandidateEmpty(true)
+        refreshExpanded(0)
     }
 
     /**
@@ -1128,13 +1154,7 @@ class HorizontalCandidateComponent :
      * (48dp) regardless of which of these three states is active — see
      * CandidateBarModePolicy.candidateRowHeightDp.
      */
-    private fun renderSingleRowLandscape(
-        automaticCandidates: AutomaticCandidates,
-        displayNativeCandidates: List<CandidateWord>,
-        contextualWords: List<CandidateWord>,
-        contextualSentences: List<CandidateWord>,
-        addressField: Boolean
-    ) {
+    private fun renderSingleRowLandscape(sources: CandidateSources, addressField: Boolean) {
         setConnectionHint(null)
         setStatusRow(false, null)
         hairlineDivider.visibility = View.GONE
@@ -1142,67 +1162,12 @@ class HorizontalCandidateComponent :
         sentenceRecyclerView.visibility = View.GONE
         sentenceAdapter.updateCandidates(emptyArray(), 0)
 
-        val topCandidates = HorizontalCandidateMerger.prependAutomatic(
-            automaticCandidates.words,
-            HorizontalCandidateMerger.merge(displayNativeCandidates, contextualWords, emptyList(), addressField)
-        )
-        val topSentenceCandidates = HorizontalCandidateMerger.prependAutomatic(
-            automaticCandidates.sentences,
-            contextualSentences.toTypedArray()
-        )
-        val sentenceCandidate = topSentenceCandidates.firstOrNull()
+        val topCandidates = sources.wordRow(addressField)
+        val sentenceCandidate = sources.sentenceRow().firstOrNull()
 
         wordAdapter.updateCandidates(topCandidates, topCandidates.size)
         wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
-
-        val hasSentence = sentenceCandidate != null
-        val hasWords = topCandidates.isNotEmpty()
-        when (CandidateBarModePolicy.singleRowContent(hasSentence, hasWords)) {
-            CandidateBarModePolicy.SingleRowContent.SENTENCE_AND_WORDS -> {
-                bindSingleRowSentenceChip(sentenceCandidate!!)
-                singleRowSentenceContainer.visibility = View.VISIBLE
-                wordRecyclerView.visibility = if (hasWords) View.VISIBLE else View.GONE
-                wordPlaceholder.visibility = View.GONE
-                wordPlaceholder.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = 0
-                    weight = 0f
-                }
-                wordRow.visibility = View.VISIBLE
-                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = context.dp(KawaiiBarComponent.HEIGHT)
-                    weight = 0f
-                }
-            }
-            CandidateBarModePolicy.SingleRowContent.WORDS_ONLY -> {
-                singleRowSentenceContainer.visibility = View.GONE
-                wordRecyclerView.visibility = View.VISIBLE
-                wordPlaceholder.visibility = View.GONE
-                wordPlaceholder.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = 0
-                    weight = 0f
-                }
-                wordRow.visibility = View.VISIBLE
-                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = context.dp(KawaiiBarComponent.HEIGHT)
-                    weight = 0f
-                }
-            }
-            CandidateBarModePolicy.SingleRowContent.PLACEHOLDER -> {
-                singleRowSentenceContainer.visibility = View.GONE
-                wordRecyclerView.visibility = View.GONE
-                wordRow.visibility = View.GONE
-                wordRow.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = 0
-                    weight = 0f
-                }
-                wordPlaceholder.visibility = View.VISIBLE
-                wordPlaceholder.updateLayoutParams<LinearLayout.LayoutParams> {
-                    height = context.dp(KawaiiBarComponent.HEIGHT)
-                    weight = 0f
-                }
-                refreshExpanded(0)
-            }
-        }
+        showSingleRowContent(sentenceCandidate, hasWords = topCandidates.isNotEmpty())
 
         val generating = StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
         singleRowGeneratingSpinner.visibility = if (generating) View.VISIBLE else View.GONE
@@ -1210,12 +1175,61 @@ class HorizontalCandidateComponent :
         bar.isCandidateTwoRow = false
         // This row's height never collapses (see CandidateBarModePolicy.candidateRowHeightDp), so
         // it always counts as visible, exactly like the portrait always-two-row bar.
-        bar.barStateMachine.push(
-            KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
-            KawaiiBarStateMachine.BooleanKey.CandidateEmpty to false
-        )
+        pushCandidateEmpty(false)
         applyFillStyle(topCandidates.size)
         setHasVisibleCandidates(true)
+    }
+
+    private fun showSingleRowContent(sentenceCandidate: CandidateWord?, hasWords: Boolean) {
+        val rowHeight = context.dp(KawaiiBarComponent.HEIGHT)
+        when (CandidateBarModePolicy.singleRowContent(hasSentence = sentenceCandidate != null, hasWords = hasWords)) {
+            CandidateBarModePolicy.SingleRowContent.SENTENCE_AND_WORDS -> {
+                bindSingleRowSentenceChip(sentenceCandidate!!)
+                singleRowSentenceContainer.visibility = View.VISIBLE
+                wordRecyclerView.visibility = if (hasWords) View.VISIBLE else View.GONE
+                wordPlaceholder.showRow(false, rowHeight)
+                wordRow.showRow(true, rowHeight)
+            }
+            CandidateBarModePolicy.SingleRowContent.WORDS_ONLY -> {
+                singleRowSentenceContainer.visibility = View.GONE
+                wordRecyclerView.visibility = View.VISIBLE
+                wordPlaceholder.showRow(false, rowHeight)
+                wordRow.showRow(true, rowHeight)
+            }
+            CandidateBarModePolicy.SingleRowContent.PLACEHOLDER -> {
+                singleRowSentenceContainer.visibility = View.GONE
+                wordRecyclerView.visibility = View.GONE
+                wordRow.showRow(false, rowHeight)
+                wordPlaceholder.showRow(true, rowHeight)
+                refreshExpanded(0)
+            }
+        }
+    }
+
+    private fun showHairlineDivider() {
+        hairlineDivider.visibility = View.VISIBLE
+        hairlineDivider.setRowHeight(max(1, context.dp(1)))
+    }
+
+    private fun pushCandidateEmpty(empty: Boolean) {
+        bar.barStateMachine.push(
+            KawaiiBarStateMachine.TransitionEvent.CandidatesUpdated,
+            KawaiiBarStateMachine.BooleanKey.CandidateEmpty to empty
+        )
+    }
+
+    /** Fixes this bar row's height; the rows of [view] never share leftover space by weight. */
+    private fun View.setRowHeight(heightPx: Int) {
+        updateLayoutParams<LinearLayout.LayoutParams> {
+            height = heightPx
+            weight = 0f
+        }
+    }
+
+    /** Shows this bar row at [heightPx], or hides it and collapses it to zero height. */
+    private fun View.showRow(visible: Boolean, heightPx: Int) {
+        visibility = if (visible) View.VISIBLE else View.GONE
+        setRowHeight(if (visible) heightPx else 0)
     }
 
     /**
