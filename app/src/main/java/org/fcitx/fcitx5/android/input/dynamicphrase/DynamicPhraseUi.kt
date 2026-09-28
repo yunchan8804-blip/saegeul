@@ -8,9 +8,7 @@ import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
-import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseResolution
@@ -19,24 +17,14 @@ import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
 import org.fcitx.fcitx5.android.input.panel.PanelRecovery
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
 import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelColumn
+import org.fcitx.fcitx5.android.input.panel.panelScrollRoot
 import org.fcitx.fcitx5.android.input.panel.panelSurface
 import splitties.dimensions.dp
 
 class DynamicPhraseUi(private val context: Context, private val theme: Theme) {
-    val root = ScrollView(context).apply {
-        setBackgroundColor(theme.barColor)
-        isFillViewport = true
-    }
-
-    private val column = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(
-            context.dp(PanelStyle.PANEL_PADDING_H_DP),
-            context.dp(PanelStyle.PANEL_PADDING_V_DP),
-            context.dp(PanelStyle.PANEL_PADDING_H_DP),
-            context.dp(PanelStyle.PANEL_PADDING_V_DP)
-        )
-    }
+    private val column = context.panelColumn()
+    val root = context.panelScrollRoot(theme, column)
     private val templateLabel = label(R.string.dynamic_phrase_template)
     private val templateText = valueText()
     private val previewLabel = label(R.string.dynamic_phrase_preview)
@@ -97,10 +85,6 @@ class DynamicPhraseUi(private val context: Context, private val theme: Theme) {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = context.dp(PanelStyle.GAP_M_DP) })
-        root.addView(column, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
     }
 
     /** [issueRecovery] rides along with the issue list, pointing at where those values live. */

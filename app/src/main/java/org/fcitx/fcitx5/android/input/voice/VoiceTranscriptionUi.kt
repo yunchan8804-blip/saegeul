@@ -8,7 +8,6 @@ import android.content.Context
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
-import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -19,7 +18,13 @@ import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
 import org.fcitx.fcitx5.android.input.panel.PanelRecovery
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
 import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelButtonPair
+import org.fcitx.fcitx5.android.input.panel.panelColumn
+import org.fcitx.fcitx5.android.input.panel.panelStatusText
 import org.fcitx.fcitx5.android.input.panel.panelSurface
+import org.fcitx.fcitx5.android.input.panel.showDisabledPanelAction
+import org.fcitx.fcitx5.android.input.panel.showPanelAction
+import org.fcitx.fcitx5.android.input.panel.showPanelActionOrRecovery
 import splitties.dimensions.dp
 
 /** Visibility contract for the separate, network-backed meeting transcription entry. */
@@ -54,12 +59,7 @@ class VoiceTranscriptionUi(
         setTextColor(theme.altKeyTextColor)
         textSize = PanelStyle.TEXT_CAPTION
     }
-    private val status = TextView(context).apply {
-        setTextColor(theme.keyTextColor)
-        textSize = PanelStyle.TEXT_BODY
-        gravity = Gravity.CENTER
-        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-    }
+    private val status = context.panelStatusText(theme)
     private val transcript = TextView(context).apply {
         setTextColor(theme.keyTextColor)
         textSize = PanelStyle.TEXT_EMPHASIS
@@ -83,12 +83,7 @@ class VoiceTranscriptionUi(
         visibility = View.GONE
     }
 
-    val root: View = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(
-            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP),
-            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP)
-        )
+    val root: View = context.panelColumn().apply {
         setBackgroundColor(theme.keyboardColor)
         addView(title, matchWrap())
         addView(provider, matchWrap())
@@ -106,15 +101,7 @@ class VoiceTranscriptionUi(
             height = dp(PanelStyle.COMPACT_BUTTON_HEIGHT_DP)
             bottomMargin = dp(PanelStyle.GAP_M_DP)
         })
-        addView(LinearLayout(context).apply {
-            gravity = Gravity.CENTER
-            addView(primary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
-                marginEnd = dp(PanelStyle.GAP_S_DP)
-            })
-            addView(secondary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
-                marginStart = dp(PanelStyle.GAP_S_DP)
-            })
-        }, matchWrap())
+        addView(context.panelButtonPair(primary, secondary), matchWrap())
     }
 
     fun showReady(providerName: String, realtime: Boolean, showMeeting: Boolean) {
@@ -127,16 +114,8 @@ class VoiceTranscriptionUi(
         )
         transcriptScroller.visibility = View.GONE
         renderMeeting(showMeeting)
-        primary.apply {
-            isEnabled = true
-            setText(R.string.voice_record_start)
-            setOnClickListener { onStart?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
+        primary.showPanelAction(R.string.voice_record_start) { onStart?.invoke() }
+        showBack()
     }
 
     fun showPermissionRequired(denied: Boolean = false) {
@@ -145,32 +124,16 @@ class VoiceTranscriptionUi(
         )
         transcriptScroller.visibility = View.GONE
         hideMeeting()
-        primary.apply {
-            isEnabled = true
-            setText(R.string.voice_permission_allow)
-            setOnClickListener { onPermission?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
+        primary.showPanelAction(R.string.voice_permission_allow) { onPermission?.invoke() }
+        showBack()
     }
 
     fun showRecording(elapsedSeconds: Int) {
         status.text = recordingStatus(context.getString(R.string.voice_recording, elapsedSeconds))
         transcriptScroller.visibility = View.GONE
         hideMeeting()
-        primary.apply {
-            isEnabled = true
-            setText(R.string.voice_record_stop)
-            setOnClickListener { onStop?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
+        primary.showPanelAction(R.string.voice_record_stop) { onStop?.invoke() }
+        showCancel()
     }
 
     fun showRealtimeConnecting() {
@@ -178,16 +141,8 @@ class VoiceTranscriptionUi(
         status.setText(R.string.voice_realtime_connecting)
         transcriptScroller.visibility = View.GONE
         hideMeeting()
-        primary.apply {
-            isEnabled = false
-            setText(R.string.voice_realtime_connecting_button)
-            setOnClickListener(null)
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
+        primary.showDisabledPanelAction(R.string.voice_realtime_connecting_button)
+        showCancel()
     }
 
     fun showRealtimeRecording(elapsedSeconds: Int, partial: String) {
@@ -197,16 +152,8 @@ class VoiceTranscriptionUi(
         )
         showTranscript(partial)
         hideMeeting()
-        primary.apply {
-            isEnabled = true
-            setText(R.string.voice_record_stop)
-            setOnClickListener { onStop?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
+        primary.showPanelAction(R.string.voice_record_stop) { onStop?.invoke() }
+        showCancel()
     }
 
     fun showRealtimeFinalizing(partial: String) {
@@ -214,32 +161,16 @@ class VoiceTranscriptionUi(
         status.setText(R.string.voice_realtime_finalizing)
         showTranscript(partial)
         hideMeeting()
-        primary.apply {
-            isEnabled = false
-            setText(R.string.voice_transcribing_button)
-            setOnClickListener(null)
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
+        primary.showDisabledPanelAction(R.string.voice_transcribing_button)
+        showCancel()
     }
 
     fun showTranscribing() {
         status.setText(R.string.voice_transcribing_segment)
         transcriptScroller.visibility = View.GONE
         hideMeeting()
-        primary.apply {
-            isEnabled = false
-            setText(R.string.voice_transcribing_button)
-            setOnClickListener(null)
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
+        primary.showDisabledPanelAction(R.string.voice_transcribing_button)
+        showCancel()
     }
 
     fun showPreview(text: String) {
@@ -247,16 +178,8 @@ class VoiceTranscriptionUi(
         transcript.text = text
         transcriptScroller.visibility = View.VISIBLE
         hideMeeting()
-        primary.apply {
-            isEnabled = true
-            setText(R.string.voice_insert)
-            setOnClickListener { onInsert?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
+        primary.showPanelAction(R.string.voice_insert) { onInsert?.invoke() }
+        showCancel()
     }
 
     /**
@@ -267,30 +190,10 @@ class VoiceTranscriptionUi(
         status.text = message
         transcriptScroller.visibility = View.GONE
         hideMeeting()
-        primary.apply {
-            when {
-                canRetry -> {
-                    isEnabled = true
-                    setText(R.string.voice_retry_record)
-                    setOnClickListener { onStart?.invoke() }
-                }
-                recovery != null -> {
-                    isEnabled = true
-                    setText(recovery.labelRes)
-                    setOnClickListener { recovery.run() }
-                }
-                else -> {
-                    isEnabled = false
-                    setText(R.string.voice_retry_record)
-                    setOnClickListener(null)
-                }
-            }
+        primary.showPanelActionOrRecovery(canRetry, R.string.voice_retry_record, recovery) {
+            onStart?.invoke()
         }
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
+        showBack()
     }
 
     fun showSetupRequired(message: String) {
@@ -298,16 +201,8 @@ class VoiceTranscriptionUi(
         status.text = message
         transcriptScroller.visibility = View.GONE
         hideMeeting()
-        primary.apply {
-            isEnabled = true
-            setText(R.string.ai_setup_action)
-            setOnClickListener { onSetupRequested?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
+        primary.showPanelAction(R.string.ai_setup_action) { onSetupRequested?.invoke() }
+        showBack()
     }
 
     fun showDeviceDictation(
@@ -327,28 +222,20 @@ class VoiceTranscriptionUi(
         status.text = message
         transcriptScroller.visibility = View.GONE
         renderMeeting(showMeeting)
-        primary.apply {
-            isEnabled = true
-            setText(
-                if (action == VoiceUnavailableAction.DeviceDictation) {
-                    R.string.voice_use_device_dictation
-                } else {
-                    R.string.ai_setup_action
-                }
-            )
-            setOnClickListener {
-                if (action == VoiceUnavailableAction.DeviceDictation) {
-                    onDeviceDictation?.invoke()
-                } else {
-                    onSetupRequested?.invoke()
-                }
+        primary.showPanelAction(
+            if (action == VoiceUnavailableAction.DeviceDictation) {
+                R.string.voice_use_device_dictation
+            } else {
+                R.string.ai_setup_action
+            }
+        ) {
+            if (action == VoiceUnavailableAction.DeviceDictation) {
+                onDeviceDictation?.invoke()
+            } else {
+                onSetupRequested?.invoke()
             }
         }
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
+        showBack()
     }
 
     /** Recording states carry a leading dot in the recording-red convention. */
@@ -360,6 +247,10 @@ class VoiceTranscriptionUi(
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }
+
+    private fun showBack() = secondary.showPanelAction(R.string.ai_back) { onClose?.invoke() }
+
+    private fun showCancel() = secondary.showPanelAction(android.R.string.cancel) { onCancel?.invoke() }
 
     private fun hideMeeting() {
         meeting.visibility = View.GONE
