@@ -99,6 +99,34 @@ class MobileHangulK21DoubleBatchimRecoveryTest {
     }
 
     @Test
+    fun `chunjiin 괜찮아 recovers ㄶ in the middle of a word after 괜 already committed`() {
+        val cjG = MobileHangulComposer.Token.Cycle("cj_g", listOf('ㄱ', 'ㅋ', 'ㄲ'))
+        val cjJ = MobileHangulComposer.Token.Cycle("cj_j", listOf('ㅈ', 'ㅊ', 'ㅉ'))
+        val c = MobileHangulComposer()
+        val e = DubeolsikEngineSimulator()
+        c.type(e, cjG, 0) // ㄱ
+        c.type(e, dot, 100)
+        c.type(e, MobileHangulComposer.Token.VowelEu, 200) // -> ㅗ (고)
+        c.type(e, i, 300) // -> ㅚ (괴)
+        c.type(e, dot, 400) // -> ㅘ (과)
+        c.type(e, i, 500) // -> ㅙ (괘)
+        c.type(e, cjN, 600) // ㄴ (괜)
+        c.type(e, cjJ, 2_200) // ㅈ (괝: ㄴ+ㅈ combine)
+        c.type(e, cjJ, 2_300) // -> ㅊ (commits 괜, opens ㅊ)
+        c.type(e, i, 2_400)
+        c.type(e, dot, 2_500) // -> ㅏ (차)
+        c.type(e, cjN, 2_600) // ㄴ (찬)
+        c.type(e, cjS, 2_700) // ㅅ (commits 찬, opens ㅅ)
+        c.type(e, cjS, 2_800) // -> ㅎ (recovers 찮)
+        assertEquals("괜찮", e.content())
+
+        c.type(e, cjNg, 4_500) // ㅇ (commits 찮, opens ㅇ)
+        c.type(e, i, 4_600)
+        c.type(e, dot, 4_700) // -> ㅏ (아)
+        assertEquals("괜찮아", e.content())
+    }
+
+    @Test
     fun `chunjiin 없다 combines ㅂ and ㅅ into ㅄ directly, needing no recovery`() {
         val c = MobileHangulComposer()
         val e = DubeolsikEngineSimulator()
@@ -171,6 +199,25 @@ class MobileHangulK21DoubleBatchimRecoveryTest {
         assertEquals("핥다", e.content())
     }
 
+    @Test
+    fun `vega 싫어 recovers ㄹ plus ㅎ into ㅀ after the first guess commits 실`() {
+        val vgIe = MobileHangulComposer.Token.Cycle("vg_ie", listOf('ㅣ', 'ㅡ', 'ㅢ'))
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val e = DubeolsikEngineSimulator()
+        c.type(e, vgM, 0) // ㅁ
+        c.type(e, vgM, 100) // -> ㅅ (plain swap: nothing composing yet)
+        c.type(e, vgIe, 200) // ㅣ (시)
+        c.type(e, vgN, 300) // ㄴ (신)
+        c.type(e, vgN, 400) // -> ㄹ (실, plain swap: 시 had no batchim yet)
+        c.type(e, vgNg, 500) // ㅇ (commits 실, opens ㅇ)
+        c.type(e, vgNg, 600) // -> ㅎ (recovers 싫)
+        assertEquals("싫", e.content())
+
+        c.type(e, vgNg, 2_200) // fresh ㅇ (commits 싫, opens ㅇ)
+        c.type(e, vgEo, 2_300) // ㅓ (어)
+        assertEquals("싫어", e.content())
+    }
+
     // ---- Naratgul (MobileHangulKeyboard.naratgulCore()) ----
     private val nrO = MobileHangulComposer.Token.Jamo('ㅇ')
     private val nrN = MobileHangulComposer.Token.Jamo('ㄴ')
@@ -209,6 +256,43 @@ class MobileHangulK21DoubleBatchimRecoveryTest {
         c.type(e, nrA, 2_400) // ㅏ: 도깨비불 moves ㅅ onward, 아 commits, open 사
         c.type(e, nrA, 2_500) // -> ㅓ (서)
         assertEquals("앉아서", e.content())
+    }
+
+    @Test
+    fun `naratgul 많다 recovers ㄴ plus ㅎ into ㄶ via AddStroke on ㅇ`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val e = DubeolsikEngineSimulator()
+        c.type(e, MobileHangulComposer.Token.Jamo('ㅁ'), 0) // ㅁ
+        c.type(e, nrA, 100) // ㅏ (마)
+        c.type(e, nrN, 200) // ㄴ (만)
+        c.type(e, nrO, 300) // ㅇ (commits 만, opens ㅇ)
+        c.type(e, addStroke, 400) // ㅇ -> ㅎ (recovers 많)
+        assertEquals("많", e.content())
+
+        c.type(e, nrN, 500) // ㄴ (commits 많, opens ㄴ)
+        c.type(e, addStroke, 600) // ㄴ -> ㄷ
+        c.type(e, nrA, 700) // ㅏ (다)
+        assertEquals("많다", e.content())
+    }
+
+    @Test
+    fun `naratgul 핥다 recovers ㄹ plus ㅌ into ㄾ through two AddStroke presses on ㄴ`() {
+        val c = MobileHangulComposer(MobileHangulFamily.Other)
+        val e = DubeolsikEngineSimulator()
+        c.type(e, nrO, 0) // ㅇ
+        c.type(e, addStroke, 100) // ㅇ -> ㅎ (plain swap: nothing composing yet)
+        c.type(e, nrA, 200) // ㅏ (하)
+        c.type(e, MobileHangulComposer.Token.Jamo('ㄹ'), 300) // ㄹ (할)
+        c.type(e, nrN, 400) // ㄴ (commits 할, opens ㄴ)
+        c.type(e, addStroke, 500) // ㄴ -> ㄷ: ㄹ+ㄷ is no compound either, so 할 stays committed
+        assertEquals("할ㄷ", e.content())
+        c.type(e, addStroke, 600) // ㄷ -> ㅌ (recovers 핥)
+        assertEquals("핥", e.content())
+
+        c.type(e, nrN, 700) // ㄴ (commits 핥, opens ㄴ)
+        c.type(e, addStroke, 800) // ㄴ -> ㄷ
+        c.type(e, nrA, 900) // ㅏ (다)
+        assertEquals("핥다", e.content())
     }
 
     // ---- Regressions the design doc calls out explicitly ----
