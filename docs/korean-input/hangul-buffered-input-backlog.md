@@ -23,15 +23,15 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 저장소 | D:\workspace\fcitx5-android |
-| 브랜치 | feat/hangul-buffered-input |
-| 기준 커밋 | 5338d80ac247a21b6831626d4b3ae09710f1c65b |
+| 저장소 | D:\workspace\Saegul (`origin` = yunchan8804-blip/saegeul) |
+| 브랜치 | main (원래 옛 로컬 저장소 D:\workspace\fcitx5-android의 feat/hangul-buffered-input에서 시작) |
+| 기준 커밋 | 5338d80ac247a21b6831626d4b3ae09710f1c65b (현재 main HEAD의 조상) |
 | 기준 커밋 제목 | Add buffered Hangul compatibility mode |
 | 기준 커밋 작성자 | Yun Chan |
 | 작업 트리 | 기준선 확인 시 clean |
 | 주요 설계 문서 | docs/korean-input/hangul-buffered-input.md |
 
-Windows clone의 Git symlink 설정은 현재 true이며, 대표적으로 build-logic/gradle/wrapper/gradle-wrapper.jar가 실제 심볼릭 링크로 복구된 상태다.
+옛 로컬 저장소는 현재 저장소로 이전을 마쳤으므로 따로 보존하지 않아도 된다. 아래 symlink 기록은 옛 clone 기준이다. Windows clone의 Git symlink 설정은 당시 true였으며, 대표적으로 build-logic/gradle/wrapper/gradle-wrapper.jar가 실제 심볼릭 링크로 복구된 상태다.
 
 ### 2.2 구현된 범위
 
@@ -44,9 +44,9 @@ Windows clone의 Git symlink 설정은 현재 true이며, 대표적으로 build-
 - 버퍼 모드가 활성화되면 Fcitx capability에서 Preedit만 제거해 대상 앱에 setComposingText 경로가 노출되지 않게 한다.
 - Fcitx CommitString은 앱으로 즉시 전달하지 않고 BufferedInputController의 메모리 버퍼에 축적한다.
 - 내부 표시에는 확정 prefix와 현재 Hangul engine preedit를 결합한다.
-- Backspace는 engine preedit가 비었을 때 버퍼의 마지막 Unicode code point를 삭제한다.
+- Backspace는 engine preedit가 비었을 때 버퍼의 마지막 글자(grapheme cluster) 하나를 삭제한다(2026-09-28 전에는 code point 하나).
 - Space, 숫자, 문장부호 같은 전달 가능한 구분자는 현재 구간에 포함한 뒤 제출한다.
-- Return 및 좌우 화살표는 버퍼를 먼저 제출한 뒤 원래 editor action을 수행한다.
+- Return은 2단계로 처리한다. 방향키(상하좌우), Home/End, PageUp/PageDown과 제어 문자 키(Tab·Escape·Delete 등)는 버퍼에 붙이지 않고 먼저 제출한 뒤 Shift·Ctrl·Alt 상태를 보존해 원래 키를 보낸다(2026-09-28 전에는 좌우 화살표만 먼저 제출했다. 2.5절 참고).
 - 전달 방식은 System paste, Ctrl+V, Direct commit 중 사용자가 명시적으로 선택한다.
 - System paste 및 Ctrl+V는 임시 clipboard entry를 만들고, Fcitx 자체 clipboard history에는 이 entry가 저장되지 않게 표시한다.
 - Android가 지원하는 경우 임시 clipboard entry를 sensitive로 표시한다.
@@ -86,7 +86,32 @@ Windows clone의 Git symlink 설정은 현재 true이며, 대표적으로 build-
 | 실제 기기 단일 paste | PASS | 한글 입력 뒤 Space로 한글과 공백이 정확히 한 번 삽입되고 내부 panel이 비워짐 |
 | 실제 기기 hide/show lifecycle | PASS | hide 시 한글이 정확히 한 번 제출되고, 같은 editor를 다시 열어 다음 테스트 구간이 target에 미리 노출되지 않다가 Space에서 한 번 제출됨 |
 
-plugin assembly와 plugin lint를 같은 Gradle invocation에 넣으면 현재 task graph의 implicit-dependency validation 문제가 발생한다. 위 PASS 결과는 두 명령을 분리해 얻은 것이다.
+plugin assembly와 plugin lint를 같은 Gradle invocation에 넣으면 당시 task graph의 implicit-dependency validation 문제가 발생했다. 위 PASS 결과는 두 명령을 분리해 얻은 것이다. 2026-09-28에 고쳐 지금은 한 invocation에서 PASS다(2.5절, P1-06).
+
+### 2.5 2026-09-28 정리 라운드
+
+백로그 상태:
+
+| 상태 | 항목 |
+| --- | --- |
+| 완료 | P0-05, P0-06, P1-02, P2-01, P2-02, P2-03, P2-03A, P3-03 (각 항목 첫 줄에 근거 커밋) |
+| 폐기 | P3-01, P3-04 (각 항목 첫 줄에 이유) |
+| 서비스 연결 대기 | P0-02, P0-03, P1-03. 상태 모델은 있으나 서비스에 연결되지 않았다. 서비스 분할(R9) 뒤 상태 머신 설계와 알림 UX 결정이 필요하다 |
+| 기기 검증 대기 | P0-01, P1-04, P1-05와 이번 라운드의 탐색 키·제어 문자 키·보조키 변경 |
+
+이번 라운드에서 한 일:
+
+| 작업 | 결과 |
+| --- | --- |
+| 탐색 키 선제출 | 버퍼 모드에서 Up/Down/Home/End/PageUp/PageDown도 Left/Right처럼 버퍼를 먼저 제출한 뒤 같은 키를 보낸다. 전에는 editor로 바로 가서 커서가 움직이면 외부 selection 경로에서 버퍼가 조용히 버려졌다. 실기기 검증은 대기다 |
+| 제어 문자 규칙 | Return·Backspace를 뺀 키 중 unicode가 제어 문자(0x01~0x1F, 0x7F)이거나 unicode 0인 탐색 키는 버퍼에 붙이지 않고 먼저 제출한 뒤 원래 키를 보낸다. 판정은 `BufferedHangulMode.submitsBeforeForwarding`이 맡고 `BufferedHangulModeTest`가 확인한다. unicode 0은 fcitx에서 '글자 없음'이라 탐색 키만 이 규칙에 든다 |
+| Tab 동작 변경 | Tab은 전에는 fcitx가 unicode 9를 주므로 탭 문자로 버퍼에 붙어 함께 붙여넣기됐다. 지금은 먼저 제출한 뒤 Tab 키(KEYCODE_TAB)로 보낸다. Escape·Delete도 제어 문자로 버퍼에 붙지 않고 원래 키로 간다 |
+| 보조키 보존 | 먼저 제출한 뒤 보내는 키는 `sendCombinationKeyEvents`로 Shift·Ctrl·Alt 상태를 함께 보낸다(Shift+방향키 선택, Shift+Tab). 전에는 좌우 화살표도 보조키를 버렸다 |
+| 글자 단위 삭제 | 버퍼 안 Backspace(`deleteLastCharacter`, 옛 이름 `deleteLastCodePoint`)가 `java.text.BreakIterator.getCharacterInstance()`로 grapheme cluster 하나를 지운다. 기기(ICU)·JDK 20 이상에서는 ZWJ emoji·국기도 한 글자로 지운다. JDK 17 JVM은 확장 grapheme을 지원하지 않아 ZWJ·국기는 JVM 테스트에서 뺐다. JVM 테스트는 두 JDK의 결과가 같은 surrogate pair, 결합 문자, 완성형·조합형 한글, surrogate 경계만 다룬다 |
+| 장문 스트레스 | `BufferedInputControllerLongInputTest`가 1만 글자의 추가·추출·한 글자씩 삭제·제출·실패 보존과 surrogate 경계를 확인한다. 버퍼 상한은 만들지 않았다(제품 결정 대기, P2-05) |
+| 설정 문구 | Direct commit 설명을 실제 동작(구간 전체를 클립보드 없이 한 번에 입력)으로 고치고, System paste·Ctrl+V 설명에 복사해 둔 내용이 사라지고 보낸 글이 clipboard에 남는다는 고지를 넣었다(P0-04, P2-04) |
+| 죽은 코드 제거 | 제품 코드에서 호출이 없던 `BufferedHangulMode.isKnownCompatibilityTarget`과 접두어 목록을 지우고, 이를 검사하던 JVM 테스트 부분과 기기 테스트 메서드 하나만 지웠다. 앱별 transport는 P1-02 profile이 맡는다 |
+| task graph | `DataDescriptorPlugin`이 lint 모델·lint 분석 task를 `generateDataDescriptor` 뒤에 돌도록 의존을 선언한다. 출력 경로는 그대로다. `:plugin:hangul:assembleDebug :plugin:hangul:lintDebug`가 한 invocation에서 PASS다(P1-06) |
 
 ## 3. 우선순위 정의
 
@@ -117,6 +142,8 @@ plugin assembly와 plugin lint를 같은 Gradle invocation에 넣으면 현재 t
 ## P0 — 알파 사용 전 차단 항목
 
 ### P0-01. 원래 문제 앱에서 전송 방식별 최종 인수 검증
+
+**상태: 기기 검증 대기**
 
 **배경**
 
@@ -158,6 +185,8 @@ plugin assembly와 plugin lint를 같은 Gradle invocation에 넣으면 현재 t
 - 따라서 이 항목은 미완료다.
 
 ### P0-02. Recording InputConnection 기반 계측 회귀 테스트
+
+**상태: 미완료** — `RecordingInputConnectionE2ETest`(app/src/test)는 테스트가 가짜 InputConnection을 직접 호출하는 JVM 테스트라 서비스의 제출 경로 증거가 아니다. 실제 service 경로를 기록하는 계측 테스트는 서비스 분할(R9) 뒤 상태 머신 설계와 함께 다시 잡는다.
 
 **배경**
 
@@ -202,6 +231,8 @@ plugin assembly와 plugin lint를 같은 Gradle invocation에 넣으면 현재 t
 - Recording InputConnection 테스트 파일과 자동 lifecycle 증거는 현재 없다.
 
 ### P0-03. 실패 및 폐기 시 무음 데이터 유실 제거
+
+**상태: 미완료** — 상태 모델(`BufferedInputController`의 종료 결과 `BufferTerminationResult`·폐기 사유 `BufferDiscardReason`·`BufferedSessionState`와 `markSubmitted`·`markDeliveryFailed`·`discardByPolicy`·`cancel`)은 있지만 서비스에 연결되지 않았다. 서비스는 여전히 `clear()`로 버퍼를 비운다. 연결은 서비스 분할(R9) 뒤 상태 머신 설계와 알림 UX 결정이 필요하다. `RecordingInputConnectionE2ETest`는 가짜 InputConnection을 테스트가 직접 호출하는 구조라 제출 경로 증거가 아니다.
 
 **배경**
 
@@ -257,7 +288,7 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 - Fcitx 자체 clipboard history에는 저장되지 않는다.
 - Password 및 Sensitive editor는 Direct commit을 강제한다.
 - 일반 editor에서 제출한 문자열은 system clipboard에 남는다.
-- 설정 설명은 실험 기능임을 알리지만 clipboard 교체와 잔존을 구체적으로 알리지 않는다.
+- 2026-09-28부터 모드 선택 화면의 System paste·Ctrl+V 설명이 복사해 둔 내용이 사라지고 보낸 글이 clipboard에 남는다고 영어·한국어로 알린다. 최초 활성화 안내와 OEM matrix는 아직 없다.
 
 **제안**
 
@@ -292,6 +323,8 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 
 ### P0-05. 전체 JVM 테스트의 기존 ThemeSerialization 실패 정리
 
+**상태: 완료** — `a539c26d`에서 `ThemeSerializationTest.version2MigratesToCurrentVersion`으로 실제 serializer 계약에 맞췄다.
+
 **배경**
 
 기능 전용 테스트가 통과하더라도 전체 test task가 red이면 새 회귀와 기존 실패를 자동으로 구분하기 어렵다. 알려진 stale test를 장기간 허용하면 CI 신뢰도가 떨어진다.
@@ -299,20 +332,20 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 **현재 상태**
 
 - 전체 app JVM 테스트 35개가 모두 통과한다.
-- `ThemeSerializationTest.version2MigratesToCurrentVersion`이 2.0 입력을 현재 2.1 계약으로 마이그레이션해야 함을 명시한다.
+- `ThemeSerializationTest.version2MigratesToCurrentVersion`이 2.0 입력을 현재 계약(`CURRENT_VERSION` 3.0, `CustomThemeSerializer.kt`)으로 마이그레이션해야 함을 명시한다.
 - 마이그레이션 뒤 현재 버전 JSON round-trip도 유지된다.
 
 **제안**
 
-- 2.0 theme이 2.1로 migrate되어야 하는 현재 계약을 serializer 구현과 release history로 확인한다.
-- serializer가 맞다면 stale fixture와 기대값을 2.1 계약에 맞게 갱신하고, 2.0에서 2.1 migration을 별도 테스트한다.
+- 2.0 theme이 현재 버전(작성 당시 2.1, 지금 3.0)으로 migrate되어야 하는 계약을 serializer 구현과 release history로 확인한다.
+- serializer가 맞다면 stale fixture와 기대값을 현재 계약에 맞게 갱신하고, 2.0에서 현재 버전으로의 migration을 별도 테스트한다.
 - serializer가 틀렸다면 production migration을 고치되 기존 사용자 theme 호환성을 먼저 증명한다.
 - 실패 테스트를 skip하거나 단순 삭제하지 않는다.
 
 **완료 조건**
 
 - :app:testDebugUnitTest가 전체 green이다.
-- 2.0 입력의 2.1 migration 동작이 명시적 테스트로 남는다.
+- 2.0 입력의 현재 버전 migration 동작이 명시적 테스트로 남는다.
 - 기존 theme JSON round-trip 테스트가 유지된다.
 - Hangul feature test 10개도 계속 green이다.
 
@@ -327,6 +360,8 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 - stale assertion을 skip하거나 삭제하지 않고 실제 serializer 계약에 맞는 migration assertion으로 교정했다.
 
 ### P0-06. 배포 가능한 variant 및 ABI 조합 검증
+
+**상태: 완료** — `6e6c1d70`에서 한글 엔진을 메인 AAB에 동봉해 main/plugin variant 조합 문제를 없앴고, Play 게시 AAB에 4 ABI native library가 들어 있음을 확인했다([한글 엔진 Play 배포 SSOT](../independent-fork/hangul-play-distribution.md)). release 검증 게이트는 `f58dd860`.
 
 **배경**
 
@@ -381,7 +416,7 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 
 **현재 상태**
 
-- Space, 숫자, 문장부호, Return, 좌우 화살표와 lifecycle이 제출을 유발한다.
+- Space, 숫자, 문장부호, Return, 방향키·Home/End·PageUp/PageDown·제어 문자 키(Tab·Escape·Delete 등)와 lifecycle이 제출을 유발한다.
 - 실패 시 내부적으로 buffer를 보존할 수 있지만 사용자가 retry 상태를 알기 어렵다.
 - keyboard bar에 dedicated submit/retry/cancel control이 없다.
 
@@ -414,6 +449,8 @@ System paste와 Ctrl+V는 전역 clipboard를 transport로 사용한다. 비동�
 - delimiter 및 hide/show 경로의 실제 기기 PASS만 있다.
 
 ### P1-02. 앱별 transport 프로필
+
+**상태: 완료** — `4a515bfa`의 앱별 키보드 profile(`AppKeyboardProfile.bufferedInputTransport`)이 transport를 앱마다 고른다(`AppKeyboardProfileTest`). Password/Sensitive의 Direct commit 강제는 서비스 `dispatchBufferedText`에서 profile보다 먼저 적용된다.
 
 **배경**
 
@@ -454,6 +491,8 @@ System paste는 표준 editor에 적합하고 Ctrl+V는 remote/raw-key surface�
 
 ### P1-03. Buffered session을 명시적 상태 머신으로 분리
 
+**상태: 미완료** — `BufferedInputController`에 종료 결과·폐기 사유 상태 모델이 생겼지만 서비스에 연결되지 않았다. 연결은 서비스 분할(R9) 뒤 상태 머신 설계와 알림 UX 결정이 필요하다(P0-03과 같은 이유).
+
 **배경**
 
 현재 구현은 FcitxInputMethodService 안의 event callback, lifecycle, selection tracker, clipboard, physical key 처리에 분산돼 있다. 기능이 확장될수록 암묵적 boolean 조합이 회귀를 만들 가능성이 높다.
@@ -493,13 +532,15 @@ System paste는 표준 editor에 적합하고 Ctrl+V는 remote/raw-key surface�
 
 ### P1-04. 물리 키보드와 modifier shortcut 실기기 검증
 
+**상태: 기기 검증 대기**
+
 **배경**
 
 원격 앱 사용자는 물리 키보드나 hardware-like key event를 함께 쓰는 경우가 많다. key down/up 비대칭, repeat, modifier ordering은 가상 키보드 테스트로 확인할 수 없다.
 
 **현재 상태**
 
-- forwarded text/navigation key 처리 코드가 있다.
+- forwarded text/navigation key 처리 코드가 있다. 2026-09-28부터 방향키·Home/End·PageUp/PageDown·제어 문자 키는 버퍼를 먼저 제출한 뒤 Shift·Ctrl·Alt 상태를 보존해 전달한다.
 - Ctrl, Alt, Meta, Super shortcut 전에 Direct commit으로 pending Hangul을 정리한다.
 - handled physical key의 release를 추적하는 집합이 있다.
 - 실제 물리 키보드 검증은 하지 않았다.
@@ -529,6 +570,8 @@ System paste는 표준 editor에 적합하고 Ctrl+V는 remote/raw-key surface�
 - 코드 리뷰 범위는 존재하지만 기존 설계 문서도 물리 키보드 실기기 미검증을 명시한다.
 
 ### P1-05. 표준 editor 유형 및 Android 버전 호환성 행렬
+
+**상태: 기기 검증 대기**
 
 **배경**
 
@@ -566,6 +609,8 @@ EditText, Jetpack Compose, WebView, contenteditable은 InputConnection과 paste 
 
 ### P1-06. Gradle task graph와 lint gate 정리
 
+**상태: 일부 완료(2026-09-28)** — task graph 부분을 고쳤다. `DataDescriptorPlugin`이 lint 모델·lint 분석 task를 `generateDataDescriptor` 뒤에 돌게 선언해 plugin assemble와 lint가 한 invocation에서 PASS다. app lint baseline과 변경 파일 gate는 남았다.
+
 **배경**
 
 검증 명령이 서로 충돌하거나 전체 lint가 항상 red이면 개발자가 실제 회귀를 놓치기 쉽다.
@@ -573,7 +618,7 @@ EditText, Jetpack Compose, WebView, contenteditable은 InputConnection과 paste 
 **현재 상태**
 
 - Hangul plugin assembly와 lint는 각각 PASS다.
-- 둘을 같은 invocation에 넣으면 generateDataDescriptor와 generateDebugLintReportModel 사이 implicit-dependency validation 문제가 발생한다.
+- 둘을 같은 invocation에 넣으면 generateDataDescriptor와 generateDebugLintReportModel 사이 implicit-dependency validation 문제가 발생했다. 2026-09-28에 descriptor와 lint task 사이 의존을 선언해 해결했다.
 - app lint는 266 errors, 49 warnings의 기존 부채로 red지만 변경 파일 finding은 0이다.
 
 **제안**
@@ -600,6 +645,7 @@ EditText, Jetpack Compose, WebView, contenteditable은 InputConnection과 paste 
 **검증 증거**
 
 - 분리 invocation PASS와 통합 invocation 실패가 재현됐다.
+- 2026-09-28: 수정 전 `:plugin:hangul:assembleDebug :plugin:hangul:lintDebug -PbuildABI=arm64-v8a`가 `generateDebugLintReportModel`의 implicit dependency 오류로 실패했고, 수정 뒤 같은 명령이 PASS(plugin lint warning 5, error 0)다.
 - app lint 수치는 266 errors, 49 warnings이며 feature 변경 finding은 0이다.
 
 ### P1-07. 내용 비노출 진단 이벤트와 호환성 리포트
@@ -684,6 +730,8 @@ paste acknowledgement가 실제 결과를 말해주지 않기 때문에 현장 �
 
 ### P2-01. 두벌식 옛글 Dubeolsik Yetgeul 전용 legend
 
+**상태: 완료** — `a539c26d`(Complete Korean input layouts and roadmap).
+
 **배경**
 
 Dubeolsik Yetgeul은 현대 두벌식과 키 위치가 일부 비슷하지만 Shift 조합을 포함한 여러 키가 옛자모로 다르다. 현대 매핑을 그대로 표시하면 입력 결과와 keycap이 불일치한다.
@@ -719,6 +767,8 @@ Dubeolsik Yetgeul은 현대 두벌식과 키 위치가 일부 비슷하지만 Sh
 - arm64-v8a debug app 조립과 관련 JVM 테스트가 PASS다.
 
 ### P2-02. 세벌식 계열 전용 keyboard surface
+
+**상태: 완료** — `a539c26d`(Complete Korean input layouts and roadmap).
 
 **배경**
 
@@ -759,6 +809,8 @@ Dubeolsik Yetgeul은 현대 두벌식과 키 위치가 일부 비슷하지만 Sh
 
 ### P2-03. Ahnmatae 및 Romaja 표시 정책
 
+**상태: 완료** — `a539c26d`(Complete Korean input layouts and roadmap).
+
 **배경**
 
 Romaja는 Latin legend가 자연스럽고 Ahnmatae는 전용 배열이 필요하다. 모든 Hangul engine을 한글 keycap 대상으로 묶으면 오히려 잘못된 UX가 된다.
@@ -791,6 +843,8 @@ Romaja는 Latin legend가 자연스럽고 Ahnmatae는 전용 배열이 필요하
 - `HangulKeyLegendsTest`와 `HangulKeyboardLayoutTest`가 두 정책을 분리해 검증한다.
 
 ### P2-03A. 모바일 한글 특화 배열
+
+**상태: 완료** — `a539c26d`(Complete Korean input layouts and roadmap).
 
 **현재 상태**
 
@@ -890,8 +944,9 @@ IME 설정과 transport 용어는 기술적이다. clipboard 위험과 unsupport
 
 **검증 증거**
 
-- Unicode code-point 단위 Backspace JVM 테스트는 PASS다.
-- 장문 및 복잡 lifecycle 증거는 없다.
+- 글자(grapheme) 단위 Backspace JVM 테스트는 PASS다.
+- `BufferedInputControllerLongInputTest`가 한글·ASCII·surrogate pair·결합 문자·조합형 자모를 섞은 1만 글자의 추가·추출·한 글자씩 삭제·제출·실패 보존과 surrogate 경계를 확인한다(JVM, 2026-09-28).
+- 버퍼 크기 상한은 제품 결정 대기다. 기기 장문 성능과 복잡 lifecycle 증거는 없다.
 
 ### P2-06. Transport 선택 진단 도우미
 
@@ -934,6 +989,8 @@ IME 설정과 transport 용어는 기술적이다. clipboard 위험과 unsupport
 ## P3 — 장기 구조 및 범용화
 
 ### P3-01. Hangul 전용 구현을 engine-agnostic buffered composition으로 일반화
+
+**상태: 폐기** — 새글은 한국어 전용 제품이 되어 중국어 엔진(`5a35fe8a`)과 다른 언어 plugin(`3e63b4ad`)을 뺐고, 버퍼 모드를 적용할 두 번째 조합형 엔진이 없다.
 
 **배경**
 
@@ -1008,6 +1065,8 @@ Canvas, Unity, OpenGL, remote video surface는 표준 InputConnection도 Android
 
 ### P3-03. Keyboard layout 데이터의 단일 원천 및 생성 파이프라인
 
+**상태: 완료** — `a539c26d`의 `scripts/generate-hangul-keyboard-tables.ps1`이 고정 리비전 libhangul 정의에서 `HangulKeyboardTables.generated.kt`를 만들고 `HangulKeyboardLayoutTest`·`HangulKeyLegendsTest`가 대조한다.
+
 **배경**
 
 layout 수가 늘면 Kotlin에 수동 복사한 legend와 libhangul engine 정의가 어긋날 수 있다. 특히 옛글과 세벌식은 key 수와 modifier 규칙이 복잡하다.
@@ -1044,6 +1103,8 @@ layout 수가 늘면 Kotlin에 수동 복사한 legend와 libhangul engine 정�
 - 다중 layout generator와 drift test는 없다.
 
 ### P3-04. Upstream 제출 및 장기 유지보수 계약
+
+**상태: 폐기** — 새글은 독립 포크로 전환했고(`24c0728c`) upstream 제출 계획이 없다.
 
 **배경**
 

@@ -4258,12 +4258,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 return true
             }
         }
+        val submitsFirst = BufferedHangulMode.submitsBeforeForwarding(data.sym.sym, data.unicode)
         val bufferedKey = when (data.sym.sym) {
             FcitxKeyMapping.FcitxKey_BackSpace,
-            FcitxKeyMapping.FcitxKey_Return,
-            FcitxKeyMapping.FcitxKey_Left,
-            FcitxKeyMapping.FcitxKey_Right -> true
-            else -> data.unicode > 0
+            FcitxKeyMapping.FcitxKey_Return -> true
+            else -> submitsFirst || data.unicode > 0
         }
         if (!bufferedKey) return false
         if (data.up) return data.states.virtual
@@ -4274,7 +4273,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     if (allowsTextInspectionFeatures()) {
                         correctionSessionTracker.onBackspace(currentWordBeforeCursor())
                     }
-                    if (bufferedHangul.deleteLastCodePoint()) {
+                    if (bufferedHangul.deleteLastCharacter()) {
                         inputView?.refreshBufferedHangulPreedit()
                     } else {
                         handleBackspaceKey()
@@ -4293,15 +4292,28 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 if (hasPendingBufferedHangul()) submitBufferedHangul() else handleReturnKey()
                 true
             }
-            FcitxKeyMapping.FcitxKey_Left -> {
-                if (submitBufferedHangul()) sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT)
-                true
-            }
-            FcitxKeyMapping.FcitxKey_Right -> {
-                if (submitBufferedHangul()) sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT)
-                true
-            }
-            else -> if (data.unicode > 0) {
+            // Navigation and control keys never become buffered text. Moving the target cursor
+            // would discard a pending segment as an unexpected selection change, so submit it
+            // first, then send the key itself with its modifiers, such as Shift for selection.
+            // A key without an Android key code continues on the normal forwarding path once
+            // the segment is submitted.
+            else -> if (submitsFirst) {
+                val keyCode = data.sym.keyCode
+                val submitted = submitBufferedHangul()
+                if (keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                    !submitted
+                } else {
+                    if (submitted) {
+                        sendCombinationKeyEvents(
+                            keyCode,
+                            alt = data.states.alt,
+                            ctrl = data.states.ctrl,
+                            shift = data.states.shift
+                        )
+                    }
+                    true
+                }
+            } else if (data.unicode > 0) {
                 bufferedHangul.capture(Character.toString(data.unicode))
                 submitBufferedHangul()
                 true

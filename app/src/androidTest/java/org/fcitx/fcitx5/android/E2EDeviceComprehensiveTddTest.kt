@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
-import org.fcitx.fcitx5.android.input.BufferedHangulMode
 import org.fcitx.fcitx5.android.input.BufferedInputController
 import org.fcitx.fcitx5.android.media.MediaFavoritesManager
 import org.fcitx.fcitx5.android.media.MediaItem
@@ -107,33 +106,6 @@ class E2EDeviceComprehensiveTddTest {
     }
 
     @Test
-    fun testDotNetAndCompatibilityEngineOnDevice() {
-        val dotNetApps = listOf(
-            "com.microsoft.maui.gallery",
-            "net.dot.android.sample",
-            "com.unity3d.player.UnityActivity",
-            "com.valvesoftware.steamlink",
-            "com.termux",
-            "com.realvnc.viewer.android"
-        )
-
-        dotNetApps.forEach { pkg ->
-            assertTrue("Expected compatibility true for $pkg", BufferedHangulMode.isKnownCompatibilityTarget(pkg))
-        }
-
-        val regularApps = listOf(
-            "com.google.android.youtube",
-            "com.kakao.talk",
-            "com.naver.search",
-            "org.telegram.messenger"
-        )
-
-        regularApps.forEach { pkg ->
-            assertFalse("Expected compatibility false for $pkg", BufferedHangulMode.isKnownCompatibilityTarget(pkg))
-        }
-    }
-
-    @Test
     fun testBufferController1000HangulTypingSequencesOnDevice() {
         val sentences = listOf(
             "새글 키보드는 대한민국 최고의 혁신적인 인풋 메소드입니다.",
@@ -155,7 +127,7 @@ class E2EDeviceComprehensiveTddTest {
 
             // Delete characters backward
             while (!bufferController.isEmpty) {
-                assertTrue(bufferController.deleteLastCodePoint())
+                assertTrue(bufferController.deleteLastCharacter())
             }
             assertTrue(bufferController.isEmpty)
         }

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import java.text.BreakIterator
+
 /**
  * Result classification for buffered input session termination.
  * P0-03 Silent Data Loss Elimination SSOT.
@@ -81,12 +83,20 @@ class BufferedInputController {
         append(currentPreedit)
     }
 
-    fun deleteLastCodePoint(): Boolean {
+    /**
+     * Deletes one grapheme cluster, the last character as the user sees it, so a letter with
+     * combining marks or a surrogate pair disappears with one Backspace.
+     * On devices (ICU) and JDK 20+ ZWJ emoji and flags are also one character; JDK 17's
+     * BreakIterator lacks extended grapheme support, so JVM tests leave those cases out.
+     */
+    fun deleteLastCharacter(): Boolean {
         if (committed.isEmpty()) {
             state = BufferedSessionState.Idle
             return false
         }
-        val start = committed.offsetByCodePoints(committed.length, -1)
+        val characters = BreakIterator.getCharacterInstance()
+        characters.setText(committed.toString())
+        val start = characters.preceding(committed.length)
         committed.delete(start, committed.length)
         state = if (committed.isEmpty()) {
             BufferedSessionState.Idle

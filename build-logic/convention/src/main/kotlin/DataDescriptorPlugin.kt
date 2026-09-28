@@ -50,6 +50,15 @@ class DataDescriptorPlugin : Plugin<Project> {
         const val TASK = "generateDataDescriptor"
         const val CLEAN_TASK = "cleanDataDescriptor"
         const val FILE_NAME = "descriptor.json"
+
+        /**
+         * AGP lint model and lint analysis tasks read the source asset directory, which is where
+         * [FILE_NAME] is written, so they must run after [TASK].
+         */
+        private fun readsLintSources(taskName: String): Boolean =
+            (taskName.startsWith("generate") && taskName.contains("Lint") && taskName.endsWith("Model")) ||
+                taskName.startsWith("lintAnalyze") ||
+                taskName.startsWith("lintVitalAnalyze")
     }
 
     override fun apply(target: Project) {
@@ -61,6 +70,9 @@ class DataDescriptorPlugin : Plugin<Project> {
             outputFile.set(target.assetsDir.resolve(FILE_NAME))
             excludes.set(extension.excludes)
             symlinks.set(extension.symlinks)
+        }
+        target.tasks.named { readsLintSources(it) }.configureEach {
+            dependsOn(TASK)
         }
         target.tasks.register<Delete>(CLEAN_TASK) {
             delete(target.assetsDir.resolve(FILE_NAME))

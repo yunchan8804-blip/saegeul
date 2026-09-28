@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input
 
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.input.keyboard.HangulKeyLegends
 
@@ -30,22 +31,27 @@ object BufferedHangulMode {
         capabilities.has(CapabilityFlag.Password) ||
             capabilities.has(CapabilityFlag.Sensitive)
 
-    private val KNOWN_COMPAT_PREFIXES = listOf(
-        "com.microsoft.",
-        "net.dot.",
-        "com.unity3d.",
-        "com.valvesoftware.",
-        "com.termux",
-        "com.realvnc.",
-        "com.teamviewer.",
-        "com.anydesk.",
-        "com.parsecgaming.",
-        "com.moonlightstream."
+    private val NAVIGATION_KEYS = setOf(
+        FcitxKeyMapping.FcitxKey_Left,
+        FcitxKeyMapping.FcitxKey_Right,
+        FcitxKeyMapping.FcitxKey_Up,
+        FcitxKeyMapping.FcitxKey_Down,
+        FcitxKeyMapping.FcitxKey_Home,
+        FcitxKeyMapping.FcitxKey_End,
+        FcitxKeyMapping.FcitxKey_Page_Up,
+        FcitxKeyMapping.FcitxKey_Page_Down
     )
 
-    fun isKnownCompatibilityTarget(packageName: String?): Boolean {
-        if (packageName.isNullOrBlank()) return false
-        val lower = packageName.lowercase()
-        return KNOWN_COMPAT_PREFIXES.any { lower.startsWith(it) || lower.contains(it) }
+    /**
+     * Whether a forwarded key submits the pending segment and then reaches the editor as a key
+     * instead of being appended to the buffer: navigation keys, and keys whose character is a
+     * control code such as Tab, Escape or Delete. Return and BackSpace have their own handling.
+     * A `unicode` of 0 means the key has no character.
+     */
+    fun submitsBeforeForwarding(sym: Int, unicode: Int): Boolean {
+        if (sym == FcitxKeyMapping.FcitxKey_Return || sym == FcitxKeyMapping.FcitxKey_BackSpace) {
+            return false
+        }
+        return sym in NAVIGATION_KEYS || unicode in 0x01..0x1F || unicode == 0x7F
     }
 }

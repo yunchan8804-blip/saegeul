@@ -26,7 +26,7 @@ TextKeyboard / physical key
   -> target InputConnection
 ```
 
-The Hangul plugin is a separate APK. Use a debug main APK with the debug Hangul plugin APK, and a release main APK with the release plugin APK, because discovery uses variant-specific package names and intent actions. The non-service Hangul plugin does not require the main APK to have the same signer; signing identity matters when updating an already installed package and for plugins that use signature-protected services.
+Since `6e6c1d70` the main app bundles the Hangul engine assets and `libhangul.so`, so Play and direct user builds need no separate plugin APK (see [`docs/independent-fork/hangul-play-distribution.md`](../independent-fork/hangul-play-distribution.md)). The standalone Hangul plugin APK remains an optional artifact for older installs and independent checks. When it is used, pair a debug main APK with the debug plugin APK and a release main APK with the release plugin APK, because discovery uses variant-specific package names and intent actions.
 
 ## Korean key legends
 
@@ -39,7 +39,7 @@ The initial mapping supports only `Dubeolsik`:
 - Caps Lock keeps normal Hangul labels because fcitx5-hangul explicitly reverses the Latin Caps Lock transformation before passing the keysym to libhangul.
 - Unknown layouts fail safely to Latin labels.
 
-`Dubeolsik Yetgeul`, all three-set layouts, `Ahnmatae`, and other layouts are not aliases of modern Dubeolsik. Three-set layouts also require keys outside the current 26-key alphabet surface, so they need dedicated keyboard definitions and action maps.
+`Dubeolsik Yetgeul`, all three-set layouts, `Ahnmatae`, and other layouts are not aliases of modern Dubeolsik. Since `a539c26d` they have dedicated legends or full keyboard surfaces generated from a pinned libhangul revision (`scripts/generate-hangul-keyboard-tables.ps1`, `HangulKeyboardTables.generated.kt`); Romaja keeps Latin legends on purpose.
 
 ## Buffered compatibility mode
 
@@ -50,8 +50,8 @@ While active:
 1. The service removes the Fcitx `Preedit` capability. Hangul preedit is therefore rendered in Fcitx's own input panel instead of being sent with `InputConnection.setComposingText()`.
 2. `CommitString` events are captured in an in-memory prefix instead of being sent to the editor.
 3. The keyboard UI displays `captured prefix + current engine preedit` as one internal composition.
-4. Backspace deletes one Unicode code point from the captured prefix when the engine has no remaining preedit.
-5. A forwarded Unicode delimiter (for example space, a number, or punctuation) is appended and submits the segment. Left/right arrows submit first, then perform their editor action.
+4. Backspace deletes one user-perceived character (grapheme cluster) from the captured prefix when the engine has no remaining preedit, so ZWJ emoji, flags and combining sequences go away with one press.
+5. A forwarded Unicode delimiter (for example space, a number, or punctuation) is appended and submits the segment. Arrow keys, Home/End, Page Up/Page Down, and keys whose character is a control code (Tab, Escape, Delete) are never appended; they submit first, then are sent as keys with their Shift/Ctrl/Alt state (before 2026-09-28 only left/right did, without modifiers; up/down, Home/End and paging reached the editor directly, so the cursor move discarded the segment, and Tab was appended to the segment as a tab character).
    Return is two-stage: while a segment is pending it only submits, so the segment can be ended without inserting a delimiter character; the next Return performs the editor's own action. A failed dispatch keeps the buffer, so the next Return retries the submission instead of sending Return after text the editor never received.
 6. Input-method changes and input-view shutdown submit the current segment, reset the Hangul engine, and clear the session so text cannot leak into a later editor.
 7. If the target reports an unexpected selection change while text is still buffered, the unsent segment is discarded. Once the editor has moved its cursor there is no reliable way to recover the original insertion anchor without reintroducing composing spans.
@@ -86,10 +86,10 @@ Enable Windows Developer Mode and Git symlink support before cloning:
 
 ```powershell
 git config --global core.symlinks true
-git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git D:\workspace\fcitx5-android
+git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git D:\workspace\Saegul
 ```
 
-That command recovers the current independent-fork baseline (`origin` = `yunchan8804-blip/saegeul`; the original `fcitx5-android/fcitx5-android` project is tracked separately as `upstream` — see [`docs/independent-fork/README.md`](independent-fork/README.md) §2). The `feat/hangul-buffered-input` branch is local and has not been pushed to `origin`, so preserve the existing `D:\workspace\fcitx5-android` checkout. Reproducing this branch elsewhere requires an approved fork/remote push, a verified Git bundle, or an exported patch containing the local commits.
+That command recovers the current independent-fork baseline (`origin` = `yunchan8804-blip/saegeul`; the original `fcitx5-android/fcitx5-android` project is tracked separately as `upstream` — see [`docs/independent-fork/README.md`](../independent-fork/README.md) §2). The original `feat/hangul-buffered-input` work from the old local `D:\workspace\fcitx5-android` checkout has been moved into this repository: implementation commit `5338d80a` is an ancestor of `main`, so no local branch needs to be preserved any more.
 
 Install MSYS2 plus the native configuration tools:
 
@@ -124,7 +124,7 @@ if (-not (Test-Path -LiteralPath $SdkManager)) {
 Use JDK 17 and make the MSYS2 UCRT64 tools visible to Gradle:
 
 ```powershell
-Set-Location D:\workspace\fcitx5-android
+Set-Location D:\workspace\Saegul
 $env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-17.0.14.7-hotspot'
 $env:Path = "C:\msys64\ucrt64\bin;$env:JAVA_HOME\bin;$env:ANDROID_HOME\platform-tools;$env:Path"
 ```
@@ -138,7 +138,7 @@ For a normal modern phone, limit development builds to arm64:
 .\gradlew.bat :app:assembleDebug :plugin:hangul:assembleDebug -PbuildABI=arm64-v8a
 ```
 
-The verified restriction is to keep Hangul plugin lint and Hangul plugin APK assembly out of the same Gradle invocation. With the current upstream task graph, selecting `:plugin:hangul:generateDataDescriptor` through assembly and `:plugin:hangul:generateDebugLintReportModel` through lint together triggers Gradle's implicit-dependency validation. Running app and plugin lint separately also makes the known app-lint debt easier to distinguish from plugin results.
+Since 2026-09-28 `DataDescriptorPlugin` makes the lint model and lint analysis tasks run after `generateDataDescriptor`, so plugin assembly and plugin lint can share one invocation. Before that fix, the verified restriction was to keep them apart: with the upstream task graph, selecting `:plugin:hangul:generateDataDescriptor` through assembly and `:plugin:hangul:generateDebugLintReportModel` through lint together triggers Gradle's implicit-dependency validation. Running app and plugin lint separately also makes the known app-lint debt easier to distinguish from plugin results.
 
 With a device connected through USB or wireless debugging:
 
@@ -153,7 +153,7 @@ Then enable the debug Fcitx input method in Android settings, open the debug app
 
 The initial branch was verified on Windows with JDK 17, SDK 36, Build Tools 36.1.0, NDK 28.0.13004108, CMake 3.31.6, and MSYS2 UCRT64. The debug APKs were also installed on a Samsung SM-F956N running Android 16 (API 36).
 
-- New unit tests for Dubeolsik labels, Shift labels, safe layout fallback, capability masking, buffered concatenation, Unicode code-point deletion, and numeric-password clipboard protection pass.
+- New unit tests for Dubeolsik labels, Shift labels, safe layout fallback, capability masking, buffered concatenation, Unicode code-point deletion, and numeric-password clipboard protection pass. (Deletion became grapheme-based on 2026-09-28; see the backlog, section 2.5.)
 - `:app:assembleDebug -PbuildABI=arm64-v8a` passes.
 - `:plugin:hangul:assembleDebug -PbuildABI=arm64-v8a` passes, including the native fcitx5-hangul build.
 - `:plugin:hangul:lintDebug -PbuildABI=arm64-v8a` passes.
@@ -161,7 +161,7 @@ The initial branch was verified on Windows with JDK 17, SDK 36, Build Tools 36.1
 - On the device, normal Dubeolsik legends and the one-shot Shift legends rendered correctly.
 - In Android Settings search, typing `한글` left the target editor untouched while the text remained in Fcitx's internal panel. Pressing Space then inserted exactly one `한글 ` segment through System paste and cleared the internal panel.
 - The same device also passed a keyboard hide/show lifecycle check: hiding the keyboard submitted `한글` exactly once, reopening the same editor kept buffered mode active, and the next internal `테스트` segment remained out of the target until Space produced `한글 테스트 `.
-- The full upstream app unit-test task currently has one unrelated pre-existing failure: `ThemeSerializationTest.version2` expects theme version 2.0 not to migrate, while `CustomThemeSerializer.CURRENT_VERSION` is 2.1. The feature-specific test selection passes.
+- At the time, the full upstream app unit-test task had one unrelated pre-existing failure, `ThemeSerializationTest.version2`. Resolved in `a539c26d`: the test now expects a 2.0 theme to migrate to the current version (`CustomThemeSerializer.CURRENT_VERSION`, now 3.0) as `version2MigratesToCurrentVersion`.
 
 ## Device test matrix
 
@@ -182,13 +182,12 @@ Also verify Backspace at every Hangul composition stage, one-shot Shift and Caps
 ## Known risks and remaining work
 
 - System paste can be dispatched successfully while the target ignores it; Android exposes no reliable editor-result signal here.
-- System paste and Ctrl+V replace the user's global clipboard and leave the submitted text there. Sensitive fields avoid this path, but users must still understand the behavior.
+- System paste and Ctrl+V replace the user's global clipboard and leave the submitted text there. Sensitive fields avoid this path, and since 2026-09-28 the mode picker descriptions say so in English and Korean.
 - Canvas, OpenGL, Unity, games, and remote video surfaces may provide neither a standard paste action nor a usable `InputConnection`.
 - Focus and selection behavior still requires validation on real problem apps. A failed delivery during focus loss is cleared to prevent cross-editor text leakage.
 - Moving the target cursor during an internal composition intentionally discards the unsent segment; preserving the old anchor would require a target-visible composing marker or editor-specific selection choreography.
 - Physical-keyboard handling is implemented for forwarded text/navigation keys but has not yet been exercised on a device.
 - Lifecycle, shortcut ordering, numeric-password privacy, and physical key down/up behavior currently have code review coverage but still need Android instrumentation tests with a recording `InputConnection`.
-- Modern Dubeolsik is the only localized key layout. Yetgeul and three-set layouts need accurate dedicated definitions.
 - Add instrumentation tests with a recording `InputConnection`, plus an explicit user-visible submit/retry control if real-app testing shows that delimiter-based submission is insufficient.
 
 ## Project continuation
