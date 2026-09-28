@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.metrics
 
+import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
@@ -312,6 +313,15 @@ class PredictionMetricsStore(
             "typo_word_correction",
             "typo_sentence_correction"
         )
+
+        /**
+         * Keystrokes saved by accepting a candidate: what typing [committed] costs on 두벌식, less
+         * what the already-typed [replaced] text it took the place of had cost (empty for a pure
+         * append), less the one tap on the candidate itself. Never negative.
+         */
+        fun savedKeystrokes(committed: String, replaced: String): Int =
+            (DubeolsikKeyMap.keystrokeCount(committed) - DubeolsikKeyMap.keystrokeCount(replaced) - 1)
+                .coerceAtLeast(0)
 
         private const val FORMAT_VERSION = 1
         private const val RECENT_WINDOW_DAYS = 30

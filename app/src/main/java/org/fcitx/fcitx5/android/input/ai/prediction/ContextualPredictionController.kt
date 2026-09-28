@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore
 import org.fcitx.fcitx5.android.input.ai.ReinforcementTracker
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
+import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
@@ -536,13 +537,24 @@ class ContextualPredictionController(private val host: Host) {
         }
     }
 
-    private fun recordContextualCandidateAccepted(candidate: PredictionMetricsSession.Candidate?, committed: Boolean) {
+    /**
+     * [committedText] is what accepting [candidate] put into the editor, and [replacedText] the
+     * already-typed text it took the place of (empty for a pure append); together they give the
+     * keystrokes the candidate saved.
+     */
+    private fun recordContextualCandidateAccepted(
+        candidate: PredictionMetricsSession.Candidate?,
+        committed: Boolean,
+        committedText: String,
+        replacedText: String
+    ) {
         if (candidate == null) return
         if (!host.allowsTextInspection()) {
             predictionMetricsSession.reset()
             return
         }
         if (predictionMetricsSession.recordAccepted(candidate, committed)) {
+            val savedKeystrokes = PredictionMetricsStore.savedKeystrokes(committedText, replacedText)
             FcitxApplication.getInstance().applicationScope.launch {
                 if (OnDeviceAiSupport.isSupported && candidate.source == "ondevice_generated") {
                     try {
@@ -551,7 +563,7 @@ class ContextualPredictionController(private val host: Host) {
                         Timber.w("Generated material acceptance save failed: ${error.javaClass.simpleName}")
                     }
                 }
-                FcitxApplication.getInstance().predictionMetricsStore.recordAccepted(candidate.source, savedKeystrokes = 0)
+                FcitxApplication.getInstance().predictionMetricsStore.recordAccepted(candidate.source, savedKeystrokes)
                 withContext(Dispatchers.Main) {
                     host.scheduleNgramSave()
                 }
@@ -651,7 +663,12 @@ class ContextualPredictionController(private val host: Host) {
             packageName = currentInputEditorInfo.packageName
         )
         predictionEpoch++
-        recordContextualCandidateAccepted(metricsCandidate?.takeIf { it.text == sentence }, committed = true)
+        recordContextualCandidateAccepted(
+            metricsCandidate?.takeIf { it.text == sentence },
+            committed = true,
+            committedText = textToCommit,
+            replacedText = ""
+        )
         return true
     }
 
@@ -707,7 +724,12 @@ class ContextualPredictionController(private val host: Host) {
         host.predictSelection(replacement.replacement.length)
         host.inputView()?.postRefreshContextualCandidates(16L)
         predictionEpoch++
-        recordContextualCandidateAccepted(metricsCandidate?.takeIf { it.text == sentence }, committed = true)
+        recordContextualCandidateAccepted(
+            metricsCandidate?.takeIf { it.text == sentence },
+            committed = true,
+            committedText = replacement.replacement,
+            replacedText = replacement.expectedContext
+        )
         return true
     }
 
@@ -743,7 +765,12 @@ class ContextualPredictionController(private val host: Host) {
                     packageName = currentInputEditorInfo.packageName
                 )
                 predictionEpoch++
-                recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
+                recordContextualCandidateAccepted(
+                    capturedMetricsCandidate,
+                    committed = true,
+                    committedText = textToCommit,
+                    replacedText = beforeCursor.takeLast(replaceLength)
+                )
             }
             return committed
         }
@@ -774,7 +801,12 @@ class ContextualPredictionController(private val host: Host) {
                                 packageName = currentInputEditorInfo.packageName
                             )
                             predictionEpoch++
-                            recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
+                            recordContextualCandidateAccepted(
+                                capturedMetricsCandidate,
+                                committed = true,
+                                committedText = textToCommit,
+                                replacedText = beforeCursor.takeLast(replacementLength)
+                            )
                         }
                         return committed
                     }
@@ -807,7 +839,12 @@ class ContextualPredictionController(private val host: Host) {
                     packageName = currentInputEditorInfo.packageName
                 )
                 predictionEpoch++
-                recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
+                recordContextualCandidateAccepted(
+                    capturedMetricsCandidate,
+                    committed = true,
+                    committedText = sentence,
+                    replacedText = beforeCursor.takeLast(replacementLength)
+                )
             }
             return committed
         }
@@ -834,7 +871,12 @@ class ContextualPredictionController(private val host: Host) {
                 packageName = currentInputEditorInfo.packageName
             )
             predictionEpoch++
-            recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
+            recordContextualCandidateAccepted(
+                capturedMetricsCandidate,
+                committed = true,
+                committedText = textToCommit,
+                replacedText = beforeCursor.takeLast(replacementLength)
+            )
         }
         return committed
     }

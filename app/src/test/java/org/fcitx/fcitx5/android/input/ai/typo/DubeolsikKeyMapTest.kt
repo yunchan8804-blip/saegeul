@@ -40,6 +40,60 @@ class DubeolsikKeyMapTest {
     }
 
     @Test
+    fun countsOneKeystrokePerJamoOfPlainSyllables() {
+        assertEquals(6, DubeolsikKeyMap.keystrokeCount("한글"))
+        assertEquals(4, DubeolsikKeyMap.keystrokeCount("나라"))
+    }
+
+    @Test
+    fun countsCompoundVowelAsTwoKeystrokes() {
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("과"))
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("의"))
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("왜"))
+    }
+
+    @Test
+    fun countsDoubleFinalConsonantAsTwoKeystrokes() {
+        assertEquals(4, DubeolsikKeyMap.keystrokeCount("닭"))
+        assertEquals(4, DubeolsikKeyMap.keystrokeCount("없"))
+        assertEquals(4, DubeolsikKeyMap.keystrokeCount("앉"))
+    }
+
+    @Test
+    fun countsShiftForTensedConsonantsAndShiftedVowels() {
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("까"))
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("또"))
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("빠"))
+        assertEquals(4, DubeolsikKeyMap.keystrokeCount("있"))
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("짜"))
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("얘"))
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("예"))
+        assertEquals(5, DubeolsikKeyMap.keystrokeCount("꺾"))
+    }
+
+    @Test
+    fun countsStandaloneJamoLikeSyllableJamo() {
+        assertEquals(2, DubeolsikKeyMap.keystrokeCount("ㅋㅋ"))
+        assertEquals(2, DubeolsikKeyMap.keystrokeCount("ㄲ"))
+        assertEquals(2, DubeolsikKeyMap.keystrokeCount("ㅘ"))
+        assertEquals(2, DubeolsikKeyMap.keystrokeCount("ㄳ"))
+    }
+
+    @Test
+    fun countsOneKeystrokePerNonHangulCharacter() {
+        assertEquals(5, DubeolsikKeyMap.keystrokeCount("Hello"))
+        assertEquals(3, DubeolsikKeyMap.keystrokeCount("a.b"))
+        assertEquals(1, DubeolsikKeyMap.keystrokeCount(" "))
+        assertEquals(1, DubeolsikKeyMap.keystrokeCount("😀"))
+    }
+
+    @Test
+    fun countsMixedTextAndEmptyText() {
+        assertEquals(13, DubeolsikKeyMap.keystrokeCount("안녕하세요 "))
+        assertEquals(0, DubeolsikKeyMap.keystrokeCount(""))
+    }
+
+    @Test
     fun substitutionCostForAdjacentSameRowKeys() {
         assertEquals(0.4f, DubeolsikKeyMap.substitutionCost('r', 't'), 0.0001f)
     }

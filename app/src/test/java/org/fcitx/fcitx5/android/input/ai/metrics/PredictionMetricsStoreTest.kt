@@ -47,6 +47,36 @@ class PredictionMetricsStoreTest {
     }
 
     @Test
+    fun `saved keystrokes count the rest of a completed word minus the candidate tap`() {
+        // 안녕하세요 + space = 13 keystrokes, 안녕 = 6, one tap on the candidate.
+        assertEquals(6, PredictionMetricsStore.savedKeystrokes(committed = "안녕하세요 ", replaced = "안녕"))
+    }
+
+    @Test
+    fun `saved keystrokes of a pure append count the whole insertion minus the candidate tap`() {
+        // 하세요 + space = 7 keystrokes.
+        assertEquals(6, PredictionMetricsStore.savedKeystrokes(committed = "하세요 ", replaced = ""))
+    }
+
+    @Test
+    fun `saved keystrokes count compound vowels, double finals and shifted jamo`() {
+        // 괜찮았어 = ㄱㅗㅐㄴ(4) + ㅊㅏㄴㅎ(4) + ㅇㅏㅆ(4, shift) + ㅇㅓ(2) = 14, 괜 = 4.
+        assertEquals(9, PredictionMetricsStore.savedKeystrokes(committed = "괜찮았어", replaced = "괜"))
+    }
+
+    @Test
+    fun `saved keystrokes count non-Hangul text one per character`() {
+        assertEquals(4, PredictionMetricsStore.savedKeystrokes(committed = "@gmail", replaced = "@"))
+    }
+
+    @Test
+    fun `saved keystrokes are never negative`() {
+        assertEquals(0, PredictionMetricsStore.savedKeystrokes(committed = "네 ", replaced = "안녕하세요"))
+        assertEquals(0, PredictionMetricsStore.savedKeystrokes(committed = "가", replaced = "가"))
+        assertEquals(0, PredictionMetricsStore.savedKeystrokes(committed = "", replaced = ""))
+    }
+
+    @Test
     fun `recent fills gap days with zero between two recorded days`() {
         var now = millisFor(LocalDate.of(2026, 1, 1))
         val store = PredictionMetricsStore(clock = { now }, zone = ZoneOffset.UTC)
