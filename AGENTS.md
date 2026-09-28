@@ -7,6 +7,7 @@
 - 모든 대화·보고·커밋 메시지·문서는 한글로 쓴다. 코드 식별자와 기술 용어는 원문 그대로 둔다.
 - git 커밋 작성자는 Yun Chan(저장된 이름·이메일)이다. 커밋 메시지에 AI가 작성했다는 문구, Co-Authored-By, Claude·Codex 언급을 넣지 않는다. 메시지는 짧게 쓴다.
 - PR 대상 브랜치는 `main`이다. 작업은 `YunChan/<topic>` 형식의 브랜치에서 한다. 커밋·push는 사용자가 요청할 때만 한다.
+- 저장소 밖에 폴더를 만들지 않는다. `D:/workspace/Saegul-wt-r0`처럼 형제 폴더에 `git worktree add`·`git clone`·`mkdir` 하는 것을 금지한다. 브랜치 분리는 이 저장소 안에서 `git switch -c`로 한다. 격리가 꼭 필요하면 저장소 안 `.claude/worktrees/<이름>`(gitignore 대상)에 만들고, 끝나면 `git worktree remove`로 지운다. 임시 파일은 세션 스크래치패드나 저장소 안 `build/`에 둔다. Claude Code에서는 `.claude/hooks/precheck-external-paths.py` 훅이 이를 막는다.
 - `.env`, 키스토어·서명 인증서, Play 콘솔 세션·쿠키, 광고 계정 정보 등 비밀은 커밋하지 않고 워커 프롬프트에도 넣지 않는다.
 - `git submodule status`에 나오는 서브모듈(`lib/fcitx5/**`, `plugin/hangul/src/main/cpp/fcitx5-hangul` 등)은 이 저장소에서 직접 수정하지 않는다. 필요하면 해당 포크 저장소에서 고치고 포인터만 갱신한다.
 - 빌드·개발 환경과 릴리스 절차의 기준 문서는 `docs/wiki/09-Developer-and-Build-Guide.md`다.
@@ -109,7 +110,7 @@
 - 역할을 지정하지 않고 스폰하면 `config.toml`의 `[agents].default_subagent_model = "gpt-5.6-terra"`가 적용된다. 워커에 Astra/Sol을 쓰지 않는다.
 - 흐름: 작업 패킷 작성 → `spawn_agent`로 병렬 스폰(조사는 주제별로 researcher 여러 개) → `wait_agent`(타임아웃은 작업 규모에 맞게) → 6절 평가 → 반려 시 `send_input`으로 재작업 지시 → 끝나면 `close_agent`.
 - 스폰 메시지에 항상 포함: "너는 워커다. 다른 에이전트를 스폰하지 마라. 설계를 바꾸지 마라. 병렬 워커의 변경을 되돌리지 마라."
-- 여러 워커가 같은 저장소를 만지면 파일·모듈 경계를 겹치지 않게 나누고, 겹치면 순차로 돌린다.
+- 여러 워커가 같은 저장소를 만지면 파일·모듈 경계를 겹치지 않게 나누고, 겹치면 순차로 돌린다. 병렬 작업을 위해 저장소 밖 워크트리를 만들지 않는다(프로젝트 공통 규칙).
 - Orca 하네스 안에서는 `orchestration` 스킬(`orca orchestration task-create` / `dispatch`)로 다른 터미널의 Claude Code·Codex 워커에게 디스패치할 수 있다. 이때도 워커 모델은 하위 티어로 지정하고, 작업 패킷과 6절 평가 게이트를 똑같이 적용한다. 디스패치한 뒤 `worker_done`을 기다려 결과를 직접 평가한다.
 
 ### 8.2 Claude Code
