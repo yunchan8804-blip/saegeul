@@ -4,22 +4,15 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.effects
 
-import android.animation.ValueAnimator
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
-import android.os.PowerManager
 import android.view.Choreographer
 import android.view.View
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
 import java.util.concurrent.CopyOnWriteArrayList
@@ -42,22 +35,16 @@ class ParticleTouchOverlayView(
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
     }
-    private val starPath = Path()
+    private val stars = StarPainter(paint, crossInnerRatio = 0.22f)
 
     private val particles = CopyOnWriteArrayList<Particle>()
     private var isAnimating = false
 
-    private var powerSaveMode = false
-    private var powerSaveReceiverRegistered = false
-
-    private val powerSaveReceiver = object : BroadcastReceiver() {
-        override fun onReceive(receivedContext: Context, intent: Intent) {
-            powerSaveMode = currentPowerSaveMode()
-            if (!canAnimate()) {
-                particles.clear()
-                isAnimating = false
-                invalidate()
-            }
+    private val powerGate: EffectPowerGate = EffectPowerGate(context) {
+        if (!powerGate.canAnimate()) {
+            particles.clear()
+            isAnimating = false
+            invalidate()
         }
     }
 
@@ -95,43 +82,19 @@ class ParticleTouchOverlayView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        registerPowerSaveReceiver()
-        powerSaveMode = currentPowerSaveMode()
+        powerGate.attach()
     }
 
     override fun onDetachedFromWindow() {
-        unregisterPowerSaveReceiver()
+        powerGate.detach()
         super.onDetachedFromWindow()
-    }
-
-    private fun currentPowerSaveMode(): Boolean =
-        (context.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isPowerSaveMode ?: false
-
-    private fun canAnimate(): Boolean =
-        EffectGate.shouldAnimate(powerSaveMode, ValueAnimator.areAnimatorsEnabled())
-
-    private fun registerPowerSaveReceiver() {
-        if (powerSaveReceiverRegistered) return
-        ContextCompat.registerReceiver(
-            context,
-            powerSaveReceiver,
-            IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        powerSaveReceiverRegistered = true
-    }
-
-    private fun unregisterPowerSaveReceiver() {
-        if (!powerSaveReceiverRegistered) return
-        context.unregisterReceiver(powerSaveReceiver)
-        powerSaveReceiverRegistered = false
     }
 
     fun spawnTouchBurst(x: Float, y: Float) {
         val def = effectDef ?: return
         val type = def.type
         if (type == "off") return
-        if (!canAnimate()) return
+        if (!powerGate.canAnimate()) return
 
         val requestedCount = def.particleCount.coerceIn(3, 28)
         val availableSlots = (MAX_LIVE_PARTICLES - particles.size).coerceAtLeast(0)
@@ -175,8 +138,8 @@ class ParticleTouchOverlayView(
     }
 
     override fun doFrame(frameTimeNanos: Long) {
-        if (particles.isEmpty() || !isAttachedToWindow || !canAnimate()) {
-            if (!canAnimate()) particles.clear()
+        if (particles.isEmpty() || !isAttachedToWindow || !powerGate.canAnimate()) {
+            if (!powerGate.canAnimate()) particles.clear()
             isAnimating = false
             invalidate()
             return
@@ -232,9 +195,9 @@ class ParticleTouchOverlayView(
                     paint.color = p.color
                     paint.alpha = alphaInt
                     if (p.isCross) {
-                        drawCrossStar(canvas, p.x, p.y, curSize, p.rotation)
+                        stars.drawCrossStar(canvas, p.x, p.y, curSize, p.rotation)
                     } else {
-                        drawStar(canvas, p.x, p.y, curSize, p.rotation)
+                        stars.drawStar(canvas, p.x, p.y, curSize, p.rotation)
                     }
                     // Central white core
                     if (p.alpha > 0.4f) {
@@ -289,46 +252,10 @@ class ParticleTouchOverlayView(
                     paint.shader = null
                     paint.color = p.color
                     paint.alpha = alphaInt
-                    drawStar(canvas, p.x, p.y, curSize, p.rotation)
+                    stars.drawStar(canvas, p.x, p.y, curSize, p.rotation)
                 }
             }
         }
-    }
-
-    private fun drawStar(canvas: Canvas, cx: Float, cy: Float, radius: Float, rotation: Float) {
-        starPath.reset()
-        val innerRadius = radius * 0.42f
-        val points = 5
-        val step = PI / points
-        val rotRad = Math.toRadians(rotation.toDouble())
-
-        for (i in 0 until (points * 2)) {
-            val r = if (i % 2 == 0) radius else innerRadius
-            val a = i * step - PI / 2.0 + rotRad
-            val x = (cx + cos(a) * r).toFloat()
-            val y = (cy + sin(a) * r).toFloat()
-            if (i == 0) starPath.moveTo(x, y) else starPath.lineTo(x, y)
-        }
-        starPath.close()
-        canvas.drawPath(starPath, paint)
-    }
-
-    private fun drawCrossStar(canvas: Canvas, cx: Float, cy: Float, radius: Float, rotation: Float) {
-        starPath.reset()
-        val innerRadius = radius * 0.22f
-        val points = 4
-        val step = PI / points
-        val rotRad = Math.toRadians(rotation.toDouble())
-
-        for (i in 0 until (points * 2)) {
-            val r = if (i % 2 == 0) radius else innerRadius
-            val a = i * step - PI / 2.0 + rotRad
-            val x = (cx + cos(a) * r).toFloat()
-            val y = (cy + sin(a) * r).toFloat()
-            if (i == 0) starPath.moveTo(x, y) else starPath.lineTo(x, y)
-        }
-        starPath.close()
-        canvas.drawPath(starPath, paint)
     }
 
     companion object {
