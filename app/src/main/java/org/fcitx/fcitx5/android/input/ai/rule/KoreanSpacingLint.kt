@@ -18,6 +18,8 @@ package org.fcitx.fcitx5.android.input.ai.rule
  * - 표준 표기가 띄어 쓰는 명사 + '있게/있는/없는': "자신감있게" (정상: "자신감 있게").
  *   '재미있게'/'맛있게'/'멋있는'처럼 형용사 어간 자체에 '있'이 포함된 정상 붙여쓰기는
  *   명사 목록에서 제외해 건드리지 않는다.
+ *
+ * 후보를 문맥 뒤에 이어 붙일 때 생기는 일부 오류도 여기서 판정한다([detachesDeurida]).
  */
 object KoreanSpacingLint {
 
@@ -34,6 +36,23 @@ object KoreanSpacingLint {
         Regex("(?:${ATTACHED_NOUNS_REQUIRING_SPACE.joinToString("|")})(?:있게|있는|없는)")
     )
 
+    // 앞 명사에 붙여 쓰는 겸양 '-드리다'("부탁드립니다", "연락드릴게요") 활용형의 첫머리.
+    private val DEURIDA_PREFIXES = listOf("드리", "드립", "드려", "드렸", "드릴", "드린", "드림")
+    private val DEURIDA_ATTACHING_NOUNS = setOf("부탁", "연락", "감사", "인사")
+
     /** [text]에 흔한 붙여쓰기 오류 패턴이 하나라도 있으면 true. */
     fun hasSpacingIssue(text: String): Boolean = PATTERNS.any { it.containsMatchIn(text) }
+
+    /**
+     * [context] 뒤에 [candidate]를 이어 붙이면 '-드리다'가 앞 명사와 띄어지는지.
+     * [context]가 공백으로 끝나고 [candidate]가 '드리다' 활용형으로 시작하며 앞 어절이 명시한
+     * 명사면 true다("부탁 " + "드립니다", 정상: "부탁드립니다"). 목적어가 생략된
+     * "커피 드립니다"처럼 다른 명사 뒤의 본동사 용법은 걸지 않는다.
+     */
+    fun detachesDeurida(context: String, candidate: String): Boolean {
+        if (!context.endsWith(' ')) return false
+        if (DEURIDA_PREFIXES.none { candidate.startsWith(it) }) return false
+        val previousWord = context.dropLast(1).substringAfterLast(' ').substringAfterLast('\n')
+        return previousWord in DEURIDA_ATTACHING_NOUNS
+    }
 }

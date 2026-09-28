@@ -39,6 +39,22 @@ class SuggestionQualityGateTest {
     }
 
     @Test
+    fun rejectsDeuridaThatWouldBeDetachedFromItsNoun() {
+        assertEquals(
+            SuggestionQualityGate.RejectionReason.SPACING,
+            SuggestionQualityGate.evaluate("드립니다", context = "확인 부탁 ")
+        )
+        assertEquals(
+            SuggestionQualityGate.RejectionReason.SPACING,
+            SuggestionQualityGate.evaluate("드리겠습니다.", context = "확인 부탁 ", isSentenceCompletion = true)
+        )
+        assertTrue(SuggestionQualityGate.accepts("드립니다", context = "커피 "))
+        assertTrue(SuggestionQualityGate.accepts("드렸습니다.", context = "서류 ", isSentenceCompletion = true))
+        assertTrue(SuggestionQualityGate.accepts("드립니다", context = "선물을 "))
+        assertTrue(SuggestionQualityGate.accepts("드립니다", context = "확인 부탁"))
+    }
+
+    @Test
     fun rejectsConsecutiveDuplicateWord() {
         assertEquals(SuggestionQualityGate.RejectionReason.DUPLICATED_WORD, SuggestionQualityGate.evaluate("회의 회의 끝나고"))
         assertFalse(SuggestionQualityGate.accepts("회의 회의 끝나고"))

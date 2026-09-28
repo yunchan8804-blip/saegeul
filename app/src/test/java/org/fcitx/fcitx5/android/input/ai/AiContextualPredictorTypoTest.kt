@@ -229,6 +229,23 @@ class AiContextualPredictorTypoTest {
     }
 
     @Test
+    fun `no typo correction targets a word of a sentence that already ended`() {
+        ngram.learn("참석합니다", "com.test.app")
+        typoCorrector.addWord("참석합니다", PersonalNgramModel.personalPrior(ngram.unigramCount("참석합니다")))
+
+        listOf("오늘 회의 끝났어요. ", "오늘 회의 끝났어요?\n", "오늘 회의 참석함니다\n", "오늘 회의 참석함니다. ").forEach { context ->
+            val results = predictor.predict(
+                currentStroke = "",
+                contextBeforeCursor = context,
+                packageName = "com.test.app",
+                limit = 8
+            )
+            val typoHits = results.filter { it.source.startsWith("typo") }
+            assertTrue("'$context' → ${typoHits.map { "${it.text}(${it.source})" }}", typoHits.isEmpty())
+        }
+    }
+
+    @Test
     fun `corrects adjacent final consonant with trailing punctuation`() {
         typoCorrector.addWord("걸린", 111f)
         typoCorrector.addWord("건가", 324f)

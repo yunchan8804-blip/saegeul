@@ -50,4 +50,42 @@ class KoreanSpacingLintTest {
             assertFalse("'$text' 는 정상 표기로 통과해야 한다", KoreanSpacingLint.hasSpacingIssue(text))
         }
     }
+
+    @Test
+    fun `catches deurida detached from the noun it attaches to`() {
+        val detached = listOf(
+            "확인 부탁 " to "드립니다",
+            "확인 부탁 " to "드려요",
+            "확인 부탁 " to "드리겠습니다",
+            "나중에 연락 " to "드릴게요",
+            "정말 감사 " to "드렸어요",
+            "먼저 인사 " to "드린다"
+        )
+        detached.forEach { (context, candidate) ->
+            assertTrue(
+                "'$context' 뒤 '$candidate' 는 앞 명사와 붙여 써야 한다",
+                KoreanSpacingLint.detachesDeurida(context, candidate)
+            )
+        }
+    }
+
+    @Test
+    fun `keeps deurida outside explicit noun attachments and a space-separated join`() {
+        val spacedCorrectly = listOf(
+            "커피 " to "드립니다",
+            "서류 " to "드렸어요",
+            "선물을 " to "드립니다",
+            "선생님께 " to "드려요",
+            "일정 " to "드릴게요",
+            "확인 부탁" to "드립니다",
+            "확인 부탁 " to "드디어",
+            "" to "드립니다"
+        )
+        spacedCorrectly.forEach { (context, candidate) ->
+            assertFalse(
+                "'$context' 뒤 '$candidate' 는 띄어쓰기 오류가 아니다",
+                KoreanSpacingLint.detachesDeurida(context, candidate)
+            )
+        }
+    }
 }

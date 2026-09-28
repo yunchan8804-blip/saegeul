@@ -69,6 +69,15 @@ class AiContextualPredictorCorpusNgramTest {
     }
 
     @Test
+    fun corpusDeuridaIsNotOfferedDetachedFromTheNounBeforeTheSpace() {
+        val results = predictor().predict("", "확인 부탁 ", "com.example.chat", limit = 10)
+        val detached = results.filter { prediction ->
+            listOf("드리", "드립", "드려", "드렸", "드릴", "드린", "드림").any { prediction.text.startsWith(it) }
+        }
+        assertTrue(detached.map { "${it.text}(${it.source})" }.toString(), detached.isEmpty())
+    }
+
+    @Test
     fun staticCollocationFallsBelowCorpusButLearnedBigramStaysAbove() {
         val collocation = KoreanCollocationModel()
         collocation.injectDynamicBigrams(mapOf("지금" to listOf("헬스장")), isInformal = false)

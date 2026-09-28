@@ -48,6 +48,26 @@ class KoreanToneClassifierTest {
     }
 
     @Test
+    fun `conversation contexts resolve to their honorific, informal or technical tone`() {
+        val expectations = listOf(
+            "안녕하세요, 확인 부탁드립니다." to KoreanTone.Honorific,
+            "내일 오후 3시에 회의가 있는데 시간 어떠신가요?" to KoreanTone.Honorific,
+            "말씀해주신 제안에 전적으로 동의합니다." to KoreanTone.Honorific,
+            "안녕! 오늘 밥 뭐 먹었어? ㅋㅋ" to KoreanTone.Informal,
+            "내일 몇 시에 볼까? 이번 주말에 시간 돼? ㅋㅋ" to KoreanTone.Informal,
+            "코드 수정해서 올렸어, 배포 확인해봐!" to KoreanTone.Informal,
+            "정말 감사했습니다. 내일 3시에 판교에서 볼까?" to KoreanTone.Informal,
+            "ㅎ 고마워 별거 아냐, 언제든 편하게 물어봐!" to KoreanTone.Informal,
+            "나도 그 생각에 동의해. 오케이 좋아!" to KoreanTone.Informal,
+            "시험 합격했다며! 완전 축하해 파이팅!" to KoreanTone.Informal,
+            "배포 및 빌드 파이프라인 이슈" to KoreanTone.Technical
+        )
+        expectations.forEach { (text, tone) ->
+            assertEquals("'$text'", tone, KoreanToneClassifier.infer(text))
+        }
+    }
+
+    @Test
     fun `blank context defaults to honorific`() {
         assertEquals(KoreanTone.Honorific, KoreanToneClassifier.infer(""))
         assertEquals(KoreanTone.Honorific, KoreanToneClassifier.infer("   "))
