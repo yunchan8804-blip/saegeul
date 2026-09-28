@@ -230,16 +230,16 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private val oneHandModePref = prefs.keyboard.oneHandMode
 
-    // Remembers which side to restore when toggling one-hand mode back on from the toolbar.
-    private var oneHandModeLastSide: OneHandMode =
-        oneHandModePref.getValue().takeIf { it != OneHandMode.Off } ?: OneHandMode.Right
+    // Remembers which side to restore when toggling one-hand mode back on from the toolbar. It is
+    // persisted across keyboard restarts; a side already in use when the toolbar is created wins.
+    private val oneHandModeLastSide = prefs.internal.lastOneHandModeSide.also { lastSide ->
+        OneHandModeTogglePolicy.sideToRemember(oneHandModePref.getValue())?.let { lastSide.setValue(it) }
+    }
 
     @Keep
     private val onOneHandModeChangeListener =
         ManagedPreference.OnChangeListener<OneHandMode> { _, value ->
-            if (value != OneHandMode.Off) {
-                oneHandModeLastSide = value
-            }
+            OneHandModeTogglePolicy.sideToRemember(value)?.let { oneHandModeLastSide.setValue(it) }
             updateOneHandModeButtonVisual()
         }
 
@@ -558,7 +558,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 oneHandModeButton.setOnClickListener {
                     val current = oneHandModePref.getValue()
                     oneHandModePref.setValue(
-                        if (current == OneHandMode.Off) oneHandModeLastSide else OneHandMode.Off
+                        OneHandModeTogglePolicy.next(current, oneHandModeLastSide.getValue())
                     )
                 }
             }

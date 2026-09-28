@@ -54,6 +54,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** K7 (design.md, 사용자 승인 2026-09-26): 펼친 화면 분할 키보드 안내를 어느 버튼으로든 한 번 닫으면 다시 보이지 않는다. */
         val splitExpandedPromptDone =
             bool("split_expanded_prompt_done", false)
+        /** Side the toolbar restores when it turns one-hand mode back on; see [org.fcitx.fcitx5.android.input.bar.OneHandModeTogglePolicy]. */
+        val lastOneHandModeSide = stringLike(
+            "last_one_hand_mode_side",
+            object : ManagedPreference.StringLikeCodec<OneHandMode> {
+                override fun decode(raw: String): OneHandMode = enumValueOf(raw)
+            },
+            OneHandMode.Right
+        )
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
