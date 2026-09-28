@@ -11,9 +11,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Unit tests for [effectiveEnrichmentPhase]: the dashboard's stale-RUNNING-becomes-INTERRUPTED,
- * terminal-phase-with-a-live-worker-becomes-RUNNING, and legacy-provider-failure-becomes-NEVER
- * corrections, and that a manually queued run is left alone by all of them.
+ * Unit tests for [effectiveEnrichmentPhase]: the dashboard's stale-RUNNING-becomes-INTERRUPTED and
+ * terminal-phase-with-a-live-worker-becomes-RUNNING corrections, and that a manually queued run is
+ * left alone by both of them.
  */
 class DashboardSnapshotTest {
 
@@ -29,13 +29,6 @@ class DashboardSnapshotTest {
         val status = GraphEnrichmentStatus(phase = GraphEnrichmentPhase.RUNNING)
 
         assertEquals(GraphEnrichmentPhase.RUNNING, effectiveEnrichmentPhase(status, workerIsRunning = true))
-    }
-
-    @Test
-    fun legacyProviderFailureBecomesNever() {
-        val status = GraphEnrichmentStatus(phase = GraphEnrichmentPhase.FAILED, failure = GraphEnrichmentFailure.PROVIDER_ERROR)
-
-        assertEquals(GraphEnrichmentPhase.NEVER, effectiveEnrichmentPhase(status, workerIsRunning = false))
     }
 
     @Test

@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.input.ai.TypingDnaSyncStatusStore
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPhase
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentFailure
-import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentFailureText
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentRunner
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatusStore
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatus
@@ -185,10 +184,8 @@ private val TERMINAL_ENRICHMENT_PHASES = setOf(
  * reached its own next incremental apply yet - shown as [GraphEnrichmentPhase.RUNNING] rather than
  * whatever the previous cycle finished as, so the dashboard never reads "done"/"failed" while a
  * cycle is genuinely in progress (only the terminal write from [GemmaGraphEnrichmentWorker.finishCycle]
- * should ever be visible, never a stale one a new cycle has already superseded). A
- * [GraphEnrichmentPhase.FAILED] status recorded by the old external AI-provider enrichment path
- * (before the on-device Gemma migration) is shown as if enrichment had never run, since there is
- * nothing left for the user to act on for that failure. [GraphEnrichmentPhase.QUEUED] (a manual
+ * should ever be visible, never a stale one a new cycle has already superseded).
+ * [GraphEnrichmentPhase.QUEUED] (a manual
  * request just scheduled the worker) is left untouched by every correction here - it is not yet
  * [GraphEnrichmentPhase.RUNNING], so a worker that has not started is expected, not "interrupted",
  * and [GemmaGraphEnrichmentWorker] itself overwrites it with RUNNING the moment it actually starts.
@@ -199,7 +196,5 @@ private val TERMINAL_ENRICHMENT_PHASES = setOf(
 internal fun effectiveEnrichmentPhase(status: GraphEnrichmentStatus, workerIsRunning: Boolean): GraphEnrichmentPhase = when {
     status.phase == GraphEnrichmentPhase.RUNNING && !workerIsRunning -> GraphEnrichmentPhase.INTERRUPTED
     workerIsRunning && status.phase in TERMINAL_ENRICHMENT_PHASES -> GraphEnrichmentPhase.RUNNING
-    status.phase == GraphEnrichmentPhase.FAILED && GraphEnrichmentFailureText.isLegacyProviderFailure(status.failure) ->
-        GraphEnrichmentPhase.NEVER
     else -> status.phase
 }
