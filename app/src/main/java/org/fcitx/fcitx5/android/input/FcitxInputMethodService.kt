@@ -103,8 +103,6 @@ import org.fcitx.fcitx5.android.input.ai.AiEditorTransaction
 import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
 import org.fcitx.fcitx5.android.input.ai.AiInputCaptureResult
 import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
-import org.fcitx.fcitx5.android.input.ai.AiSourceKind
-import org.fcitx.fcitx5.android.input.ai.AiSourceScope
 import org.fcitx.fcitx5.android.input.ai.AiSuggestionApplyResult
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
 import org.fcitx.fcitx5.android.core.CandidateWord
@@ -114,9 +112,11 @@ import org.fcitx.fcitx5.android.input.ai.learning.CollectionFeedbackEvent
 import org.fcitx.fcitx5.android.input.ai.learning.PersonalLearningController
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.fcitx.fcitx5.android.input.ai.ondevice.AiRuntimeStatusStore
+import org.fcitx.fcitx5.android.input.ai.ondevice.ExtractedTextTokens
+import org.fcitx.fcitx5.android.input.ai.ondevice.ON_DEVICE_CONTEXT_MAX_CHARS
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceContextCompletionPolicy
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceContextCompletionController
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticEditorSnapshot
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionIndicator
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionRuntime
@@ -166,7 +166,6 @@ import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
 
-private const val ON_DEVICE_CONTEXT_MAX_CHARS = 2048
 private const val AUTOMATIC_SUGGESTION_TTL_MS = 30_000L
 private const val AUTOMATIC_SUGGESTION_HIDE_GRACE_MS = 600_000L
 private const val AUTOMATIC_SUGGESTION_WARMUP_BUSY_RETRIES = 20
@@ -264,10 +263,25 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         offlineMode = { offlineMode },
         appProfile = { effectiveAppProfile }
     )
-    private var onDeviceContextSnapshotInvalidationListener: (() -> Unit)? = null
-    private var nextOnDeviceContextExtractedTextToken = -1
-    private var activeOnDeviceContextExtractedTextToken: Int? = null
-    private var activeOnDeviceContextExtractedTextEpoch: Long? = null
+    private val extractedTextTokens = ExtractedTextTokens()
+    private val onDeviceContextCompletion: OnDeviceContextCompletionController = OnDeviceContextCompletionController(
+        tokens = extractedTextTokens,
+        host = OnDeviceContextCompletionController.Host(
+            allowsCompletion = ::allowsOnDeviceContextCompletionFeatures,
+            editorInfo = { currentInputEditorInfo },
+            selection = { currentInputSelection },
+            inputSessionEpoch = { inputSessionEpoch },
+            inputConnection = { currentInputConnection },
+            finishCompositionForDirectAction = ::finishCompositionForDirectAction,
+            matchesCurrentEditor = ::matchesCurrentEditor,
+            commitAiTextAtCursor = ::commitAiTextAtCursor,
+            predictSelection = { position -> selection.predict(position) },
+            onSnapshotInvalidated = {
+                clearAutomaticSuggestionPreeditReferences()
+                notifyAutomaticSuggestionSnapshotInvalidated()
+            }
+        )
+    )
     private var automaticSuggestionInvalidationListener: (() -> Unit)? = null
     private var activeAutomaticSuggestionExtractedTextToken: Int? = null
     private var activeAutomaticSuggestionExtractedTextEpoch: Long? = null
@@ -1016,14 +1030,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             ic.deleteSurroundingText(before, after)
         }
         if (before > 0 || after > 0) {
-            notifyOnDeviceContextSnapshotInvalidated()
+            onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         }
         inputView?.postRefreshContextualCandidates(16L)
     }
 
     private fun handleBackspaceKey() {
         if (internalPrompt.deleteInternalPromptBeforeCursor(1)) return
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         val dnaInspectionAllowed = allowsTextInspectionFeatures()
         val dnaRemovedText = if (dnaInspectionAllowed) {
             currentInputConnection?.getTextBeforeCursor(1, 0)?.toString()
@@ -1115,7 +1129,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             KeyEvent.KEYCODE_DPAD_RIGHT -> end + offset
             else -> return
         }
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         currentInputConnection.setSelection(target, target)
     }
 
@@ -1365,41 +1379,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun allowsOnDeviceContextCompletionFeatures(): Boolean =
         featurePolicy.allowsOnDeviceContextCompletionFeatures()
 
-    /** Only the active local completion window may receive invalidation events. */
-    fun setOnDeviceContextSnapshotInvalidationListener(listener: (() -> Unit)?) {
-        check(listener == null || onDeviceContextSnapshotInvalidationListener == null ||
-            onDeviceContextSnapshotInvalidationListener === listener) {
-            "On-device context completion already has an active listener"
-        }
-        if (listener == null) clearOnDeviceContextExtractedTextMonitor()
-        onDeviceContextSnapshotInvalidationListener = listener
-        clearAutomaticSuggestionPreeditReferences()
-        notifyAutomaticSuggestionSnapshotInvalidated()
-    }
-
-    private fun notifyOnDeviceContextSnapshotInvalidated() {
-        clearOnDeviceContextExtractedTextMonitor()
-        onDeviceContextSnapshotInvalidationListener?.invoke()
-        clearAutomaticSuggestionPreeditReferences()
-        notifyAutomaticSuggestionSnapshotInvalidated()
-    }
-
-    private fun beginOnDeviceContextExtractedTextMonitor(epoch: Long): ExtractedTextRequest {
-        val token = nextOnDeviceContextExtractedTextToken
-        nextOnDeviceContextExtractedTextToken = if (token == Int.MIN_VALUE) -1 else token - 1
-        activeOnDeviceContextExtractedTextToken = token
-        activeOnDeviceContextExtractedTextEpoch = epoch
-        return ExtractedTextRequest().apply {
-            this.token = token
-            hintMaxChars = ON_DEVICE_CONTEXT_MAX_CHARS + 1
-            hintMaxLines = 1
-        }
-    }
-
-    private fun clearOnDeviceContextExtractedTextMonitor() {
-        activeOnDeviceContextExtractedTextToken = null
-        activeOnDeviceContextExtractedTextEpoch = null
-    }
+    fun setOnDeviceContextSnapshotInvalidationListener(listener: (() -> Unit)?) =
+        onDeviceContextCompletion.setOnDeviceContextSnapshotInvalidationListener(listener)
 
     fun setAutomaticSuggestionInvalidationListener(listener: (() -> Unit)?) {
         check(listener == null || automaticSuggestionInvalidationListener == null ||
@@ -1420,8 +1401,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun beginAutomaticSuggestionExtractedTextMonitor(epoch: Long): ExtractedTextRequest {
-        val token = nextOnDeviceContextExtractedTextToken
-        nextOnDeviceContextExtractedTextToken = if (token == Int.MIN_VALUE) -1 else token - 1
+        val token = extractedTextTokens.next()
         activeAutomaticSuggestionExtractedTextToken = token
         activeAutomaticSuggestionExtractedTextEpoch = epoch
         return ExtractedTextRequest().apply {
@@ -1596,12 +1576,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return selected.isSuccess && selected.getOrNull().isNullOrEmpty()
     }
 
-    private val AiEditorTarget.identity: EditorIdentity
-        get() = EditorIdentity(packageName, fieldId, inputType)
-
-    private val AiEditorTarget.selection: EditorSelection
-        get() = EditorSelection(selectionStart, selectionEnd)
-
     /** Canonical "is this still the same editor field" check: identity, then selection, then an optional session epoch. */
     fun matchesCurrentEditor(
         identity: EditorIdentity,
@@ -1691,124 +1665,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return commitTextToEditor(text, 1)
     }
 
-    /** Captures only a complete, bounded editor prefix with a collapsed cursor at its end. */
-    fun captureOnDeviceContextSnapshot(): AiInputCaptureResult {
-        clearOnDeviceContextExtractedTextMonitor()
-        if (!allowsOnDeviceContextCompletionFeatures()) return AiInputCaptureResult.NoText
-        if (currentInputSelection.isNotEmpty()) return AiInputCaptureResult.EditorStateChanged
-        val capturedSessionEpoch = inputSessionEpoch
-        if (!finishCompositionForDirectAction()) return AiInputCaptureResult.NoText
-        val info = currentInputEditorInfo
-        val capturedSelectionStart = currentInputSelection.start
-        val capturedSelectionEnd = currentInputSelection.end
-        if (capturedSelectionStart != capturedSelectionEnd || inputSessionEpoch != capturedSessionEpoch) {
-            return AiInputCaptureResult.EditorStateChanged
-        }
-        val connection = currentInputConnection ?: return AiInputCaptureResult.NoText
-        val extractedRequest = beginOnDeviceContextExtractedTextMonitor(capturedSessionEpoch)
-        val extracted = runCatching {
-            connection.getExtractedText(extractedRequest, InputConnection.GET_EXTRACTED_TEXT_MONITOR)
-        }.getOrNull() ?: return onDeviceContextEditorStateChanged()
-        val extractedText = extracted.text ?: return onDeviceContextEditorStateChanged()
-        if (extractedText.length > ON_DEVICE_CONTEXT_MAX_CHARS) {
-            clearOnDeviceContextExtractedTextMonitor()
-            return AiInputCaptureResult.SelectionTooLarge
-        }
-        val source = extractedText.toString()
-        if (extracted.startOffset != 0 || extracted.partialStartOffset != -1 ||
-            extracted.partialEndOffset != -1 ||
-            extracted.selectionStart != capturedSelectionStart ||
-            extracted.selectionEnd != capturedSelectionEnd ||
-            activeOnDeviceContextExtractedTextToken != extractedRequest.token ||
-            activeOnDeviceContextExtractedTextEpoch != capturedSessionEpoch
-        ) return onDeviceContextEditorStateChanged()
-        if (!matchesCurrentEditor(
-                EditorIdentity.of(info),
-                EditorSelection(capturedSelectionStart, capturedSelectionEnd),
-                expectedInputSessionEpoch = capturedSessionEpoch
-            )) {
-            return onDeviceContextEditorStateChanged()
-        }
-        if (source.length != capturedSelectionStart) return onDeviceContextEditorStateChanged()
-        if (source.isBlank()) {
-            clearOnDeviceContextExtractedTextMonitor()
-            return AiInputCaptureResult.NoText
-        }
-        return AiInputCaptureResult.Captured(
-            AiInputSnapshot(
-                editor = AiEditorTarget(
-                    packageName = info.packageName,
-                    fieldId = info.fieldId,
-                    inputType = info.inputType,
-                    selectionStart = capturedSelectionStart,
-                    selectionEnd = capturedSelectionEnd,
-                    inputSessionEpoch = inputSessionEpoch
-                ),
-                source = source,
-                sourceKind = AiSourceKind.BeforeCursor,
-                scope = AiSourceScope.CursorContext
-            )
-        )
-    }
+    fun captureOnDeviceContextSnapshot(): AiInputCaptureResult =
+        onDeviceContextCompletion.captureOnDeviceContextSnapshot()
 
-    /** Revalidates the complete captured prefix, its end cursor, and the current editor session. */
-    fun isOnDeviceContextSnapshotCurrent(snapshot: AiInputSnapshot): Boolean {
-        if (!allowsOnDeviceContextCompletionFeatures() ||
-            snapshot.sourceKind != AiSourceKind.BeforeCursor ||
-            snapshot.editor.selectionStart != snapshot.editor.selectionEnd ||
-            snapshot.source.length !in 1..ON_DEVICE_CONTEXT_MAX_CHARS ||
-            activeOnDeviceContextExtractedTextEpoch != snapshot.editor.inputSessionEpoch ||
-            !matchesCurrentEditor(snapshot.editor.identity, snapshot.editor.selection, snapshot.editor.inputSessionEpoch)
-        ) return false
-        val connection = currentInputConnection ?: return false
-        val beforeCursor = connection.getTextBeforeCursor(ON_DEVICE_CONTEXT_MAX_CHARS + 1, 0)
-            ?.toString() ?: return false
-        val afterCursor = connection.getTextAfterCursor(1, 0)?.toString() ?: return false
-        return beforeCursor == snapshot.source &&
-            beforeCursor.length == snapshot.editor.selectionStart &&
-            afterCursor == "" &&
-            activeOnDeviceContextExtractedTextEpoch == snapshot.editor.inputSessionEpoch &&
-            matchesCurrentEditor(snapshot.editor.identity, snapshot.editor.selection, snapshot.editor.inputSessionEpoch)
-    }
+    fun isOnDeviceContextSnapshotCurrent(snapshot: AiInputSnapshot): Boolean =
+        onDeviceContextCompletion.isOnDeviceContextSnapshotCurrent(snapshot)
 
-    private fun onDeviceContextEditorStateChanged(): AiInputCaptureResult {
-        clearOnDeviceContextExtractedTextMonitor()
-        return AiInputCaptureResult.EditorStateChanged
-    }
-
-    /** Inserts one reviewed on-device suffix at the captured end cursor without disturbing the rest of the editor. */
     fun applyOnDeviceContextCompletion(
         snapshot: AiInputSnapshot,
         suffix: String
-    ): AiSuggestionApplyResult {
-        if (suffix.isBlank() || !OnDeviceContextCompletionPolicy.isIncompleteContext(snapshot.source) ||
-            OnDeviceContextCompletionPolicy.parseCompletion(snapshot.source, snapshot.source + suffix) != suffix ||
-            !isOnDeviceContextSnapshotCurrent(snapshot)
-        ) return AiSuggestionApplyResult.EditorChanged
-        if (!finishCompositionForDirectAction() || !isOnDeviceContextSnapshotCurrent(snapshot)) {
-            return AiSuggestionApplyResult.EditorChanged
-        }
-        val connection = currentInputConnection ?: return AiSuggestionApplyResult.NotApplied
-        val cursor = currentInputSelection.start
-        if (!commitAiTextAtCursor(
-                connection = connection,
-                cursor = cursor,
-                text = suffix,
-                restoreStart = cursor,
-                restoreEnd = cursor
-            )
-        ) return AiSuggestionApplyResult.NotApplied
-        val end = cursor + suffix.length
-        selection.predict(end)
-        notifyOnDeviceContextSnapshotInvalidated()
-        return AiSuggestionApplyResult.Applied(
-            AiAppliedEdit(
-                editor = snapshot.editor.copy(selectionStart = end, selectionEnd = end),
-                inserted = suffix,
-                restore = ""
-            )
-        )
-    }
+    ): AiSuggestionApplyResult = onDeviceContextCompletion.applyOnDeviceContextCompletion(snapshot, suffix)
 
     val automaticSuggestionsSupported: Boolean
         get() = OnDeviceAiSupport.isSupported
@@ -2400,7 +2266,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun captureAutomaticSuggestionSnapshot(): OnDeviceAutomaticEditorSnapshot? {
-        if (activeOnDeviceContextExtractedTextToken != null) return null
+        if (onDeviceContextCompletion.activeExtractedTextToken != null) return null
         clearAutomaticSuggestionExtractedTextMonitor()
         if (!canCaptureAutomaticSuggestionSnapshot()) return null
         val capturedSessionEpoch = inputSessionEpoch
@@ -2482,7 +2348,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             OnDeviceGenerationControl.isKeyboardActive &&
             !isInternalPromptInputOwned &&
             !isInternalPromptCaptureActive &&
-            onDeviceContextSnapshotInvalidationListener == null
+            !onDeviceContextCompletion.hasSnapshotInvalidationListener
 
     private fun automaticSuggestionSnapshotFrom(
         extracted: ExtractedText,
@@ -2779,7 +2645,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             dispatched
         }
         if (dispatchedResult) {
-            notifyOnDeviceContextSnapshotInvalidated()
+            onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
             observeCommittedEditorText(text)
             inputView?.postRefreshContextualCandidates(16L)
         }
@@ -3363,7 +3229,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // Android can reuse identical EditorInfo metadata for a different text field. An internal
         // prompt therefore never survives a new input-session boundary, even for a same-app
         // restart: dropping a draft is safer than sending a later GIF/AI action to the wrong field.
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         inputSessionEpoch += 1
         personalLearning.onStartInput()
         contextualPrediction.onStartInput()
@@ -3499,7 +3365,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesEnd: Int
     ) {
         lastEditorActivityAtMs = SystemClock.elapsedRealtime()
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         currentInputEditorInfo.let { info ->
             SensitivePhraseSession.onEditorChanged(
                 DynamicPhraseEditorTarget(
@@ -3526,9 +3392,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUpdateExtractedText(token: Int, text: ExtractedText?) {
-        if (activeOnDeviceContextExtractedTextToken == token) {
-            clearOnDeviceContextExtractedTextMonitor()
-            onDeviceContextSnapshotInvalidationListener?.invoke()
+        if (onDeviceContextCompletion.activeExtractedTextToken == token) {
+            onDeviceContextCompletion.onExtractedTextUpdated()
             return
         }
         if (activeAutomaticSuggestionExtractedTextToken == token) {
@@ -3844,7 +3709,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // 재료 생성의 경계는 입력 뷰 가시성이다. 자동 추천의 웜 유예(onKeyboardVisibilityChanged)와
         // 분리되어 숨김 즉시 배경 축적이 가능해진다.
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
         scheduleAutomaticSuggestionHideClose()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
@@ -3876,7 +3741,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onFinishInput() {
         Timber.d("onFinishInput")
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
         scheduleAutomaticSuggestionHideClose()
         engineRestartEditorRehydrationGate.onFinishInput()
@@ -3900,7 +3765,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUnbindInput() {
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         engineRestartEditorRehydrationGate.onUnbindInput()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()
