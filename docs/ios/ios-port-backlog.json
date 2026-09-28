@@ -807,13 +807,13 @@
       "phase": 5,
       "status": "pending",
       "title": "오프라인 모드 선행 차단",
-      "blocked_by": [
-        "IOS-5-03"
-      ],
+      "blocked_by": [],
       "files": [
         "ios/App/",
         "ios/Keyboard/"
-      ]
+      ],
+      "updated": "2026-09-28",
+      "note": "선행이던 IOS-5-03이 취소돼 blocked_by에서 뺐다. 남은 선행 없음"
     },
     {
       "id": "IOS-5-06",

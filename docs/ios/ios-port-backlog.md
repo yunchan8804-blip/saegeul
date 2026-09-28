@@ -24,7 +24,7 @@ P1 1차 = 자판 + 로컬 스마트 입력.
 P2 모아키 제외 자판 전량.
 P3 모아키는 법률 후.
 P4 무료.
-P5 AI/컴패니언/Gemma는 1차 밖.
+P5 AI/컴패니언(2026-09-24 제거)/Gemma는 1차 밖.
 
 번들: 호스트 `net.chanpaca.saegeul.ios`, 키보드 `net.chanpaca.saegeul.ios.keyboard`.
 개발 팀: `L6BZF5NB99` (스파이크). 게시자 불일치는 `IOS-7-SIGN`.
@@ -332,7 +332,7 @@ Romaja(`ro`)는 제품 17종에 없음. 넣지 않음.
 
 타자마다 서버 예측 금지 (4.4.1).
 
-IOS-5-02·5-03·5-04 취소 사유: 2026-09-24 외부 AI 제거(기기 안 Gemma만). 컴패니언 스크립트 `scripts/ai-provider-companion.py`는 `fd0f6748`에서 지웠다.
+IOS-5-02·5-03·5-04 취소 사유: 2026-09-24 외부 AI 제거(기기 안 Gemma만). 컴패니언 스크립트 `scripts/ai-provider-companion.py`는 `fd0f6748`에서 지웠다. IOS-5-05는 선행이던 IOS-5-03이 취소돼 남은 선행 없이 둔다(json `blocked_by` 비움).
 
 ---
 
