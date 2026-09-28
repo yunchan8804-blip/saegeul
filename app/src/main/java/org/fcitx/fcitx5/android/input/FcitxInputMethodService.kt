@@ -4294,15 +4294,23 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             // Navigation and control keys never become buffered text. Moving the target cursor
             // would discard a pending segment as an unexpected selection change, so submit it
-            // first, then send the key itself. A key without an Android key code continues on
-            // the normal forwarding path once the segment is submitted.
+            // first, then send the key itself with its modifiers, such as Shift for selection.
+            // A key without an Android key code continues on the normal forwarding path once
+            // the segment is submitted.
             else -> if (submitsFirst) {
                 val keyCode = data.sym.keyCode
                 val submitted = submitBufferedHangul()
                 if (keyCode == KeyEvent.KEYCODE_UNKNOWN) {
                     !submitted
                 } else {
-                    if (submitted) sendDownUpKeyEvents(keyCode)
+                    if (submitted) {
+                        sendCombinationKeyEvents(
+                            keyCode,
+                            alt = data.states.alt,
+                            ctrl = data.states.ctrl,
+                            shift = data.states.shift
+                        )
+                    }
                     true
                 }
             } else if (data.unicode > 0) {
