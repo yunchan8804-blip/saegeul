@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidateSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -191,12 +192,12 @@ class SentencePackMatrixDeviceTest {
         )
     }
 
-    private fun snapshotSignature(snapshot: FcitxInputMethodService.ContextualCandidateSnapshot): String =
+    private fun snapshotSignature(snapshot: ContextualCandidateSnapshot): String =
         snapshot.sentences.joinToString(separator = "|") { candidate ->
             "${candidate.metricsCandidate?.source ?: "unattributed"}:${candidate.word.text.hashCode()}"
         }
 
-    private fun sourceCounts(snapshot: FcitxInputMethodService.ContextualCandidateSnapshot): Map<String, Int> =
+    private fun sourceCounts(snapshot: ContextualCandidateSnapshot): Map<String, Int> =
         snapshot.sentences.groupingBy { it.metricsCandidate?.source ?: "unattributed" }.eachCount()
 
     private fun configureUiAutomation(): UiAutomation = instrumentation.uiAutomation.apply {
@@ -225,7 +226,7 @@ class SentencePackMatrixDeviceTest {
 
     private fun revealCandidateByScrolling(
         automation: UiAutomation,
-        snapshot: FcitxInputMethodService.ContextualCandidateSnapshot,
+        snapshot: ContextualCandidateSnapshot,
         suffix: String,
         result: MatrixResult
     ): AccessibilityNodeInfo? {
@@ -478,7 +479,7 @@ class SentencePackMatrixDeviceTest {
         }
 
     private data class SnapshotObservation(
-        val snapshot: FcitxInputMethodService.ContextualCandidateSnapshot,
+        val snapshot: ContextualCandidateSnapshot,
         val elapsedMs: Long,
         val stable: Boolean
     )

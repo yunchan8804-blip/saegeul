@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -110,7 +111,7 @@ class SentencePackImeDeviceTest {
     private fun waitForSentencePackCandidate(
         ime: FcitxInputMethodService,
         expectedSuffix: String
-    ): FcitxInputMethodService.ContextualCandidate {
+    ): ContextualCandidate {
         val deadline = SystemClock.elapsedRealtime() + CANDIDATE_TIMEOUT_MS
         var latestSources = emptyList<String>()
         while (SystemClock.elapsedRealtime() < deadline) {

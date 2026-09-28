@@ -64,8 +64,8 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.FoldKeyboardProfileResolver
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardViewportReader
 import org.fcitx.fcitx5.android.input.keyboard.ThumbSplitPreferences
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualAppendSnapshot
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualReplacementSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionWarmupState
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceFailureText
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator
@@ -73,7 +73,7 @@ import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionSession
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
-import org.fcitx.fcitx5.android.input.CollectionFeedbackEvent
+import org.fcitx.fcitx5.android.input.ai.learning.CollectionFeedbackEvent
 import org.fcitx.fcitx5.android.input.context.KoreanParticleKind
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSuggester
 import org.mechdancer.dependency.DynamicScope

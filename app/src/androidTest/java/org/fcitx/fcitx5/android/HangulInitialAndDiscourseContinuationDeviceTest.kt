@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidate
 import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -843,7 +844,7 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
     )
 
     private data class DiscourseCandidate(
-        val candidate: FcitxInputMethodService.ContextualCandidate,
+        val candidate: ContextualCandidate,
         val latencyMs: Long
     )
 

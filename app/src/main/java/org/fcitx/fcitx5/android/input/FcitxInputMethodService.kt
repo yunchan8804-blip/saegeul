@@ -18,8 +18,6 @@ import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.os.PersistableBundle
 import android.os.SystemClock
 import android.text.InputType
@@ -52,24 +50,14 @@ import androidx.autofill.inline.v1.InlineSuggestionUi
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
@@ -105,47 +93,43 @@ import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
 import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseSession
-import org.fcitx.fcitx5.android.input.ai.AiAppliedEdit
 import org.fcitx.fcitx5.android.input.ai.AiApplyMode
 import org.fcitx.fcitx5.android.input.ai.AiEditorTransaction
-import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
 import org.fcitx.fcitx5.android.input.ai.AiInputCaptureResult
 import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
-import org.fcitx.fcitx5.android.input.ai.AiSourceKind
-import org.fcitx.fcitx5.android.input.ai.AiSourceScope
 import org.fcitx.fcitx5.android.input.ai.AiSuggestionApplyResult
 import org.fcitx.fcitx5.android.input.ai.AiTextSource
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.input.ai.AiContextualPredictor
-import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
-import org.fcitx.fcitx5.android.input.ai.ContextualAppend
-import org.fcitx.fcitx5.android.input.ai.ContextualReplacement
-import org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor
+import org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector
+import org.fcitx.fcitx5.android.input.ai.learning.CollectionFeedbackEvent
+import org.fcitx.fcitx5.android.input.ai.learning.PersonalLearningController
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.fcitx.fcitx5.android.input.ai.ondevice.AiRuntimeStatusStore
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
+import org.fcitx.fcitx5.android.input.ai.ondevice.AutomaticSuggestionController
+import org.fcitx.fcitx5.android.input.ai.ondevice.ExtractedTextTokens
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceContextCompletionPolicy
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticEditorSnapshot
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionIndicator
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceContextCompletionController
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionRuntime
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionWarmupState
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceRecoveryBudget
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSharedEngine
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionSession
+import org.fcitx.fcitx5.android.input.ai.ondevice.RecentSentSentences
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidateSnapshot
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualPredictionController
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
+import org.fcitx.fcitx5.android.input.ai.typo.CorrectionSessionTracker
 import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
 import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSuggester
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
-import org.fcitx.fcitx5.android.input.profile.AppFeaturePolicy
+import org.fcitx.fcitx5.android.input.policy.InputFeaturePolicy
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardGlobalDefaults
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileResolver
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileStore
 import org.fcitx.fcitx5.android.input.profile.AppToolbarVisibility
 import org.fcitx.fcitx5.android.input.profile.EffectiveAppKeyboardProfile
+import org.fcitx.fcitx5.android.input.prompt.InternalPromptController
 import org.fcitx.fcitx5.android.input.search.KoreanDictionaryQuery
 import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
@@ -164,57 +148,12 @@ import splitties.dimensions.dp
 import splitties.resources.styledColor
 import timber.log.Timber
 import java.time.ZonedDateTime
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
 
-private const val ON_DEVICE_CONTEXT_MAX_CHARS = 2048
-private const val AUTOMATIC_SUGGESTION_TTL_MS = 30_000L
-private const val AUTOMATIC_SUGGESTION_HIDE_GRACE_MS = 600_000L
-private const val AUTOMATIC_SUGGESTION_WARMUP_BUSY_RETRIES = 20
-private const val AUTOMATIC_SUGGESTION_WARMUP_BUSY_RETRY_MS = 500L
-
-// 이미 따뜻한 공유 엔진에 다시 붙는 워밍업도 타이핑이 잠시 멈춘 뒤에 한다.
-private const val AUTOMATIC_SUGGESTION_WARMUP_IDLE_MS = 1_500L
-// 차가운 엔진의 워밍업이 키보드가 숨겨지기를 기다리며 확인하는 간격.
-private const val AUTOMATIC_SUGGESTION_WARMUP_HIDDEN_POLL_MS = 500L
-
-/** A transient collection-progress hint for the keyboard's status row (see [FcitxInputMethodService.collectionFeedback]). */
-data class CollectionFeedbackEvent(
-    val category: String,
-    val pendingCount: Int,
-    val threshold: Int,
-    val compiled: Boolean,
-    val atMs: Long
-)
-
 class FcitxInputMethodService : LifecycleInputMethodService() {
 
-    /**
-     * UI 경로용 비동기 즉시 동기화다. collector flush는 predictionEpoch·policy·handler에
-     * 접근하므로 Main.immediate에서 수행하고, vault 동기화·컴파일·저장은 IO에서 수행한다.
-     */
-    suspend fun triggerInstantTypingDnaSyncAsync() {
-        val pendingPersonalLearning = withContext(Dispatchers.Main.immediate) {
-            userTypingContextCollector.flushAllPending()
-            personalLearningTail
-        }
-        pendingPersonalLearning?.join()
-        withContext(Dispatchers.IO) {
-            persistInstantTypingDnaSync()
-        }
-    }
-
-    private fun persistInstantTypingDnaSync() {
-        val before = typingDnaVault.totalBufferedCount()
-        typingDnaInstantSync.syncNow()
-        if (before == 0) {
-            runCatching {
-                typingDnaCompiler.compileFullProfile(typingDnaRepository.load())
-            }
-        }
-        personalizedStore.save()
-    }
+    suspend fun triggerInstantTypingDnaSyncAsync() = personalLearning.triggerInstantTypingDnaSyncAsync()
 
     val isDirectBootInputMode: Boolean
         get() = FcitxApplication.getInstance().isDirectBootMode
@@ -292,37 +231,68 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val appProfileStore by lazy { AppKeyboardProfileStore(this) }
     @Volatile
     private var effectiveAppProfile: EffectiveAppKeyboardProfile? = null
-    private var onDeviceContextSnapshotInvalidationListener: (() -> Unit)? = null
-    private var nextOnDeviceContextExtractedTextToken = -1
-    private var activeOnDeviceContextExtractedTextToken: Int? = null
-    private var activeOnDeviceContextExtractedTextEpoch: Long? = null
-    private var automaticSuggestionInvalidationListener: (() -> Unit)? = null
-    private var activeAutomaticSuggestionExtractedTextToken: Int? = null
-    private var activeAutomaticSuggestionExtractedTextEpoch: Long? = null
-    private var automaticSuggestionRevision = 0L
-    private var automaticSuggestionClientPreedit: String? = null
-    private var automaticSuggestionInputPanelPreedit: String? = null
-    private var automaticSuggestionsEnabledInternal = false
-    private var automaticSuggestionOptInRestored = false
-    private var automaticSuggestionsUseGpuInternal = prefs.internal.automaticOnDeviceSuggestionsUseGpu.getValue()
-    private var automaticSuggestionBackendFallbackUsed = false
-    private var automaticSuggestionRuntime: OnDeviceAutomaticSuggestionRuntime? = null
+    private val featurePolicy: InputFeaturePolicy = InputFeaturePolicy(
+        isDirectBootMode = { isDirectBootInputMode },
+        editorInfo = { currentInputEditorInfo },
+        capabilityFlags = { capabilityFlags },
+        offlineMode = { offlineMode },
+        appProfile = { effectiveAppProfile }
+    )
+
+    private val extractedTextTokens = ExtractedTextTokens()
+    private val onDeviceContextCompletion: OnDeviceContextCompletionController = OnDeviceContextCompletionController(
+        tokens = extractedTextTokens,
+        host = OnDeviceContextCompletionController.Host(
+            allowsCompletion = ::allowsOnDeviceContextCompletionFeatures,
+            editorInfo = { currentInputEditorInfo },
+            selection = { currentInputSelection },
+            inputSessionEpoch = { inputSessionEpoch },
+            inputConnection = { currentInputConnection },
+            finishCompositionForDirectAction = ::finishCompositionForDirectAction,
+            matchesCurrentEditor = ::matchesCurrentEditor,
+            commitAiTextAtCursor = ::commitAiTextAtCursor,
+            predictSelection = { position -> selection.predict(position) },
+            onSnapshotInvalidated = { automaticSuggestion.onContextSnapshotInvalidated() }
+        )
+    )
+
+    private val automaticSuggestion: AutomaticSuggestionController = AutomaticSuggestionController(
+        tokens = extractedTextTokens,
+        host = AutomaticSuggestionController.Host(
+            createRuntime = { useGpu -> OnDeviceAutomaticSuggestionRuntime(this, useGpu) },
+            createStatusStore = { AiRuntimeStatusStore(this) },
+            lifecycleScope = { lifecycleScope },
+            inputView = { inputView },
+            editorInfo = { currentInputEditorInfo },
+            capabilityFlags = { capabilityFlags },
+            inputConnection = { currentInputConnection },
+            selection = { currentInputSelection },
+            inputSessionEpoch = { inputSessionEpoch },
+            isDirectBootMode = { isDirectBootInputMode },
+            appAiPolicy = { effectiveAppProfile?.source?.aiPolicy },
+            allowsCompletion = ::allowsOnDeviceContextCompletionFeatures,
+            isPromptInputOwned = { internalPrompt.isInternalPromptInputOwned },
+            isPromptCaptureActive = { internalPrompt.isInternalPromptCaptureActive },
+            isContextCompletionMonitorActive = { onDeviceContextCompletion.activeExtractedTextToken != null },
+            hasContextCompletionListener = { onDeviceContextCompletion.hasSnapshotInvalidationListener },
+            personalSentenceVault = { personalLearning.personalSentenceVault },
+            recentSentSentences = { personalLearning.recentSentSentences },
+            lastEditorActivityAtMs = { lastEditorActivityAtMs },
+            isBufferedHangulSession = { bufferedHangulSessionActive },
+            bufferedHangulPrefix = { bufferedHangulPrefix },
+            isBufferedEngineResetPending = { bufferedHangulEngineResetPending },
+            enginePreedit = { fcitx.runImmediately { inputPanelCached.preedit } },
+            composing = { composing },
+            composingText = { composingText },
+            finishCompositionForDirectAction = ::finishCompositionForDirectAction,
+            commitAiTextAtCursor = ::commitAiTextAtCursor,
+            predictSelection = { position -> selection.predict(position) }
+        )
+    )
 
     /** 마지막으로 에디터 선택이 바뀐 시각(elapsedRealtime). 워밍업을 입력이 멈춘 뒤로 미루는 데 쓴다. */
     @Volatile
     private var lastEditorActivityAtMs = 0L
-    private var automaticSuggestionCoordinator: OnDeviceSuggestionCoordinator? = null
-    private var automaticSuggestionWarmupJob: Job? = null
-    private var automaticSuggestionWarmupStateInternal = OnDeviceAutomaticSuggestionWarmupState.Idle
-    private var automaticSuggestionWarmupFailureCodeInternal: String? = null
-    private var automaticSuggestionIndicatorInternal: OnDeviceAutomaticSuggestionIndicator =
-        OnDeviceAutomaticSuggestionIndicator.Hidden
-    private var latestAutomaticSuggestionSnapshot: OnDeviceAutomaticEditorSnapshot? = null
-    private var automaticSuggestionTtlCandidate: OnDeviceSuggestionCoordinator.Candidate? = null
-    private var automaticSuggestionClosedGateInvalidated = true
-    private var automaticSuggestionGenerationStartedAtMs: Long? = null
-    private val automaticSuggestionRecoveryBudget = OnDeviceRecoveryBudget()
-    private val aiRuntimeStatusStore by lazy { AiRuntimeStatusStore(this) }
     private var appliedInputThemeName: String? = null
 
     private val bufferedHangul = BufferedInputController()
@@ -335,119 +305,128 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var snippetCatalog = SnippetCatalog.builtIns()
     private var snippetRefreshJob: Job? = null
 
-    private data class ActiveInternalPromptCapture(
-        val token: Long,
-        val engineGeneration: Long,
-        val spec: InternalPromptSpec,
-        val session: InternalPromptCaptureSession,
-        val onStarted: (token: Long) -> Unit,
-        val onChanged: (token: Long, committed: String, preedit: String) -> Unit,
-        val target: InternalPromptEditorTarget,
-        val directCommits: InternalPromptDirectCommitQueue = InternalPromptDirectCommitQueue()
+    private val internalPrompt: InternalPromptController = InternalPromptController(
+        InternalPromptController.Host(
+            engineGeneration = { fcitx.engineGeneration.value },
+            isEngineReady = { fcitx.runImmediately { isReady } },
+            isEventCollectorReady = { isFcitxEventCollectorReady },
+            eventCollectorEngineGeneration = { fcitxEventCollectorEngineGeneration },
+            discardEventGeneration = ::discardFcitxEventGenerationForPromptSafety,
+            postFcitxJob = ::postFcitxJob,
+            lifecycleScope = { lifecycleScope },
+            inputView = { inputView },
+            editorInfo = { currentInputEditorInfo },
+            selection = { currentInputSelection },
+            inputSessionEpoch = { inputSessionEpoch },
+            allowsFeature = { feature -> featurePolicy.allowsInternalPromptFeature(feature) },
+            finishCompositionForDirectAction = ::finishCompositionForDirectAction,
+            finishComposing = ::finishComposing,
+            clearBufferedHangul = ::clearBufferedHangul,
+            resetComposingState = ::resetComposingState,
+            removeCachedKeyEvent = { timestamp -> cachedKeyEvents.remove(timestamp) }
+        )
     )
-
-    /** A reviewed prompt that may open its next IME window only after the reset drain finishes. */
-    private data class PendingInternalPromptSubmission(
-        val token: Long,
-        val text: String,
-        val target: InternalPromptEditorTarget
-    )
-
-    private val internalPromptCaptureGate = InternalPromptCaptureGate()
-    private var activeInternalPromptCapture: ActiveInternalPromptCapture? = null
-    private var pendingInternalPromptSubmission: PendingInternalPromptSubmission? = null
     private var inputSessionEpoch = 0L
 
-    /** Avoids logging a "privacy" collection drop on every keystroke of the same editor session. */
-    private var collectionPrivacyDropLogged = false
-
-    /** Whether the first Typing DNA sentence of the current editor session already gave feedback. */
-    private var collectionFeedbackEmittedForSession = false
-
-    private val mutableCollectionFeedback = MutableStateFlow<CollectionFeedbackEvent?>(null)
+    private val personalLearning: PersonalLearningController = PersonalLearningController(
+        PersonalLearningController.Host(
+            filesDir = { filesDir },
+            collocationModel = { contextualPrediction.contextualPredictor.collocationModel },
+            advancePredictionEpoch = { contextualPrediction.advancePredictionEpoch() },
+            allowsTextInspection = ::allowsTextInspectionFeatures,
+            editorInfo = { currentInputEditorInfo },
+            inputConnection = { currentInputConnection },
+            activePreedit = ::activePreeditForContextualInput,
+            appPersona = { effectiveAppProfile?.source?.persona },
+            isDestroyed = { lifecycle.currentState == Lifecycle.State.DESTROYED },
+            lifecycleScope = { lifecycleScope },
+            inputView = { inputView }
+        )
+    )
 
     /** A transient collection-progress hint for the keyboard's status row. */
-    val collectionFeedback: StateFlow<CollectionFeedbackEvent?> = mutableCollectionFeedback.asStateFlow()
+    val collectionFeedback: StateFlow<CollectionFeedbackEvent?>
+        get() = personalLearning.collectionFeedback
 
-    private fun publishCollectionFeedbackIfEnabled(event: CollectionFeedbackEvent) {
-        if (!AppPrefs.getInstance().internal.collectionFeedbackInKeyboard.getValue()) return
-        mutableCollectionFeedback.value = event
-    }
+    val userTypingContextCollector: UserTypingContextCollector
+        get() = personalLearning.userTypingContextCollector
 
-    /** A prompt is scoped to the exact Fcitx engine instance that accepted its start marker. */
-    private fun ActiveInternalPromptCapture.belongsToCurrentEngine(): Boolean =
-        engineGeneration == fcitx.engineGeneration.value
+    val recentSentSentences: RecentSentSentences
+        get() = personalLearning.recentSentSentences
 
-    /** Fails closed before any stale prompt callback can cross into a replacement engine. */
-    private fun invalidateStaleInternalPromptEngine(capture: ActiveInternalPromptCapture): Boolean {
-        if (capture.belongsToCurrentEngine()) return false
-        discardFcitxEventGenerationForPromptSafety(engineRestart = true)
-        return true
-    }
+    private val correctionSessionTracker: CorrectionSessionTracker
+        get() = personalLearning.correctionSessionTracker
+
+    private fun currentWordBeforeCursor(): String = personalLearning.currentWordBeforeCursor()
+
+    private fun observeCommittedEditorText(text: String) = personalLearning.observeCommittedEditorText(text)
+
+    private val contextualPrediction: ContextualPredictionController = ContextualPredictionController(
+        ContextualPredictionController.Host(
+            lifecycleScope = { lifecycleScope },
+            inputView = { inputView },
+            allowsTextInspection = ::allowsTextInspectionFeatures,
+            editorInfo = { currentInputEditorInfo },
+            capabilityFlags = { capabilityFlags },
+            inputConnection = { currentInputConnection },
+            selection = { currentInputSelection },
+            inputSessionEpoch = { inputSessionEpoch },
+            activePreedit = ::activePreeditForContextualInput,
+            finishCompositionForDirectAction = ::finishCompositionForDirectAction,
+            commitTextToEditor = { text, cursor -> commitTextToEditor(text, cursor) },
+            replaceAiRange = ::replaceAiRange,
+            commitAiTextAtCursor = ::commitAiTextAtCursor,
+            predictSelection = { position -> selection.predict(position) },
+            morphologyEngine = { personalLearning.morphologyEngine },
+            personalizedStore = { personalLearning.personalizedStore },
+            personalNgramModel = { personalLearning.personalNgramModel },
+            typoCorrector = { personalLearning.typoCorrector },
+            baseKoreanVocabulary = { personalLearning.baseKoreanVocabulary },
+            correctionPatternStore = { personalLearning.correctionPatternStore },
+            personalSentenceVault = { personalLearning.personalSentenceVault },
+            personalGraphStore = { personalLearning.personalGraphStore },
+            reinforcementTracker = { personalLearning.reinforcementTracker },
+            enqueuePersonalLearning = { action -> personalLearning.enqueuePersonalLearning(action = action) },
+            enqueueContextualSelectionFeedback = { context, selected, reinforced, packageName ->
+                personalLearning.enqueueContextualSelectionFeedback(context, selected, reinforced, packageName)
+            },
+            scheduleNgramSave = { personalLearning.scheduleNgramSave() },
+            observeCommittedEditorText = { text -> personalLearning.observeCommittedEditorText(text) },
+            captureCorrectionBoundarySnapshot = { personalLearning.captureCorrectionBoundarySnapshot() },
+            onEditorSuffixDeleted = { packageName, removedText, inspectionAllowed ->
+                personalLearning.typingDnaCommitSink.onEditorSuffixDeleted(packageName, removedText, inspectionAllowed)
+            }
+        )
+    )
 
     val isInternalPromptCaptureActive: Boolean
-        get() = activeInternalPromptCapture?.let { capture ->
-            capture.belongsToCurrentEngine() && internalPromptCaptureGate.isActive(capture.token)
-        } == true
+        get() = internalPrompt.isInternalPromptCaptureActive
 
-    /** Lets delayed UI posts verify that their exact capture is still the current destination. */
     fun isInternalPromptCaptureActive(token: Long): Boolean =
-        activeInternalPromptCapture?.let { capture ->
-            capture.token == token && capture.belongsToCurrentEngine() &&
-                internalPromptCaptureGate.isActive(token)
-        } == true
+        internalPrompt.isInternalPromptCaptureActive(token)
 
     val isInternalPromptCaptureDraining: Boolean
-        get() = internalPromptCaptureGate.isDraining
+        get() = internalPrompt.isInternalPromptCaptureDraining
 
-    /** True whenever a prompt is starting, active, or draining and blocks new editor actions. */
     val isInternalPromptInputOwned: Boolean
-        get() = internalPromptCaptureGate.blocksNewInput
+        get() = internalPrompt.isInternalPromptInputOwned
 
-    /** True before the FIFO start marker activates prompt capture. */
     val isInternalPromptCaptureStarting: Boolean
-        get() = internalPromptCaptureGate.isStarting
+        get() = internalPrompt.isInternalPromptCaptureStarting
 
     /** Monotonically changes at every Android editor-session boundary. */
     val currentInputSessionEpoch: Long
         get() = inputSessionEpoch
 
     val isInternalPromptSubmissionPending: Boolean
-        get() = activeInternalPromptCapture?.let { capture ->
-            capture.belongsToCurrentEngine() && internalPromptCaptureGate.isActive(capture.token) &&
-                capture.directCommits.isSubmissionPending
-        } == true
+        get() = internalPrompt.isInternalPromptSubmissionPending
 
-    /**
-     * Queues IME-owned picker/clipboard text behind the prompt's existing Fcitx composition.
-     *
-     * This is deliberately separate from [commitToEditor]: while an internal prompt is active,
-     * direct UI text belongs to that prompt, never to the app editor that opened the keyboard.
-     */
-    internal fun insertInternalPromptDirectText(text: String): InternalPromptDirectCommitResult {
-        val capture = activeInternalPromptCapture
-        if (capture != null && invalidateStaleInternalPromptEngine(capture)) {
-            return InternalPromptDirectCommitResult.ConsumedClosing
-        }
-        if (capture != null && internalPromptCaptureGate.isActive(capture.token)) {
-            val reservation = capture.directCommits.reserve()?.let { sequence ->
-                InternalPromptDirectCommitResult.Reserved(capture.token, sequence)
-            } ?: return InternalPromptDirectCommitResult.ConsumedClosing
-            postInternalPromptDirectCommit(reservation, text)
-            return reservation
-        }
-        return if (isInternalPromptInputOwned) {
-            InternalPromptDirectCommitResult.ConsumedClosing
-        } else {
-            InternalPromptDirectCommitResult.NotPrompt
-        }
-    }
+    internal fun insertInternalPromptDirectText(text: String): InternalPromptDirectCommitResult =
+        internalPrompt.insertInternalPromptDirectText(text)
 
     /** Serializes candidate selection with virtual-key input and prompt submit fences. */
     fun selectCandidate(index: Int) {
-        activeInternalPromptCapture?.let { capture ->
-            if (invalidateStaleInternalPromptEngine(capture)) return
-        }
+        if (internalPrompt.invalidateStaleEngine()) return
         if (isInternalPromptCaptureStarting || isInternalPromptCaptureDraining ||
             isInternalPromptSubmissionPending
         ) return
@@ -455,33 +434,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun shouldRetainInternalPromptCapture(info: EditorInfo): Boolean =
-        activeInternalPromptCapture?.let { capture ->
-            capture.belongsToCurrentEngine() && internalPromptCaptureGate.isActive(capture.token) &&
-                matchesCurrentInternalPromptTarget(capture.target, info)
-        } == true
-
-    private fun captureCurrentInternalPromptTarget(
-        info: EditorInfo = currentInputEditorInfo
-    ): InternalPromptEditorTarget {
-        val selection = currentInputSelection
-        return InternalPromptEditorTarget(
-            identity = EditorIdentity.of(info),
-            selection = EditorSelection(selection.start, selection.end),
-            inputSessionEpoch = inputSessionEpoch
-        )
-    }
-
-    private fun matchesCurrentInternalPromptTarget(
-        target: InternalPromptEditorTarget,
-        info: EditorInfo = currentInputEditorInfo
-    ): Boolean {
-        val selection = currentInputSelection
-        return target.matches(
-            identity = EditorIdentity.of(info),
-            selection = EditorSelection(selection.start, selection.end),
-            inputSessionEpoch = inputSessionEpoch
-        )
-    }
+        internalPrompt.shouldRetainInternalPromptCapture(info)
 
     /** Prepares a deterministic keyboard return path before an IME-owned settings activity. */
     fun prepareForSettingsActivity() {
@@ -516,7 +469,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         setInputView(newInputView)
         inputDeviceMgr.setInputView(newInputView)
         inputView = newInputView
-        newInputView.updateAutomaticSuggestionIndicator(automaticSuggestionIndicatorInternal)
+        newInputView.updateAutomaticSuggestionIndicator(automaticSuggestion.indicator)
         return newInputView
     }
 
@@ -541,12 +494,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @Keep
     private val recreateInputViewListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         replaceInputView(effectiveInputTheme())
-    }
-
-    @Keep
-    private val automaticSuggestionOptInListener = ManagedPreference.OnChangeListener<Boolean> { _, enabled ->
-        automaticSuggestionOptInRestored = false
-        setAutomaticSuggestionsEnabled(enabled)
     }
 
     @Keep
@@ -737,10 +684,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         readyFcitxEventCollectorGeneration = Long.MIN_VALUE
         fcitxEventCollectorJob?.cancel()
         fcitxEventCollectorJob = null
-        pendingInternalPromptSubmission = null
-        activeInternalPromptCapture = null
-        internalPromptCaptureGate.resetForEngineRestart()
-        inputView?.abortInternalPromptInput()
+        internalPrompt.resetForEngineRestart()
         restartFcitxEventCollectorWhenReady()
     }
 
@@ -780,12 +724,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         prefs.candidates.registerOnChangeListener(recreateCandidatesViewListener)
         bufferedHangulInputPref.registerOnChangeListener(bufferedHangulInputListener)
-        prefs.internal.automaticOnDeviceSuggestionsOptIn.registerOnChangeListener(automaticSuggestionOptInListener)
-        OnDeviceGenerationControl.configureAutoContextPreemption(
-            ::isAutomaticSuggestionBusyForPreemption,
-            ::preemptAutomaticSuggestionForExplicitContext,
-            ::resumeAutomaticSuggestionAfterExplicitContext
-        )
+        automaticSuggestion.registerListeners()
         ThemeManager.addOnChangedListener(onThemeChangeListener)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             postFcitxJob {
@@ -793,57 +732,27 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
         }
         super.onCreate()
-        observeSentencePackRevision()
+        contextualPrediction.observeSentencePackRevision()
         decorView = window.window!!.decorView
         contentView = decorView.findViewById(android.R.id.content)
         lastKnownConfig = resources.configuration
         refreshSnippetCatalog()
-        attachTypingDnaBatchCompiler()
-    }
-
-    private fun attachTypingDnaBatchCompiler() {
-        typingDnaVault.setOnBatchReady { category, sentences ->
-            FcitxApplication.getInstance().collectionDiagnostics.batchReady(category, sentences.size)
-            lifecycleScope.launch(Dispatchers.IO) {
-                try {
-                    typingDnaInstantSync.syncNow(category)
-                    personalizedStore.save()
-                    FcitxApplication.getInstance().collectionDiagnostics.compiled(category, ok = true)
-                    publishCollectionFeedbackIfEnabled(
-                        CollectionFeedbackEvent(
-                            category = category,
-                            pendingCount = 0,
-                            threshold = typingDnaVault.thresholdPerCategory,
-                            compiled = true,
-                            atMs = System.currentTimeMillis()
-                        )
-                    )
-                } catch (exception: org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException) {
-                    android.util.Log.w(
-                        "SaegeulAI",
-                        "Typing DNA persistence failed: ${exception.javaClass.simpleName}"
-                    )
-                    FcitxApplication.getInstance().collectionDiagnostics.compiled(category, ok = false)
-                }
-            }
-        }
+        personalLearning.attachTypingDnaBatchCompiler()
     }
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.InternalPromptStartBarrier -> {
-                deliverInternalPromptStartFence(event.data)
+                internalPrompt.deliverInternalPromptStartFence(event.data)
             }
             is FcitxEvent.InternalPromptDrainBarrier -> {
-                if (internalPromptCaptureGate.releaseDrain(event.data)) {
-                    deliverSettledInternalPromptSubmission(event.data)
-                }
+                internalPrompt.deliverInternalPromptDrainFence(event.data)
             }
             is FcitxEvent.InternalPromptSubmitBarrier -> {
-                deliverInternalPromptSubmitFence(event.data)
+                internalPrompt.deliverInternalPromptSubmitFence(event.data)
             }
             is FcitxEvent.InternalPromptDirectCommitBarrier -> {
-                deliverInternalPromptDirectCommit(
+                internalPrompt.deliverInternalPromptDirectCommit(
                     event.data.token,
                     event.data.sequence,
                     event.data.text
@@ -851,7 +760,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             is FcitxEvent.CommitStringEvent -> {
                 val snippetBoundary = boundaryForText(event.data.text)
-                if (captureInternalPromptCommit(event.data.text)) {
+                if (internalPrompt.captureInternalPromptCommit(event.data.text)) {
                     // Internal prompt capture owns this commit; never forward it to the target editor.
                 } else if (isInternalPromptCaptureStarting) {
                     // This callback was already ahead of the start marker. It belongs to the
@@ -869,7 +778,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
             }
             is FcitxEvent.KeyEvent -> event.data.let event@{
-                if (handleInternalPromptForwardedKey(it)) return@event
+                if (internalPrompt.handleInternalPromptForwardedKey(it)) return@event
                 if (handleBufferedHangulForwardedKey(it)) return@event
                 if (it.states.virtual) {
                     // KeyEvent from virtual keyboard
@@ -947,7 +856,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                             } else {
                                 null
                             }
-                            typingDnaCommitSink.onEditorContinuityLost(
+                            personalLearning.typingDnaCommitSink.onEditorContinuityLost(
                                 currentInputEditorInfo?.packageName,
                                 dnaRemovedText,
                                 dnaInspectionAllowed
@@ -955,7 +864,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         }
                         currentInputConnection?.sendKeyEvent(keyEvent)
                         if (keyEvent.action == KeyEvent.ACTION_DOWN) {
-                            observeForwardedKeyIfPrintable(keyEvent.keyCode, keyEvent.unicodeChar, keyEvent.metaState)
+                            personalLearning.observeForwardedKeyIfPrintable(keyEvent.keyCode, keyEvent.unicodeChar, keyEvent.metaState)
                         }
                         if (KeyEvent.isModifierKey(keyEvent.keyCode)) {
                             when (keyEvent.action) {
@@ -1011,21 +920,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
             }
             is FcitxEvent.ClientPreeditEvent -> {
-                notifyAutomaticSuggestionPreeditChanged(clientPreedit = event.data.toString())
-                if (!updateInternalPromptPreedit(event.data.toString())) {
+                automaticSuggestion.notifyAutomaticSuggestionPreeditChanged(clientPreedit = event.data.toString())
+                if (!internalPrompt.updateInternalPromptPreedit(event.data.toString())) {
                     updateComposingText(event.data)
                 }
             }
             is FcitxEvent.DeleteSurroundingEvent -> {
                 val (before, after) = event.data
-                if (!deleteInternalPromptBeforeCursor(before)) {
+                if (!internalPrompt.deleteInternalPromptBeforeCursor(before)) {
                     handleDeleteSurrounding(before, after)
                 }
             }
             is FcitxEvent.InputPanelEvent -> {
-                notifyAutomaticSuggestionPreeditChanged(inputPanelPreedit = event.data.preedit.toString())
+                automaticSuggestion.notifyAutomaticSuggestionPreeditChanged(inputPanelPreedit = event.data.preedit.toString())
                 if (isInternalPromptCaptureActive && bufferedHangulSessionActive) {
-                    updateInternalPromptPreedit(event.data.preedit.toString())
+                    internalPrompt.updateInternalPromptPreedit(event.data.preedit.toString())
                 }
             }
             is FcitxEvent.IMChangeEvent -> {
@@ -1076,7 +985,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             } else {
                 null
             }
-            typingDnaCommitSink.onEditorContinuityLost(
+            personalLearning.typingDnaCommitSink.onEditorContinuityLost(
                 currentInputEditorInfo?.packageName,
                 dnaRemovedText,
                 dnaInspectionAllowed
@@ -1091,21 +1000,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             ic.deleteSurroundingText(before, after)
         }
         if (before > 0 || after > 0) {
-            notifyOnDeviceContextSnapshotInvalidated()
+            onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         }
         inputView?.postRefreshContextualCandidates(16L)
     }
 
     private fun handleBackspaceKey() {
-        if (deleteInternalPromptBeforeCursor(1)) return
-        notifyOnDeviceContextSnapshotInvalidated()
+        if (internalPrompt.deleteInternalPromptBeforeCursor(1)) return
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         val dnaInspectionAllowed = allowsTextInspectionFeatures()
         val dnaRemovedText = if (dnaInspectionAllowed) {
             currentInputConnection?.getTextBeforeCursor(1, 0)?.toString()
         } else {
             null
         }
-        typingDnaCommitSink.onEditorContinuityLost(
+        personalLearning.typingDnaCommitSink.onEditorContinuityLost(
             currentInputEditorInfo?.packageName,
             dnaRemovedText,
             dnaInspectionAllowed
@@ -1148,14 +1057,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             inputView?.submitInternalPromptInput()
             return
         }
-        flushTypingDnaForCurrentEditor()
-        finalizeCorrectionSessionAtBoundary()
+        personalLearning.flushTypingDnaForCurrentEditor()
+        personalLearning.finalizeCorrectionSessionAtBoundary()
         currentInputEditorInfo.run {
             if (inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL ||
                 imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_ENTER_ACTION)
             ) {
                 sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-                observeForwardedKeyIfPrintable(KeyEvent.KEYCODE_ENTER, 0, 0)
+                personalLearning.observeForwardedKeyIfPrintable(KeyEvent.KEYCODE_ENTER, 0, 0)
                 return
             }
             if (actionLabel?.isNotEmpty() == true && actionId != EditorInfo.IME_ACTION_UNSPECIFIED) {
@@ -1166,7 +1075,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 EditorInfo.IME_ACTION_UNSPECIFIED,
                 EditorInfo.IME_ACTION_NONE -> {
                     sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-                    observeForwardedKeyIfPrintable(KeyEvent.KEYCODE_ENTER, 0, 0)
+                    personalLearning.observeForwardedKeyIfPrintable(KeyEvent.KEYCODE_ENTER, 0, 0)
                 }
                 else -> currentInputConnection.performEditorAction(action)
             }
@@ -1190,7 +1099,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             KeyEvent.KEYCODE_DPAD_RIGHT -> end + offset
             else -> return
         }
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         currentInputConnection.setSelection(target, target)
     }
 
@@ -1331,7 +1240,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /**
      * Commits reviewed output to the app editor that opened this IME.
      *
-     * Native Fcitx events are captured separately by [captureInternalPromptCommit]. Returning
+     * Native Fcitx events are captured separately by
+     * [InternalPromptController.captureInternalPromptCommit]. Returning
      * false while a prompt owns input is intentional: an editor-targeted action must never look
      * successful when its target is being isolated or drained.
      */
@@ -1351,7 +1261,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * may write while starting. Active and draining prompts remain fail-closed.
      */
     private fun commitFcitxEventToEditor(text: String, cursor: Int = -1): Boolean {
-        if (internalPromptCaptureGate.ownsInput) return false
+        if (internalPrompt.ownsInput) return false
         if (bufferedHangulSessionActive) {
             bufferedHangul.capture(text)
             return submitBufferedHangul(allowPromptStart = isInternalPromptCaptureStarting)
@@ -1366,354 +1276,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** Inserts IME-window text into the app editor; it never crosses an active prompt boundary. */
     fun insertImeText(text: String, cursor: Int = -1): Boolean = commitToEditor(text, cursor)
 
-    /** Starts an internal text target while leaving the real keyboard and Fcitx engine active. */
     fun beginInternalPromptCapture(
         spec: InternalPromptSpec,
         initialText: String,
         onStarted: (token: Long) -> Unit,
         onChanged: (token: Long, committed: String, preedit: String) -> Unit
-    ): Long? {
-        if (!allowsInternalPromptFeature(spec.feature)) return null
-        // SharedFlow has replay=0. Do not enqueue a control marker until this service has an
-        // active subscription for the current Fcitx generation to observe it.
-        if (!isFcitxEventCollectorReady) return null
-        // A collector can subscribe while the daemon is stopped between restart phases. Its
-        // marker would wait behind a new engine boundary, so only start a capture on a ready
-        // engine instance.
-        if (!fcitx.runImmediately { isReady }) return null
-        // A prior prompt may still have Fcitx callbacks queued. Wait for its in-stream barrier
-        // instead of treating the next prompt as the destination for those callbacks.
-        if (activeInternalPromptCapture != null || internalPromptCaptureGate.ownsInput) return null
-        if (!finishCompositionForDirectAction()) return null
-        clearBufferedHangul()
-        val info = currentInputEditorInfo
-        val promptEngineGeneration = fcitx.engineGeneration.value
-        if (promptEngineGeneration != fcitxEventCollectorEngineGeneration ||
-            !fcitx.runImmediately { isReady }
-        ) return null
-        val token = internalPromptCaptureGate.beginStarting() ?: return null
-        val capture = ActiveInternalPromptCapture(
-            token = token,
-            engineGeneration = promptEngineGeneration,
-            spec = spec,
-            session = InternalPromptCaptureSession(initialText, spec.maxCharacters),
-            onStarted = onStarted,
-            onChanged = onChanged,
-            target = captureCurrentInternalPromptTarget(info)
-        )
-        activeInternalPromptCapture = capture
-        val startMarkerEmitted = AtomicBoolean(false)
-        postFcitxJob {
-            // This marker is behind every Fcitx action that existed before opening the prompt.
-            // Their commits still belong to the original editor; only events after the marker may
-            // enter the internal prompt session.
-            reset()
-            emitInternalPromptStartBarrier(token)
-            startMarkerEmitted.set(true)
-        }.invokeOnCompletion { cause ->
-            if (cause != null && !startMarkerEmitted.get()) {
-                lifecycleScope.launch { abandonInternalPromptStartFence(token) }
-            }
-        }
-        return token
-    }
+    ): Long? = internalPrompt.beginInternalPromptCapture(spec, initialText, onStarted, onChanged)
 
-    /** Starts a FIFO submit fence; the final callback is released only after the reset drain. */
-    internal fun finishInternalPromptCapture(): InternalPromptFinishResult {
-        val capture = activeInternalPromptCapture ?: return InternalPromptFinishResult.Rejected
-        if (invalidateStaleInternalPromptEngine(capture)) {
-            return InternalPromptFinishResult.Rejected
-        }
-        if (!internalPromptCaptureGate.isActive(capture.token)) {
-            return InternalPromptFinishResult.Rejected
-        }
-        return when (capture.directCommits.requestSubmit()) {
-            InternalPromptDirectCommitQueue.SubmissionRequest.AlreadyPending -> {
-                InternalPromptFinishResult.Pending
-            }
-            InternalPromptDirectCommitQueue.SubmissionRequest.Started -> {
-                val submitMarkerEmitted = AtomicBoolean(false)
-                postFcitxJob {
-                    if (!flushInternalPromptDirectComposition()) {
-                        lifecycleScope.launch { abandonInternalPromptSubmitFence(capture.token) }
-                        return@postFcitxJob
-                    }
-                    emitInternalPromptSubmitBarrier(capture.token)
-                    submitMarkerEmitted.set(true)
-                }
-                    .invokeOnCompletion { cause ->
-                        if (cause != null && !submitMarkerEmitted.get()) {
-                            lifecycleScope.launch {
-                                abandonInternalPromptSubmitFence(capture.token)
-                            }
-                        }
-                    }
-                InternalPromptFinishResult.Pending
-            }
-        }
-    }
+    internal fun finishInternalPromptCapture(): InternalPromptFinishResult =
+        internalPrompt.finishInternalPromptCapture()
 
-    /**
-     * Cancels the current prompt.
-     *
-     * A user cancellation can still let callbacks already ahead of the start marker finish in the
-     * same editor. Lifecycle/editor changes instead set [discardPreStartCallbacks] so those
-     * callbacks are quarantined until their marker and cannot leak into a new InputConnection.
-     */
-    fun cancelInternalPromptCapture(discardPreStartCallbacks: Boolean = false) {
-        // A detached/restarted InputView must also suppress a submission that is waiting for its
-        // drain barrier. The callback can never reopen a tool against a changed editor.
-        pendingInternalPromptSubmission = null
-        val capture = activeInternalPromptCapture
-        if (capture == null) {
-            // A user may have cancelled while the start marker was still pending. Keep enough
-            // state to quarantine those old callbacks if Android immediately changes editors.
-            if (discardPreStartCallbacks) {
-                internalPromptCaptureGate.discardPendingStart()
-            }
-            return
-        }
-        if (invalidateStaleInternalPromptEngine(capture)) return
-        val cancelledStart = if (discardPreStartCallbacks) {
-            internalPromptCaptureGate.discardStart(capture.token)
-        } else {
-            internalPromptCaptureGate.cancelStart(capture.token)
-        }
-        if (cancelledStart) {
-            activeInternalPromptCapture = null
-            return
-        }
-        if (!internalPromptCaptureGate.isActive(capture.token)) return
-        capture.directCommits.discard()
-        beginInternalPromptDrain(capture)
-    }
-
-    private fun beginInternalPromptDrain(capture: ActiveInternalPromptCapture) {
-        if (invalidateStaleInternalPromptEngine(capture)) return
-        if (!internalPromptCaptureGate.beginDrain(capture.token)) return
-        activeInternalPromptCapture = null
-        resetComposingState()
-        val drainMarkerEmitted = AtomicBoolean(false)
-        postFcitxJob {
-            resetForInternalPromptDrain(capture.token)
-            drainMarkerEmitted.set(true)
-        }.invokeOnCompletion { cause ->
-            if (cause != null && !drainMarkerEmitted.get()) {
-                lifecycleScope.launch { abandonInternalPromptDrainFence(capture.token) }
-            }
-        }
-    }
-
-    /** Enables capture only after all older Fcitx callbacks have crossed the start marker. */
-    private fun deliverInternalPromptStartFence(token: Long) {
-        if (internalPromptCaptureGate.releaseDiscardedStart(token)) return
-        if (internalPromptCaptureGate.releaseCancelledStart(token)) return
-        val capture = activeInternalPromptCapture ?: return
-        if (invalidateStaleInternalPromptEngine(capture)) return
-        if (capture.token != token || !internalPromptCaptureGate.activateStart(token)) return
-        capture.onStarted(token)
-        notifyInternalPromptChanged(capture)
-    }
-
-    /**
-     * Fails a start fence without ever reopening its queued event generation to an editor.
-     *
-     * A worker error says nothing about callbacks already buffered ahead of the marker. Drop the
-     * service subscription first, then create a replay-free replacement before allowing input.
-     */
-    private fun abandonInternalPromptStartFence(token: Long) {
-        if (!internalPromptCaptureGate.hasPendingStart(token)) return
-        discardFcitxEventGenerationForPromptSafety()
-    }
-
-    /** A cancelled drain marker can never release its gate against a possibly restarted engine. */
-    private fun abandonInternalPromptDrainFence(token: Long) {
-        if (!internalPromptCaptureGate.isDraining(token)) return
-        discardFcitxEventGenerationForPromptSafety()
-    }
-
-    /** Schedules the picker/clipboard marker only after Fcitx flushes the preceding preedit. */
-    private fun postInternalPromptDirectCommit(
-        reservation: InternalPromptDirectCommitResult.Reserved,
-        text: String
-    ) {
-        val directMarkerEmitted = AtomicBoolean(false)
-        postFcitxJob {
-            if (!flushInternalPromptDirectComposition()) {
-                lifecycleScope.launch { abandonInternalPromptDirectCommit(reservation) }
-                return@postFcitxJob
-            }
-            emitInternalPromptDirectCommitBarrier(reservation.token, reservation.sequence, text)
-            directMarkerEmitted.set(true)
-        }.invokeOnCompletion { cause ->
-            if (cause != null && !directMarkerEmitted.get()) {
-                lifecycleScope.launch { abandonInternalPromptDirectCommit(reservation) }
-            }
-        }
-    }
-
-    /**
-     * Finalizes the engine-owned segment before a direct IME insert.
-     *
-     * Chinese must select a real candidate. If that fails, resetting would silently discard the
-     * raw preedit, so the caller leaves the prompt open and restores its Search/Run button.
-     */
-    private suspend fun FcitxAPI.flushInternalPromptDirectComposition(): Boolean {
-        if (inputMethodEntryCached.languageCode.startsWith("zh")) {
-            if (clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()) {
-                if (!select(0)) return false
-            }
-        } else {
-            withContext(Dispatchers.Main.immediate) { finishComposing() }
-        }
-        reset()
-        return true
-    }
-
-    private fun allowsInternalPromptFeature(feature: InternalPromptFeature): Boolean = when (feature) {
-        InternalPromptFeature.GifSearch -> allowsNetworkInputFeatures()
-    }
-
-    private fun captureInternalPromptCommit(text: String): Boolean {
-        val capture = activeInternalPromptCapture
-        if (capture != null && internalPromptCaptureGate.isActive(capture.token)) {
-            if (invalidateStaleInternalPromptEngine(capture)) return true
-            capture.session.commit(text)
-            notifyInternalPromptChanged(capture)
-            return true
-        }
-        return internalPromptCaptureGate.ownsInput
-    }
-
-    /** Resolves a generic Search/Run fence after all earlier Fcitx callbacks reached this IME. */
-    private fun deliverInternalPromptSubmitFence(token: Long) {
-        val capture = activeInternalPromptCapture
-        if (capture == null || capture.token != token || !internalPromptCaptureGate.isActive(token)) {
-            return
-        }
-        if (invalidateStaleInternalPromptEngine(capture)) return
-        if (capture.directCommits.reachSubmitFence() ==
-            InternalPromptDirectCommitQueue.Completion.SubmitReady
-        ) {
-            settleInternalPromptSubmission(capture)
-        }
-    }
-
-    /** Appends a picker result only when its original prompt is still the active destination. */
-    private fun deliverInternalPromptDirectCommit(token: Long, sequence: Long, text: String) {
-        val capture = activeInternalPromptCapture
-        if (capture == null || capture.token != token || !internalPromptCaptureGate.isActive(token)) {
-            // Prompt closed, changed editors, or a newer prompt owns the keyboard. The marker is
-            // deliberately dropped; a stale picker action must never fall through to the editor.
-            return
-        }
-        if (invalidateStaleInternalPromptEngine(capture)) return
-        val completion = capture.directCommits.complete(sequence)
-        if (completion == InternalPromptDirectCommitQueue.Completion.Ignored) return
-        capture.session.commit(text)
-        notifyInternalPromptChanged(capture)
-        if (completion == InternalPromptDirectCommitQueue.Completion.SubmitReady) {
-            settleInternalPromptSubmission(capture)
-        }
-    }
-
-    /** Snapshots a fenced prompt, then waits for reset callbacks before opening the next surface. */
-    private fun settleInternalPromptSubmission(capture: ActiveInternalPromptCapture) {
-        if (invalidateStaleInternalPromptEngine(capture)) return
-        val prompt = capture.session.submission()
-        if (prompt.isBlank() && !capture.spec.allowBlankSubmission) {
-            inputView?.restoreInternalPromptSubmission(capture.token)
-            return
-        }
-        pendingInternalPromptSubmission = PendingInternalPromptSubmission(
-            token = capture.token,
-            text = prompt,
-            target = capture.target
-        )
-        beginInternalPromptDrain(capture)
-    }
-
-    /** Opens the next IME-owned surface only after the matching reset drain released the gate. */
-    private fun deliverSettledInternalPromptSubmission(token: Long) {
-        val pending = pendingInternalPromptSubmission ?: return
-        if (pending.token != token) return
-        pendingInternalPromptSubmission = null
-        if (!matchesCurrentInternalPromptTarget(pending.target)) return
-        inputView?.completeInternalPromptSubmission(pending.token, pending.text)
-    }
-
-    /** Releases a failed Fcitx picker job so Search/Run never remains permanently disabled. */
-    internal fun abandonInternalPromptDirectCommit(
-        reservation: InternalPromptDirectCommitResult.Reserved
-    ) {
-        val capture = activeInternalPromptCapture ?: return
-        if (capture.token != reservation.token || !internalPromptCaptureGate.isActive(capture.token)) {
-            return
-        }
-        if (invalidateStaleInternalPromptEngine(capture)) return
-        if (capture.directCommits.abandon(reservation.sequence)) {
-            inputView?.restoreInternalPromptSubmission(capture.token)
-        }
-    }
-
-    /** Restores an active prompt after its generic submit-fence worker cannot run. */
-    private fun abandonInternalPromptSubmitFence(token: Long) {
-        val capture = activeInternalPromptCapture ?: return
-        if (capture.token != token || !internalPromptCaptureGate.isActive(token)) return
-        if (invalidateStaleInternalPromptEngine(capture)) return
-        if (capture.directCommits.abortSubmission()) {
-            inputView?.restoreInternalPromptSubmission(token)
-        }
-    }
-
-    private fun updateInternalPromptPreedit(text: String): Boolean {
-        val capture = activeInternalPromptCapture
-        if (capture != null && internalPromptCaptureGate.isActive(capture.token)) {
-            if (invalidateStaleInternalPromptEngine(capture)) return true
-            capture.session.updatePreedit(text)
-            notifyInternalPromptChanged(capture)
-            return true
-        }
-        return internalPromptCaptureGate.ownsInput
-    }
-
-    private fun deleteInternalPromptBeforeCursor(codePoints: Int): Boolean {
-        val capture = activeInternalPromptCapture
-        if (capture != null && internalPromptCaptureGate.isActive(capture.token)) {
-            if (invalidateStaleInternalPromptEngine(capture)) return true
-            capture.session.deleteBeforeCursor(codePoints)
-            notifyInternalPromptChanged(capture)
-            return true
-        }
-        return internalPromptCaptureGate.ownsInput
-    }
-
-    private fun notifyInternalPromptChanged(capture: ActiveInternalPromptCapture) {
-        capture.onChanged(capture.token, capture.session.committedText, capture.session.preeditText)
-    }
-
-    /** Consumes only keys that Fcitx chose to forward; engine-owned composition stays untouched. */
-    private fun handleInternalPromptForwardedKey(data: FcitxEvent.KeyEvent.Data): Boolean {
-        if (!internalPromptCaptureGate.ownsInput) return false
-        if (!data.states.virtual) cachedKeyEvents.remove(data.timestamp)
-        if (internalPromptCaptureGate.isDraining) return true
-        if (isInternalPromptSubmissionPending) return true
-        if (data.up) return true
-        val hasShortcutModifier = data.states.ctrl || data.states.alt || data.states.meta ||
-            data.states.has(KeyState.Super) || data.states.has(KeyState.Super2) ||
-            data.states.has(KeyState.Hyper)
-        if (hasShortcutModifier) return true
-        when (data.sym.sym) {
-            FcitxKeyMapping.FcitxKey_BackSpace -> deleteInternalPromptBeforeCursor(1)
-            FcitxKeyMapping.FcitxKey_Return -> inputView?.submitInternalPromptInput()
-            FcitxKeyMapping.FcitxKey_Left,
-            FcitxKeyMapping.FcitxKey_Right -> Unit // The internal target intentionally uses an end cursor.
-            else -> if (data.unicode > 0) {
-                captureInternalPromptCommit(Character.toString(data.unicode))
-            }
-        }
-        return true
-    }
+    fun cancelInternalPromptCapture(discardPreStartCallbacks: Boolean = false) =
+        internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks)
 
     /**
      * Consume a dynamic quick-phrase commit and replace it with a frozen preview. Failure is
@@ -1768,231 +1342,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return true
     }
 
-    /** Text-inspection actions do not read password/private editors, even when fully offline. */
-    private fun flushTypingDnaForCurrentEditor() {
-        typingDnaCommitSink.onEditorFinished(
-            currentInputEditorInfo?.packageName,
-            allowsTextInspectionFeatures()
-        )
-    }
+    fun allowsTextInspectionFeatures(): Boolean = featurePolicy.allowsTextInspectionFeatures()
 
-    /**
-     * A chat app's own send button clears the editor without ever calling our return-key or
-     * finish-input handlers, so Typing DNA would otherwise sit unflushed until the editor closes.
-     * Detect the "just emptied" selection and flush pending text for that package.
-     */
-    private fun flushTypingDnaIfEditorEmptied(newSelStart: Int, newSelEnd: Int) {
-        if (newSelStart != 0 || newSelEnd != 0) return
-        val pkg = currentInputEditorInfo?.packageName ?: return
-        if (!userTypingContextCollector.hasPending(pkg)) return
-        if (!allowsTextInspectionFeatures()) return
-        val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(1, 0)
-        val after = ic.getTextAfterCursor(1, 0)
-        if (!before.isNullOrEmpty() || !after.isNullOrEmpty()) return
-        flushTypingDnaForCurrentEditor()
-    }
+    fun allowsNetworkInputFeatures(): Boolean = featurePolicy.allowsNetworkInputFeatures()
 
-    private fun observeCommittedEditorText(text: String) {
-        if (!allowsTextInspectionFeatures()) {
-            if (!collectionPrivacyDropLogged) {
-                collectionPrivacyDropLogged = true
-                FcitxApplication.getInstance().collectionDiagnostics.dropped("privacy")
-            }
-            return
-        }
-        handleCorrectionWordBoundary(text)
-        if (text.isEmpty()) return
-        val pkg = currentInputEditorInfo?.packageName ?: return
-        typingDnaCommitSink.onEditorTextCommitted(pkg, text, true)
-    }
-
-    /**
-     * 우리 커밋 경로(commitTextToEditor)를 거치지 않고 raw KeyEvent로 곧장 편집기에 전달되는
-     * 스페이스·문장부호·엔터 등을 관찰한다. 개행은 실제로 개행이 삽입되는 멀티라인 편집기에서만
-     * 문장 종결로 취급해 관찰한다.
-     */
-    private fun observeForwardedKeyIfPrintable(keyCode: Int, unicodeChar: Int, metaState: Int) {
-        if (!allowsTextInspectionFeatures()) return
-        val printable = ForwardedKeyObserver.printableText(keyCode, unicodeChar, metaState) ?: return
-        if (printable == "\n" &&
-            currentInputEditorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE == 0
-        ) return
-        observeCommittedEditorText(printable)
-    }
-
-    /**
-     * 커서 바로 앞의 "쓰고 있는 어절"을 계산한다. 아직 편집기에 커밋되지 않은 조합/프리에딧과
-     * 한글 버퍼드 입력 모드의 미전송 세그먼트까지 이어붙여 판단한다.
-     */
-    private fun currentWordBeforeCursor(): String {
-        val ic = currentInputConnection ?: return ""
-        val beforeCursor = ic.getTextBeforeCursor(64, 0)?.toString().orEmpty()
-        val activePreedit = activePreeditForContextualInput()
-        return org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput.resolve(beforeCursor, activePreedit).stroke
-    }
-
-    /** 어절 경계 커밋(observeCommittedEditorText)이 실제 IC 변경 직전에 잡아 둔 스냅샷. */
-    private var correctionBoundarySnapshot: String = ""
-
-    /** 세션이 활성일 때만 IPC를 태워 현재 어절을 스냅샷한다. IPC 절약을 위해 비활성이면 빈 문자열. */
-    private fun captureCorrectionBoundarySnapshot() {
-        correctionBoundarySnapshot = if (correctionSessionTracker.isActive() && allowsTextInspectionFeatures()) {
-            currentWordBeforeCursor()
-        } else {
-            ""
-        }
-    }
-
-    private fun recordCorrectionPairIfPresent(pair: Pair<String, String>?) {
-        val (typed, corrected) = pair ?: return
-        if (correctionPatternStore.recordCorrection(typed, corrected)) {
-            typoCorrector.addWord(
-                corrected,
-                org.fcitx.fcitx5.android.input.ai.PersonalNgramModel.personalPrior(
-                    personalNgramModel.unigramCount(corrected)
-                )
-            )
-            scheduleCorrectionSave()
-        }
-    }
-
-    /** 공백/문장 종결 부호로 끝나는 커밋을 어절 경계로 보고, 지운-다시쓴 쌍이 있으면 학습한다. */
-    private fun handleCorrectionWordBoundary(text: String) {
-        if (text.isEmpty() || !correctionSessionTracker.isActive()) return
-        val isBoundary = text.first().isWhitespace() || text.last() in correctionSentenceTerminators
-        if (!isBoundary) return
-        recordCorrectionPairIfPresent(correctionSessionTracker.onWordBoundary(correctionBoundarySnapshot))
-    }
-
-    /** 엔터·입력 종료처럼 observeCommittedEditorText를 거치지 않는 경계에서 직접 호출한다. */
-    private fun finalizeCorrectionSessionAtBoundary() {
-        if (!allowsTextInspectionFeatures() || !correctionSessionTracker.isActive()) return
-        recordCorrectionPairIfPresent(correctionSessionTracker.onWordBoundary(currentWordBeforeCursor()))
-    }
-
-    fun allowsTextInspectionFeatures(): Boolean =
-        DirectBootInputPolicy.allowsTextInspection(
-            isDirectBootMode = isDirectBootInputMode,
-            editorAllowsTextInspection = !EditorPrivacyPolicy.forbidsTextInspection(
-                currentInputEditorInfo,
-                capabilityFlags
-            )
-        )
-
-    /** Network-backed input features must never inspect or contact a server for private editors. */
-    fun allowsNetworkInputFeatures(): Boolean =
-        allowsTextInspectionFeatures() && !offlineMode &&
-            effectiveAppProfile?.source?.networkPolicy != AppFeaturePolicy.Block
-
-    /** Explicit local completion never opens a network path, but uses the same privacy and AI policy gates. */
     fun allowsOnDeviceContextCompletionFeatures(): Boolean =
-        allowsTextInspectionFeatures() && effectiveAppProfile?.source?.aiPolicy != AppFeaturePolicy.Block
+        featurePolicy.allowsOnDeviceContextCompletionFeatures()
 
-    /** Only the active local completion window may receive invalidation events. */
-    fun setOnDeviceContextSnapshotInvalidationListener(listener: (() -> Unit)?) {
-        check(listener == null || onDeviceContextSnapshotInvalidationListener == null ||
-            onDeviceContextSnapshotInvalidationListener === listener) {
-            "On-device context completion already has an active listener"
-        }
-        if (listener == null) clearOnDeviceContextExtractedTextMonitor()
-        onDeviceContextSnapshotInvalidationListener = listener
-        clearAutomaticSuggestionPreeditReferences()
-        notifyAutomaticSuggestionSnapshotInvalidated()
-    }
+    fun setOnDeviceContextSnapshotInvalidationListener(listener: (() -> Unit)?) =
+        onDeviceContextCompletion.setOnDeviceContextSnapshotInvalidationListener(listener)
 
-    private fun notifyOnDeviceContextSnapshotInvalidated() {
-        clearOnDeviceContextExtractedTextMonitor()
-        onDeviceContextSnapshotInvalidationListener?.invoke()
-        clearAutomaticSuggestionPreeditReferences()
-        notifyAutomaticSuggestionSnapshotInvalidated()
-    }
-
-    private fun beginOnDeviceContextExtractedTextMonitor(epoch: Long): ExtractedTextRequest {
-        val token = nextOnDeviceContextExtractedTextToken
-        nextOnDeviceContextExtractedTextToken = if (token == Int.MIN_VALUE) -1 else token - 1
-        activeOnDeviceContextExtractedTextToken = token
-        activeOnDeviceContextExtractedTextEpoch = epoch
-        return ExtractedTextRequest().apply {
-            this.token = token
-            hintMaxChars = ON_DEVICE_CONTEXT_MAX_CHARS + 1
-            hintMaxLines = 1
-        }
-    }
-
-    private fun clearOnDeviceContextExtractedTextMonitor() {
-        activeOnDeviceContextExtractedTextToken = null
-        activeOnDeviceContextExtractedTextEpoch = null
-    }
-
-    fun setAutomaticSuggestionInvalidationListener(listener: (() -> Unit)?) {
-        check(listener == null || automaticSuggestionInvalidationListener == null ||
-            automaticSuggestionInvalidationListener === listener) {
-            "Automatic on-device suggestion already has an active listener"
-        }
-        automaticSuggestionInvalidationListener = listener
-        if (listener == null) {
-            clearAutomaticSuggestionPreeditReferences()
-            notifyAutomaticSuggestionSnapshotInvalidated()
-        }
-    }
-
-    private fun notifyAutomaticSuggestionSnapshotInvalidated() {
-        clearAutomaticSuggestionExtractedTextMonitor()
-        automaticSuggestionRevision += 1
-        automaticSuggestionInvalidationListener?.invoke()
-    }
-
-    private fun beginAutomaticSuggestionExtractedTextMonitor(epoch: Long): ExtractedTextRequest {
-        val token = nextOnDeviceContextExtractedTextToken
-        nextOnDeviceContextExtractedTextToken = if (token == Int.MIN_VALUE) -1 else token - 1
-        activeAutomaticSuggestionExtractedTextToken = token
-        activeAutomaticSuggestionExtractedTextEpoch = epoch
-        return ExtractedTextRequest().apply {
-            this.token = token
-            hintMaxChars = ON_DEVICE_CONTEXT_MAX_CHARS + 1
-            hintMaxLines = 0
-        }
-    }
-
-    private fun clearAutomaticSuggestionExtractedTextMonitor() {
-        activeAutomaticSuggestionExtractedTextToken = null
-        activeAutomaticSuggestionExtractedTextEpoch = null
-    }
-
-    private fun clearAutomaticSuggestionPreeditReferences() {
-        automaticSuggestionClientPreedit = null
-        automaticSuggestionInputPanelPreedit = null
-    }
-
-    private fun notifyAutomaticSuggestionPreeditChanged(
-        clientPreedit: String? = null,
-        inputPanelPreedit: String? = null
-    ) {
-        if (automaticSuggestionInvalidationListener == null) return
-        if (!canCaptureAutomaticSuggestionSnapshot()) {
-            clearAutomaticSuggestionPreeditReferences()
-            notifyAutomaticSuggestionSnapshotInvalidated()
-            return
-        }
-        val clientChanged = clientPreedit != null && clientPreedit != automaticSuggestionClientPreedit
-        val panelChanged = inputPanelPreedit != null && inputPanelPreedit != automaticSuggestionInputPanelPreedit
-        if (clientPreedit != null) automaticSuggestionClientPreedit = clientPreedit
-        if (inputPanelPreedit != null) automaticSuggestionInputPanelPreedit = inputPanelPreedit
-        if (clientChanged || panelChanged) notifyAutomaticSuggestionSnapshotInvalidated()
-    }
-
-    /**
-     * Which of the three gates in [allowsNetworkInputFeatures] is closed, so a panel can
-     * name the real cause and point at the setting that reopens it. Null when allowed.
-     */
-    fun networkInputBlock(): InputFeatureBlock? = when {
-        !allowsTextInspectionFeatures() -> InputFeatureBlock.PrivateEditor
-        offlineMode -> InputFeatureBlock.OfflineMode
-        effectiveAppProfile?.source?.networkPolicy == AppFeaturePolicy.Block ->
-            InputFeatureBlock.AppPolicy
-        else -> null
-    }
+    fun networkInputBlock(): InputFeatureBlock? = featurePolicy.networkInputBlock()
 
 
     fun effectiveMobileHangulLayout(global: MobileHangulLayout): MobileHangulLayout =
@@ -2130,12 +1490,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return selected.isSuccess && selected.getOrNull().isNullOrEmpty()
     }
 
-    private val AiEditorTarget.identity: EditorIdentity
-        get() = EditorIdentity(packageName, fieldId, inputType)
-
-    private val AiEditorTarget.selection: EditorSelection
-        get() = EditorSelection(selectionStart, selectionEnd)
-
     /** Canonical "is this still the same editor field" check: identity, then selection, then an optional session epoch. */
     fun matchesCurrentEditor(
         identity: EditorIdentity,
@@ -2225,1484 +1579,55 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return commitTextToEditor(text, 1)
     }
 
-    val morphologyEngine by lazy { org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine() }
+    fun captureOnDeviceContextSnapshot(): AiInputCaptureResult =
+        onDeviceContextCompletion.captureOnDeviceContextSnapshot()
 
-    val personalizedStore by lazy {
-        val file = java.io.File(filesDir, "personalized_sentences.json")
-        org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore(
-            storageFile = file,
-            morphology = morphologyEngine,
-            cipher = org.fcitx.fcitx5.android.FcitxApplication.getInstance().vaultCipher
-        ).apply {
-            load()
-        }
-    }
+    fun isOnDeviceContextSnapshotCurrent(snapshot: AiInputSnapshot): Boolean =
+        onDeviceContextCompletion.isOnDeviceContextSnapshotCurrent(snapshot)
 
-    val reinforcementTracker by lazy {
-        org.fcitx.fcitx5.android.input.ai.ReinforcementTracker(store = personalizedStore)
-    }
-
-    val typingDnaRepository: org.fcitx.fcitx5.android.input.ai.TypingDnaRepository
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typingDnaRepository
-
-    val typingDnaProfiler by lazy { org.fcitx.fcitx5.android.input.ai.TypingDnaProfiler() }
-
-    val typingDnaCompiler: org.fcitx.fcitx5.android.input.ai.TypingDnaCompiler by lazy {
-        org.fcitx.fcitx5.android.input.ai.TypingDnaCompiler(
-            collocationModel = contextualPredictor.collocationModel,
-            sentenceStore = personalizedStore,
-            repository = typingDnaRepository
-        ).apply {
-            runCatching {
-                compileFullProfile(typingDnaRepository.load())
-            }
-        }
-    }
-
-    val typingDnaVault: org.fcitx.fcitx5.android.input.ai.TypingDnaVault
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typingDnaVault
-
-    val typingDnaInstantSync by lazy {
-        org.fcitx.fcitx5.android.input.ai.TypingDnaInstantSync(
-            vault = typingDnaVault,
-            repository = typingDnaRepository,
-            profiler = typingDnaProfiler,
-            compiler = typingDnaCompiler
-        )
-    }
-
-    /** Captures only a complete, bounded editor prefix with a collapsed cursor at its end. */
-    fun captureOnDeviceContextSnapshot(): AiInputCaptureResult {
-        clearOnDeviceContextExtractedTextMonitor()
-        if (!allowsOnDeviceContextCompletionFeatures()) return AiInputCaptureResult.NoText
-        if (currentInputSelection.isNotEmpty()) return AiInputCaptureResult.EditorStateChanged
-        val capturedSessionEpoch = inputSessionEpoch
-        if (!finishCompositionForDirectAction()) return AiInputCaptureResult.NoText
-        val info = currentInputEditorInfo
-        val capturedSelectionStart = currentInputSelection.start
-        val capturedSelectionEnd = currentInputSelection.end
-        if (capturedSelectionStart != capturedSelectionEnd || inputSessionEpoch != capturedSessionEpoch) {
-            return AiInputCaptureResult.EditorStateChanged
-        }
-        val connection = currentInputConnection ?: return AiInputCaptureResult.NoText
-        val extractedRequest = beginOnDeviceContextExtractedTextMonitor(capturedSessionEpoch)
-        val extracted = runCatching {
-            connection.getExtractedText(extractedRequest, InputConnection.GET_EXTRACTED_TEXT_MONITOR)
-        }.getOrNull() ?: return onDeviceContextEditorStateChanged()
-        val extractedText = extracted.text ?: return onDeviceContextEditorStateChanged()
-        if (extractedText.length > ON_DEVICE_CONTEXT_MAX_CHARS) {
-            clearOnDeviceContextExtractedTextMonitor()
-            return AiInputCaptureResult.SelectionTooLarge
-        }
-        val source = extractedText.toString()
-        if (extracted.startOffset != 0 || extracted.partialStartOffset != -1 ||
-            extracted.partialEndOffset != -1 ||
-            extracted.selectionStart != capturedSelectionStart ||
-            extracted.selectionEnd != capturedSelectionEnd ||
-            activeOnDeviceContextExtractedTextToken != extractedRequest.token ||
-            activeOnDeviceContextExtractedTextEpoch != capturedSessionEpoch
-        ) return onDeviceContextEditorStateChanged()
-        if (!matchesCurrentEditor(
-                EditorIdentity.of(info),
-                EditorSelection(capturedSelectionStart, capturedSelectionEnd),
-                expectedInputSessionEpoch = capturedSessionEpoch
-            )) {
-            return onDeviceContextEditorStateChanged()
-        }
-        if (source.length != capturedSelectionStart) return onDeviceContextEditorStateChanged()
-        if (source.isBlank()) {
-            clearOnDeviceContextExtractedTextMonitor()
-            return AiInputCaptureResult.NoText
-        }
-        return AiInputCaptureResult.Captured(
-            AiInputSnapshot(
-                editor = AiEditorTarget(
-                    packageName = info.packageName,
-                    fieldId = info.fieldId,
-                    inputType = info.inputType,
-                    selectionStart = capturedSelectionStart,
-                    selectionEnd = capturedSelectionEnd,
-                    inputSessionEpoch = inputSessionEpoch
-                ),
-                source = source,
-                sourceKind = AiSourceKind.BeforeCursor,
-                scope = AiSourceScope.CursorContext
-            )
-        )
-    }
-
-    /** Revalidates the complete captured prefix, its end cursor, and the current editor session. */
-    fun isOnDeviceContextSnapshotCurrent(snapshot: AiInputSnapshot): Boolean {
-        if (!allowsOnDeviceContextCompletionFeatures() ||
-            snapshot.sourceKind != AiSourceKind.BeforeCursor ||
-            snapshot.editor.selectionStart != snapshot.editor.selectionEnd ||
-            snapshot.source.length !in 1..ON_DEVICE_CONTEXT_MAX_CHARS ||
-            activeOnDeviceContextExtractedTextEpoch != snapshot.editor.inputSessionEpoch ||
-            !matchesCurrentEditor(snapshot.editor.identity, snapshot.editor.selection, snapshot.editor.inputSessionEpoch)
-        ) return false
-        val connection = currentInputConnection ?: return false
-        val beforeCursor = connection.getTextBeforeCursor(ON_DEVICE_CONTEXT_MAX_CHARS + 1, 0)
-            ?.toString() ?: return false
-        val afterCursor = connection.getTextAfterCursor(1, 0)?.toString() ?: return false
-        return beforeCursor == snapshot.source &&
-            beforeCursor.length == snapshot.editor.selectionStart &&
-            afterCursor == "" &&
-            activeOnDeviceContextExtractedTextEpoch == snapshot.editor.inputSessionEpoch &&
-            matchesCurrentEditor(snapshot.editor.identity, snapshot.editor.selection, snapshot.editor.inputSessionEpoch)
-    }
-
-    private fun onDeviceContextEditorStateChanged(): AiInputCaptureResult {
-        clearOnDeviceContextExtractedTextMonitor()
-        return AiInputCaptureResult.EditorStateChanged
-    }
-
-    /** Inserts one reviewed on-device suffix at the captured end cursor without disturbing the rest of the editor. */
     fun applyOnDeviceContextCompletion(
         snapshot: AiInputSnapshot,
         suffix: String
-    ): AiSuggestionApplyResult {
-        if (suffix.isBlank() || !OnDeviceContextCompletionPolicy.isIncompleteContext(snapshot.source) ||
-            OnDeviceContextCompletionPolicy.parseCompletion(snapshot.source, snapshot.source + suffix) != suffix ||
-            !isOnDeviceContextSnapshotCurrent(snapshot)
-        ) return AiSuggestionApplyResult.EditorChanged
-        if (!finishCompositionForDirectAction() || !isOnDeviceContextSnapshotCurrent(snapshot)) {
-            return AiSuggestionApplyResult.EditorChanged
-        }
-        val connection = currentInputConnection ?: return AiSuggestionApplyResult.NotApplied
-        val cursor = currentInputSelection.start
-        if (!commitAiTextAtCursor(
-                connection = connection,
-                cursor = cursor,
-                text = suffix,
-                restoreStart = cursor,
-                restoreEnd = cursor
-            )
-        ) return AiSuggestionApplyResult.NotApplied
-        val end = cursor + suffix.length
-        selection.predict(end)
-        notifyOnDeviceContextSnapshotInvalidated()
-        return AiSuggestionApplyResult.Applied(
-            AiAppliedEdit(
-                editor = snapshot.editor.copy(selectionStart = end, selectionEnd = end),
-                inserted = suffix,
-                restore = ""
-            )
-        )
-    }
+    ): AiSuggestionApplyResult = onDeviceContextCompletion.applyOnDeviceContextCompletion(snapshot, suffix)
 
     val automaticSuggestionsSupported: Boolean
-        get() = OnDeviceAiSupport.isSupported
+        get() = automaticSuggestion.automaticSuggestionsSupported
 
     val automaticSuggestionsEnabled: Boolean
-        get() = automaticSuggestionsEnabledInternal
+        get() = automaticSuggestion.automaticSuggestionsEnabled
 
     val automaticSuggestionsUseGpu: Boolean
-        get() = automaticSuggestionsUseGpuInternal
+        get() = automaticSuggestion.automaticSuggestionsUseGpu
 
     val automaticSuggestionBackendFallbackOccurred: Boolean
-        get() = automaticSuggestionBackendFallbackUsed
+        get() = automaticSuggestion.automaticSuggestionBackendFallbackOccurred
 
     val automaticSuggestionStatus: OnDeviceSuggestionCoordinator.Status
-        get() = automaticSuggestionCoordinator?.status
-            ?: OnDeviceSuggestionCoordinator.Status(OnDeviceSuggestionCoordinator.State.OFF)
+        get() = automaticSuggestion.automaticSuggestionStatus
 
     val automaticSuggestionWarmupState: OnDeviceAutomaticSuggestionWarmupState
-        get() = automaticSuggestionWarmupStateInternal
+        get() = automaticSuggestion.automaticSuggestionWarmupState
 
     val automaticSuggestionWarmupFailureCode: String?
-        get() = automaticSuggestionWarmupFailureCodeInternal
+        get() = automaticSuggestion.automaticSuggestionWarmupFailureCode
 
     val automaticSuggestionRuntimeWarm: Boolean
-        get() = automaticSuggestionRuntime?.isWarm == true
+        get() = automaticSuggestion.automaticSuggestionRuntimeWarm
 
-    fun setAutomaticSuggestionsEnabled(enabled: Boolean) {
-        if (!enabled) {
-            // Turning off must release the warm engine even when only the warm-up ran (opt-in was
-            // never on), so no native lease survives an opt-out or service teardown.
-            val wasEnabled = automaticSuggestionsEnabledInternal
-            automaticSuggestionsEnabledInternal = false
-            automaticSuggestionWarmupJob?.cancel()
-            automaticSuggestionWarmupJob = null
-            updateAutomaticSuggestionWarmupState(OnDeviceAutomaticSuggestionWarmupState.Idle)
-            if (wasEnabled) setAutomaticSuggestionInvalidationListener(null)
-            latestAutomaticSuggestionSnapshot = null
-            clearAutomaticSuggestionTtl()
-            automaticSuggestionCoordinator?.setEnabled(false)
-            automaticSuggestionCoordinator?.invalidate(closeBackend = true)
-            automaticSuggestionClosedGateInvalidated = true
-            automaticSuggestionWarmupFailureCodeInternal = null
-            automaticSuggestionRecoveryBudget.reset()
-            refreshAutomaticSuggestionIndicator()
-            // 자동 추천을 끄면 공유 엔진이 차지하던 메모리·GPU도 돌려준다(다른 목적은 필요할 때 다시 연다).
-            OnDeviceSharedEngine.requestClose("AUTO_SUGGESTIONS_OFF")
-            return
-        }
-        // Opting in is the documented release valve for an exhausted recovery budget: give it a
-        // full fresh window so a terminal coordinator/runtime from before this toggle is not
-        // permanently blocked by ENGINE_UNRECOVERABLE just because the budget was already spent.
-        if (!automaticSuggestionsEnabledInternal) automaticSuggestionRecoveryBudget.reset()
-        if (!automaticSuggestionsSupported || !ensureAutomaticSuggestionCoordinator()) return
-        if (automaticSuggestionsEnabledInternal) return
-        automaticSuggestionsEnabledInternal = true
-        automaticSuggestionClosedGateInvalidated = false
-        automaticSuggestionCoordinator?.setEnabled(true)
-        setAutomaticSuggestionInvalidationListener(::onAutomaticSuggestionInvalidated)
-        refreshAutomaticSuggestionIndicator()
-        // Opting in while the keyboard is already showing (e.g. a mid-session toggle used as the
-        // recovery release valve) must warm up immediately rather than waiting for the next
-        // onStartInputView, or a just-recovered coordinator would sit idle until the editor
-        // restarts. retryAutomaticSuggestionWarmup() is a no-op when there is no current editor.
-        retryAutomaticSuggestionWarmup()
-    }
+    fun setAutomaticSuggestionsEnabled(enabled: Boolean) =
+        automaticSuggestion.setAutomaticSuggestionsEnabled(enabled)
 
-    fun setAutomaticSuggestionsUseGpu(useGpu: Boolean): Boolean {
-        if (automaticSuggestionsEnabledInternal) return false
-        if (automaticSuggestionsUseGpuInternal == useGpu) return true
-        val runtime = automaticSuggestionRuntime
-        if (runtime != null && (runtime.isPreparing || runtime.isRunning || runtime.isWarm)) return false
-        automaticSuggestionCoordinator?.setEnabled(false)
-        automaticSuggestionCoordinator = null
-        automaticSuggestionRuntime = null
-        latestAutomaticSuggestionSnapshot = null
-        clearAutomaticSuggestionTtl()
-        automaticSuggestionClosedGateInvalidated = true
-        automaticSuggestionsUseGpuInternal = useGpu
-        prefs.internal.automaticOnDeviceSuggestionsUseGpu.setValue(useGpu)
-        return true
-    }
+    fun setAutomaticSuggestionsUseGpu(useGpu: Boolean): Boolean =
+        automaticSuggestion.setAutomaticSuggestionsUseGpu(useGpu)
 
-    fun getAutomaticSuggestionCandidates(): List<OnDeviceSuggestionCoordinator.Candidate> {
-        if (!automaticSuggestionsSupported || !automaticSuggestionsEnabledInternal) return emptyList()
-        if (!canCaptureAutomaticSuggestionSnapshot()) {
-            invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
-            return emptyList()
-        }
-        val coordinator = automaticSuggestionCoordinator ?: return emptyList()
-        val snapshot = latestAutomaticSuggestionSnapshot?.takeIf(::isAutomaticSuggestionSnapshotCurrent)
-            ?: captureAutomaticSuggestionSnapshot()
-            ?: run {
-                invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
-                return emptyList()
-            }
-        automaticSuggestionClosedGateInvalidated = false
-        latestAutomaticSuggestionSnapshot = snapshot
-        coordinator.observe(
-            snapshot = snapshot.session,
-            input = OnDeviceSuggestionPolicy.Input(
-                textBeforeCursor = snapshot.session.textBeforeCursor,
-                packageName = snapshot.session.scope.packageName,
-                inputType = snapshot.inputType,
-                imeAction = snapshot.imeAction,
-                mode = OnDeviceSuggestionPolicy.Mode.SENTENCE,
-                appCategory = org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry.classify(
-                    snapshot.session.scope.packageName
-                ),
-                fieldHint = automaticSuggestionFieldHint(),
-                recentSentences = recentSentSentences.recent(snapshot.session.scope.packageName, 3)
-            )
-        )
-        return coordinator.candidates
-    }
-
-    /**
-     * The current editor's hint text, trimmed and capped at 40 characters, or null when empty or
-     * when it looks like it contains PII. This is sent to the on-device model as a hint about what
-     * the field is asking for (e.g. "받는 사람"), never as free-form user-authored text.
-     */
-    private fun automaticSuggestionFieldHint(): String? {
-        val trimmed = currentInputEditorInfo?.hintText?.toString()?.trim().orEmpty()
-        if (trimmed.isEmpty()) return null
-        val capped = if (trimmed.length > 40) trimmed.take(40) else trimmed
-        return capped.takeUnless { org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber.containsPii(it) }
-    }
+    fun getAutomaticSuggestionCandidates(): List<OnDeviceSuggestionCoordinator.Candidate> =
+        automaticSuggestion.getAutomaticSuggestionCandidates()
 
     fun commitAutomaticSuggestionCandidate(
         candidate: OnDeviceSuggestionCoordinator.Candidate
-    ): AiSuggestionApplyResult {
-        if (!isAutomaticSuggestionEligible()) return AiSuggestionApplyResult.NotApplied
-        val coordinator = automaticSuggestionCoordinator ?: return AiSuggestionApplyResult.NotApplied
-        val snapshot = latestAutomaticSuggestionSnapshot ?: return AiSuggestionApplyResult.EditorChanged
-        if (!isAutomaticSuggestionSnapshotCurrent(snapshot)) return AiSuggestionApplyResult.EditorChanged
-        val suffix = coordinator.takeForApply(candidate, snapshot.session)
-            ?: return AiSuggestionApplyResult.EditorChanged
-        val result = applyAutomaticSuggestion(snapshot, suffix)
-        inputView?.postRefreshContextualCandidates(16L)
-        return result
-    }
+    ): AiSuggestionApplyResult = automaticSuggestion.commitAutomaticSuggestionCandidate(candidate)
 
-    private fun ensureAutomaticSuggestionCoordinator(): Boolean {
-        if (!recoverAutomaticSuggestionStateIfTerminal()) return false
-        automaticSuggestionCoordinator?.let { return true }
-        val runtime = OnDeviceAutomaticSuggestionRuntime(this, automaticSuggestionsUseGpuInternal)
-        if (!runtime.supported) return false
-        val session = OnDeviceSuggestionSession()
-        automaticSuggestionRuntime = runtime
-        automaticSuggestionCoordinator = OnDeviceSuggestionCoordinator(
-            scope = lifecycleScope,
-            session = session,
-            backend = runtime,
-            clockMs = SystemClock::elapsedRealtime,
-            isCurrent = { sessionSnapshot ->
-                latestAutomaticSuggestionSnapshot?.let { snapshot ->
-                    snapshot.session == sessionSnapshot && isAutomaticSuggestionSnapshotCurrent(snapshot)
-                } == true
-            },
-            onChanged = ::onAutomaticSuggestionCoordinatorChanged,
-            promptContextEnricher = ::enrichAutomaticSuggestionInputWithPersonalStyle
-        )
-        // A coordinator created here can be a mid-session replacement for a terminal instance
-        // (see recoverAutomaticSuggestionStateIfTerminal), not only a first-time creation from
-        // setAutomaticSuggestionsEnabled(true). Sync it to the current opt-in state immediately so
-        // a recovery that happens while already opted in does not leave the fresh coordinator
-        // silently disabled (its own default is enabled=false).
-        automaticSuggestionCoordinator?.setEnabled(automaticSuggestionsEnabledInternal)
-        return true
-    }
-
-    /**
-     * Adds up to 3 similar past sentences from [personalSentenceVault] to [input] as style
-     * examples. Runs off the main thread (the coordinator dispatches this call on
-     * [kotlinx.coroutines.Dispatchers.Default]); this function itself does no dispatching.
-     */
-    private fun enrichAutomaticSuggestionInputWithPersonalStyle(
-        input: OnDeviceSuggestionPolicy.Input
-    ): OnDeviceSuggestionPolicy.Input {
-        val currentText = input.textBeforeCursor.trim()
-        val styleExamples = personalSentenceVault.retrieve(input.textBeforeCursor, input.packageName, limit = 5)
-            .map { it.sentence.trim() }
-            .filter {
-                it.isNotEmpty() && it != currentText && it.length <= 80 &&
-                    !org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber.containsPii(it)
-            }
-            .take(3)
-        if (styleExamples.isEmpty()) return input
-        return OnDeviceSuggestionPolicy.Input(
-            textBeforeCursor = input.textBeforeCursor,
-            packageName = input.packageName,
-            inputType = input.inputType,
-            imeAction = input.imeAction,
-            mode = input.mode,
-            appCategory = input.appCategory,
-            fieldHint = input.fieldHint,
-            recentSentences = input.recentSentences,
-            styleExamples = styleExamples
-        )
-    }
-
-    /**
-     * A [terminalFailureCode]/[OnDeviceSuggestionCoordinator.isTerminal] latch is scoped to that
-     * runtime/coordinator instance, not the process: it means the underlying engine object is
-     * unusable, not that automatic suggestions must stay off forever. When terminal, this discards
-     * the stale instance (the same disposal steps the GPU-to-CPU fallback uses) so
-     * [ensureAutomaticSuggestionCoordinator] creates a fresh one, gated by
-     * [automaticSuggestionRecoveryBudget] so a repeatedly failing engine cannot recover in a tight
-     * loop. Returns false only when the budget is exhausted, in which case the caller must not
-     * create a new coordinator until the opt-in is toggled or the service is destroyed.
-     */
-    private fun recoverAutomaticSuggestionStateIfTerminal(): Boolean {
-        val runtimeFailureCode = automaticSuggestionRuntime?.terminalFailureCode
-        val coordinatorTerminal = automaticSuggestionCoordinator?.isTerminal == true
-        if (runtimeFailureCode == null && !coordinatorTerminal) return true
-        val now = SystemClock.elapsedRealtime()
-        if (!automaticSuggestionRecoveryBudget.tryConsume(now)) {
-            automaticSuggestionWarmupFailureCodeInternal = "ENGINE_UNRECOVERABLE"
-            aiRuntimeStatusStore.recordFailure("ENGINE_UNRECOVERABLE", System.currentTimeMillis())
-            refreshAutomaticSuggestionIndicator()
-            return false
-        }
-        val fromCode = runtimeFailureCode ?: automaticSuggestionCoordinator?.status?.errorCode ?: "UNKNOWN"
-        Timber.w(
-            "Automatic suggestion engine recovered from %s (recovery %d)",
-            fromCode,
-            automaticSuggestionRecoveryBudget.consumedInWindow(now)
-        )
-        aiRuntimeStatusStore.recordRecovery(fromCode, System.currentTimeMillis())
-        automaticSuggestionCoordinator?.setEnabled(false)
-        // Start the dead backend's late cleanup so its native lease is released; otherwise the
-        // replacement engine would only ever see BUSY.
-        automaticSuggestionCoordinator?.invalidate(closeBackend = true)
-        automaticSuggestionCoordinator = null
-        automaticSuggestionRuntime = null
-        latestAutomaticSuggestionSnapshot = null
-        clearAutomaticSuggestionTtl()
-        automaticSuggestionClosedGateInvalidated = true
-        automaticSuggestionWarmupJob?.cancel()
-        automaticSuggestionWarmupJob = null
-        return true
-    }
-
-    private fun isAutomaticSuggestionEligible(): Boolean =
-        automaticSuggestionsSupported && automaticSuggestionsEnabledInternal &&
-            canCaptureAutomaticSuggestionSnapshot()
-
-    /**
-     * Whether the AUTO_CONTEXT lease holder is actually generating right now. A warm-up in
-     * progress ([OnDeviceAutomaticSuggestionRuntime.isPreparing]) is deliberately excluded: the
-     * user's explicit, tap-triggered completion outranks a background warm-up, so that case is
-     * still preemptible.
-     */
-    private fun isAutomaticSuggestionBusyForPreemption(): Boolean =
-        automaticSuggestionRuntime?.isRunning == true
-
-    /**
-     * Hard-stops automatic suggestions' runtime/coordinator/warm-up job (the same body
-     * [scheduleAutomaticSuggestionHideClose] runs after its grace period, called here without the
-     * delay) so an explicit, tap-triggered context completion can take the native lease instead of
-     * waiting behind a warm or warming-up automatic engine. The opt-in enabled state
-     * ([automaticSuggestionsEnabledInternal]) is left untouched, so this is a lease-release only,
-     * not an opt-out.
-     */
-    private fun preemptAutomaticSuggestionForExplicitContext() {
-        // Invoked from whichever thread called OnDeviceGenerationControl.tryBegin (the material
-        // accumulation worker runs on a WorkManager thread). The teardown touches main-thread-only
-        // state, so hop over instead of asserting the caller's thread.
-        runOnMainThread {
-            Timber.i("Automatic suggestion preempted by explicit context")
-            invalidateAutomaticSuggestionsForClosedGate(closeBackend = true)
-        }
-    }
-
-    private val automaticSuggestionMainHandler = Handler(Looper.getMainLooper())
-
-    private fun runOnMainThread(block: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) block() else automaticSuggestionMainHandler.post(block)
-    }
-
-    /**
-     * Called right after an EXPLICIT_CONTEXT lease is released. If automatic suggestions are still
-     * opted in and the keyboard is active, this restarts warm-up immediately so the feature resumes
-     * within the same input session instead of waiting for the next onStartInputView.
-     */
-    private fun resumeAutomaticSuggestionAfterExplicitContext() {
-        // Called from OnDeviceGenerationControl.end(), possibly on the releasing worker's thread.
-        runOnMainThread {
-            if (!OnDeviceGenerationControl.isKeyboardActive) return@runOnMainThread
-            val info = currentInputEditorInfo ?: return@runOnMainThread
-            refreshAutomaticSuggestionIndicator()
-            startAutomaticSuggestionWarmupIfAllowed(info, capabilityFlags)
-        }
-    }
-
-    /** Manually restarts automatic-suggestion warm-up, e.g. after a user taps the blocked indicator. */
-    fun retryAutomaticSuggestionWarmup() {
-        val info = currentInputEditorInfo ?: return
-        startAutomaticSuggestionWarmupIfAllowed(info, capabilityFlags)
-    }
-
-    /**
-     * 워밍업을 시작해도 되는 때까지 기다린다. 공유 엔진이 이미 따뜻하면 GPU 초기화가 없으므로 입력이 잠시 멈추기만
-     * 기다린다. 차가우면 키보드가 숨겨질 때까지 기다린다: 키보드가 떠 있는 동안 GPU로 초기화하면 가중치 변환이
-     * 화면 그리기와 GPU를 다퉈 키보드가 1초 넘게 멈춘다.
-     */
-    private suspend fun awaitWarmupWindow(since: Long) {
-        while (!OnDeviceSharedEngine.isWarm && OnDeviceGenerationControl.isInputViewVisible) {
-            delay(AUTOMATIC_SUGGESTION_WARMUP_HIDDEN_POLL_MS)
-        }
-        if (OnDeviceGenerationControl.isInputViewVisible) awaitEditorIdle(since)
-    }
-
-    /** [since] 이후로 에디터 입력이 [AUTOMATIC_SUGGESTION_WARMUP_IDLE_MS] 동안 없을 때까지 기다린다. */
-    private suspend fun awaitEditorIdle(since: Long) {
-        while (true) {
-            val quietSince = maxOf(since, lastEditorActivityAtMs)
-            val remaining = quietSince + AUTOMATIC_SUGGESTION_WARMUP_IDLE_MS - SystemClock.elapsedRealtime()
-            if (remaining <= 0) return
-            delay(remaining)
-        }
-    }
-
-    private fun startAutomaticSuggestionWarmupIfAllowed(
-        info: EditorInfo,
-        flags: CapabilityFlags
-    ) {
-        val warmupAllowed = allowsAutomaticSuggestionWarmup(info, flags)
-        val keyboardActive = OnDeviceGenerationControl.isKeyboardActive
-        Timber.i(
-            "Automatic suggestion warm-up gate: supported=%s allowed=%s keyboardActive=%s " +
-                "directBoot=%s forbidsInspection=%s conversational=%s aiPolicy=%s inputType=0x%x imeOptions=0x%x",
-            automaticSuggestionsSupported,
-            warmupAllowed,
-            keyboardActive,
-            isDirectBootInputMode,
-            EditorPrivacyPolicy.forbidsTextInspection(info, flags),
-            EditorPrivacyPolicy.isConversationalTextField(info, flags),
-            effectiveAppProfile?.source?.aiPolicy,
-            info.inputType,
-            info.imeOptions
-        )
-        if (!automaticSuggestionsSupported || !warmupAllowed || !keyboardActive ||
-            !ensureAutomaticSuggestionCoordinator()
-        ) {
-            invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
-            return
-        }
-        val runtime = automaticSuggestionRuntime ?: return
-        if (runtime.isWarm) {
-            updateAutomaticSuggestionWarmupState(OnDeviceAutomaticSuggestionWarmupState.Idle)
-            return
-        }
-        if (automaticSuggestionWarmupJob?.isActive == true) return
-        automaticSuggestionClosedGateInvalidated = false
-        automaticSuggestionWarmupFailureCodeInternal = null
-        refreshAutomaticSuggestionIndicator()
-        val warmupScheduledAt = SystemClock.elapsedRealtime()
-        automaticSuggestionWarmupJob = lifecycleScope.launch {
-            var warmupStartedAt = warmupScheduledAt
-            try {
-                awaitWarmupWindow(since = warmupScheduledAt)
-                warmupStartedAt = SystemClock.elapsedRealtime()
-                updateAutomaticSuggestionWarmupState(OnDeviceAutomaticSuggestionWarmupState.Preparing)
-                var busyRetries = 0
-                while (true) {
-                    try {
-                        runtime.warmUp()
-                        break
-                    } catch (error: OnDeviceSuggestionCoordinator.BackendException) {
-                        // Another generation purpose can still hold the native lease for a moment
-                        // after the keyboard became active; wait for it instead of giving up.
-                        if (error.code != "BUSY" || busyRetries >= AUTOMATIC_SUGGESTION_WARMUP_BUSY_RETRIES ||
-                            !OnDeviceGenerationControl.isKeyboardActive
-                        ) {
-                            throw error
-                        }
-                        busyRetries += 1
-                        Timber.i("Automatic suggestion warm-up busy, retry %d", busyRetries)
-                        delay(AUTOMATIC_SUGGESTION_WARMUP_BUSY_RETRY_MS)
-                    }
-                }
-                automaticSuggestionWarmupFailureCodeInternal = null
-                refreshAutomaticSuggestionIndicator()
-                val warmupElapsedMs = SystemClock.elapsedRealtime() - warmupStartedAt
-                aiRuntimeStatusStore.recordWarmup(
-                    result = "OK",
-                    durationMs = warmupElapsedMs,
-                    backend = if (automaticSuggestionsUseGpuInternal) "gpu" else "cpu",
-                    nowMs = System.currentTimeMillis()
-                )
-                Timber.i(
-                    "Automatic suggestion warm-up finished: warm=%s elapsedMs=%d",
-                    runtime.isWarm,
-                    warmupElapsedMs
-                )
-            } catch (error: CancellationException) {
-                Timber.i("Automatic suggestion warm-up cancelled after %dms", SystemClock.elapsedRealtime() - warmupStartedAt)
-                throw error
-            } catch (error: Throwable) {
-                val backendErrorCode = (error as? OnDeviceSuggestionCoordinator.BackendException)?.code
-                if (org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceBackendFallbackPolicy.shouldFallbackToCpu(
-                        errorCode = backendErrorCode,
-                        useGpu = automaticSuggestionsUseGpuInternal,
-                        fallbackAlreadyUsed = automaticSuggestionBackendFallbackUsed
-                    )
-                ) {
-                    Timber.i("Automatic suggestion backend fallback gpu->cpu")
-                    automaticSuggestionBackendFallbackUsed = true
-                    automaticSuggestionsUseGpuInternal = false
-                    prefs.internal.automaticOnDeviceSuggestionsUseGpu.setValue(false)
-                    automaticSuggestionCoordinator?.setEnabled(false)
-                    automaticSuggestionCoordinator = null
-                    automaticSuggestionRuntime = null
-                    latestAutomaticSuggestionSnapshot = null
-                    clearAutomaticSuggestionTtl()
-                    automaticSuggestionClosedGateInvalidated = true
-                    automaticSuggestionWarmupJob = null
-                    startAutomaticSuggestionWarmupIfAllowed(info, flags)
-                } else {
-                    val code = backendErrorCode ?: "UNKNOWN"
-                    automaticSuggestionWarmupFailureCodeInternal = code
-                    refreshAutomaticSuggestionIndicator()
-                    aiRuntimeStatusStore.recordWarmup(
-                        result = code,
-                        durationMs = SystemClock.elapsedRealtime() - warmupStartedAt,
-                        backend = if (automaticSuggestionsUseGpuInternal) "gpu" else "cpu",
-                        nowMs = System.currentTimeMillis()
-                    )
-                    aiRuntimeStatusStore.recordFailure(code, System.currentTimeMillis())
-                    Timber.w("Automatic suggestion warm-up failed: %s", code)
-                    Timber.d(error, "Automatic suggestion warm-up stopped")
-                }
-            } finally {
-                if (automaticSuggestionRuntime === runtime) {
-                    automaticSuggestionWarmupJob = null
-                    updateAutomaticSuggestionWarmupState(OnDeviceAutomaticSuggestionWarmupState.Idle)
-                }
-            }
-        }
-    }
-
-    private fun allowsAutomaticSuggestionWarmup(
-        info: EditorInfo,
-        flags: CapabilityFlags
-    ): Boolean =
-        DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode) &&
-            !EditorPrivacyPolicy.forbidsTextInspection(info, flags) &&
-            EditorPrivacyPolicy.isConversationalTextField(info, flags) &&
-            effectiveAppProfile?.source?.aiPolicy != AppFeaturePolicy.Block
-
-    private fun updateAutomaticSuggestionWarmupState(
-        state: OnDeviceAutomaticSuggestionWarmupState
-    ) {
-        check(Looper.myLooper() == Looper.getMainLooper())
-        if (automaticSuggestionWarmupStateInternal == state) return
-        automaticSuggestionWarmupStateInternal = state
-        inputView?.postRefreshContextualCandidates(16L)
-        refreshAutomaticSuggestionIndicator()
-    }
-
-    private fun refreshAutomaticSuggestionIndicator() {
-        val next = when {
-            !automaticSuggestionsSupported -> OnDeviceAutomaticSuggestionIndicator.Hidden
-            // The warm-up runs before opt-in so that opting in is instant; its spinner is shown
-            // regardless. Blocked states are only meaningful once the feature is on.
-            automaticSuggestionWarmupStateInternal == OnDeviceAutomaticSuggestionWarmupState.Preparing -> OnDeviceAutomaticSuggestionIndicator.Preparing
-            !automaticSuggestionsEnabledInternal -> OnDeviceAutomaticSuggestionIndicator.Hidden
-            automaticSuggestionWarmupFailureCodeInternal != null -> OnDeviceAutomaticSuggestionIndicator.Blocked(automaticSuggestionWarmupFailureCodeInternal!!)
-            automaticSuggestionCoordinator?.status?.let { it.state == OnDeviceSuggestionCoordinator.State.ERROR && it.errorCode != "INVALID_INPUT" } == true ->
-                OnDeviceAutomaticSuggestionIndicator.Blocked(automaticSuggestionCoordinator?.status?.errorCode ?: "BACKEND_FAILURE")
-            else -> OnDeviceAutomaticSuggestionIndicator.Hidden
-        }
-        if (next == automaticSuggestionIndicatorInternal) return
-        automaticSuggestionIndicatorInternal = next
-        inputView?.updateAutomaticSuggestionIndicator(next)
-    }
-
-    private fun onAutomaticSuggestionInvalidated() {
-        latestAutomaticSuggestionSnapshot = null
-        // A stale in-flight generation is discarded by the coordinator's epoch check. Cancelling
-        // it natively would tear down the warm engine and cost a full re-preparation.
-        if (!isAutomaticSuggestionEligible()) {
-            invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
-            return
-        }
-        inputView?.postRefreshContextualCandidates(16L)
-    }
-
-    private fun invalidateAutomaticSuggestionsForClosedGate(closeBackend: Boolean) {
-        val runtimeNeedsClose = closeBackend && automaticSuggestionRuntime?.let {
-            it.isPreparing || it.isRunning || it.isWarm
-        } == true
-        val warmupNeedsCancel = closeBackend && automaticSuggestionWarmupJob != null
-        val coordinatorNeedsClear = automaticSuggestionCoordinator?.let {
-            it.candidates.isNotEmpty() ||
-                it.status.state !in setOf(
-                    OnDeviceSuggestionCoordinator.State.OFF,
-                    OnDeviceSuggestionCoordinator.State.NO_CANDIDATE
-                )
-        } == true
-        if (automaticSuggestionClosedGateInvalidated &&
-            !warmupNeedsCancel && !runtimeNeedsClose && !coordinatorNeedsClear
-        ) return
-        automaticSuggestionClosedGateInvalidated = true
-        if (closeBackend) {
-            automaticSuggestionWarmupJob?.cancel()
-            automaticSuggestionWarmupJob = null
-            updateAutomaticSuggestionWarmupState(OnDeviceAutomaticSuggestionWarmupState.Idle)
-        }
-        latestAutomaticSuggestionSnapshot = null
-        clearAutomaticSuggestionTtl()
-        automaticSuggestionCoordinator?.invalidate(closeBackend)
-        inputView?.postRefreshContextualCandidates(16L)
-    }
-
-    private fun onAutomaticSuggestionCoordinatorChanged() {
-        trackAutomaticSuggestionGenerationLatency()
-        scheduleAutomaticSuggestionTtlIfNeeded()
-        inputView?.postRefreshContextualCandidates(16L)
-        refreshAutomaticSuggestionIndicator()
-    }
-
-    /**
-     * Records generation latency in [aiRuntimeStatusStore] whenever the coordinator reaches
-     * READY. The clock starts at GENERATING (backend.generate() is in flight) and is discarded on
-     * any other transition (NO_CANDIDATE, ERROR, OFF) since no successful generation completed.
-     */
-    private fun trackAutomaticSuggestionGenerationLatency() {
-        when (automaticSuggestionCoordinator?.status?.state) {
-            OnDeviceSuggestionCoordinator.State.GENERATING -> {
-                if (automaticSuggestionGenerationStartedAtMs == null) {
-                    automaticSuggestionGenerationStartedAtMs = SystemClock.elapsedRealtime()
-                }
-            }
-            OnDeviceSuggestionCoordinator.State.READY -> {
-                automaticSuggestionGenerationStartedAtMs?.let { startedAt ->
-                    aiRuntimeStatusStore.recordGeneration(
-                        SystemClock.elapsedRealtime() - startedAt,
-                        System.currentTimeMillis()
-                    )
-                }
-                automaticSuggestionGenerationStartedAtMs = null
-            }
-            else -> automaticSuggestionGenerationStartedAtMs = null
-        }
-    }
-
-    private fun scheduleAutomaticSuggestionTtlIfNeeded() {
-        val coordinator = automaticSuggestionCoordinator ?: return
-        if (coordinator.status.state != OnDeviceSuggestionCoordinator.State.READY) {
-            clearAutomaticSuggestionTtl()
-            return
-        }
-        val generated = coordinator.candidates.firstOrNull {
-            it.origin == OnDeviceSuggestionSession.Origin.GENERATED
-        } ?: return
-        if (automaticSuggestionTtlCandidate === generated) return
-        clearAutomaticSuggestionTtl()
-        automaticSuggestionTtlCandidate = generated
-        val runnable = Runnable {
-            automaticSuggestionTtlRunnable = null
-            automaticSuggestionTtlCandidate = null
-            inputView?.postRefreshContextualCandidates(16L)
-        }
-        automaticSuggestionTtlRunnable = runnable
-        ngramSaveHandler.postDelayed(runnable, AUTOMATIC_SUGGESTION_TTL_MS)
-    }
-
-    private fun clearAutomaticSuggestionTtl() {
-        automaticSuggestionTtlRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        automaticSuggestionTtlRunnable = null
-        automaticSuggestionTtlCandidate = null
-    }
-
-    private fun scheduleAutomaticSuggestionHideClose() {
-        if (automaticSuggestionHideRunnable != null) return
-        val runnable = Runnable {
-            automaticSuggestionHideRunnable = null
-            invalidateAutomaticSuggestionsForClosedGate(closeBackend = true)
-            OnDeviceGenerationControl.onKeyboardVisibilityChanged(false)
-        }
-        automaticSuggestionHideRunnable = runnable
-        ngramSaveHandler.postDelayed(runnable, AUTOMATIC_SUGGESTION_HIDE_GRACE_MS)
-    }
-
-    private fun cancelAutomaticSuggestionHideClose() {
-        automaticSuggestionHideRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        automaticSuggestionHideRunnable = null
-    }
-
-    fun captureAutomaticSuggestionSnapshot(): OnDeviceAutomaticEditorSnapshot? {
-        if (activeOnDeviceContextExtractedTextToken != null) return null
-        clearAutomaticSuggestionExtractedTextMonitor()
-        if (!canCaptureAutomaticSuggestionSnapshot()) return null
-        val capturedSessionEpoch = inputSessionEpoch
-        val connection = currentInputConnection ?: return null
-        val request = beginAutomaticSuggestionExtractedTextMonitor(capturedSessionEpoch)
-        val extracted = connection.getExtractedText(request, InputConnection.GET_EXTRACTED_TEXT_MONITOR)
-            ?: run {
-                clearAutomaticSuggestionExtractedTextMonitor()
-                return null
-            }
-        return automaticSuggestionSnapshotFrom(
-            extracted = extracted,
-            expectedSessionEpoch = capturedSessionEpoch,
-            expectedMonitorToken = request.token,
-            recordPreedit = true
-        ).also {
-            if (it == null) clearAutomaticSuggestionExtractedTextMonitor()
-        }
-    }
-
-    fun isAutomaticSuggestionSnapshotCurrent(snapshot: OnDeviceAutomaticEditorSnapshot): Boolean {
-        if (!canCaptureAutomaticSuggestionSnapshot() ||
-            snapshot.session.revision != automaticSuggestionRevision
-        ) return false
-        val connection = currentInputConnection ?: return false
-        val extracted = connection.getExtractedText(ExtractedTextRequest(), 0) ?: return false
-        val current = automaticSuggestionSnapshotFrom(
-            extracted = extracted,
-            expectedSessionEpoch = snapshot.session.scope.editorSessionId
-        ) ?: return false
-        return sameAutomaticSuggestionSnapshot(current, snapshot)
-    }
-
-    fun applyAutomaticSuggestion(
-        snapshot: OnDeviceAutomaticEditorSnapshot,
-        suffix: String
-    ): AiSuggestionApplyResult {
-        if (!isAutomaticSuggestionSuffixSafe(snapshot, suffix)) {
-            return AiSuggestionApplyResult.NotApplied
-        }
-        if (!isAutomaticSuggestionSnapshotCurrent(snapshot)) {
-            return AiSuggestionApplyResult.EditorChanged
-        }
-        if (!finishCompositionForDirectAction()) return AiSuggestionApplyResult.NotApplied
-        if (!matchesAutomaticSuggestionAfterComposition(snapshot)) {
-            return AiSuggestionApplyResult.EditorChanged
-        }
-        val connection = currentInputConnection ?: return AiSuggestionApplyResult.NotApplied
-        val cursor = currentInputSelection.start
-        if (!commitAiTextAtCursor(
-                connection = connection,
-                cursor = cursor,
-                text = suffix,
-                restoreStart = cursor,
-                restoreEnd = cursor
-            )
-        ) return AiSuggestionApplyResult.NotApplied
-        val end = cursor + suffix.length
-        selection.predict(end)
-        notifyAutomaticSuggestionSnapshotInvalidated()
-        return AiSuggestionApplyResult.Applied(
-            AiAppliedEdit(
-                editor = AiEditorTarget(
-                    packageName = snapshot.session.scope.packageName,
-                    fieldId = snapshot.session.scope.fieldId,
-                    inputType = snapshot.inputType,
-                    selectionStart = end,
-                    selectionEnd = end,
-                    inputSessionEpoch = snapshot.session.scope.editorSessionId
-                ),
-                inserted = suffix,
-                restore = ""
-            )
-        )
-    }
-
-    private fun canCaptureAutomaticSuggestionSnapshot(): Boolean =
-        allowsOnDeviceContextCompletionFeatures() &&
-            OnDeviceGenerationControl.isKeyboardActive &&
-            !isInternalPromptInputOwned &&
-            !isInternalPromptCaptureActive &&
-            onDeviceContextSnapshotInvalidationListener == null
-
-    private fun automaticSuggestionSnapshotFrom(
-        extracted: ExtractedText,
-        expectedSessionEpoch: Long,
-        expectedMonitorToken: Int? = null,
-        recordPreedit: Boolean = false
-    ): OnDeviceAutomaticEditorSnapshot? {
-        if (!canCaptureAutomaticSuggestionSnapshot() || inputSessionEpoch != expectedSessionEpoch ||
-            (expectedMonitorToken != null &&
-                (activeAutomaticSuggestionExtractedTextToken != expectedMonitorToken ||
-                    activeAutomaticSuggestionExtractedTextEpoch != expectedSessionEpoch))
-        ) return null
-        val physical = extracted.text?.toString() ?: return null
-        val physicalSelection = currentInputSelection
-        if (physical.length > ON_DEVICE_CONTEXT_MAX_CHARS || extracted.startOffset != 0 ||
-            extracted.partialStartOffset != -1 || extracted.partialEndOffset != -1 ||
-            extracted.selectionStart != physicalSelection.start ||
-            extracted.selectionEnd != physicalSelection.end ||
-            physicalSelection.start != physicalSelection.end ||
-            physicalSelection.end != physical.length
-        ) return null
-        val info = currentInputEditorInfo
-        val isBuffered = bufferedHangulSessionActive
-        val currentComposingText = composingText.toString()
-        val rawBufferedPrefix = bufferedHangulPrefix
-        val rawEnginePreedit: String
-        val logical: String
-        if (isBuffered) {
-            if (!composing.isEmpty() || currentComposingText.isNotEmpty() ||
-                bufferedHangulEngineResetPending
-            ) return null
-            val enginePreedit = fcitx.runImmediately { inputPanelCached.preedit }
-            rawEnginePreedit = enginePreedit.toString()
-            if (rawEnginePreedit.isEmpty()) {
-                if (enginePreedit.cursor != -1 && enginePreedit.cursor != 0) return null
-            } else if (enginePreedit.cursor != rawEnginePreedit.length) return null
-            if (recordPreedit && automaticSuggestionInvalidationListener != null) {
-                automaticSuggestionInputPanelPreedit = rawEnginePreedit
-            }
-            logical = physical + rawBufferedPrefix + rawEnginePreedit
-        } else {
-            if (composing.isEmpty()) {
-                if (currentComposingText.isNotEmpty()) return null
-            } else if (
-                composing.start < 0 || composing.end > physical.length ||
-                composing.end - composing.start != currentComposingText.length ||
-                physical.substring(composing.start, composing.end) != currentComposingText ||
-                (composingText.cursor != -1 && composingText.cursor != currentComposingText.length) ||
-                composing.end != physical.length
-            ) return null
-            if (recordPreedit && automaticSuggestionInvalidationListener != null) {
-                automaticSuggestionClientPreedit = currentComposingText
-            }
-            rawEnginePreedit = ""
-            logical = physical
-        }
-        if (logical.length !in 1..ON_DEVICE_CONTEXT_MAX_CHARS || logical.isBlank()) return null
-        return OnDeviceAutomaticEditorSnapshot(
-            session = OnDeviceSuggestionSession.Snapshot(
-                scope = OnDeviceSuggestionSession.Scope(
-                    packageName = info.packageName,
-                    fieldId = info.fieldId,
-                    editorSessionId = inputSessionEpoch
-                ),
-                revision = automaticSuggestionRevision,
-                textBeforeCursor = logical,
-                selectionStart = logical.length,
-                selectionEnd = logical.length
-            ),
-            inputType = info.inputType,
-            imeAction = info.imeOptions and EditorInfo.IME_MASK_ACTION,
-            physicalExtractedText = physical,
-            physicalSelectionStart = physicalSelection.start,
-            physicalSelectionEnd = physicalSelection.end,
-            composingStart = composing.start,
-            composingEnd = composing.end,
-            composingText = currentComposingText,
-            bufferedHangul = isBuffered,
-            rawBufferedPrefix = rawBufferedPrefix,
-            rawEnginePreedit = rawEnginePreedit
-        )
-    }
-
-    private fun sameAutomaticSuggestionSnapshot(
-        current: OnDeviceAutomaticEditorSnapshot,
-        expected: OnDeviceAutomaticEditorSnapshot
-    ): Boolean =
-        current.session == expected.session &&
-            current.inputType == expected.inputType &&
-            current.imeAction == expected.imeAction &&
-            current.physicalExtractedText == expected.physicalExtractedText &&
-            current.physicalSelectionStart == expected.physicalSelectionStart &&
-            current.physicalSelectionEnd == expected.physicalSelectionEnd &&
-            current.composingStart == expected.composingStart &&
-            current.composingEnd == expected.composingEnd &&
-            current.composingText == expected.composingText &&
-            current.bufferedHangul == expected.bufferedHangul &&
-            current.rawBufferedPrefix == expected.rawBufferedPrefix &&
-            current.rawEnginePreedit == expected.rawEnginePreedit
-
-    private fun matchesAutomaticSuggestionAfterComposition(
-        snapshot: OnDeviceAutomaticEditorSnapshot
-    ): Boolean {
-        if (!canCaptureAutomaticSuggestionSnapshot()) return false
-        val info = currentInputEditorInfo
-        if (!EditorIdentity.of(info).sameField(snapshot.identity) ||
-            (info.imeOptions and EditorInfo.IME_MASK_ACTION) != snapshot.imeAction ||
-            inputSessionEpoch != snapshot.session.scope.editorSessionId
-        ) return false
-        val connection = currentInputConnection ?: return false
-        val extracted = connection.getExtractedText(ExtractedTextRequest(), 0) ?: return false
-        val physical = extracted.text?.toString() ?: return false
-        val currentSelection = currentInputSelection
-        return extracted.startOffset == 0 && extracted.partialStartOffset == -1 &&
-            extracted.partialEndOffset == -1 && physical == snapshot.session.textBeforeCursor &&
-            extracted.selectionStart == physical.length && extracted.selectionEnd == physical.length &&
-            currentSelection.rangeEquals(physical.length)
-    }
-
-    private fun isAutomaticSuggestionSuffixSafe(
-        snapshot: OnDeviceAutomaticEditorSnapshot,
-        suffix: String
-    ): Boolean {
-        val base = OnDeviceSuggestionPolicy.Input(
-            textBeforeCursor = snapshot.session.textBeforeCursor,
-            packageName = snapshot.session.scope.packageName,
-            inputType = snapshot.inputType,
-            imeAction = snapshot.imeAction,
-            mode = OnDeviceSuggestionPolicy.Mode.WORD
-        )
-        return OnDeviceSuggestionPolicy.parseSuffix(base, suffix) == suffix ||
-            OnDeviceSuggestionPolicy.parseSuffix(
-                OnDeviceSuggestionPolicy.Input(
-                    textBeforeCursor = base.textBeforeCursor,
-                    packageName = base.packageName,
-                    inputType = base.inputType,
-                    imeAction = base.imeAction,
-                    mode = OnDeviceSuggestionPolicy.Mode.SENTENCE
-                ),
-                suffix
-            ) == suffix
-    }
-
-    val personalNgramModel: org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalNgramModel
-
-    val personalSentenceVault: org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalSentenceVault
-
-    /**
-     * In-memory-only record of sentences this user recently sent, per app package. Owned by this
-     * service instance (never persisted), used only to enrich the automatic suggestion prompt with
-     * "what I just said in this app".
-     */
-    val recentSentSentences = org.fcitx.fcitx5.android.input.ai.ondevice.RecentSentSentences()
-
-    val personalGraphStore: org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().personalGraphStore
-
-    val typoCorrector: org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().typoCorrector
-
-    val baseKoreanVocabulary: org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().baseKoreanVocabulary
-
-    val correctionPatternStore: org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
-        get() = org.fcitx.fcitx5.android.FcitxApplication.getInstance().correctionPatternStore
-
-    private val correctionSessionTracker = org.fcitx.fcitx5.android.input.ai.typo.CorrectionSessionTracker()
-    private val correctionSentenceTerminators = charArrayOf('.', '?', '!', '\n')
-
-    @Volatile
-    private var predictionEpoch = 0L
-
-    private data class ContextualPredictionMemoKey(
-        val stroke: String,
-        val context: String,
-        val packageName: String,
-        val epoch: Long,
-        val sentencePackRevision: Long,
-        val generatedSentenceRevision: Long
-    )
-
-    data class ContextualAppendSnapshot(
-        val append: ContextualAppend,
-        val inputSessionEpoch: Long
-    )
-
-    data class ContextualReplacementSnapshot(
-        val replacement: ContextualReplacement,
-        val inputSessionEpoch: Long,
-        val cursor: Int
-    )
-
-    data class ContextualCandidate(
-        val word: CandidateWord,
-        val metricsCandidate: PredictionMetricsSession.Candidate?,
-        val appendSnapshot: ContextualAppendSnapshot? = null,
-        val replacementSnapshot: ContextualReplacementSnapshot? = null
-    )
-
-    data class ContextualCandidateSnapshot(
-        val words: List<ContextualCandidate>,
-        val sentences: List<ContextualCandidate>
-    )
-
-    private data class CachedContextualPredictions(
-        val key: ContextualPredictionMemoKey,
-        val generation: Long,
-        val predictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>
-    )
-
-    private data class ResolvedContextualPredictions(
-        val predictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>,
-        val generation: Long?
-    )
-
-    private fun mergeGeneratedSentencePredictions(
-        predictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>,
-        generatedPredictions: List<org.fcitx.fcitx5.android.input.ai.AiPrediction>
-    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
-        val seen = mutableSetOf<String>()
-        return (predictions + generatedPredictions)
-            .asSequence()
-            .sortedByDescending { it.confidenceScore }
-            .filter { prediction -> seen.add("${prediction.isSentenceCompletion}:${prediction.text}") }
-            .toList()
-    }
-
-    @Volatile
-    private var contextualResultCache: CachedContextualPredictions? = null
-
-    private var contextualPredictKey: ContextualPredictionMemoKey? = null
-    private var contextualPredictJob: Job? = null
-    private var personalLearningTail: Job? = null
-    private var sentencePackRevisionJob: Job? = null
-    private var observedSentencePackRevision = Long.MIN_VALUE
-    private var nextContextualPredictionGeneration = 0L
-    private val predictionScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val predictionMetricsSession = PredictionMetricsSession()
-
-    private fun observeSentencePackRevision() {
-        val sentencePacks = FcitxApplication.getInstance().sentencePacks
-        sentencePacks.prepare()
-        observedSentencePackRevision = sentencePacks.revision
-        sentencePackRevisionJob?.cancel()
-        sentencePackRevisionJob = lifecycleScope.launch {
-            sentencePacks.status
-                .map { it.revision }
-                .distinctUntilChanged()
-                .collect { revision ->
-                    if (revision == observedSentencePackRevision) return@collect
-                    observedSentencePackRevision = revision
-                    contextualPredictJob?.cancel()
-                    contextualPredictJob = null
-                    contextualPredictKey = null
-                    contextualResultCache = null
-                    predictionEpoch++
-                    inputView?.refreshContextualCandidates()
-                }
-        }
-    }
-
-    private val ngramSaveHandler = Handler(Looper.getMainLooper())
-    private var pendingNgramSaveRunnable: Runnable? = null
-    private var pendingCorrectionSaveRunnable: Runnable? = null
-    private var automaticSuggestionTtlRunnable: Runnable? = null
-    private var automaticSuggestionHideRunnable: Runnable? = null
-
-    private fun scheduleNgramSave() {
-        pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        val runnable = Runnable { launchPersonalModelSave() }
-        pendingNgramSaveRunnable = runnable
-        ngramSaveHandler.postDelayed(runnable, 1500L)
-    }
-
-    private fun enqueuePersonalLearning(
-        afterLearningOnMain: (() -> Unit)? = null,
-        action: () -> Unit
-    ) {
-        val previous = personalLearningTail
-        personalLearningTail = FcitxApplication.getInstance().applicationScope.launch {
-            previous?.join()
-            action()
-            val persistAfterDestroyed = withContext(Dispatchers.Main) {
-                predictionEpoch++
-                if (lifecycle.currentState == Lifecycle.State.DESTROYED) {
-                    true
-                } else {
-                    scheduleNgramSave()
-                    inputView?.postRefreshContextualCandidates(16L)
-                    afterLearningOnMain?.invoke()
-                    false
-                }
-            }
-            if (persistAfterDestroyed) {
-                personalizedStore.save()
-                personalNgramModel.save()
-                personalSentenceVault.save()
-                FcitxApplication.getInstance().predictionMetricsStore.save()
-            }
-        }
-    }
-
-    private fun enqueueContextualSelectionFeedback(
-        contextBeforeReinforce: String,
-        selectedSentence: String,
-        reinforcedSentence: String,
-        packageName: String
-    ) {
-        enqueuePersonalLearning {
-            reinforcementTracker.onCandidateSelected(selectedSentence, packageName)
-            personalNgramModel.reinforce(contextBeforeReinforce, reinforcedSentence, packageName)
-        }
-    }
-
-    /** Persists the on-device personal learning stores (n-gram model + sentence RAG vault) off the main thread. */
-    private fun launchPersonalModelSave() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            personalNgramModel.save()
-            personalSentenceVault.save()
-            FcitxApplication.getInstance().predictionMetricsStore.save()
-        }
-    }
-
-    private fun scheduleCorrectionSave() {
-        pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        val runnable = Runnable {
-            lifecycleScope.launch(Dispatchers.IO) { correctionPatternStore.save() }
-        }
-        pendingCorrectionSaveRunnable = runnable
-        ngramSaveHandler.postDelayed(runnable, 1500L)
-    }
-
-    private val typingDnaCommitSink by lazy {
-        org.fcitx.fcitx5.android.input.ai.TypingDnaCommitSink(userTypingContextCollector)
-    }
-
-    val userTypingContextCollector by lazy {
-        org.fcitx.fcitx5.android.input.ai.UserTypingContextCollector(
-            onSentenceCommitted = { pkg, sentence ->
-                val capturedPackageName = pkg
-                val capturedSentence = sentence
-                // Computed once here (not inside the queued action below) so a profile change
-                // that happens while this commit is still queued can't retroactively change
-                // which persona it gets attributed to.
-                val capturedPersona = org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry.classify(
-                    capturedPackageName, effectiveAppProfile?.source?.persona
-                )
-                val trackLearnedMetrics = allowsTextInspectionFeatures()
-                var feedbackCategory: String? = null
-                var feedbackPendingCount = 0
-                enqueuePersonalLearning(
-                    afterLearningOnMain = {
-                        val category = feedbackCategory
-                        if (category != null && !collectionFeedbackEmittedForSession) {
-                            collectionFeedbackEmittedForSession = true
-                            publishCollectionFeedbackIfEnabled(
-                                CollectionFeedbackEvent(
-                                    category = category,
-                                    pendingCount = feedbackPendingCount,
-                                    threshold = typingDnaVault.thresholdPerCategory,
-                                    compiled = false,
-                                    atMs = System.currentTimeMillis()
-                                )
-                            )
-                        }
-                    }
-                ) {
-                    typingDnaVault.recordSentence(capturedPackageName, capturedSentence, personaOverride = capturedPersona)
-                    feedbackCategory = capturedPersona
-                    feedbackPendingCount = typingDnaVault.pendingByCategory()[capturedPersona] ?: 0
-                    val beforeLearning = if (trackLearnedMetrics) personalNgramModel.stats() else null
-                    personalNgramModel.learn(capturedSentence, capturedPackageName, personaOverride = capturedPersona)
-                    beforeLearning?.let { before ->
-                        val after = personalNgramModel.stats()
-                        val learnedSentences = (after.learnedSentences - before.learnedSentences).coerceAtLeast(0)
-                        val learnedWords = (after.unigrams - before.unigrams).coerceAtLeast(0)
-                        if (learnedSentences > 0 || learnedWords > 0) {
-                            FcitxApplication.getInstance().predictionMetricsStore.recordLearned(learnedSentences, learnedWords)
-                        }
-                    }
-                    personalSentenceVault.record(capturedSentence, capturedPackageName, personaOverride = capturedPersona)
-                    recentSentSentences.record(capturedPackageName, capturedSentence)
-                    org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer.tokenize(capturedSentence).forEach { token ->
-                        typoCorrector.addWord(
-                            token,
-                            org.fcitx.fcitx5.android.input.ai.PersonalNgramModel.personalPrior(
-                                personalNgramModel.unigramCount(token)
-                            )
-                        )
-                    }
-                }
-            },
-            diagnostics = FcitxApplication.getInstance().collectionDiagnostics
-        )
-    }
-
-    val contextualPredictor: org.fcitx.fcitx5.android.input.ai.AiContextualPredictor by lazy {
-        org.fcitx.fcitx5.android.input.ai.AiContextualPredictor(
-            morphology = morphologyEngine,
-            semanticPredictor = org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor(),
-            personalizedStore = personalizedStore,
-            ngram = personalNgramModel,
-            typoCorrector = typoCorrector,
-            baseVocabulary = baseKoreanVocabulary,
-            correctionStore = correctionPatternStore,
-            personalSentenceVault = personalSentenceVault,
-            personalGraphStore = personalGraphStore,
-            sentencePackLookup = FcitxApplication.getInstance().sentencePacks::complete,
-            bundledNgram = { FcitxApplication.getInstance().bundledKoreanNgram }
-        )
-    }
-
-    private fun getEmailDomainPredictions(
-        beforeCursor: String,
-        activePreedit: String,
-        limit: Int
-    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
-        val emailDomains = listOf(
-            "gmail.com",
-            "naver.com",
-            "kakao.com",
-            "daum.net",
-            "icloud.com",
-            "outlook.com"
-        )
-        val trimmedBefore = beforeCursor.trim()
-        val atIndex = trimmedBefore.lastIndexOf('@')
-
-        val results = mutableListOf<org.fcitx.fcitx5.android.input.ai.AiPrediction>()
-
-        if (atIndex >= 0) {
-            val queryDomain = (trimmedBefore.substring(atIndex + 1) + activePreedit).trim().lowercase()
-            val matched = if (queryDomain.isEmpty()) {
-                emailDomains
-            } else {
-                emailDomains.filter { it.startsWith(queryDomain) }
-            }
-            matched.take(limit).forEachIndexed { idx, domain ->
-                results.add(
-                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
-                        text = domain,
-                        confidenceScore = 0.99f - (idx * 0.01f),
-                        isSentenceCompletion = false,
-                        source = "email_domain",
-                        badge = "📧"
-                    )
-                )
-            }
-        } else {
-            emailDomains.take(limit).forEachIndexed { idx, domain ->
-                results.add(
-                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
-                        text = "@$domain",
-                        confidenceScore = 0.98f - (idx * 0.01f),
-                        isSentenceCompletion = false,
-                        source = "email_domain",
-                        badge = "📧"
-                    )
-                )
-            }
-        }
-        return results
-    }
-
-    private fun getUrlDomainPredictions(
-        beforeCursor: String,
-        activePreedit: String,
-        limit: Int
-    ): List<org.fcitx.fcitx5.android.input.ai.AiPrediction> {
-        val tlds = listOf(".com", ".co.kr", ".net", ".kr", ".org")
-        val results = mutableListOf<org.fcitx.fcitx5.android.input.ai.AiPrediction>()
-        val trimmed = (beforeCursor.trim() + activePreedit.trim()).lowercase()
-        val lastDotIndex = trimmed.lastIndexOf('.')
-        val queryExt = if (lastDotIndex >= 0 && lastDotIndex >= trimmed.length - 6) {
-            trimmed.substring(lastDotIndex)
-        } else {
-            ""
-        }
-        val matched = if (queryExt.isNotEmpty() && queryExt != ".") {
-            tlds.filter { it.startsWith(queryExt) }
-        } else {
-            tlds
-        }
-        if (!tlds.any { trimmed.endsWith(it) }) {
-            matched.take(limit).forEachIndexed { idx, tld ->
-                results.add(
-                    org.fcitx.fcitx5.android.input.ai.AiPrediction(
-                        text = tld,
-                        confidenceScore = 0.95f - (idx * 0.01f),
-                        isSentenceCompletion = false,
-                        source = "url_tld",
-                        badge = ""
-                    )
-                )
-            }
-        }
-        return results
-    }
-
-    private fun getRawContextualPredictions(limit: Int): ResolvedContextualPredictions {
-        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-
-        val isEmail = EditorPrivacyPolicy.isEmailAddressField(currentInputEditorInfo, capabilityFlags)
-        val isPhone = EditorPrivacyPolicy.isPhoneField(currentInputEditorInfo, capabilityFlags)
-        val isNumeric = EditorPrivacyPolicy.isNumericField(currentInputEditorInfo, capabilityFlags)
-        val isUrl = EditorPrivacyPolicy.isUrlField(currentInputEditorInfo, capabilityFlags)
-        val isConversational = EditorPrivacyPolicy.isConversationalTextField(currentInputEditorInfo, capabilityFlags)
-
-        // 1. Phone or pure numeric inputs -> strictly no conversational predictions
-        if (isPhone || isNumeric) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-
-        val ic = currentInputConnection ?: run {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-        val beforeCursor = ic.getTextBeforeCursor(128, 0)?.toString().orEmpty()
-
-        val activePreedit = activePreeditForContextualInput()
-
-        // 2. Email field -> smart email domain suggestions, zero sentence completions
-        if (isEmail) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(getEmailDomainPredictions(beforeCursor, activePreedit, limit), null)
-        }
-
-        // 3. URL field -> web domain suggestions, zero sentence completions
-        if (isUrl) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(getUrlDomainPredictions(beforeCursor, activePreedit, limit), null)
-        }
-
-        // 4. Non-conversational text field (e.g. search filter with NO_SUGGESTIONS) -> emptyList()
-        if (!isConversational) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-
-        val pkgName = currentInputEditorInfo.packageName
-        val resolved = org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput.resolve(beforeCursor, activePreedit)
-        // 진짜 유휴(스트로크도 없고 커서 앞 문맥도 비어 있음)일 때만 예측을 건너뛴다. 그래야
-        // 후보 영역이 접혀 도구 줄만 남는다. 단어를 치고 스페이스를 눌러 스트로크가 비었어도
-        // 커서 앞에 문맥이 있으면(예: "회의 참석 ") 다음 단어·입력 이어쓰기(회의 참석하겠습니다)를
-        // 계속 제시한다.
-        if (resolved.stroke.isBlank() && resolved.context.isBlank()) {
-            predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
-        }
-
-        val application = FcitxApplication.getInstance()
-        val memoKey = ContextualPredictionMemoKey(
-            resolved.stroke,
-            resolved.context,
-            pkgName,
-            predictionEpoch,
-            application.sentencePacks.revision,
-            if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank.revision else 0L
-        )
-        val inputSessionEpoch = currentInputSessionEpoch
-        contextualResultCache?.let { cached ->
-            if (cached.key == memoKey) {
-                return ResolvedContextualPredictions(cached.predictions, cached.generation)
-            }
-        }
-        predictionMetricsSession.reset()
-
-        val rawFullContext = org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput.rawFullContext(
-            resolved.stroke,
-            resolved.context
-        )
-        val immediateResults = org.fcitx.fcitx5.android.input.ai.ImmediateContextualPredictions.collect(
-            input = org.fcitx.fcitx5.android.input.ai.ImmediateContextualPredictions.Input(
-                rawContext = rawFullContext,
-                packageName = pkgName,
-                inputSessionEpoch = inputSessionEpoch,
-                limit = limit
-            ),
-            sentencePackLookup = application.sentencePacks::complete,
-            generatedSentenceLookup = if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank::complete else null,
-            generatedSpacingLookup = if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank::suggestSpacing else null
-        )
-        val immediateGeneration = ++nextContextualPredictionGeneration
-        contextualResultCache = CachedContextualPredictions(
-            key = memoKey,
-            generation = immediateGeneration,
-            predictions = immediateResults
-        )
-        if (contextualPredictKey != memoKey) {
-            contextualPredictJob?.cancel()
-            contextualPredictKey = memoKey
-            contextualPredictJob = predictionScope.launch {
-                val results = contextualPredictor.predict(
-                    currentStroke = resolved.stroke,
-                    contextBeforeCursor = resolved.context,
-                    packageName = pkgName,
-                    limit = limit,
-                    inputSessionEpoch = inputSessionEpoch
-                )
-                withContext(Dispatchers.Main) {
-                    val currentFieldIsConversational =
-                        !EditorPrivacyPolicy.isEmailAddressField(currentInputEditorInfo, capabilityFlags) &&
-                            !EditorPrivacyPolicy.isPhoneField(currentInputEditorInfo, capabilityFlags) &&
-                            !EditorPrivacyPolicy.isNumericField(currentInputEditorInfo, capabilityFlags) &&
-                            !EditorPrivacyPolicy.isUrlField(currentInputEditorInfo, capabilityFlags) &&
-                            EditorPrivacyPolicy.isConversationalTextField(currentInputEditorInfo, capabilityFlags)
-                    if (
-                        contextualPredictKey == memoKey &&
-                        currentInputConnection != null &&
-                        currentInputSessionEpoch == inputSessionEpoch &&
-                        allowsTextInspectionFeatures() &&
-                        currentInputSelection.isEmpty() &&
-                        currentFieldIsConversational
-                    ) {
-                        val generatedImmediateResults = immediateResults.filter {
-                            it.source == "ondevice_generated"
-                        }
-                        val publishedResults = when {
-                            results.isEmpty() && immediateResults.isNotEmpty() -> immediateResults
-                            generatedImmediateResults.isEmpty() -> results
-                            else -> mergeGeneratedSentencePredictions(results, generatedImmediateResults)
-                        }
-                        contextualResultCache = CachedContextualPredictions(
-                            key = memoKey,
-                            generation = ++nextContextualPredictionGeneration,
-                            predictions = publishedResults
-                        )
-                        inputView?.refreshContextualCandidates()
-                    }
-                }
-            }
-        }
-        return ResolvedContextualPredictions(immediateResults, immediateGeneration)
-    }
+    fun retryAutomaticSuggestionWarmup() = automaticSuggestion.retryAutomaticSuggestionWarmup()
 
     private fun activePreeditForContextualInput(): String {
         val clientPreedit = composingText.toString()
@@ -3725,389 +1650,35 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
     }
 
-    fun getContextualSentencePredictions(limit: Int = 2): List<CandidateWord> {
-        val predictions = getRawContextualPredictions(limit = 10).predictions
-        return predictions.filter { it.isSentenceCompletion }.take(limit).mapIndexed { index, pred ->
-            CandidateWord(
-                label = (index + 1).toString(),
-                text = pred.text,
-                comment = pred.badge
-            )
-        }
-    }
+    fun getContextualSentencePredictions(limit: Int = 2): List<CandidateWord> =
+        contextualPrediction.getContextualSentencePredictions(limit)
 
-    fun getContextualWordPredictions(limit: Int = 4): List<CandidateWord> {
-        val predictions = getRawContextualPredictions(limit = 10).predictions
-        return predictions.filter { !it.isSentenceCompletion }.take(limit).mapIndexed { index, pred ->
-            CandidateWord(
-                label = (index + 1).toString(),
-                text = pred.text,
-                comment = pred.badge
-            )
-        }
-    }
+    fun getContextualWordPredictions(limit: Int = 4): List<CandidateWord> =
+        contextualPrediction.getContextualWordPredictions(limit)
 
-    /**
-     * Provides one immutable cache generation to the candidate UI so metrics preserve the source
-     * that produced each rendered candidate instead of resolving a source from current text later.
-     */
-    fun getContextualCandidateSnapshot(wordLimit: Int = 4, sentenceLimit: Int = 2): ContextualCandidateSnapshot {
-        val resolved = getRawContextualPredictions(limit = 10)
-        val generation = resolved.generation
-        if (generation != null) {
-            predictionMetricsSession.activate(generation)
-        }
-        fun toCandidate(prediction: org.fcitx.fcitx5.android.input.ai.AiPrediction, index: Int): ContextualCandidate =
-            ContextualCandidate(
-                word = CandidateWord(
-                    label = index.toString(),
-                    text = prediction.text,
-                    comment = prediction.badge
-                ),
-                metricsCandidate = generation?.let {
-                    PredictionMetricsSession.Candidate(it, prediction.text, prediction.source)
-                },
-                appendSnapshot = prediction.append?.let { append ->
-                    ContextualAppendSnapshot(append, inputSessionEpoch)
-                },
-                replacementSnapshot = prediction.replacement?.let { replacement ->
-                    ContextualReplacementSnapshot(
-                        replacement = replacement,
-                        inputSessionEpoch = inputSessionEpoch,
-                        cursor = currentInputSelection.start
-                    )
-                }
-            )
+    fun getContextualCandidateSnapshot(wordLimit: Int = 4, sentenceLimit: Int = 2): ContextualCandidateSnapshot =
+        contextualPrediction.getContextualCandidateSnapshot(wordLimit, sentenceLimit)
 
-        val words = resolved.predictions.filter { !it.isSentenceCompletion }
-            .take(wordLimit)
-            .mapIndexed { index, prediction -> toCandidate(prediction, index + 1) }
-        val sentences = resolved.predictions.filter { it.isSentenceCompletion }
-            .take(sentenceLimit)
-            .mapIndexed { index, prediction -> toCandidate(prediction, index + 1) }
-        return ContextualCandidateSnapshot(words = words, sentences = sentences)
-    }
+    fun recordContextualCandidateShown(candidate: PredictionMetricsSession.Candidate?) =
+        contextualPrediction.recordContextualCandidateShown(candidate)
 
-    fun recordContextualCandidateShown(candidate: PredictionMetricsSession.Candidate?) {
-        if (candidate == null) return
-        if (!allowsTextInspectionFeatures()) {
-            predictionMetricsSession.reset()
-            return
-        }
-        if (predictionMetricsSession.recordShown(candidate)) {
-            FcitxApplication.getInstance().applicationScope.launch {
-                FcitxApplication.getInstance().predictionMetricsStore.recordShown(1)
-                withContext(Dispatchers.Main) {
-                    scheduleNgramSave()
-                }
-            }
-        }
-    }
+    fun recordContextualCandidatesIgnored(offeredSentences: List<String>) =
+        contextualPrediction.recordContextualCandidatesIgnored(offeredSentences)
 
-    private fun recordContextualCandidateAccepted(candidate: PredictionMetricsSession.Candidate?, committed: Boolean) {
-        if (candidate == null) return
-        if (!allowsTextInspectionFeatures()) {
-            predictionMetricsSession.reset()
-            return
-        }
-        if (predictionMetricsSession.recordAccepted(candidate, committed)) {
-            FcitxApplication.getInstance().applicationScope.launch {
-                if (OnDeviceAiSupport.isSupported && candidate.source == "ondevice_generated") {
-                    try {
-                        FcitxApplication.getInstance().generatedSentenceBank.recordAcceptedSuffix(candidate.text)
-                    } catch (error: Exception) {
-                        Timber.w("Generated material acceptance save failed: ${error.javaClass.simpleName}")
-                    }
-                }
-                FcitxApplication.getInstance().predictionMetricsStore.recordAccepted(candidate.source, savedKeystrokes = 0)
-                withContext(Dispatchers.Main) {
-                    scheduleNgramSave()
-                }
-            }
-        }
-    }
-
-    fun recordContextualCandidatesIgnored(offeredSentences: List<String>) {
-        if (!allowsTextInspectionFeatures() || offeredSentences.isEmpty()) return
-        val capturedSentences = offeredSentences.toList()
-        enqueuePersonalLearning {
-            reinforcementTracker.onCandidatesIgnored(capturedSentences)
-        }
-    }
-
-    fun recordContextualCandidateRejected(sentence: String, heavyPenalty: Boolean = true) {
-        if (!allowsTextInspectionFeatures()) return
-        val capturedSentence = sentence
-        enqueuePersonalLearning {
-            reinforcementTracker.onCandidateRejected(capturedSentence, heavyPenalty)
-        }
-    }
-
-    /** 마지막으로 만든 예측 결과 메모에서 텍스트가 같은 후보의 replaceLength를 찾는다. */
-    private fun replaceLengthForCandidate(sentence: String): Int =
-        contextualResultCache?.predictions?.firstOrNull { it.text == sentence }?.replaceLength ?: 0
-
-    private fun commitContextualCandidateText(
-        connection: InputConnection,
-        replaceLength: Int,
-        textToCommit: String
-    ): Boolean {
-        if (replaceLength <= 0) {
-            return commitTextToEditor(textToCommit, textToCommit.length)
-        }
-        val start = currentInputSelection.start
-        val end = currentInputSelection.end
-        if (start != end || start < replaceLength) return false
-        val removedText = connection.getTextBeforeCursor(replaceLength, 0)?.toString() ?: return false
-        if (removedText.length != replaceLength || !currentInputSelection.rangeEquals(start, end)) {
-            return false
-        }
-        captureCorrectionBoundarySnapshot()
-        val replacementStart = start - replaceLength
-        if (!replaceAiRange(
-                connection = connection,
-                start = replacementStart,
-                end = start,
-                replacement = textToCommit,
-                restoreStart = start,
-                restoreEnd = end
-            )
-        ) {
-            return false
-        }
-        typingDnaCommitSink.onEditorSuffixDeleted(
-            currentInputEditorInfo?.packageName,
-            removedText,
-            allowsTextInspectionFeatures()
-        )
-        observeCommittedEditorText(textToCommit)
-        selection.predict(replacementStart + textToCommit.length)
-        inputView?.postRefreshContextualCandidates(16L)
-        return true
-    }
-
-    private fun commitConfirmedContextualAppend(
-        sentence: String,
-        appendSnapshot: ContextualAppendSnapshot,
-        metricsCandidate: PredictionMetricsSession.Candidate?
-    ): Boolean {
-        if (!allowsTextInspectionFeatures()) return false
-        if (sentence != appendSnapshot.append.suffix || appendSnapshot.inputSessionEpoch != inputSessionEpoch) {
-            return false
-        }
-        if (!finishCompositionForDirectAction()) return false
-        if (appendSnapshot.inputSessionEpoch != inputSessionEpoch) return false
-        val cursor = currentInputSelection.start
-        if (cursor != currentInputSelection.end) return false
-        val connection = currentInputConnection ?: return false
-        val beforeCursor = connection.getTextBeforeCursor(1024, 0)?.toString() ?: return false
-        if (appendSnapshot.inputSessionEpoch != inputSessionEpoch ||
-            !currentInputSelection.rangeEquals(cursor, cursor)
-        ) {
-            return false
-        }
-        val textToCommit = appendSnapshot.append.insertionFor(beforeCursor) ?: return false
-        captureCorrectionBoundarySnapshot()
-        if (!commitAiTextAtCursor(connection, cursor, textToCommit, cursor, cursor)) return false
-
-        observeCommittedEditorText(textToCommit)
-        selection.predict(cursor + textToCommit.length)
-        inputView?.postRefreshContextualCandidates(16L)
-        enqueueContextualSelectionFeedback(
-            contextBeforeReinforce = beforeCursor.takeLast(64),
-            selectedSentence = sentence,
-            reinforcedSentence = appendSnapshot.append.suffix,
-            packageName = currentInputEditorInfo.packageName
-        )
-        predictionEpoch++
-        recordContextualCandidateAccepted(metricsCandidate?.takeIf { it.text == sentence }, committed = true)
-        return true
-    }
-
-    private fun commitConfirmedContextualReplacement(
-        sentence: String,
-        replacementSnapshot: ContextualReplacementSnapshot,
-        metricsCandidate: PredictionMetricsSession.Candidate?
-    ): Boolean {
-        val replacement = replacementSnapshot.replacement
-        if (!allowsTextInspectionFeatures() ||
-            !EditorPrivacyPolicy.isConversationalTextField(currentInputEditorInfo, capabilityFlags) ||
-            sentence != replacement.replacement ||
-            replacementSnapshot.inputSessionEpoch != inputSessionEpoch
-        ) {
-            return false
-        }
-        val capturedCursor = currentInputSelection.start
-        if (capturedCursor != currentInputSelection.end ||
-            capturedCursor != replacementSnapshot.cursor ||
-            capturedCursor != replacement.expectedContext.length
-        ) {
-            return false
-        }
-        if (!finishCompositionForDirectAction() || replacementSnapshot.inputSessionEpoch != inputSessionEpoch) {
-            return false
-        }
-        val cursor = currentInputSelection.start
-        if (cursor != currentInputSelection.end ||
-            cursor != replacementSnapshot.cursor ||
-            cursor != replacement.expectedContext.length
-        ) {
-            return false
-        }
-        val connection = currentInputConnection ?: return false
-        val beforeCursor = connection.getTextBeforeCursor(replacement.expectedContext.length + 1, 0)
-            ?.toString() ?: return false
-        if (beforeCursor != replacement.expectedContext ||
-            replacementSnapshot.inputSessionEpoch != inputSessionEpoch ||
-            !currentInputSelection.rangeEquals(cursor, cursor)
-        ) {
-            return false
-        }
-        if (!replaceAiRange(
-                connection = connection,
-                start = 0,
-                end = replacement.expectedContext.length,
-                replacement = replacement.replacement,
-                restoreStart = cursor,
-                restoreEnd = cursor
-            )
-        ) {
-            return false
-        }
-        selection.predict(replacement.replacement.length)
-        inputView?.postRefreshContextualCandidates(16L)
-        predictionEpoch++
-        recordContextualCandidateAccepted(metricsCandidate?.takeIf { it.text == sentence }, committed = true)
-        return true
-    }
+    fun recordContextualCandidateRejected(sentence: String, heavyPenalty: Boolean = true) =
+        contextualPrediction.recordContextualCandidateRejected(sentence, heavyPenalty)
 
     fun commitContextualSentence(
         sentence: String,
         metricsCandidate: PredictionMetricsSession.Candidate? = null,
         appendSnapshot: ContextualAppendSnapshot? = null,
         replacementSnapshot: ContextualReplacementSnapshot? = null
-    ): Boolean {
-        if (!allowsTextInspectionFeatures()) return false
-        if (replacementSnapshot != null) {
-            return commitConfirmedContextualReplacement(sentence, replacementSnapshot, metricsCandidate)
-        }
-        if (appendSnapshot != null) {
-            return commitConfirmedContextualAppend(sentence, appendSnapshot, metricsCandidate)
-        }
-        if (!finishCompositionForDirectAction()) return false
-        val ic = currentInputConnection ?: return false
-        val beforeCursor = ic.getTextBeforeCursor(512, 0)?.toString().orEmpty()
-        val capturedMetricsCandidate = metricsCandidate?.takeIf { it.text == sentence }
-
-        val replaceLength = replaceLengthForCandidate(sentence)
-        if (replaceLength > 0) {
-            val contextBeforeReinforce = beforeCursor.dropLast(replaceLength).takeLast(64)
-            val shouldAppendSpace = !sentence.endsWith(" ") && !sentence.endsWith("\n")
-            val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
-            val committed = commitContextualCandidateText(ic, replaceLength, textToCommit)
-            if (committed) {
-                enqueueContextualSelectionFeedback(
-                    contextBeforeReinforce = contextBeforeReinforce,
-                    selectedSentence = sentence,
-                    reinforcedSentence = sentence,
-                    packageName = currentInputEditorInfo.packageName
-                )
-                predictionEpoch++
-                recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
-            }
-            return committed
-        }
-
-        if (!sentence.contains(" ")) {
-            val lastSentence = beforeCursor
-                .substringAfterLast('.')
-                .substringAfterLast('?')
-                .substringAfterLast('!')
-                .substringAfterLast('\n')
-                .trim()
-            if (lastSentence.isNotEmpty()) {
-                val typoPairs = contextualPredictor.typoEngine.findTypoCorrectionsInSentence(lastSentence)
-                val matchingPair = typoPairs.firstOrNull { it.second == sentence }
-                if (matchingPair != null && !lastSentence.endsWith(matchingPair.first)) {
-                    val correctedSentence = contextualPredictor.typoEngine.correctSentence(lastSentence)
-                    if (correctedSentence != null) {
-                        val trailingSpaces = beforeCursor.length - beforeCursor.trimEnd().length
-                        val replacementLength = lastSentence.length + trailingSpaces
-                        val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
-                        val textToCommit = if (correctedSentence.endsWith(" ") || correctedSentence.endsWith("\n")) correctedSentence else "$correctedSentence "
-                        val committed = commitContextualCandidateText(ic, replacementLength, textToCommit)
-                        if (committed) {
-                            enqueueContextualSelectionFeedback(
-                                contextBeforeReinforce = contextBeforeReinforce,
-                                selectedSentence = sentence,
-                                reinforcedSentence = correctedSentence,
-                                packageName = currentInputEditorInfo.packageName
-                            )
-                            predictionEpoch++
-                            recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
-                        }
-                        return committed
-                    }
-                }
-            }
-        }
-
-        val isEmailField = EditorPrivacyPolicy.isEmailAddressField(currentInputEditorInfo, capabilityFlags)
-        val isEmailDomain = sentence.startsWith("@") || sentence.endsWith(".com") || sentence.endsWith(".net") || sentence.endsWith(".co.kr") || sentence.endsWith(".io") || sentence.endsWith(".org")
-        val isUrlField = EditorPrivacyPolicy.isUrlField(currentInputEditorInfo, capabilityFlags)
-        val isUrlTld = sentence.startsWith(".") && (sentence.endsWith(".com") || sentence.endsWith(".net") || sentence.endsWith(".org") || sentence.endsWith(".kr") || sentence.endsWith(".co.kr") || sentence.endsWith(".io"))
-        val urlReplaceLength = if (isUrlField && isUrlTld && beforeCursor.endsWith(".")) 1 else 0
-
-        if (isEmailField && beforeCursor.contains("@")) {
-            val afterAt = beforeCursor.substringAfterLast('@')
-            val replacementLength = if (sentence.startsWith("@")) {
-                afterAt.length + 1
-            } else if (afterAt.isNotEmpty() && sentence.startsWith(afterAt)) {
-                afterAt.length
-            } else {
-                0
-            }
-            val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
-            val committed = commitContextualCandidateText(ic, replacementLength, sentence)
-            if (committed) {
-                enqueueContextualSelectionFeedback(
-                    contextBeforeReinforce = contextBeforeReinforce,
-                    selectedSentence = sentence,
-                    reinforcedSentence = sentence,
-                    packageName = currentInputEditorInfo.packageName
-                )
-                predictionEpoch++
-                recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
-            }
-            return committed
-        }
-
-        val overlapLengthInBeforeCursor = if (isEmailField || isUrlField) {
-            0
-        } else {
-            contextualPredictor.typoEngine.calculateReplacementOverlap(beforeCursor, sentence)
-        }
-        val replacementLength = if (overlapLengthInBeforeCursor > 0) {
-            overlapLengthInBeforeCursor
-        } else {
-            urlReplaceLength
-        }
-        val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
-        val shouldAppendSpace = !isEmailField && !isUrlField && !isEmailDomain && !isUrlTld && !sentence.endsWith(" ") && !sentence.endsWith("\n")
-        val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
-        val committed = commitContextualCandidateText(ic, replacementLength, textToCommit)
-        if (committed) {
-            enqueueContextualSelectionFeedback(
-                contextBeforeReinforce = contextBeforeReinforce,
-                selectedSentence = sentence,
-                reinforcedSentence = sentence,
-                packageName = currentInputEditorInfo.packageName
-            )
-            predictionEpoch++
-            recordContextualCandidateAccepted(capturedMetricsCandidate, committed = true)
-        }
-        return committed
-    }
+    ): Boolean = contextualPrediction.commitContextualSentence(
+        sentence,
+        metricsCandidate,
+        appendSnapshot,
+        replacementSnapshot
+    )
 
     fun captureTypoRecoverySnapshot(): TypoRecoverySnapshot? {
         if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return null
@@ -4170,7 +1741,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     ): Boolean {
         if (isInternalPromptInputOwned && !allowPromptStart) return false
         val ic = currentInputConnection ?: return false
-        captureCorrectionBoundarySnapshot()
+        personalLearning.captureCorrectionBoundarySnapshot()
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
             val c = if (cursor == -1) text.length else cursor
@@ -4208,7 +1779,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             dispatched
         }
         if (dispatchedResult) {
-            notifyOnDeviceContextSnapshotInvalidated()
+            onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
             observeCommittedEditorText(text)
             inputView?.postRefreshContextualCandidates(16L)
         }
@@ -4804,14 +2375,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // Android can reuse identical EditorInfo metadata for a different text field. An internal
         // prompt therefore never survives a new input-session boundary, even for a same-app
         // restart: dropping a draft is safer than sending a later GIF/AI action to the wrong field.
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         inputSessionEpoch += 1
-        collectionPrivacyDropLogged = false
-        collectionFeedbackEmittedForSession = false
-        predictionEpoch++
-        predictionMetricsSession.reset()
+        personalLearning.onStartInput()
+        contextualPrediction.onStartInput()
         correctionSessionTracker.onEditorChanged()
-        cancelInternalPromptCapture(discardPreStartCallbacks = true)
+        internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.onEditorChanged(
             DynamicPhraseEditorTarget(
                 packageName = attribute.packageName,
@@ -4842,7 +2411,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         bufferedHangulSessionActive = nextBufferedHangulSessionActive
         inputView?.refreshBufferedHangulPreedit()
-        typingDnaCommitSink.onEditorSessionStarted(attribute.packageName, attribute.fieldId, restarting)
+        personalLearning.typingDnaCommitSink.onEditorSessionStarted(attribute.packageName, attribute.fieldId, restarting)
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
@@ -4885,7 +2454,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
-        cancelAutomaticSuggestionHideClose()
+        automaticSuggestion.cancelAutomaticSuggestionHideClose()
         OnDeviceGenerationControl.onKeyboardVisibilityChanged(true)
         OnDeviceGenerationControl.onInputViewVisibilityChanged(true)
         val viewCapabilityFlags = CapabilityFlags.fromEditorInfo(info)
@@ -4924,13 +2493,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             showStatusIcon(StatusIconMapping.fromEntry(fcitx.runImmediately { inputMethodEntryCached }))
         }
-        if (automaticSuggestionsSupported && !automaticSuggestionOptInRestored) {
-            automaticSuggestionOptInRestored = true
-            if (AppPrefs.getInstance().internal.automaticOnDeviceSuggestionsOptIn.getValue()) {
-                setAutomaticSuggestionsEnabled(true)
-            }
-        }
-        startAutomaticSuggestionWarmupIfAllowed(info, viewCapabilityFlags)
+        automaticSuggestion.onStartInputView(info, viewCapabilityFlags)
     }
 
     override fun onUpdateSelection(
@@ -4942,7 +2505,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesEnd: Int
     ) {
         lastEditorActivityAtMs = SystemClock.elapsedRealtime()
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         currentInputEditorInfo.let { info ->
             SensitivePhraseSession.onEditorChanged(
                 DynamicPhraseEditorTarget(
@@ -4965,17 +2528,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             cursorUpdateIndex
         )
         inputView?.updateSelection(newSelStart, newSelEnd)
-        flushTypingDnaIfEditorEmptied(newSelStart, newSelEnd)
+        personalLearning.flushTypingDnaIfEditorEmptied(newSelStart, newSelEnd)
     }
 
     override fun onUpdateExtractedText(token: Int, text: ExtractedText?) {
-        if (activeOnDeviceContextExtractedTextToken == token) {
-            clearOnDeviceContextExtractedTextMonitor()
-            onDeviceContextSnapshotInvalidationListener?.invoke()
+        if (onDeviceContextCompletion.activeExtractedTextToken == token) {
+            onDeviceContextCompletion.onExtractedTextUpdated()
             return
         }
-        if (activeAutomaticSuggestionExtractedTextToken == token) {
-            notifyAutomaticSuggestionSnapshotInvalidated()
+        if (automaticSuggestion.activeExtractedTextToken == token) {
+            automaticSuggestion.notifyAutomaticSuggestionSnapshotInvalidated()
             return
         }
         super.onUpdateExtractedText(token, text)
@@ -5046,13 +2608,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // Prompt composition lives exclusively in Fcitx and its internal buffer. A delayed editor
         // selection callback must not restore a composing span or reset/focus the real editor, but
         // it must still update our identity snapshot so a pending tool action fails closed.
-        if (internalPromptCaptureGate.ownsInput) {
+        if (internalPrompt.ownsInput) {
             selection.resetTo(newSelStart, newSelEnd)
             return
         }
         if (bufferedHangulSessionActive) {
             if (!selection.consume(newSelStart, newSelEnd)) {
-                typingDnaCommitSink.onEditorContinuityLost(
+                personalLearning.typingDnaCommitSink.onEditorContinuityLost(
                     currentInputEditorInfo?.packageName,
                     null,
                     allowsTextInspectionFeatures()
@@ -5085,7 +2647,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             // cursor update can't match any prediction: it's treated as a user input
             if (composing.isEmpty() || newSelStart != newSelEnd || !composing.contains(newSelStart)) {
-                typingDnaCommitSink.onEditorContinuityLost(
+                personalLearning.typingDnaCommitSink.onEditorContinuityLost(
                     currentInputEditorInfo?.packageName,
                     null,
                     allowsTextInspectionFeatures()
@@ -5139,7 +2701,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // because of https://android.googlesource.com/platform/frameworks/base.git/+/refs/tags/android-11.0.0_r45/core/java/android/view/inputmethod/BaseInputConnection.java#851
     // it's not possible to set cursor inside composing text
     private fun updateComposingText(text: FormattedText) {
-        if (updateInternalPromptPreedit(text.toString())) return
+        if (internalPrompt.updateInternalPromptPreedit(text.toString())) return
         // A stale empty ClientPreeditEvent can race the capability change. In buffered mode the
         // engine renders preedit in Fcitx's own input panel, never in the target InputConnection.
         if (bufferedHangulSessionActive) return
@@ -5200,17 +2762,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Also updates internal composing state of [FcitxInputMethodService].
      */
     fun finishComposing() {
-        activeInternalPromptCapture?.let { capture ->
-            if (internalPromptCaptureGate.isActive(capture.token)) {
-                if (invalidateStaleInternalPromptEngine(capture)) return
-                capture.session.commitPreedit()
-                notifyInternalPromptChanged(capture)
-                return
-            }
-        }
-        // A queued keyboard action may call this after the prompt has submitted. Do not turn the
-        // old composing span into editor text until its reset barrier has reached this service.
-        if (internalPromptCaptureGate.ownsInput) return
+        if (internalPrompt.finishComposingIfOwned()) return
         if (bufferedHangulSessionActive) {
             submitBufferedHangul()
             return
@@ -5297,17 +2849,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // 재료 생성의 경계는 입력 뷰 가시성이다. 자동 추천의 웜 유예(onKeyboardVisibilityChanged)와
         // 분리되어 숨김 즉시 배경 축적이 가능해진다.
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
-        notifyOnDeviceContextSnapshotInvalidated()
-        invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
-        scheduleAutomaticSuggestionHideClose()
-        cancelInternalPromptCapture(discardPreStartCallbacks = true)
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
+        automaticSuggestion.onFinishInputView()
+        internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
         val wasBufferedHangul = bufferedHangulSessionActive
         if (wasBufferedHangul) {
             submitBufferedHangul()
         }
-        flushTypingDnaForCurrentEditor()
+        personalLearning.flushTypingDnaForCurrentEditor()
         if (finishingInput) {
             bufferedHangulSessionActive = false
             bufferedHangul.clear()
@@ -5329,25 +2880,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onFinishInput() {
         Timber.d("onFinishInput")
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
-        notifyOnDeviceContextSnapshotInvalidated()
-        invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
-        scheduleAutomaticSuggestionHideClose()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
+        automaticSuggestion.onFinishInput()
         engineRestartEditorRehydrationGate.onFinishInput()
-        finalizeCorrectionSessionAtBoundary()
-        cancelInternalPromptCapture(discardPreStartCallbacks = true)
+        personalLearning.finalizeCorrectionSessionAtBoundary()
+        internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()
         val wasBufferedHangul = bufferedHangulSessionActive
         if (wasBufferedHangul) {
             submitBufferedHangul()
         }
-        flushTypingDnaForCurrentEditor()
-        predictionMetricsSession.reset()
-        pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        pendingNgramSaveRunnable = null
-        launchPersonalModelSave()
-        pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        pendingCorrectionSaveRunnable = null
-        lifecycleScope.launch(Dispatchers.IO) { correctionPatternStore.save() }
+        personalLearning.flushTypingDnaForCurrentEditor()
+        contextualPrediction.onFinishInput()
+        personalLearning.onFinishInput()
         bufferedHangulSessionActive = false
         bufferedHangul.clear()
         postFcitxJob {
@@ -5358,9 +2903,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUnbindInput() {
-        notifyOnDeviceContextSnapshotInvalidated()
+        onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         engineRestartEditorRehydrationGate.onUnbindInput()
-        cancelInternalPromptCapture(discardPreStartCallbacks = true)
+        internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()
         bufferedHangulSessionActive = false
         bufferedHangul.clear()
@@ -5386,27 +2931,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
             level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE
         if (!pressure) return
-        invalidateAutomaticSuggestionsForClosedGate(closeBackend = true)
-        OnDeviceSharedEngine.requestClose("TRIM_MEMORY_$level")
+        automaticSuggestion.onTrimMemory(level)
     }
 
     override fun onDestroy() {
-        cancelAutomaticSuggestionHideClose()
-        setAutomaticSuggestionsEnabled(false)
-        invalidateAutomaticSuggestionsForClosedGate(closeBackend = true)
-        OnDeviceSharedEngine.requestClose("SERVICE_DESTROYED")
-        latestAutomaticSuggestionSnapshot = null
-        clearAutomaticSuggestionTtl()
+        automaticSuggestion.onDestroy()
         OnDeviceGenerationControl.onKeyboardVisibilityChanged(false)
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
-        sentencePackRevisionJob?.cancel()
-        sentencePackRevisionJob = null
-        predictionScope.cancel()
-        typingDnaVault.setOnBatchReady(null)
-        pendingNgramSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        pendingNgramSaveRunnable = null
-        pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
-        pendingCorrectionSaveRunnable = null
+        contextualPrediction.onDestroy()
+        personalLearning.onDestroy()
         if (activeInstance === this) {
             activeInstance = null
         }
@@ -5416,8 +2949,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
         bufferedHangulInputPref.unregisterOnChangeListener(bufferedHangulInputListener)
-        prefs.internal.automaticOnDeviceSuggestionsOptIn.unregisterOnChangeListener(automaticSuggestionOptInListener)
-        OnDeviceGenerationControl.configureAutoContextPreemption(null, null, null)
+        automaticSuggestion.unregisterListeners()
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
         super.onDestroy()
         // Fcitx might be used in super.onDestroy()

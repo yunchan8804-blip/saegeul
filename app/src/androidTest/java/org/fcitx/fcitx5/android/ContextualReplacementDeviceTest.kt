@@ -25,9 +25,10 @@ import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualReplacementSnapshot
 import org.fcitx.fcitx5.android.input.ai.ContextualReplacement
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedMaterialPolicy
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidate
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -252,7 +253,7 @@ class ContextualReplacementDeviceTest {
     private fun waitForStoredSpacingSnapshot(
         ime: FcitxInputMethodService,
         candidate: StoredSpacingCandidate
-    ): FcitxInputMethodService.ContextualCandidate {
+    ): ContextualCandidate {
         val deadline = SystemClock.elapsedRealtime() + UI_TIMEOUT_MS
         while (SystemClock.elapsedRealtime() < deadline) {
             val snapshot = onMain { ime.getContextualCandidateSnapshot(sentenceLimit = 2) }

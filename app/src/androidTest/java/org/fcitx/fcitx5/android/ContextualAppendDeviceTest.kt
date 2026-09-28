@@ -14,8 +14,8 @@ import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService.ContextualAppendSnapshot
 import org.fcitx.fcitx5.android.input.ai.ContextualAppend
+import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
