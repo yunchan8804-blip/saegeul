@@ -7,15 +7,9 @@ package org.fcitx.fcitx5.android.ui.main.settings.behavior
 import android.content.Context
 import android.os.Bundle
 import android.os.Build
-import android.text.InputType
 import android.util.Log
 import android.view.View
-import android.view.ViewGroup
-import android.view.WindowManager
-import android.view.inputmethod.EditorInfo
-import android.widget.EditText
 import android.widget.CheckBox
-import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
@@ -61,7 +55,6 @@ import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
-import splitties.dimensions.dp
 import splitties.resources.styledColor
 
 /** User-visible controls for network input, BYOK credentials, and local traces. */
@@ -205,31 +198,30 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                     summary = getString(R.string.privacy_ai_typing_dna_clear_summary)
                     isIconSpaceReserved = false
                     setOnPreferenceClickListener {
-                        AlertDialog.Builder(ctx)
-                            .setTitle(R.string.privacy_ai_typing_dna_clear_dialog_title)
-                            .setMessage(R.string.privacy_ai_typing_dna_clear_dialog_message)
-                            .setPositiveButton(R.string.delete) { _, _ ->
-                                val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-                                app.typingDnaRepository.clear()
-                                val stagingPurged = try {
-                                    app.typingDnaVault.purge()
-                                    true
-                                } catch (_: org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException) {
-                                    false
-                                }
-                                app.personalNgramModel.clear()
-                                app.personalSentenceVault.clear()
-                                org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.recentSentSentences?.clear()
-                                refreshSummaries()
-                                val resultMessage = if (stagingPurged) {
-                                    R.string.privacy_ai_typing_dna_cleared_toast
-                                } else {
-                                    R.string.privacy_ai_typing_dna_clear_failed_toast
-                                }
-                                Toast.makeText(ctx, resultMessage, Toast.LENGTH_SHORT).show()
+                        showDeleteConfirmation(
+                            ctx,
+                            R.string.privacy_ai_typing_dna_clear_dialog_title,
+                            R.string.privacy_ai_typing_dna_clear_dialog_message
+                        ) {
+                            val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
+                            app.typingDnaRepository.clear()
+                            val stagingPurged = try {
+                                app.typingDnaVault.purge()
+                                true
+                            } catch (_: org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException) {
+                                false
                             }
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .show()
+                            app.personalNgramModel.clear()
+                            app.personalSentenceVault.clear()
+                            org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.recentSentSentences?.clear()
+                            refreshSummaries()
+                            val resultMessage = if (stagingPurged) {
+                                R.string.privacy_ai_typing_dna_cleared_toast
+                            } else {
+                                R.string.privacy_ai_typing_dna_clear_failed_toast
+                            }
+                            Toast.makeText(ctx, resultMessage, Toast.LENGTH_SHORT).show()
+                        }
                         true
                     }
                 }
@@ -724,21 +716,6 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val ctx = requireContext()
         val store = VoiceProviderCredentialStore(ctx)
         val configured = store.load()
-        val apiKey = EditText(ctx).apply {
-            setHint(
-                if (configured == null) {
-                    R.string.voice_provider_key_hint
-                } else {
-                    R.string.voice_provider_key_unchanged_hint
-                }
-            )
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
-            }
-            maxLines = 1
-            isSaveEnabled = false
-        }
         val accurate = RadioButton(ctx).apply {
             id = View.generateViewId()
             setText(R.string.voice_model_accurate)
@@ -759,70 +736,58 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 }
             )
         }
-        val horizontal = ctx.dp(20)
-        val container = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
-            addView(apiKey)
-            addView(models)
-        }
-        val dialog = AlertDialog.Builder(ctx)
-            .setTitle(R.string.voice_openai_api_settings)
-            .setMessage(R.string.voice_provider_security_note)
-            .setView(container)
-            .setPositiveButton(R.string.save, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            // Keep the save button reachable while the soft keyboard is up.
-            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val key = apiKey.text.toString().trim().ifEmpty { configured?.apiKey.orEmpty() }
-                val model = if (models.checkedRadioButtonId == efficient.id) {
-                    VoiceTranscriptionModel.Efficient.id
-                } else {
-                    VoiceTranscriptionModel.Accurate.id
+        CredentialInputDialog.show(
+            context = ctx,
+            title = R.string.voice_openai_api_settings,
+            securityNote = R.string.voice_provider_security_note,
+            field = CredentialFieldSpec(
+                hint = R.string.voice_provider_key_hint,
+                unchangedHint = R.string.voice_provider_key_unchanged_hint,
+                configured = configured != null
+            ),
+            extraViews = listOf(models)
+        ) { input ->
+            val key = input.enteredKey.ifEmpty { configured?.apiKey.orEmpty() }
+            val model = if (models.checkedRadioButtonId == efficient.id) {
+                VoiceTranscriptionModel.Efficient.id
+            } else {
+                VoiceTranscriptionModel.Accurate.id
+            }
+            val profile = VoiceProviderProfile(apiKey = key, transcriptionModel = model)
+            val validated = runCatching(profile::validate)
+                .onFailure { error ->
+                    input.showKeyError(error.message ?: getString(R.string.voice_provider_invalid))
                 }
-                val profile = VoiceProviderProfile(apiKey = key, transcriptionModel = model)
-                val validated = runCatching(profile::validate)
-                    .onFailure { error ->
-                        apiKey.error = error.message ?: getString(R.string.voice_provider_invalid)
-                    }
-                    .getOrNull() ?: return@setOnClickListener
-                runCatching {
-                    store.save(validated)
-                    val selectedMode = VoiceProviderModeSelectionPolicy.afterCredentialSaved(
-                        currentMode = VoiceProviderModeStore(ctx).load(),
-                        requestedMode = pendingMode
-                    )
-                    VoiceProviderModeStore(ctx).save(selectedMode)
-                }.onSuccess {
-                    apiKey.text?.clear()
-                    dialog.dismiss()
-                    refreshSummaries()
-                    Toast.makeText(ctx, R.string.voice_provider_saved, Toast.LENGTH_SHORT).show()
-                }.onFailure {
-                    apiKey.error = getString(R.string.voice_provider_save_failed)
-                }
+                .getOrNull() ?: return@show
+            runCatching {
+                store.save(validated)
+                val selectedMode = VoiceProviderModeSelectionPolicy.afterCredentialSaved(
+                    currentMode = VoiceProviderModeStore(ctx).load(),
+                    requestedMode = pendingMode
+                )
+                VoiceProviderModeStore(ctx).save(selectedMode)
+            }.onSuccess {
+                input.finish()
+                refreshSummaries()
+                Toast.makeText(ctx, R.string.voice_provider_saved, Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                input.showKeyError(getString(R.string.voice_provider_save_failed))
             }
         }
-        dialog.setOnDismissListener { apiKey.text?.clear() }
-        dialog.show()
     }
 
     private fun showRemoveVoiceProviderDialog() {
         val ctx = requireContext()
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.voice_provider_key_remove)
-            .setMessage(R.string.voice_provider_key_remove_confirm)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                VoiceProviderCredentialStore(ctx).clear()
-                VoiceProviderModeStore(ctx).save(VoiceProviderMode.DeviceDictation)
-                refreshSummaries()
-                Toast.makeText(ctx, R.string.voice_provider_removed, Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        showDeleteConfirmation(
+            ctx,
+            R.string.voice_provider_key_remove,
+            R.string.voice_provider_key_remove_confirm
+        ) {
+            VoiceProviderCredentialStore(ctx).clear()
+            VoiceProviderModeStore(ctx).save(VoiceProviderMode.DeviceDictation)
+            refreshSummaries()
+            Toast.makeText(ctx, R.string.voice_provider_removed, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun voiceModelName(ctx: Context, model: String): String = ctx.getString(
@@ -864,90 +829,42 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         val ctx = requireContext()
         val store = GifProviderCredentialStore(ctx)
         val configured = store.state() == GifProviderCredentialState.Configured
-        val apiKey = EditText(ctx).apply {
-            setHint(
+        CredentialInputDialog.show(
+            context = ctx,
+            title = R.string.gif_klipy_settings,
+            securityNote = R.string.gif_provider_security_note,
+            field = CredentialFieldSpec(
+                hint = R.string.gif_provider_key_hint,
+                unchangedHint = R.string.gif_provider_key_unchanged_hint,
+                configured = configured
+            )
+        ) { input ->
+            val key = input.enteredKey
+            if (key.isEmpty()) {
                 if (configured) {
-                    R.string.gif_provider_key_unchanged_hint
+                    input.dismiss()
                 } else {
-                    R.string.gif_provider_key_hint
+                    input.showKeyError(getString(R.string.gif_provider_key_required))
                 }
-            )
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+                return@show
             }
-            maxLines = 1
-            isSaveEnabled = false
-        }
-        val horizontal = ctx.dp(20)
-        val container = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
-            addView(
-                apiKey,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
-        val dialog = AlertDialog.Builder(ctx)
-            .setTitle(R.string.gif_klipy_settings)
-            .setMessage(R.string.gif_provider_security_note)
-            .setView(container)
-            .setPositiveButton(R.string.save, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            // Keep the save button reachable while the soft keyboard is up, matching the
-            // voice OpenAI credential dialog.
-            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val key = apiKey.text.toString().trim()
-                if (key.isEmpty()) {
-                    if (configured) {
-                        dialog.dismiss()
-                    } else {
-                        apiKey.error = getString(R.string.gif_provider_key_required)
-                    }
-                    return@setOnClickListener
+            runCatching { store.saveKey(key) }
+                .onSuccess {
+                    input.finish()
+                    refreshSummaries()
+                    Toast.makeText(ctx, R.string.gif_provider_key_saved, Toast.LENGTH_SHORT)
+                        .show()
                 }
-                runCatching { store.saveKey(key) }
-                    .onSuccess {
-                        apiKey.text?.clear()
-                        dialog.dismiss()
-                        refreshSummaries()
-                        Toast.makeText(ctx, R.string.gif_provider_key_saved, Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                    .onFailure {
-                        apiKey.error = getString(R.string.gif_provider_key_invalid)
-                    }
-            }
+                .onFailure {
+                    input.showKeyError(getString(R.string.gif_provider_key_invalid))
+                }
         }
-        dialog.setOnDismissListener { apiKey.text?.clear() }
-        dialog.show()
     }
 
     private fun showGiphyProviderDialog() {
         val ctx = requireContext()
         val store = GiphyProviderCredentialStore(ctx)
         val configured = store.load()
-        val apiKey = EditText(ctx).apply {
-            setHint(
-                if (configured == null) {
-                    R.string.gif_giphy_key_hint
-                } else {
-                    R.string.gif_giphy_key_unchanged_hint
-                }
-            )
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
-            }
-            maxLines = 1
-            isSaveEnabled = false
-        }
         val productionApproved = CheckBox(ctx).apply {
             setText(R.string.gif_giphy_production_approval_confirmation)
             isChecked = configured?.productionApproved == true
@@ -956,83 +873,68 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
             setText(R.string.gif_giphy_media_approval_confirmation)
             isChecked = configured?.mediaCachingApproved == true
         }
-        val horizontal = ctx.dp(20)
-        val container = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(horizontal, ctx.dp(8), horizontal, ctx.dp(8))
-            addView(apiKey)
-            addView(productionApproved)
-            addView(mediaCachingApproved)
-        }
-        val dialog = AlertDialog.Builder(ctx)
-            .setTitle(R.string.gif_giphy_settings)
-            .setMessage(R.string.gif_giphy_security_note)
-            .setView(container)
-            .setPositiveButton(R.string.save, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            // Keep the save button reachable while the soft keyboard is up, matching the
-            // voice OpenAI credential dialog.
-            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val key = apiKey.text.toString().trim().ifEmpty { configured?.apiKey.orEmpty() }
-                if (key.isEmpty()) {
-                    apiKey.error = getString(R.string.gif_giphy_key_required)
-                    return@setOnClickListener
-                }
-                if (mediaCachingApproved.isChecked && !productionApproved.isChecked) {
-                    mediaCachingApproved.error = getString(R.string.gif_giphy_media_requires_production)
-                    return@setOnClickListener
-                }
-                runCatching {
-                    store.save(
-                        GiphyProviderConfiguration(
-                            apiKey = key,
-                            productionApproved = productionApproved.isChecked,
-                            mediaCachingApproved = mediaCachingApproved.isChecked
-                        )
+        CredentialInputDialog.show(
+            context = ctx,
+            title = R.string.gif_giphy_settings,
+            securityNote = R.string.gif_giphy_security_note,
+            field = CredentialFieldSpec(
+                hint = R.string.gif_giphy_key_hint,
+                unchangedHint = R.string.gif_giphy_key_unchanged_hint,
+                configured = configured != null
+            ),
+            extraViews = listOf(productionApproved, mediaCachingApproved)
+        ) { input ->
+            val key = input.enteredKey.ifEmpty { configured?.apiKey.orEmpty() }
+            if (key.isEmpty()) {
+                input.showKeyError(getString(R.string.gif_giphy_key_required))
+                return@show
+            }
+            if (mediaCachingApproved.isChecked && !productionApproved.isChecked) {
+                mediaCachingApproved.error = getString(R.string.gif_giphy_media_requires_production)
+                return@show
+            }
+            runCatching {
+                store.save(
+                    GiphyProviderConfiguration(
+                        apiKey = key,
+                        productionApproved = productionApproved.isChecked,
+                        mediaCachingApproved = mediaCachingApproved.isChecked
                     )
-                }.onSuccess {
-                    apiKey.text?.clear()
-                    dialog.dismiss()
-                    refreshSummaries()
-                    Toast.makeText(ctx, R.string.gif_giphy_key_saved, Toast.LENGTH_SHORT).show()
-                }.onFailure {
-                    apiKey.error = getString(R.string.gif_giphy_key_invalid)
-                }
+                )
+            }.onSuccess {
+                input.finish()
+                refreshSummaries()
+                Toast.makeText(ctx, R.string.gif_giphy_key_saved, Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                input.showKeyError(getString(R.string.gif_giphy_key_invalid))
             }
         }
-        dialog.setOnDismissListener { apiKey.text?.clear() }
-        dialog.show()
     }
 
     private fun showRemoveGifProviderDialog() {
         val ctx = requireContext()
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.gif_provider_key_remove)
-            .setMessage(R.string.gif_provider_key_remove_confirm)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                GifProviderCredentialStore(ctx).clear()
-                refreshSummaries()
-                Toast.makeText(ctx, R.string.gif_provider_key_removed, Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        showDeleteConfirmation(
+            ctx,
+            R.string.gif_provider_key_remove,
+            R.string.gif_provider_key_remove_confirm
+        ) {
+            GifProviderCredentialStore(ctx).clear()
+            refreshSummaries()
+            Toast.makeText(ctx, R.string.gif_provider_key_removed, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showRemoveGiphyProviderDialog() {
         val ctx = requireContext()
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.gif_giphy_key_remove)
-            .setMessage(R.string.gif_giphy_key_remove_confirm)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                GiphyProviderCredentialStore(ctx).clear()
-                GiphyCustomerIdStore(ctx).clear()
-                refreshSummaries()
-                Toast.makeText(ctx, R.string.gif_giphy_key_removed, Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        showDeleteConfirmation(
+            ctx,
+            R.string.gif_giphy_key_remove,
+            R.string.gif_giphy_key_remove_confirm
+        ) {
+            GiphyProviderCredentialStore(ctx).clear()
+            GiphyCustomerIdStore(ctx).clear()
+            refreshSummaries()
+            Toast.makeText(ctx, R.string.gif_giphy_key_removed, Toast.LENGTH_SHORT).show()
+        }
     }
 }
