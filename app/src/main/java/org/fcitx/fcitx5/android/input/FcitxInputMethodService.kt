@@ -4258,19 +4258,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 return true
             }
         }
+        val submitsFirst = BufferedHangulMode.submitsBeforeForwarding(data.sym.sym, data.unicode)
         val bufferedKey = when (data.sym.sym) {
             FcitxKeyMapping.FcitxKey_BackSpace,
-            FcitxKeyMapping.FcitxKey_Return,
-            FcitxKeyMapping.FcitxKey_Left,
-            FcitxKeyMapping.FcitxKey_Right,
-            FcitxKeyMapping.FcitxKey_Up,
-            FcitxKeyMapping.FcitxKey_Down,
-            FcitxKeyMapping.FcitxKey_Home,
-            FcitxKeyMapping.FcitxKey_End,
-            FcitxKeyMapping.FcitxKey_Page_Up,
-            FcitxKeyMapping.FcitxKey_Page_Down,
-            FcitxKeyMapping.FcitxKey_Tab -> true
-            else -> data.unicode > 0
+            FcitxKeyMapping.FcitxKey_Return -> true
+            else -> submitsFirst || data.unicode > 0
         }
         if (!bufferedKey) return false
         if (data.up) return data.states.virtual
@@ -4300,21 +4292,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 if (hasPendingBufferedHangul()) submitBufferedHangul() else handleReturnKey()
                 true
             }
-            // Navigation moves the target cursor, and an unexpected selection change discards the
-            // pending segment. Submit it first, then perform the navigation.
-            FcitxKeyMapping.FcitxKey_Left,
-            FcitxKeyMapping.FcitxKey_Right,
-            FcitxKeyMapping.FcitxKey_Up,
-            FcitxKeyMapping.FcitxKey_Down,
-            FcitxKeyMapping.FcitxKey_Home,
-            FcitxKeyMapping.FcitxKey_End,
-            FcitxKeyMapping.FcitxKey_Page_Up,
-            FcitxKeyMapping.FcitxKey_Page_Down,
-            FcitxKeyMapping.FcitxKey_Tab -> {
-                if (submitBufferedHangul()) sendDownUpKeyEvents(data.sym.keyCode)
-                true
-            }
-            else -> if (data.unicode > 0) {
+            // Navigation and control keys never become buffered text. Moving the target cursor
+            // would discard a pending segment as an unexpected selection change, so submit it
+            // first, then send the key itself. A key without an Android key code continues on
+            // the normal forwarding path once the segment is submitted.
+            else -> if (submitsFirst) {
+                val keyCode = data.sym.keyCode
+                val submitted = submitBufferedHangul()
+                if (keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                    !submitted
+                } else {
+                    if (submitted) sendDownUpKeyEvents(keyCode)
+                    true
+                }
+            } else if (data.unicode > 0) {
                 bufferedHangul.capture(Character.toString(data.unicode))
                 submitBufferedHangul()
                 true

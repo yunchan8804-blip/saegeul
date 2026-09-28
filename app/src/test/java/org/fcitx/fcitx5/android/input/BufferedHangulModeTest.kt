@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input
 
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -67,6 +68,48 @@ class BufferedHangulModeTest {
         assertFalse(
             BufferedHangulMode.mustAvoidClipboard(CapabilityFlags(CapabilityFlag.Multiline))
         )
+    }
+
+    @Test
+    fun navigationKeysSubmitBeforeForwarding() {
+        listOf(
+            FcitxKeyMapping.FcitxKey_Left,
+            FcitxKeyMapping.FcitxKey_Right,
+            FcitxKeyMapping.FcitxKey_Up,
+            FcitxKeyMapping.FcitxKey_Down,
+            FcitxKeyMapping.FcitxKey_Home,
+            FcitxKeyMapping.FcitxKey_End,
+            FcitxKeyMapping.FcitxKey_Page_Up,
+            FcitxKeyMapping.FcitxKey_Page_Down
+        ).forEach { sym ->
+            assertTrue(BufferedHangulMode.submitsBeforeForwarding(sym, unicode = 0))
+        }
+    }
+
+    @Test
+    fun controlCharactersAreNeverBufferedAsText() {
+        assertTrue(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_Tab, 0x09))
+        assertTrue(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_Escape, 0x1B))
+        assertTrue(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_Delete, 0x7F))
+        assertTrue(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_KP_Enter, 0x0D))
+        ((0x01..0x1F) + 0x7F).forEach { code ->
+            assertTrue(BufferedHangulMode.submitsBeforeForwarding(0x01000000 + code, code))
+        }
+    }
+
+    @Test
+    fun returnAndBackSpaceKeepTheirOwnHandling() {
+        assertFalse(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_Return, 0x0D))
+        assertFalse(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_BackSpace, 0x08))
+    }
+
+    @Test
+    fun printableCharactersAndOtherKeysWithoutCharacterAreNotSubmittedFirst() {
+        assertFalse(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_a, 'a'.code))
+        assertFalse(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_space, ' '.code))
+        assertFalse(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_period, '.'.code))
+        assertFalse(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_F1, 0))
+        assertFalse(BufferedHangulMode.submitsBeforeForwarding(FcitxKeyMapping.FcitxKey_Shift_L, 0))
     }
 
     @Test
