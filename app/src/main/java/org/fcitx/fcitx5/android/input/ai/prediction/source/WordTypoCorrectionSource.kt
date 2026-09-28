@@ -9,7 +9,8 @@ import org.fcitx.fcitx5.android.input.ai.KoreanTypoCorrectionEngine
 
 /**
  * Word-level typo correction (`typo_correction`) by the legacy [KoreanTypoCorrectionEngine] for the
- * stroke and the word before the cursor, skipping the fragment keyboard-aware correction handled.
+ * stroke and the word before the cursor, skipping the fragment keyboard-aware correction handled
+ * and the words of a sentence that already ended.
  */
 internal class WordTypoCorrectionSource(private val typoEngine: KoreanTypoCorrectionEngine) {
 
@@ -20,7 +21,7 @@ internal class WordTypoCorrectionSource(private val typoEngine: KoreanTypoCorrec
         if (cleanStroke.isNotBlank()) {
             typoCandidates.add(cleanStroke)
         }
-        if (lastWordInContext.isNotBlank()) {
+        if (lastWordInContext.isNotBlank() && !input.contextEndsSentence) {
             if (!input.hasTrailingSpace) {
                 typoCandidates.add(lastWordInContext)
                 if (cleanStroke.isNotBlank() && !lastWordInContext.endsWith(cleanStroke)) {

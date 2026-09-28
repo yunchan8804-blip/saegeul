@@ -18,6 +18,11 @@ internal class TypoTarget(val typed: String, val replaceLength: Int)
  */
 internal class PredictionInput(val currentStroke: String, val contextBeforeCursor: String) {
 
+    companion object {
+        // Characters that end a sentence; the text after the last one is the sentence being typed.
+        private val SENTENCE_TERMINATORS = charArrayOf('.', '?', '!', '\n')
+    }
+
     val cleanStroke: String = currentStroke.trim()
 
     val cleanContext: String = contextBeforeCursor.trim()
@@ -31,9 +36,18 @@ internal class PredictionInput(val currentStroke: String, val contextBeforeCurso
         .substringAfterLast('\r')
         .trim()
 
+    private val lastTerminatorIndex = contextBeforeCursor.lastIndexOfAny(SENTENCE_TERMINATORS)
+
+    /**
+     * True when only whitespace follows the last sentence terminator, so the words before the
+     * cursor belong to a sentence that already ended and are no longer typo-corrected.
+     */
+    val contextEndsSentence: Boolean =
+        lastTerminatorIndex >= 0 && contextBeforeCursor.substring(lastTerminatorIndex + 1).isBlank()
+
     val typoTarget: TypoTarget? = when {
         cleanStroke.isNotBlank() -> TypoTarget(cleanStroke, cleanStroke.length)
-        hasTrailingSpace && lastWordInContext.isNotBlank() -> {
+        hasTrailingSpace && lastWordInContext.isNotBlank() && !contextEndsSentence -> {
             val trailingSpaces = contextBeforeCursor.length - contextBeforeCursor.trimEnd().length
             TypoTarget(lastWordInContext, lastWordInContext.length + trailingSpaces)
         }
@@ -42,12 +56,7 @@ internal class PredictionInput(val currentStroke: String, val contextBeforeCurso
 
     /** The sentence being typed: the context after its last terminator, joined with the stroke. */
     val currentSentence: String = run {
-        val baseSentence = cleanContext
-            .substringAfterLast('.')
-            .substringAfterLast('?')
-            .substringAfterLast('!')
-            .substringAfterLast('\n')
-            .trim()
+        val baseSentence = contextBeforeCursor.substring(lastTerminatorIndex + 1).trim()
         if (cleanStroke.isNotBlank()) {
             if (baseSentence.isNotBlank()) {
                 if (baseSentence.endsWith(cleanStroke)) {
