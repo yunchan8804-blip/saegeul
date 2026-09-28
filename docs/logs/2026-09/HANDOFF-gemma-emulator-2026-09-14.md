@@ -51,7 +51,7 @@
 1. **29항 선점 재작업 마무리 확인**: 워커 `gemma-cache-fix`의 마지막 상태(이 문서 끝 "마지막 워커 보고")를 보고, 반려 2건(busy 기준 `isRunning`만, 선점 시 `setAutomaticSuggestionsEnabled(false)` 대신 런타임 하드 종료)이 반영됐는지 diff로 확인. `./gradlew :app:testDebugUnitTest --tests "org.fcitx.fcitx5.android.input.ai.ondevice.*"` 전부 통과여야 한다(오늘 기준 117개 + 추가분).
 2. 에뮬레이터에서 `GemmaAutomaticImeDeviceTest`(온라인)와 `GemmaContextImeDeviceTest`(오프라인) 실행. 후자는 `initialization_cancel` 시나리오가 자동 추천 웜 상태에서 선점 경로로 초기화 단계를 보여야 하고, 시나리오 끝에 `automaticSuggestionsEnabled`가 유지돼야 한다. 크래시(XNNPack 캐시)가 재발하면 28항이 안 들어간 것이다.
 3. 전체 단위 테스트 `./gradlew :app:testDebugUnitTest` 회귀(기존 실패는 `TypingDnaStatsTest` 1건뿐이어야 한다).
-4. 후속 설계 주제(사용자 결정 필요): 웜 엔진을 자동·명시 두 목적이 공유하는 구조(재웜업 비용 제거), `Proposal.snapshot`이 `var`가 된 캡슐화 정리, release 빌드의 온디바이스 지원(현재 debug 전용), fcitx 재시작 직후 `onFinishInput` "Dispatcher is not in running state" 크래시(스택 미확보).
+4. 후속 설계 주제(사용자 결정 필요): 웜 엔진을 자동·명시 두 목적이 공유하는 구조(재웜업 비용 제거), `Proposal.snapshot`이 `var`가 된 캡슐화 정리, release 빌드의 온디바이스 지원(현재 debug 전용), fcitx 재시작 직후 `onFinishInput` "Dispatcher is not in running state" 크래시(스택 미확보). (`Proposal.snapshot` 메모, 2026-09-28: 불변화 대신 세션 안으로 변경 범위를 좁힘 — rebase의 정체성 유지는 설계(코디네이터·서비스가 동일성에 의존))
 5. 자동 추천 박스 디자인 후속: 후보 바 한국어 로케일 스크린샷 검토(에뮬레이터를 ko-KR로 바꾸거나 실기기), 문장 칩과 단어 칩의 시각 위계.
 
 ## 오늘 삭제·추가한 파일 요약
