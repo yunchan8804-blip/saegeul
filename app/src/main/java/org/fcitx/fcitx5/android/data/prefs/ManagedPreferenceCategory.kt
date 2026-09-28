@@ -91,27 +91,19 @@ abstract class ManagedPreferenceCategory(
     }
 
     protected fun int(
-        @StringRes
-        title: Int,
-        key: String,
-        defaultValue: Int,
-        min: Int = 0,
-        max: Int = Int.MAX_VALUE,
-        unit: String = "",
-        step: Int = 1,
-        @StringRes
-        defaultLabel: Int? = null,
+        spec: IntPreferenceSpec,
         enableUiOn: (() -> Boolean)? = null
     ): ManagedPreference.PInt {
-        val pref = ManagedPreference.PInt(sharedPreferences, key, defaultValue)
+        val pref = ManagedPreference.PInt(sharedPreferences, spec.key, spec.defaultValue)
         // Int can overflow when min < 0 && max == Int.MAX_VALUE
-        val ui = if ((max.toLong() - min.toLong()) / step.toLong() >= 240L)
+        val ui = if ((spec.max.toLong() - spec.min.toLong()) / spec.step.toLong() >= 240L)
             ManagedPreferenceUi.EditTextInt(
-                title, key, defaultValue, min, max, unit, enableUiOn
+                spec.title, spec.key, spec.defaultValue, spec.min, spec.max, spec.unit, enableUiOn
             )
         else
             ManagedPreferenceUi.SeekBarInt(
-                title, key, defaultValue, min, max, unit, step, defaultLabel, enableUiOn
+                spec.title, spec.key, spec.defaultValue, spec.min, spec.max, spec.unit, spec.step,
+                spec.defaultLabel, enableUiOn
             )
         pref.register()
         ui.registerUi()
@@ -119,37 +111,22 @@ abstract class ManagedPreferenceCategory(
     }
 
     protected fun twinInt(
-        @StringRes
-        title: Int,
-        @StringRes
-        label: Int,
-        key: String,
-        defaultValue: Int,
-        @StringRes
-        secondaryLabel: Int,
-        secondaryKey: String,
-        secondaryDefaultValue: Int,
-        min: Int,
-        max: Int,
-        unit: String = "",
-        step: Int = 1,
-        @StringRes
-        defaultLabel: Int? = null,
+        spec: TwinIntPreferenceSpec,
         enableUiOn: (() -> Boolean)? = null
     ): Pair<ManagedPreference.PInt, ManagedPreference.PInt> {
         val primary = ManagedPreference.PInt(
             sharedPreferences,
-            key, defaultValue,
+            spec.primary.key, spec.primary.defaultValue,
         )
         val secondary = ManagedPreference.PInt(
             sharedPreferences,
-            secondaryKey, secondaryDefaultValue
+            spec.secondary.key, spec.secondary.defaultValue
         )
         val ui = ManagedPreferenceUi.TwinSeekBarInt(
-            title,
-            label, key, defaultValue,
-            secondaryLabel, secondaryKey, secondaryDefaultValue,
-            min, max, unit, step, defaultLabel, enableUiOn
+            spec.title,
+            spec.primary.label, spec.primary.key, spec.primary.defaultValue,
+            spec.secondary.label, spec.secondary.key, spec.secondary.defaultValue,
+            spec.min, spec.max, spec.unit, spec.step, spec.defaultLabel, enableUiOn
         )
         primary.register()
         secondary.register()

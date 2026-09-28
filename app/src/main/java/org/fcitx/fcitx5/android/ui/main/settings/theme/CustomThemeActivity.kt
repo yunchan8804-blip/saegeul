@@ -61,6 +61,7 @@ import org.fcitx.fcitx5.android.ui.main.CropImageActivity.CropResult
 import org.fcitx.fcitx5.android.utils.DarkenColorFilter
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.parcelable
+import org.fcitx.fcitx5.android.utils.setOnChangeListener
 import splitties.dimensions.dp
 import splitties.resources.color
 import splitties.resources.resolveThemeAttribute
@@ -643,15 +644,7 @@ class CustomThemeActivity : AppCompatActivity() {
             add(changeImageLabel, lParams(matchParent, dp(48)))
             add(cropLabel, lParams(matchParent, dp(48)))
             add(removeImageLabel, lParams(matchParent, dp(48)))
-            val brightnessRow = horizontalLayout {
-                gravity = Gravity.CENTER_VERTICAL
-                add(brightnessLabel, lParams(0, dp(40)) { weight = 1f })
-                add(brightnessValue, lParams(wrapContent, dp(40)) { rightMargin = dp(16) })
-            }
-            add(brightnessRow, lParams(matchParent, wrapContent))
-            add(brightnessSeekBar, lParams(matchParent, wrapContent) {
-                leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-            })
+            addSeekBarControl(brightnessLabel, brightnessValue, brightnessSeekBar, rowHeight = dp(40))
             add(keyToneSectionContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
 
             // d. Contrast warning (only rendered when there is an issue)
@@ -663,108 +656,87 @@ class CustomThemeActivity : AppCompatActivity() {
         }
     }
 
+    /** A label/value line above its SeekBar, the layout every fine-tuning control shares. */
+    private fun LinearLayout.addSeekBarControl(
+        label: TextView,
+        value: TextView,
+        seekBar: SeekBar,
+        rowHeight: Int = dp(36)
+    ) {
+        val row = horizontalLayout {
+            gravity = Gravity.CENTER_VERTICAL
+            add(label, lParams(0, rowHeight) { weight = 1f })
+            add(value, lParams(wrapContent, rowHeight) { rightMargin = dp(16) })
+        }
+        add(row, lParams(matchParent, wrapContent))
+        add(seekBar, lParams(matchParent, wrapContent) {
+            leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
+        })
+    }
+
     private fun buildMoreContainer() {
+        // e. Detail colors
         moreContainer.apply {
-            // e. Detail colors
             add(createSectionHeader(getString(R.string.theme_section_detail_colors)), lParams(matchParent, wrapContent))
             add(detailColorContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
+        }
+        // f. Ambient lighting / reactive / particle / glow
+        buildAmbientSection()
+        buildReactiveSection()
+        buildParticleSection()
+        buildGlowSection()
+        // g. Per-key
+        buildPerKeySection()
+    }
 
-            // f. Ambient lighting / reactive / particle / glow
+    private fun buildAmbientSection() {
+        moreContainer.apply {
             add(createSectionHeader(getString(R.string.theme_rgb_backlight)), lParams(matchParent, wrapContent))
             add(ambientModeContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(6) })
-
             ambientControlsLayout = verticalLayout {
                 add(createTextView(R.string.theme_rgb_direction), lParams(matchParent, dp(36)))
                 add(ambientDirectionContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(6) })
-
-                val speedRow = horizontalLayout {
-                    gravity = Gravity.CENTER_VERTICAL
-                    add(ambientSpeedLabel, lParams(0, dp(36)) { weight = 1f })
-                    add(ambientSpeedValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
-                }
-                add(speedRow, lParams(matchParent, wrapContent))
-                add(ambientSpeedSeekBar, lParams(matchParent, wrapContent) {
-                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-                })
-
-                val intensityRow = horizontalLayout {
-                    gravity = Gravity.CENTER_VERTICAL
-                    add(ambientIntensityLabel, lParams(0, dp(36)) { weight = 1f })
-                    add(ambientIntensityValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
-                }
-                add(intensityRow, lParams(matchParent, wrapContent))
-                add(ambientIntensitySeekBar, lParams(matchParent, wrapContent) {
-                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-                })
-
-                val transRow = horizontalLayout {
-                    gravity = Gravity.CENTER_VERTICAL
-                    add(keyTranslucencyLabel, lParams(0, dp(36)) { weight = 1f })
-                    add(keyTranslucencyValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
-                }
-                add(transRow, lParams(matchParent, wrapContent))
-                add(keyTranslucencySeekBar, lParams(matchParent, wrapContent) {
-                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-                })
+                addSeekBarControl(ambientSpeedLabel, ambientSpeedValue, ambientSpeedSeekBar)
+                addSeekBarControl(ambientIntensityLabel, ambientIntensityValue, ambientIntensitySeekBar)
+                addSeekBarControl(keyTranslucencyLabel, keyTranslucencyValue, keyTranslucencySeekBar)
             }
             add(ambientControlsLayout, lParams(matchParent, wrapContent))
+        }
+    }
 
+    private fun buildReactiveSection() {
+        moreContainer.apply {
             add(createSectionHeader(getString(R.string.theme_rgb_reactive_title)), lParams(matchParent, wrapContent))
             add(reactiveModeContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
+        }
+    }
 
+    private fun buildParticleSection() {
+        moreContainer.apply {
             add(createSectionHeader(getString(R.string.theme_particle_effect)), lParams(matchParent, wrapContent))
             add(particleModeContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(6) })
-
             particleControlsLayout = verticalLayout {
-                val pCountRow = horizontalLayout {
-                    gravity = Gravity.CENTER_VERTICAL
-                    add(particleCountLabel, lParams(0, dp(36)) { weight = 1f })
-                    add(particleCountValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
-                }
-                add(pCountRow, lParams(matchParent, wrapContent))
-                add(particleCountSeekBar, lParams(matchParent, wrapContent) {
-                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-                })
-
-                val pLifeRow = horizontalLayout {
-                    gravity = Gravity.CENTER_VERTICAL
-                    add(particleLifetimeLabel, lParams(0, dp(36)) { weight = 1f })
-                    add(particleLifetimeValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
-                }
-                add(pLifeRow, lParams(matchParent, wrapContent))
-                add(particleLifetimeSeekBar, lParams(matchParent, wrapContent) {
-                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-                })
-
-                val pSpeedRow = horizontalLayout {
-                    gravity = Gravity.CENTER_VERTICAL
-                    add(particleSpeedLabel, lParams(0, dp(36)) { weight = 1f })
-                    add(particleSpeedValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
-                }
-                add(pSpeedRow, lParams(matchParent, wrapContent))
-                add(particleSpeedSeekBar, lParams(matchParent, wrapContent) {
-                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-                })
+                addSeekBarControl(particleCountLabel, particleCountValue, particleCountSeekBar)
+                addSeekBarControl(particleLifetimeLabel, particleLifetimeValue, particleLifetimeSeekBar)
+                addSeekBarControl(particleSpeedLabel, particleSpeedValue, particleSpeedSeekBar)
             }
             add(particleControlsLayout, lParams(matchParent, wrapContent))
+        }
+    }
 
+    private fun buildGlowSection() {
+        moreContainer.apply {
             add(createSectionHeader(getString(R.string.theme_key_glow_effect)), lParams(matchParent, wrapContent))
             add(glowColorContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(6) })
-
             glowControlsLayout = verticalLayout {
-                val glowRadRow = horizontalLayout {
-                    gravity = Gravity.CENTER_VERTICAL
-                    add(glowRadiusLabel, lParams(0, dp(36)) { weight = 1f })
-                    add(glowRadiusValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
-                }
-                add(glowRadRow, lParams(matchParent, wrapContent))
-                add(glowRadiusSeekBar, lParams(matchParent, wrapContent) {
-                    leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-                })
+                addSeekBarControl(glowRadiusLabel, glowRadiusValue, glowRadiusSeekBar)
             }
             add(glowControlsLayout, lParams(matchParent, wrapContent))
+        }
+    }
 
-            // g. Per-key
+    private fun buildPerKeySection() {
+        moreContainer.apply {
             add(createSectionHeader(getString(R.string.theme_per_key_customization)), lParams(matchParent, wrapContent))
             add(perKeyTargetContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(4) })
             add(perKeyDetailContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
@@ -1343,18 +1315,12 @@ class CustomThemeActivity : AppCompatActivity() {
             radiusValue.text = "${radiusSeekBar.progress}dp"
         }
         refreshRadiusValue()
-        radiusSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                refreshRadiusValue()
-                if (fromUser) {
-                    updatePerKeyStyle { it.copy(cornerRadius = progress.toFloat()) }
-                }
+        radiusSeekBar.setOnChangeListener { progress, fromUser ->
+            refreshRadiusValue()
+            if (fromUser) {
+                updatePerKeyStyle { it.copy(cornerRadius = progress.toFloat()) }
             }
-        })
+        }
         perKeyRefreshers.add { radiusSeekBar.progress = currentPerKeyStyle().cornerRadius?.toInt() ?: radiusSeekBar.progress }
 
         val resetButton = styledChip(getString(R.string.theme_key_reset_button), false) {
@@ -1365,128 +1331,77 @@ class CustomThemeActivity : AppCompatActivity() {
             add(bgRow, lParams(matchParent, wrapContent))
             add(textRow, lParams(matchParent, wrapContent))
             add(borderRow, lParams(matchParent, wrapContent))
-            val radiusRow = horizontalLayout {
-                gravity = Gravity.CENTER_VERTICAL
-                add(radiusLabel, lParams(0, dp(36)) { weight = 1f })
-                add(radiusValue, lParams(wrapContent, dp(36)) { rightMargin = dp(16) })
-            }
-            add(radiusRow, lParams(matchParent, wrapContent))
-            add(radiusSeekBar, lParams(matchParent, wrapContent) {
-                leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(8)
-            })
+            addSeekBarControl(radiusLabel, radiusValue, radiusSeekBar)
             add(resetButton, lParams(wrapContent, dp(48)) { leftMargin = dp(16); bottomMargin = dp(8) })
         }
     }
 
-    private fun setupSeekBars() {
-        ambientSpeedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val speed = (progress.coerceAtLeast(20) / 100f)
-                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
-                    theme = theme.copy(lightingEffect = currentDef.copy(speed = speed))
-                    updatePreview()
-                }
-            }
-        })
+    private fun updateLightingEffect(mutate: (Theme.Custom.LightingEffectDef) -> Theme.Custom.LightingEffectDef) {
+        theme = theme.copy(lightingEffect = mutate(theme.lightingEffect ?: Theme.Custom.LightingEffectDef()))
+        updatePreview()
+    }
 
-        ambientIntensitySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val intensity = (progress.coerceAtLeast(10) / 100f)
-                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
-                    theme = theme.copy(lightingEffect = currentDef.copy(intensity = intensity))
-                    updatePreview()
-                }
-            }
-        })
+    private fun updateParticleEffect(mutate: (Theme.Custom.ParticleEffectDef) -> Theme.Custom.ParticleEffectDef) {
+        theme = theme.copy(particleEffect = mutate(theme.particleEffect ?: Theme.Custom.ParticleEffectDef()))
+        updatePreview()
+    }
 
-        keyTranslucencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val trans = (progress / 100f)
-                    val currentDef = theme.lightingEffect ?: Theme.Custom.LightingEffectDef()
-                    theme = theme.copy(lightingEffect = currentDef.copy(keyTranslucency = trans))
-                    updatePreview()
-                }
-            }
-        })
+    private fun setupAmbientSeekBars() {
+        ambientSpeedSeekBar.setOnChangeListener { progress, fromUser ->
+            if (fromUser) updateLightingEffect { it.copy(speed = progress.coerceAtLeast(20) / 100f) }
+        }
+        ambientIntensitySeekBar.setOnChangeListener { progress, fromUser ->
+            if (fromUser) updateLightingEffect { it.copy(intensity = progress.coerceAtLeast(10) / 100f) }
+        }
+        keyTranslucencySeekBar.setOnChangeListener { progress, fromUser ->
+            if (fromUser) updateLightingEffect { it.copy(keyTranslucency = progress / 100f) }
+        }
+    }
 
-        particleCountSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val count = progress.coerceAtLeast(3)
-                    val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
-                    theme = theme.copy(particleEffect = currentP.copy(particleCount = count))
-                    updatePreview()
-                }
-            }
-        })
+    private fun setupParticleSeekBars() {
+        particleCountSeekBar.setOnChangeListener { progress, fromUser ->
+            if (fromUser) updateParticleEffect { it.copy(particleCount = progress.coerceAtLeast(3)) }
+        }
+        particleLifetimeSeekBar.setOnChangeListener { progress, fromUser ->
+            if (fromUser) updateParticleEffect { it.copy(lifetimeMs = progress.coerceAtLeast(200).toLong()) }
+        }
+        particleSpeedSeekBar.setOnChangeListener { progress, fromUser ->
+            if (fromUser) updateParticleEffect { it.copy(speed = progress.coerceAtLeast(30) / 100f) }
+        }
+    }
 
-        particleLifetimeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val lifetime = progress.coerceAtLeast(200).toLong()
-                    val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
-                    theme = theme.copy(particleEffect = currentP.copy(lifetimeMs = lifetime))
-                    updatePreview()
-                }
+    private fun setupGlowSeekBar() {
+        glowRadiusSeekBar.setOnChangeListener { progress, fromUser ->
+            if (fromUser) {
+                val currentGlow = theme.keyGlowEffect ?: Theme.Custom.KeyGlowDef(enabled = true)
+                theme = theme.copy(keyGlowEffect = currentGlow.copy(glowRadius = progress.coerceAtLeast(2).toFloat()))
+                updatePreview()
             }
-        })
-
-        particleSpeedSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val speed = (progress.coerceAtLeast(30) / 100f)
-                    val currentP = theme.particleEffect ?: Theme.Custom.ParticleEffectDef()
-                    theme = theme.copy(particleEffect = currentP.copy(speed = speed))
-                    updatePreview()
-                }
-            }
-        })
-
-        glowRadiusSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val radius = progress.coerceAtLeast(2).toFloat()
-                    val currentG = theme.keyGlowEffect ?: Theme.Custom.KeyGlowDef(enabled = true)
-                    theme = theme.copy(keyGlowEffect = currentG.copy(glowRadius = radius))
-                    updatePreview()
-                }
-            }
-        })
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        loadStartingTheme()
+        seedGenIsDark = theme.isDark
+        keyToneIsDark = !theme.isDark
+        previewUi = KeyboardPreviewUi(this, theme)
+        setupWindow()
+        setupEditorSections()
+        setupBackgroundImageControls()
+        syncSeekBarsWithTheme()
+
+        updateControlsVisibility()
+        refreshContrastRow()
+        updateMoreVisibility()
+
+        onBackPressedDispatcher.addCallback {
+            cancel()
+        }
+    }
+
+    /** Edits the theme passed in, or starts a new one from the SaegeulIvory template. */
+    private fun loadStartingTheme() {
         // recover from bundle
         val originTheme = intent?.parcelable<Theme.Custom>(ORIGIN_THEME)?.also { t ->
             theme = t
@@ -1512,10 +1427,9 @@ class CustomThemeActivity : AppCompatActivity() {
             // Use SaegeulIvory as the starting template for a brand-new custom theme
             theme = ThemePreset.SaegeulIvory.deriveCustomNoBackground(n)
         }
-        seedGenIsDark = theme.isDark
-        keyToneIsDark = !theme.isDark
-        previewUi = KeyboardPreviewUi(this, theme)
+    }
 
+    private fun setupWindow() {
         enableEdgeToEdge()
         ViewCompat.setOnApplyWindowInsetsListener(ui) { _, windowInsets ->
             val statusBars = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars())
@@ -1535,11 +1449,12 @@ class CustomThemeActivity : AppCompatActivity() {
         // show back button
         supportActionBar!!.setDisplayHomeAsUpEnabled(true)
         setContentView(ui)
+    }
 
+    private fun setupEditorSections() {
         // Build the deeper "더 꾸미기" tier before it's needed by updateMoreVisibility()/updatePreview()
         buildMoreContainer()
 
-        // Setup rows
         setupStartingThemeRow()
         setupSeedBrightnessRow()
         setupSeedSwatchRow()
@@ -1552,8 +1467,12 @@ class CustomThemeActivity : AppCompatActivity() {
         setupGlowColorRow()
         setupPerKeyRow()
         setupPerKeyDetailSection()
-        setupSeekBars()
+        setupAmbientSeekBars()
+        setupParticleSeekBars()
+        setupGlowSeekBar()
+    }
 
+    private fun setupBackgroundImageControls() {
         backgroundStates.launcher = registerForActivityResult(CropContract()) {
             when (it) {
                 CropResult.Fail -> {
@@ -1603,23 +1522,18 @@ class CustomThemeActivity : AppCompatActivity() {
             setupKeyToneRow()
         }
 
-        brightnessSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            // 의도적으로 비움: 이 화면은 진행값 변경만 반영한다.
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-
-            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) updateBackgroundState()
-            }
-        })
+        brightnessSeekBar.setOnChangeListener { _, fromUser ->
+            if (fromUser) updateBackgroundState()
+        }
 
         whenHasBackground { background ->
             brightnessSeekBar.progress = background.brightness
             updateBackgroundState()
         }
+    }
 
-        // Initialize SeekBars with theme properties
+    /** Moves the effect SeekBars to the loaded theme; programmatic changes do not write back. */
+    private fun syncSeekBarsWithTheme() {
         theme.lightingEffect?.let { l ->
             ambientSpeedSeekBar.progress = (l.speed * 100).toInt()
             ambientIntensitySeekBar.progress = (l.intensity * 100).toInt()
@@ -1632,14 +1546,6 @@ class CustomThemeActivity : AppCompatActivity() {
         }
         theme.keyGlowEffect?.let { g ->
             glowRadiusSeekBar.progress = g.glowRadius.toInt()
-        }
-
-        updateControlsVisibility()
-        refreshContrastRow()
-        updateMoreVisibility()
-
-        onBackPressedDispatcher.addCallback {
-            cancel()
         }
     }
 

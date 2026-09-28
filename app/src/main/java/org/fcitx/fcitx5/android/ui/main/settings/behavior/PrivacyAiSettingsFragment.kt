@@ -5,89 +5,45 @@
 package org.fcitx.fcitx5.android.ui.main.settings.behavior
 
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.os.Bundle
-import android.os.Build
 import android.util.Log
 import android.view.View
-import android.widget.CheckBox
-import android.widget.RadioButton
-import android.widget.RadioGroup
-import android.widget.ScrollView
-import android.widget.TextView
-import android.widget.Toast
 import androidx.annotation.DrawableRes
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
-import androidx.preference.Preference
-import androidx.preference.SwitchPreferenceCompat
-import androidx.lifecycle.Lifecycle
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
-import org.fcitx.fcitx5.android.input.gif.GifCache
-import org.fcitx.fcitx5.android.input.gif.GifProviderCredentialState
-import org.fcitx.fcitx5.android.input.gif.GifProviderCredentialStore
-import org.fcitx.fcitx5.android.input.gif.GifProviderKind
-import org.fcitx.fcitx5.android.input.gif.GifProviderResolver
-import org.fcitx.fcitx5.android.input.gif.GifProviderSelection
-import org.fcitx.fcitx5.android.input.gif.GifProviderSelectionStore
-import org.fcitx.fcitx5.android.input.gif.GiphyCustomerIdStore
-import org.fcitx.fcitx5.android.input.gif.GiphyCredentialState
-import org.fcitx.fcitx5.android.input.gif.GiphyProviderConfiguration
-import org.fcitx.fcitx5.android.input.gif.GiphyProviderCredentialStore
-import org.fcitx.fcitx5.android.input.voice.VoiceProviderCredentialStore
-import org.fcitx.fcitx5.android.input.voice.VoiceProviderMode
-import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeStore
-import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeSelectionPolicy
-import org.fcitx.fcitx5.android.input.voice.VoiceProviderPolicy
-import org.fcitx.fcitx5.android.input.voice.VoiceProviderProfile
-import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionModel
-import org.fcitx.fcitx5.android.ui.main.MainActivity
+import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
-import org.fcitx.fcitx5.android.utils.addCategory
-import org.fcitx.fcitx5.android.utils.addPreference
+import org.fcitx.fcitx5.android.ui.main.MainActivity
 import splitties.resources.styledColor
 
 /** User-visible controls for network input, BYOK credentials, and local traces. */
 class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
-    private lateinit var voiceModePreference: Preference
-    private lateinit var voiceProviderPreference: Preference
-    private lateinit var clearVoiceProviderPreference: Preference
-    private lateinit var gifSelectionPreference: Preference
-    private lateinit var gifProviderPreference: Preference
-    private lateinit var clearGifProviderPreference: Preference
-    private lateinit var giphyProviderPreference: Preference
-    private lateinit var clearGiphyProviderPreference: Preference
-    private lateinit var typingDnaPreference: Preference
-    private lateinit var typingDnaSyncPreference: Preference
-    private lateinit var clearTypingDnaPreference: Preference
-    private lateinit var sentencePackPreference: Preference
-    private lateinit var notificationPermissionPreference: Preference
-    private lateinit var gemmaModelPreference: Preference
-    private lateinit var offlineModeSwitch: SwitchPreferenceCompat
+    private lateinit var languageVault: LanguageVaultSection
+    private lateinit var networkControls: NetworkControlsSection
+    private lateinit var voiceProvider: VoiceProviderSection
+    private lateinit var gifProvider: GifProviderSection
 
     private var summaryRefreshJob: Job? = null
     private var summaryGeneration = 0L
     private var hasSummarySnapshot = false
-    private var typingDnaSyncJob: Job? = null
     private var privacySettingsResumed = false
 
     // sync the offline-mode switch when `advanced.offlineMode` changes from another screen
     // (e.g. Advanced Settings) while this fragment isn't the visible one.
     @androidx.annotation.Keep
     private val offlineModeChangeListener =
-        org.fcitx.fcitx5.android.data.prefs.ManagedPreference.OnChangeListener<Boolean> { _, v ->
+        ManagedPreference.OnChangeListener<Boolean> { _, v ->
             if (privacySettingsResumed) return@OnChangeListener
-            if (::offlineModeSwitch.isInitialized) offlineModeSwitch.isChecked = v
+            if (::networkControls.isInitialized) networkControls.showOfflineMode(v)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,302 +52,42 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        val ctx = requireContext()
-        val prefs = AppPrefs.getInstance()
-        val preferenceIconTint = ctx.styledColor(android.R.attr.colorControlNormal)
-        fun themedPreferenceIcon(@DrawableRes resource: Int) =
-            AppCompatResources.getDrawable(ctx, resource)?.mutate()?.apply {
-                setTint(preferenceIconTint)
-            }
-        preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
-            addCategory(R.string.privacy_ai_vault_category) {
-                gemmaModelPreference = Preference(ctx).apply {
-                    setTitle(R.string.privacy_ai_gemma_model_title)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        ctx.startActivity(android.content.Intent(
-                            ctx,
-                            org.fcitx.fcitx5.android.ui.main.ai.install.GemmaModelActivity::class.java
-                        ))
-                        true
-                    }
-                }
-                addPreference(gemmaModelPreference)
-                addPreference(
-                    title = R.string.privacy_ai_vault_dashboard_title,
-                    summary = R.string.privacy_ai_vault_dashboard_summary,
-                    onClick = {
-                        ctx.startActivity(android.content.Intent(
-                            ctx,
-                            org.fcitx.fcitx5.android.ui.main.ai.TypingDnaDashboardActivity::class.java
-                        ))
-                    }
-                )
-                addPreference(SwitchPreferenceCompat(ctx).apply {
-                    key = "automatic_ondevice_suggestions_opt_in"
-                    setTitle(R.string.gemma_automatic_enable)
-                    isPersistent = true
-                    setDefaultValue(true)
-                    isChecked = prefs.internal.automaticOnDeviceSuggestionsOptIn.getValue()
-                    if (OnDeviceAiSupport.isSupported) {
-                        setSummary(R.string.gemma_automatic_enable_description)
-                    } else {
-                        isEnabled = false
-                        setSummary(R.string.privacy_ai_automatic_release_summary)
-                    }
-                })
-                addPreference(SwitchPreferenceCompat(ctx).apply {
-                    key = "automatic_ondevice_suggestions_use_gpu"
-                    setTitle(R.string.privacy_ai_gpu_acceleration_title)
-                    setSummary(R.string.privacy_ai_gpu_acceleration_summary)
-                    isPersistent = true
-                    setDefaultValue(true)
-                    isChecked = prefs.internal.automaticOnDeviceSuggestionsUseGpu.getValue()
-                    isEnabled = OnDeviceAiSupport.isSupported
-                })
-                addPreference(SwitchPreferenceCompat(ctx).apply {
-                    key = "background_progress_notifications"
-                    setTitle(R.string.privacy_ai_background_notifications_title)
-                    setSummary(R.string.privacy_ai_background_notifications_summary)
-                    isPersistent = true
-                    setDefaultValue(true)
-                    isChecked = prefs.internal.backgroundProgressNotifications.getValue()
-                })
-                addPreference(SwitchPreferenceCompat(ctx).apply {
-                    key = "collection_feedback_in_keyboard"
-                    setTitle(R.string.privacy_ai_collection_feedback_title)
-                    setSummary(R.string.privacy_ai_collection_feedback_summary)
-                    isPersistent = true
-                    setDefaultValue(true)
-                    isChecked = prefs.internal.collectionFeedbackInKeyboard.getValue()
-                })
-                notificationPermissionPreference = Preference(ctx).apply {
-                    setTitle(R.string.privacy_ai_open_notification_settings_title)
-                    setSummary(R.string.privacy_ai_open_notification_settings_summary)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName)
-                        })
-                        true
-                    }
-                }
-                addPreference(notificationPermissionPreference)
-                typingDnaPreference = Preference(ctx).apply {
-                    title = getString(R.string.privacy_ai_typing_dna_report_title)
-                    icon = themedPreferenceIcon(R.drawable.ic_baseline_auto_awesome_24)
-                    isSelectable = false
-                }
-                addPreference(typingDnaPreference)
-                typingDnaSyncPreference = Preference(ctx).apply {
-                    title = getString(R.string.privacy_ai_typing_dna_sync_title)
-                    summary = getString(R.string.privacy_ai_typing_dna_sync_summary)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        startTypingDnaSync()
-                        true
-                    }
-                }
-                addPreference(typingDnaSyncPreference)
-                clearTypingDnaPreference = Preference(ctx).apply {
-                    title = getString(R.string.privacy_ai_typing_dna_clear_title)
-                    summary = getString(R.string.privacy_ai_typing_dna_clear_summary)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        showDeleteConfirmation(
-                            ctx,
-                            R.string.privacy_ai_typing_dna_clear_dialog_title,
-                            R.string.privacy_ai_typing_dna_clear_dialog_message
-                        ) {
-                            val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-                            app.typingDnaRepository.clear()
-                            val stagingPurged = try {
-                                app.typingDnaVault.purge()
-                                true
-                            } catch (_: org.fcitx.fcitx5.android.input.ai.TypingDnaPersistenceException) {
-                                false
-                            }
-                            app.personalNgramModel.clear()
-                            app.personalSentenceVault.clear()
-                            org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance?.recentSentSentences?.clear()
-                            refreshSummaries()
-                            val resultMessage = if (stagingPurged) {
-                                R.string.privacy_ai_typing_dna_cleared_toast
-                            } else {
-                                R.string.privacy_ai_typing_dna_clear_failed_toast
-                            }
-                            Toast.makeText(ctx, resultMessage, Toast.LENGTH_SHORT).show()
-                        }
-                        true
-                    }
-                }
-                addPreference(clearTypingDnaPreference)
-                setTypingDnaSyncBusy(typingDnaSyncJob?.isActive == true)
-                updateNotificationPermissionVisibility()
-            }
-            addCategory(R.string.privacy_network_controls) {
-                addPreference(SwitchPreferenceCompat(ctx).apply {
-                    key = "privacy_offline_mode"
-                    setTitle(R.string.offline_mode)
-                    setSummary(R.string.offline_mode_summary)
-                    isPersistent = false
-                    isChecked = prefs.advanced.offlineMode.getValue()
-                    setOnPreferenceChangeListener { _, value ->
-                        val offline = value as Boolean
-                        prefs.advanced.offlineMode.setValue(offline)
-                        if (offline) {
-                            org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-                                .sentencePacks.cancelDownload()
-                        }
-                        true
-                    }
-                }.also { offlineModeSwitch = it })
-                sentencePackPreference = Preference(ctx).apply {
-                    setTitle(R.string.sentence_packs_title)
-                    setSummary(R.string.sentence_packs_default_summary)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        SentencePackDialog.show(
-                            context = ctx,
-                            lifecycleOwner = viewLifecycleOwner,
-                            repository = org.fcitx.fcitx5.android.FcitxApplication.getInstance().sentencePacks,
-                            isOfflineMode = { prefs.advanced.offlineMode.getValue() }
-                        )
-                        true
-                    }
-                }
-                addPreference(sentencePackPreference)
-            }
-            addCategory(R.string.voice_provider_settings) {
-                voiceModePreference = Preference(ctx).apply {
-                    setTitle(R.string.voice_provider_mode_title)
-                    icon = themedPreferenceIcon(R.drawable.ic_baseline_keyboard_voice_24)
-                    setOnPreferenceClickListener {
-                        showVoiceModeDialog()
-                        true
-                    }
-                }
-                addPreference(voiceModePreference)
-                voiceProviderPreference = Preference(ctx).apply {
-                    setTitle(R.string.voice_openai_api_settings)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        showVoiceProviderDialog()
-                        true
-                    }
-                }
-                addPreference(voiceProviderPreference)
-                clearVoiceProviderPreference = Preference(ctx).apply {
-                    setTitle(R.string.voice_provider_key_remove)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        showRemoveVoiceProviderDialog()
-                        true
-                    }
-                }
-                addPreference(clearVoiceProviderPreference)
-            }
-            addCategory(R.string.gif_provider_settings) {
-                gifSelectionPreference = Preference(ctx).apply {
-                    setTitle(R.string.gif_provider_selection_title)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        showGifProviderSelectionDialog()
-                        true
-                    }
-                }
-                addPreference(gifSelectionPreference)
-                gifProviderPreference = Preference(ctx).apply {
-                    setTitle(R.string.gif_klipy_settings)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        showKlipyProviderDialog()
-                        true
-                    }
-                }
-                addPreference(gifProviderPreference)
-                clearGifProviderPreference = Preference(ctx).apply {
-                    setTitle(R.string.gif_provider_key_remove)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        showRemoveGifProviderDialog()
-                        true
-                    }
-                }
-                addPreference(clearGifProviderPreference)
-                giphyProviderPreference = Preference(ctx).apply {
-                    setTitle(R.string.gif_giphy_settings)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        showGiphyProviderDialog()
-                        true
-                    }
-                }
-                addPreference(giphyProviderPreference)
-                clearGiphyProviderPreference = Preference(ctx).apply {
-                    setTitle(R.string.gif_giphy_key_remove)
-                    isIconSpaceReserved = false
-                    setOnPreferenceClickListener {
-                        showRemoveGiphyProviderDialog()
-                        true
-                    }
-                }
-                addPreference(clearGiphyProviderPreference)
-            }
-            addCategory(R.string.privacy_local_data) {
-                addPreference(R.string.gif_cache_clear, onClick = {
-                    GifCache(ctx).clear()
-                    Toast.makeText(ctx, R.string.gif_cache_cleared, Toast.LENGTH_SHORT).show()
-                })
-            }
-            addCategory(R.string.privacy_guarantees) {
-                addPreference(
-                    R.string.privacy_guarantees,
-                    R.string.privacy_guarantees_summary
-                )
-            }
+        languageVault = LanguageVaultSection(this, ::refreshSummaries)
+        networkControls = NetworkControlsSection(this)
+        voiceProvider = VoiceProviderSection(this, ::refreshSummaries)
+        gifProvider = GifProviderSection(this, ::refreshSummaries)
+        preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
+            languageVault.addTo(this)
+            networkControls.addTo(this)
+            voiceProvider.addTo(this)
+            gifProvider.addTo(this)
+            LocalDataSection.addTo(this)
+            PrivacyGuaranteesSection.addTo(this)
         }
         refreshSummaries()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        observeSentencePackSummary()
-        observeGemmaModelSummary()
-    }
-
-    /** Summary line: the shared install-status title, plus its detail (e.g. live download %) when there is one. */
-    private fun observeGemmaModelSummary() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaModelInstaller.state(requireContext().applicationContext)
-                    .collect { state ->
-                        if (!::gemmaModelPreference.isInitialized) return@collect
-                        val ctx = requireContext()
-                        val uiState = org.fcitx.fcitx5.android.ui.main.ai.install.GemmaInstallUiState.from(state)
-                        val title = ctx.getString(uiState.titleRes)
-                        val detail = uiState.detailRes?.let { ctx.getString(it, *uiState.detailArgs.toTypedArray()) }
-                        gemmaModelPreference.summary = if (detail != null) "$title · $detail" else title
-                    }
-            }
-        }
+        networkControls.observeSentencePackSummary()
+        languageVault.observeGemmaModelSummary()
     }
 
     override fun onResume() {
         super.onResume()
         privacySettingsResumed = true
-        if (::voiceModePreference.isInitialized) {
-            setTypingDnaSyncBusy(typingDnaSyncJob?.isActive == true)
+        if (::languageVault.isInitialized) {
+            languageVault.refreshSyncBusy()
             refreshSummaries()
+            languageVault.updateNotificationPermissionVisibility()
         }
-        updateNotificationPermissionVisibility()
         val intent = requireActivity().intent
         val action = intent.getStringExtra(MainActivity.EXTRA_PRIVACY_AI_ACTION)
         if (action != MainActivity.PRIVACY_AI_ACTION_VOICE_SETUP) return
         intent.removeExtra(MainActivity.EXTRA_PRIVACY_AI_ACTION)
         view?.post {
             if (!isAdded) return@post
-            showVoiceProviderDialog()
+            voiceProvider.showProviderDialog()
         }
     }
 
@@ -411,55 +107,15 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
         super.onDestroy()
     }
 
-    private fun updateNotificationPermissionVisibility() {
-        if (!::notificationPermissionPreference.isInitialized) return
-        val ctx = requireContext()
-        notificationPermissionPreference.isVisible =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                androidx.core.content.ContextCompat.checkSelfPermission(
-                    ctx, android.Manifest.permission.POST_NOTIFICATIONS
-                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun observeSentencePackSummary() {
-        val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-        app.sentencePacks.prepare()
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                app.sentencePacks.status.collect { status ->
-                    if (!::sentencePackPreference.isInitialized) return@collect
-                    sentencePackPreference.summary = when {
-                        status.isDownloading -> getString(
-                            R.string.sentence_packs_downloading_summary,
-                            getString(
-                                R.string.sentence_packs_progress,
-                                android.text.format.Formatter.formatFileSize(requireContext(), status.downloadedBytes),
-                                android.text.format.Formatter.formatFileSize(
-                                    requireContext(),
-                                    status.totalBytes.coerceAtLeast(1L)
-                                )
-                            )
-                        )
-                        status.installedCount > 0 -> getString(
-                            R.string.sentence_packs_installed_summary,
-                            status.builtinCount,
-                            status.installedCount
-                        )
-                        status.error != null -> getString(R.string.sentence_packs_failed_summary)
-                        else -> getString(R.string.sentence_packs_default_summary)
-                    }
-                }
-            }
-        }
-    }
-
     private fun refreshSummaries() {
-        if (!::voiceModePreference.isInitialized) return
+        if (!::voiceProvider.isInitialized) return
         val configuration = android.content.res.Configuration(requireContext().resources.configuration)
         val ctx = requireContext().applicationContext.createConfigurationContext(configuration)
         val generation = ++summaryGeneration
         summaryRefreshJob?.cancel()
-        if (!hasSummarySnapshot && view != null) showSummariesLoading()
+        if (!hasSummarySnapshot && view != null) {
+            showSummaryPlaceholder(getString(R.string.privacy_ai_summary_loading))
+        }
         summaryRefreshJob = lifecycleScope.launch {
             try {
                 val snapshot = withContext(Dispatchers.IO) { createSummarySnapshot(ctx) }
@@ -470,471 +126,46 @@ class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
                 throw cancelled
             } catch (error: Throwable) {
                 Log.w("SaegeulAI", "privacy AI summaries failed: ${error.javaClass.simpleName}")
-                if (canApplySummarySnapshot(generation) && !hasSummarySnapshot) showSummariesLoadFailure()
-            }
-        }
-    }
-
-    private fun createSummarySnapshot(ctx: Context): PrivacyAiSummarySnapshot {
-        val voiceMode = VoiceProviderModeStore(ctx).load()
-        val voiceStore = VoiceProviderCredentialStore(ctx)
-        val voiceProfile = voiceStore.load()
-        val voiceModeSummary = ctx.getString(
-            when (voiceMode) {
-                VoiceProviderMode.DeviceDictation -> R.string.voice_provider_mode_device_summary
-                VoiceProviderMode.OpenAiRealtime ->
-                    R.string.voice_provider_mode_openai_realtime_summary
-                VoiceProviderMode.OpenAiApi -> R.string.voice_provider_mode_openai_summary
-            }
-        )
-        val voiceProviderSummary = when {
-            voiceProfile != null && !VoiceProviderPolicy.requiresCredential(voiceMode) -> ctx.getString(
-                R.string.voice_provider_status_optional_configured,
-                ctx.getString(
-                    R.string.voice_models_configured,
-                    voiceModelName(ctx, voiceProfile.transcriptionModel),
-                    voiceProfile.realtimeTranscriptionModel
-                )
-            )
-            voiceProfile != null -> ctx.getString(
-                R.string.voice_provider_configured_summary,
-                ctx.getString(
-                    R.string.voice_models_configured,
-                    voiceModelName(ctx, voiceProfile.transcriptionModel),
-                    voiceProfile.realtimeTranscriptionModel
-                )
-            )
-            voiceStore.hasStoredProfile() -> ctx.getString(R.string.voice_provider_status_unreadable)
-            !VoiceProviderPolicy.requiresCredential(voiceMode) ->
-                ctx.getString(R.string.voice_provider_status_optional_missing)
-            else -> ctx.getString(R.string.voice_provider_status_missing)
-        }
-        val clearVoiceProviderVisible = voiceStore.hasStoredProfile()
-        val gifProvider = GifProviderResolver.resolve(ctx)
-        val gifSelectionSummary = when (gifProvider.selection) {
-            GifProviderSelection.Standard -> ctx.getString(R.string.gif_provider_selection_standard)
-            GifProviderSelection.Commons -> ctx.getString(R.string.gif_provider_selection_commons)
-            GifProviderSelection.Giphy -> ctx.getString(R.string.gif_provider_selection_giphy)
-        }
-        val gifProviderSummary = when {
-            gifProvider.credentialState == GifProviderCredentialState.Unreadable -> {
-                ctx.getString(R.string.gif_provider_status_unreadable)
-            }
-            gifProvider.credentialState == GifProviderCredentialState.Configured -> {
-                ctx.getString(R.string.gif_provider_status_klipy)
-            }
-            else -> ctx.getString(R.string.gif_provider_status_noto)
-        }
-        val clearGifProviderVisible =
-            gifProvider.credentialState != GifProviderCredentialState.Missing
-        val giphyProviderSummary = when (gifProvider.giphyCredentialState) {
-            GiphyCredentialState.Missing -> ctx.getString(R.string.gif_giphy_status_missing)
-            GiphyCredentialState.KeyOnly -> ctx.getString(R.string.gif_giphy_status_key_only)
-            GiphyCredentialState.Unreadable -> ctx.getString(R.string.gif_giphy_status_unreadable)
-            GiphyCredentialState.Ready -> ctx.getString(
-                if (gifProvider.giphyMediaCachingApproved) {
-                    R.string.gif_giphy_status_ready_attach
-                } else {
-                    R.string.gif_giphy_status_ready_link_only
+                if (canApplySummarySnapshot(generation) && !hasSummarySnapshot) {
+                    showSummaryPlaceholder(getString(R.string.privacy_ai_summary_load_failed))
                 }
-            )
+            }
         }
-        val clearGiphyProviderVisible =
-            gifProvider.giphyCredentialState != GiphyCredentialState.Missing
-
-        val typingDnaStats = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-            .typingDnaRepository.getStats()
-        val typingDnaSummary = if (!typingDnaStats.hasLearnedData) {
-            ctx.getString(R.string.privacy_ai_typing_dna_no_data_summary)
-        } else {
-            ctx.getString(
-                R.string.privacy_ai_typing_dna_stats_summary,
-                typingDnaStats.level,
-                typingDnaStats.levelTitle,
-                typingDnaStats.totalSentences,
-                typingDnaStats.bigramsCount,
-                typingDnaStats.endingsCount
-            )
-        }
-        return PrivacyAiSummarySnapshot(
-            voiceModeSummary = voiceModeSummary,
-            voiceProviderSummary = voiceProviderSummary,
-            clearVoiceProviderVisible = clearVoiceProviderVisible,
-            gifSelectionSummary = gifSelectionSummary,
-            gifProviderSummary = gifProviderSummary,
-            clearGifProviderVisible = clearGifProviderVisible,
-            giphyProviderSummary = giphyProviderSummary,
-            clearGiphyProviderVisible = clearGiphyProviderVisible,
-            typingDnaSummary = typingDnaSummary
-        )
     }
+
+    private fun createSummarySnapshot(ctx: Context) = PrivacyAiSummarySnapshot(
+        voice = voiceProvider.loadSummary(ctx),
+        gif = gifProvider.loadSummary(ctx),
+        typingDna = languageVault.loadSummary(ctx)
+    )
 
     private fun applySummarySnapshot(snapshot: PrivacyAiSummarySnapshot) {
-        voiceModePreference.summary = snapshot.voiceModeSummary
-        voiceProviderPreference.summary = snapshot.voiceProviderSummary
-        clearVoiceProviderPreference.isVisible = snapshot.clearVoiceProviderVisible
-        gifSelectionPreference.summary = snapshot.gifSelectionSummary
-        gifProviderPreference.summary = snapshot.gifProviderSummary
-        clearGifProviderPreference.isVisible = snapshot.clearGifProviderVisible
-        giphyProviderPreference.summary = snapshot.giphyProviderSummary
-        clearGiphyProviderPreference.isVisible = snapshot.clearGiphyProviderVisible
-        typingDnaPreference.summary = snapshot.typingDnaSummary
+        voiceProvider.applySummary(snapshot.voice)
+        gifProvider.applySummary(snapshot.gif)
+        languageVault.applySummary(snapshot.typingDna)
     }
 
-    private fun showSummariesLoading() {
-        val summary = getString(R.string.privacy_ai_summary_loading)
-        voiceModePreference.summary = summary
-        voiceProviderPreference.summary = summary
-        gifSelectionPreference.summary = summary
-        gifProviderPreference.summary = summary
-        giphyProviderPreference.summary = summary
-        typingDnaPreference.summary = summary
-    }
-
-    private fun showSummariesLoadFailure() {
-        val summary = getString(R.string.privacy_ai_summary_load_failed)
-        voiceModePreference.summary = summary
-        voiceProviderPreference.summary = summary
-        gifSelectionPreference.summary = summary
-        gifProviderPreference.summary = summary
-        giphyProviderPreference.summary = summary
-        typingDnaPreference.summary = summary
+    /** Shows the loading or failure line in every summary that waits on the snapshot. */
+    private fun showSummaryPlaceholder(summary: String) {
+        voiceProvider.showSummaryPlaceholder(summary)
+        gifProvider.showSummaryPlaceholder(summary)
+        languageVault.showSummaryPlaceholder(summary)
     }
 
     private fun canApplySummarySnapshot(generation: Long): Boolean =
         generation == summaryGeneration && canUpdatePreferenceView()
 
-    private fun canUpdatePreferenceView(): Boolean = isAdded && view != null
-
-    private fun startTypingDnaSync() {
-        if (typingDnaSyncJob?.isActive == true) return
-        val ctx = requireContext().applicationContext
-        val app = org.fcitx.fcitx5.android.FcitxApplication.getInstance()
-        val ime = org.fcitx.fcitx5.android.input.FcitxInputMethodService.activeInstance
-        setTypingDnaSyncBusy(true)
-        val syncJob = lifecycleScope.launch(start = CoroutineStart.LAZY) {
-            try {
-                val totalSentences = if (ime != null) {
-                    ime.triggerInstantTypingDnaSyncAsync()
-                    withContext(Dispatchers.IO) {
-                        app.typingDnaRepository.getSummary().totalSentences
-                    }
-                } else {
-                    withContext(Dispatchers.IO) {
-                        org.fcitx.fcitx5.android.input.ai.TypingDnaInstantSync.persistOnly(
-                            app.typingDnaVault,
-                            app.typingDnaRepository,
-                            sentenceStoreFile = java.io.File(ctx.filesDir, "personalized_sentences.json"),
-                            cipher = app.vaultCipher
-                        )
-                        app.typingDnaRepository.getSummary().totalSentences
-                    }
-                }
-                if (canUpdatePreferenceView()) {
-                    Toast.makeText(
-                        ctx,
-                        ctx.getString(R.string.privacy_ai_typing_dna_sync_done_toast, totalSentences),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    refreshSummaries()
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Throwable) {
-                Log.w("SaegeulAI", "typing DNA sync failed: ${error.javaClass.simpleName}")
-                if (canUpdatePreferenceView()) {
-                    Toast.makeText(ctx, R.string.privacy_ai_typing_dna_sync_failed, Toast.LENGTH_SHORT).show()
-                }
-            } finally {
-                if (typingDnaSyncJob === coroutineContext[Job]) {
-                    typingDnaSyncJob = null
-                    if (canUpdatePreferenceView()) setTypingDnaSyncBusy(false)
-                }
-            }
-        }
-        typingDnaSyncJob = syncJob
-        syncJob.start()
-    }
-
-    private fun setTypingDnaSyncBusy(busy: Boolean) {
-        typingDnaSyncPreference.isEnabled = !busy
-        clearTypingDnaPreference.isEnabled = !busy
-        typingDnaSyncPreference.summary = getString(
-            if (busy) R.string.privacy_ai_typing_dna_sync_busy
-            else R.string.privacy_ai_typing_dna_sync_summary
-        )
-    }
-
     private data class PrivacyAiSummarySnapshot(
-        val voiceModeSummary: String,
-        val voiceProviderSummary: String,
-        val clearVoiceProviderVisible: Boolean,
-        val gifSelectionSummary: String,
-        val gifProviderSummary: String,
-        val clearGifProviderVisible: Boolean,
-        val giphyProviderSummary: String,
-        val clearGiphyProviderVisible: Boolean,
-        val typingDnaSummary: String
+        val voice: VoiceProviderSection.Summary,
+        val gif: GifProviderSection.Summary,
+        val typingDna: String
     )
-
-    private fun showVoiceModeDialog() {
-        val ctx = requireContext()
-        val store = VoiceProviderModeStore(ctx)
-        val values = VoiceProviderMode.entries
-        val labels = arrayOf(
-            getString(R.string.voice_provider_mode_device),
-            getString(R.string.voice_provider_mode_openai_realtime),
-            getString(R.string.voice_provider_mode_openai)
-        )
-        var selected = values.indexOf(store.load()).coerceAtLeast(0)
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.voice_provider_mode_title)
-            .setSingleChoiceItems(labels, selected) { _, index -> selected = index }
-            .setPositiveButton(R.string.save) { _, _ ->
-                val mode = values[selected]
-                val plan = VoiceProviderModeSelectionPolicy.plan(
-                    selectedMode = mode,
-                    hasCredential = VoiceProviderCredentialStore(ctx).load() != null
-                )
-                runCatching { plan.modeToPersist?.let(store::save) }
-                    .onSuccess {
-                        refreshSummaries()
-                        plan.credentialMode?.let { pendingMode ->
-                            view?.post { showVoiceProviderDialog(pendingMode) }
-                        }
-                    }
-                    .onFailure {
-                        Toast.makeText(ctx, R.string.voice_provider_save_failed, Toast.LENGTH_SHORT)
-                            .show()
-                    }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun showVoiceProviderDialog(pendingMode: VoiceProviderMode? = null) {
-        val ctx = requireContext()
-        val store = VoiceProviderCredentialStore(ctx)
-        val configured = store.load()
-        val accurate = RadioButton(ctx).apply {
-            id = View.generateViewId()
-            setText(R.string.voice_model_accurate)
-        }
-        val efficient = RadioButton(ctx).apply {
-            id = View.generateViewId()
-            setText(R.string.voice_model_efficient)
-        }
-        val models = RadioGroup(ctx).apply {
-            orientation = RadioGroup.VERTICAL
-            addView(accurate)
-            addView(efficient)
-            check(
-                if (configured?.transcriptionModel == VoiceTranscriptionModel.Efficient.id) {
-                    efficient.id
-                } else {
-                    accurate.id
-                }
-            )
-        }
-        CredentialInputDialog.show(
-            context = ctx,
-            title = R.string.voice_openai_api_settings,
-            securityNote = R.string.voice_provider_security_note,
-            field = CredentialFieldSpec(
-                hint = R.string.voice_provider_key_hint,
-                unchangedHint = R.string.voice_provider_key_unchanged_hint,
-                configured = configured != null
-            ),
-            extraViews = listOf(models)
-        ) { input ->
-            val key = input.enteredKey.ifEmpty { configured?.apiKey.orEmpty() }
-            val model = if (models.checkedRadioButtonId == efficient.id) {
-                VoiceTranscriptionModel.Efficient.id
-            } else {
-                VoiceTranscriptionModel.Accurate.id
-            }
-            val profile = VoiceProviderProfile(apiKey = key, transcriptionModel = model)
-            val validated = runCatching(profile::validate)
-                .onFailure { error ->
-                    input.showKeyError(error.message ?: getString(R.string.voice_provider_invalid))
-                }
-                .getOrNull() ?: return@show
-            runCatching {
-                store.save(validated)
-                val selectedMode = VoiceProviderModeSelectionPolicy.afterCredentialSaved(
-                    currentMode = VoiceProviderModeStore(ctx).load(),
-                    requestedMode = pendingMode
-                )
-                VoiceProviderModeStore(ctx).save(selectedMode)
-            }.onSuccess {
-                input.finish()
-                refreshSummaries()
-                Toast.makeText(ctx, R.string.voice_provider_saved, Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                input.showKeyError(getString(R.string.voice_provider_save_failed))
-            }
-        }
-    }
-
-    private fun showRemoveVoiceProviderDialog() {
-        val ctx = requireContext()
-        showDeleteConfirmation(
-            ctx,
-            R.string.voice_provider_key_remove,
-            R.string.voice_provider_key_remove_confirm
-        ) {
-            VoiceProviderCredentialStore(ctx).clear()
-            VoiceProviderModeStore(ctx).save(VoiceProviderMode.DeviceDictation)
-            refreshSummaries()
-            Toast.makeText(ctx, R.string.voice_provider_removed, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun voiceModelName(ctx: Context, model: String): String = ctx.getString(
-        if (model == VoiceTranscriptionModel.Efficient.id) {
-            R.string.voice_model_efficient
-        } else {
-            R.string.voice_model_accurate
-        }
-    )
-
-    private fun showGifProviderSelectionDialog() {
-        val ctx = requireContext()
-        val store = GifProviderSelectionStore(ctx)
-        val values = GifProviderSelection.entries
-        val labels = values.map { selection ->
-            when (selection) {
-                GifProviderSelection.Standard -> getString(R.string.gif_provider_selection_standard)
-                GifProviderSelection.Commons -> getString(R.string.gif_provider_selection_commons)
-                GifProviderSelection.Giphy -> getString(R.string.gif_provider_selection_giphy)
-            }
-        }.toTypedArray()
-        var selected = values.indexOf(store.load()).coerceAtLeast(0)
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.gif_provider_selection_title)
-            .setSingleChoiceItems(labels, selected) { _, index -> selected = index }
-            .setPositiveButton(R.string.save) { _, _ ->
-                runCatching { store.save(values[selected]) }
-                    .onSuccess { refreshSummaries() }
-                    .onFailure {
-                        Toast.makeText(ctx, R.string.gif_provider_selection_failed, Toast.LENGTH_SHORT)
-                            .show()
-                    }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun showKlipyProviderDialog() {
-        val ctx = requireContext()
-        val store = GifProviderCredentialStore(ctx)
-        val configured = store.state() == GifProviderCredentialState.Configured
-        CredentialInputDialog.show(
-            context = ctx,
-            title = R.string.gif_klipy_settings,
-            securityNote = R.string.gif_provider_security_note,
-            field = CredentialFieldSpec(
-                hint = R.string.gif_provider_key_hint,
-                unchangedHint = R.string.gif_provider_key_unchanged_hint,
-                configured = configured
-            )
-        ) { input ->
-            val key = input.enteredKey
-            if (key.isEmpty()) {
-                if (configured) {
-                    input.dismiss()
-                } else {
-                    input.showKeyError(getString(R.string.gif_provider_key_required))
-                }
-                return@show
-            }
-            runCatching { store.saveKey(key) }
-                .onSuccess {
-                    input.finish()
-                    refreshSummaries()
-                    Toast.makeText(ctx, R.string.gif_provider_key_saved, Toast.LENGTH_SHORT)
-                        .show()
-                }
-                .onFailure {
-                    input.showKeyError(getString(R.string.gif_provider_key_invalid))
-                }
-        }
-    }
-
-    private fun showGiphyProviderDialog() {
-        val ctx = requireContext()
-        val store = GiphyProviderCredentialStore(ctx)
-        val configured = store.load()
-        val productionApproved = CheckBox(ctx).apply {
-            setText(R.string.gif_giphy_production_approval_confirmation)
-            isChecked = configured?.productionApproved == true
-        }
-        val mediaCachingApproved = CheckBox(ctx).apply {
-            setText(R.string.gif_giphy_media_approval_confirmation)
-            isChecked = configured?.mediaCachingApproved == true
-        }
-        CredentialInputDialog.show(
-            context = ctx,
-            title = R.string.gif_giphy_settings,
-            securityNote = R.string.gif_giphy_security_note,
-            field = CredentialFieldSpec(
-                hint = R.string.gif_giphy_key_hint,
-                unchangedHint = R.string.gif_giphy_key_unchanged_hint,
-                configured = configured != null
-            ),
-            extraViews = listOf(productionApproved, mediaCachingApproved)
-        ) { input ->
-            val key = input.enteredKey.ifEmpty { configured?.apiKey.orEmpty() }
-            if (key.isEmpty()) {
-                input.showKeyError(getString(R.string.gif_giphy_key_required))
-                return@show
-            }
-            if (mediaCachingApproved.isChecked && !productionApproved.isChecked) {
-                mediaCachingApproved.error = getString(R.string.gif_giphy_media_requires_production)
-                return@show
-            }
-            runCatching {
-                store.save(
-                    GiphyProviderConfiguration(
-                        apiKey = key,
-                        productionApproved = productionApproved.isChecked,
-                        mediaCachingApproved = mediaCachingApproved.isChecked
-                    )
-                )
-            }.onSuccess {
-                input.finish()
-                refreshSummaries()
-                Toast.makeText(ctx, R.string.gif_giphy_key_saved, Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                input.showKeyError(getString(R.string.gif_giphy_key_invalid))
-            }
-        }
-    }
-
-    private fun showRemoveGifProviderDialog() {
-        val ctx = requireContext()
-        showDeleteConfirmation(
-            ctx,
-            R.string.gif_provider_key_remove,
-            R.string.gif_provider_key_remove_confirm
-        ) {
-            GifProviderCredentialStore(ctx).clear()
-            refreshSummaries()
-            Toast.makeText(ctx, R.string.gif_provider_key_removed, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun showRemoveGiphyProviderDialog() {
-        val ctx = requireContext()
-        showDeleteConfirmation(
-            ctx,
-            R.string.gif_giphy_key_remove,
-            R.string.gif_giphy_key_remove_confirm
-        ) {
-            GiphyProviderCredentialStore(ctx).clear()
-            GiphyCustomerIdStore(ctx).clear()
-            refreshSummaries()
-            Toast.makeText(ctx, R.string.gif_giphy_key_removed, Toast.LENGTH_SHORT).show()
-        }
-    }
 }
+
+internal fun Fragment.canUpdatePreferenceView(): Boolean = isAdded && view != null
+
+/** Preference icon tinted like the surrounding controls; mutated so the tint stays local. */
+internal fun Context.themedPreferenceIcon(@DrawableRes resource: Int): Drawable? =
+    AppCompatResources.getDrawable(this, resource)?.mutate()?.apply {
+        setTint(styledColor(android.R.attr.colorControlNormal))
+    }

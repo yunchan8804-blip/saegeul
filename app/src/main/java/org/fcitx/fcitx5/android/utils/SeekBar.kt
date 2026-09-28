@@ -7,14 +7,15 @@ package org.fcitx.fcitx5.android.utils
 
 import android.widget.SeekBar
 
-fun SeekBar.setOnChangeListener(listener: SeekBar.(progress: Int) -> Unit) {
+/** [fromUser] is false for programmatic `progress` changes, which callers usually ignore. */
+fun SeekBar.setOnChangeListener(listener: SeekBar.(progress: Int, fromUser: Boolean) -> Unit) {
     setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
         // 의도적으로 비움: 이 헬퍼는 진행값 변경만 넘긴다.
         override fun onStartTrackingTouch(seekBar: SeekBar) {}
         // 의도적으로 비움: 이 헬퍼는 진행값 변경만 넘긴다.
         override fun onStopTrackingTouch(seekBar: SeekBar) {}
         override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-            listener.invoke(seekBar, progress)
+            listener.invoke(seekBar, progress, fromUser)
         }
     })
 }
