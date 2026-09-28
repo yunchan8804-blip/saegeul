@@ -1054,8 +1054,12 @@ class HorizontalCandidateComponent :
     private fun showTwoRowSentences(bottomCandidates: Array<CandidateWord>) {
         sentenceAdapter.updateCandidates(bottomCandidates, bottomCandidates.size)
         sentenceAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
+        // Sets the recycler's whole in-row layout on every pass so nothing another layout did to
+        // this view instance can keep the sentence chips hidden.
+        sentenceRecyclerView.visibility = View.VISIBLE
         sentenceRecyclerView.updateLayoutParams<LinearLayout.LayoutParams> {
             width = 0
+            height = ViewGroup.LayoutParams.MATCH_PARENT
             weight = 1f
         }
         sentenceRow.showRow(bottomCandidates.isNotEmpty(), context.dp(sentenceAdapter.rowHeightDp))
@@ -1094,6 +1098,10 @@ class HorizontalCandidateComponent :
 
         singleRowSentenceContainer.visibility = View.GONE
         singleRowGeneratingSpinner.visibility = View.GONE
+        // Neither row belongs to this layout, but the two-row and landscape layouts may have left
+        // them showing on this view instance.
+        wordPlaceholder.hideRow()
+        sentenceRow.hideRow()
         when {
             candidates.isNotEmpty() -> showOneRowCandidates(candidates.size, sources.automatic)
             statusRow.forcesBar -> showOneRowStatus(candidates.size, statusRow)
@@ -1108,7 +1116,6 @@ class HorizontalCandidateComponent :
         wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
         wordRow.setRowHeight(ViewGroup.LayoutParams.MATCH_PARENT)
         hairlineDivider.visibility = View.GONE
-        sentenceRecyclerView.visibility = View.GONE
         bar.isCandidateTwoRow = false
         // 유휴 상태(preedit 없음)에서 native 후보도 없다면, 문맥 후보만으로 CandidateEmpty를
         // false로 밀어붙이지 않는다(이중 안전장치). native 후보가 있는 경로는 그대로 둔다.
@@ -1125,8 +1132,6 @@ class HorizontalCandidateComponent :
         wordAdapter.rowHeightDp = 28
         wordRow.setRowHeight(context.dp(wordAdapter.rowHeightDp))
         showHairlineDivider()
-        sentenceRecyclerView.visibility = View.GONE
-        sentenceRecyclerView.setRowHeight(0)
         setStatusRow(true, statusRow.content)
         bar.isCandidateTwoRow = true
         pushCandidateEmpty(false)
@@ -1139,7 +1144,6 @@ class HorizontalCandidateComponent :
         setStatusRow(false, null)
         wordRecyclerView.visibility = View.GONE
         hairlineDivider.visibility = View.GONE
-        sentenceRecyclerView.visibility = View.GONE
         bar.isCandidateTwoRow = false
         setHasVisibleCandidates(false)
         pushCandidateEmpty(true)
@@ -1158,8 +1162,7 @@ class HorizontalCandidateComponent :
         setConnectionHint(null)
         setStatusRow(false, null)
         hairlineDivider.visibility = View.GONE
-        sentenceRow.visibility = View.GONE
-        sentenceRecyclerView.visibility = View.GONE
+        sentenceRow.hideRow()
         sentenceAdapter.updateCandidates(emptyArray(), 0)
 
         val topCandidates = sources.wordRow(addressField)
@@ -1231,6 +1234,8 @@ class HorizontalCandidateComponent :
         visibility = if (visible) View.VISIBLE else View.GONE
         setRowHeight(if (visible) heightPx else 0)
     }
+
+    private fun View.hideRow() = showRow(visible = false, heightPx = 0)
 
     /**
      * Wires the landscape single row's sentence chip to the exact same action/learning/metrics
