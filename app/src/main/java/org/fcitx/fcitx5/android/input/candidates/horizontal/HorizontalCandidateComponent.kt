@@ -188,98 +188,6 @@ class HorizontalCandidateComponent :
         bar.onCandidatesVisibilityChanged(value)
     }
 
-    private fun mergeCandidates(
-        nativeList: List<CandidateWord>,
-        contextualWords: List<CandidateWord>,
-        contextualSentences: List<CandidateWord> = emptyList()
-    ): Array<CandidateWord> {
-        val flags = if (currentCapFlags != CapabilityFlags.DefaultFlags) currentCapFlags else service.capabilityFlags
-        val isEmail = EditorPrivacyPolicy.isEmailAddressField(service.currentInputEditorInfo, flags)
-        val isUrl = EditorPrivacyPolicy.isUrlField(service.currentInputEditorInfo, flags)
-
-        val merged = mutableListOf<CandidateWord>()
-        if (isEmail || isUrl) {
-            if (nativeList.isNotEmpty()) {
-                // Actively composed word takes first priority
-                merged.add(nativeList[0])
-                // Followed by domain / TLD suggestion chips
-                contextualWords.forEach { cw ->
-                    if (merged.none { it.text == cw.text }) {
-                        merged.add(cw)
-                    }
-                }
-                // Followed by remaining native alternatives
-                for (i in 1 until nativeList.size) {
-                    val nc = nativeList[i]
-                    if (merged.none { it.text == nc.text }) {
-                        merged.add(nc)
-                    }
-                }
-            } else {
-                merged.addAll(contextualWords)
-            }
-            return merged.toTypedArray()
-        }
-
-        // In conversational text fields:
-        // Typo corrections (badge "✏️") get top priority for immediate single-tap correction
-        val typoWords = contextualWords.filter { it.comment.startsWith("✏️") }
-        val typoSentences = contextualSentences.filter { it.comment.startsWith("✏️") }
-        val otherWords = contextualWords.filter { !it.comment.startsWith("✏️") }
-        val otherSentences = contextualSentences.filter { !it.comment.startsWith("✏️") }
-
-        if (nativeList.isNotEmpty()) {
-            merged.add(nativeList[0])
-            typoWords.forEach { tw ->
-                if (merged.none { it.text == tw.text }) {
-                    merged.add(tw)
-                }
-            }
-            typoSentences.forEach { ts ->
-                if (merged.none { it.text == ts.text }) {
-                    merged.add(ts)
-                }
-            }
-            for (i in 1 until nativeList.size) {
-                val nc = nativeList[i]
-                if (merged.none { it.text == nc.text }) {
-                    merged.add(nc)
-                }
-            }
-            otherWords.forEach { cw ->
-                if (merged.none { it.text == cw.text }) {
-                    merged.add(cw)
-                }
-            }
-            otherSentences.forEach { cs ->
-                if (merged.none { it.text == cs.text }) {
-                    merged.add(cs)
-                }
-            }
-        } else {
-            typoWords.forEach { tw ->
-                if (merged.none { it.text == tw.text }) merged.add(tw)
-            }
-            typoSentences.forEach { ts ->
-                if (merged.none { it.text == ts.text }) merged.add(ts)
-            }
-            otherWords.forEach { cw ->
-                if (merged.none { it.text == cw.text }) merged.add(cw)
-            }
-            otherSentences.forEach { cs ->
-                if (merged.none { it.text == cs.text }) merged.add(cs)
-            }
-        }
-        return merged.toTypedArray()
-    }
-
-    private fun prependAutomaticCandidates(
-        automatic: List<CandidateWord>,
-        legacy: Array<CandidateWord>
-    ): Array<CandidateWord> = (automatic + legacy.filterNot { legacyCandidate ->
-        automatic.any { automaticCandidate -> automaticCandidate.text == legacyCandidate.text }
-    }).toTypedArray()
-
     private fun getAutomaticCandidates(): AutomaticCandidates {
         automaticSuggestionCandidates.clear()
         val words = mutableListOf<CandidateWord>()
@@ -1011,6 +919,7 @@ class HorizontalCandidateComponent :
         val flags = if (currentCapFlags != CapabilityFlags.DefaultFlags) currentCapFlags else service.capabilityFlags
         val isEmail = EditorPrivacyPolicy.isEmailAddressField(service.currentInputEditorInfo, flags)
         val isUrl = EditorPrivacyPolicy.isUrlField(service.currentInputEditorInfo, flags)
+        val addressField = isEmail || isUrl
 
         // K5: landscape while not thumb-split overrides the two-row preference entirely with the
         // fixed 48dp single row (see CandidateBarModePolicy.isHorizontalSingleRow / design.md K5).
@@ -1043,16 +952,22 @@ class HorizontalCandidateComponent :
         wordRow.visibility = View.VISIBLE
 
         if (singleRowLandscape) {
-            renderSingleRowLandscape(automaticCandidates, displayNativeCandidates, contextualWords, contextualSentences)
+            renderSingleRowLandscape(
+                automaticCandidates,
+                displayNativeCandidates,
+                contextualWords,
+                contextualSentences,
+                addressField
+            )
         } else if (showTwoRows) {
-            val topCandidates = prependAutomaticCandidates(
+            val topCandidates = HorizontalCandidateMerger.prependAutomatic(
                 automaticCandidates.words,
-                mergeCandidates(displayNativeCandidates, contextualWords, emptyList())
+                HorizontalCandidateMerger.merge(displayNativeCandidates, contextualWords, emptyList(), addressField)
             )
             val bottomCandidates = if (
                 automaticCandidates.sentences.isNotEmpty() || contextualSentences.isNotEmpty()
             ) {
-                prependAutomaticCandidates(
+                HorizontalCandidateMerger.prependAutomatic(
                     automaticCandidates.sentences,
                     contextualSentences.toTypedArray()
                 )
@@ -1135,12 +1050,16 @@ class HorizontalCandidateComponent :
             applyFillStyle(topCandidates.size)
             setHasVisibleCandidates(true)
         } else {
-            val candidates = mergeCandidates(
+            val candidates = HorizontalCandidateMerger.merge(
                 displayNativeCandidates,
                 contextualWords,
-                contextualSentences
+                contextualSentences,
+                addressField
             ).let { legacy ->
-                prependAutomaticCandidates(automaticCandidates.words + automaticCandidates.sentences, legacy)
+                HorizontalCandidateMerger.prependAutomatic(
+                    automaticCandidates.words + automaticCandidates.sentences,
+                    legacy
+                )
             }
             wordAdapter.updateCandidates(candidates, candidates.size)
             sentenceAdapter.updateCandidates(emptyArray(), 0)
@@ -1228,7 +1147,8 @@ class HorizontalCandidateComponent :
         automaticCandidates: AutomaticCandidates,
         displayNativeCandidates: List<CandidateWord>,
         contextualWords: List<CandidateWord>,
-        contextualSentences: List<CandidateWord>
+        contextualSentences: List<CandidateWord>,
+        addressField: Boolean
     ) {
         setConnectionHint(null)
         setStatusRow(false, null)
@@ -1237,11 +1157,11 @@ class HorizontalCandidateComponent :
         sentenceRecyclerView.visibility = View.GONE
         sentenceAdapter.updateCandidates(emptyArray(), 0)
 
-        val topCandidates = prependAutomaticCandidates(
+        val topCandidates = HorizontalCandidateMerger.prependAutomatic(
             automaticCandidates.words,
-            mergeCandidates(displayNativeCandidates, contextualWords, emptyList())
+            HorizontalCandidateMerger.merge(displayNativeCandidates, contextualWords, emptyList(), addressField)
         )
-        val topSentenceCandidates = prependAutomaticCandidates(
+        val topSentenceCandidates = HorizontalCandidateMerger.prependAutomatic(
             automaticCandidates.sentences,
             contextualSentences.toTypedArray()
         )
