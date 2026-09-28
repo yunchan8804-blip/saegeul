@@ -9,4 +9,13 @@
     <string name="typing_dna_card_metric_bigrams_unknown">Word pairs —</string>
     <string name="typing_dna_card_metric_endings_unknown">Endings —</string>
     <string name="typing_dna_card_metric_phrases_unknown">Phrases —</string>
+    <string name="typing_dna_card_title">%1$s · Learning on device</string>
+    <string name="typing_dna_card_empty_summary">As you use the keyboard, your tone and word habits build up here.</string>
+    <string name="typing_dna_card_stats_summary">%1$d sentences analyzed · %2$d word pairs · %3$d endings</string>
+    <string name="typing_dna_card_points_suffix"> · %1$d points</string>
+    <string name="typing_dna_card_metric_sentences">Sentences %1$d</string>
+    <string name="typing_dna_card_metric_bigrams">Word pairs %1$d</string>
+    <string name="typing_dna_card_metric_endings">Endings %1$d</string>
+    <string name="typing_dna_card_metric_phrases">Phrases %1$d</string>
+    <string name="typing_dna_card_content_description">Language fingerprint learning status. Level %1$d %2$s. %3$d sentences analyzed. Tap to open the detailed dashboard.</string>
 </resources>

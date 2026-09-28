@@ -100,8 +100,8 @@ class DialogSeekBarPreference @JvmOverloads constructor(
         val seekBar = context.seekBar {
             max = progressForValue(this@DialogSeekBarPreference.max)
             progress = progressForValue(value)
-            setOnChangeListener {
-                textView.text = textForValue(valueForProgress(it))
+            setOnChangeListener { progress, _ ->
+                textView.text = textForValue(valueForProgress(progress))
             }
         }
         val dialogContent = context.verticalLayout {

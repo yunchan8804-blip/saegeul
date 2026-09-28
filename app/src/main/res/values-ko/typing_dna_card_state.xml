@@ -9,4 +9,13 @@
     <string name="typing_dna_card_metric_bigrams_unknown">단어쌍 —</string>
     <string name="typing_dna_card_metric_endings_unknown">어미 —</string>
     <string name="typing_dna_card_metric_phrases_unknown">상용구 —</string>
+    <string name="typing_dna_card_title">%1$s · 온디바이스 학습 중</string>
+    <string name="typing_dna_card_empty_summary">키보드를 사용하면 내 말투와 어휘 습관이 이곳에 축적됩니다.</string>
+    <string name="typing_dna_card_stats_summary">분석 문장 %1$d개 · 단어쌍 %2$d개 · 종결어미 %3$d개</string>
+    <string name="typing_dna_card_points_suffix"> · 포인트 %1$d점</string>
+    <string name="typing_dna_card_metric_sentences">문장 %1$d</string>
+    <string name="typing_dna_card_metric_bigrams">단어쌍 %1$d</string>
+    <string name="typing_dna_card_metric_endings">어미 %1$d</string>
+    <string name="typing_dna_card_metric_phrases">상용구 %1$d</string>
+    <string name="typing_dna_card_content_description">AI 언어 지문 학습 현황. 레벨 %1$d %2$s. 분석 문장 %3$d개. 탭하면 상세 그래프 대시보드를 엽니다.</string>
 </resources>

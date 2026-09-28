@@ -10,9 +10,12 @@ import android.os.Build
 import androidx.annotation.StringRes
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.IntPreferenceSpec
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
+import org.fcitx.fcitx5.android.data.prefs.TwinIntPreferenceSpec
+import org.fcitx.fcitx5.android.data.prefs.TwinIntSide
 
 class ThemePrefs(sharedPreferences: SharedPreferences) :
     ManagedPreferenceCategory(R.string.theme, sharedPreferences) {
@@ -47,16 +50,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     init {
         val (primary, secondary) = twinInt(
-            R.string.key_horizontal_margin,
-            R.string.portrait,
-            "key_horizontal_margin",
-            3,
-            R.string.landscape,
-            "key_horizontal_margin_landscape",
-            3,
-            0,
-            24,
-            "dp"
+            TwinIntPreferenceSpec(
+                title = R.string.key_horizontal_margin,
+                primary = TwinIntSide(R.string.portrait, "key_horizontal_margin", 3),
+                secondary = TwinIntSide(R.string.landscape, "key_horizontal_margin_landscape", 3),
+                min = 0,
+                max = 24,
+                unit = "dp"
+            )
         )
         keyHorizontalMargin = primary
         keyHorizontalMarginLandscape = secondary
@@ -67,28 +68,51 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     init {
         val (primary, secondary) = twinInt(
-            R.string.key_vertical_margin,
-            R.string.portrait,
-            "key_vertical_margin",
-            7,
-            R.string.landscape,
-            "key_vertical_margin_landscape",
-            4,
-            0,
-            24,
-            "dp"
+            TwinIntPreferenceSpec(
+                title = R.string.key_vertical_margin,
+                primary = TwinIntSide(R.string.portrait, "key_vertical_margin", 7),
+                secondary = TwinIntSide(R.string.landscape, "key_vertical_margin_landscape", 4),
+                min = 0,
+                max = 24,
+                unit = "dp"
+            )
         )
         keyVerticalMargin = primary
         keyVerticalMarginLandscape = secondary
     }
 
-    val keyRadius = int(R.string.key_radius, "key_radius", 4, 0, 48, "dp")
+    val keyRadius = int(
+        IntPreferenceSpec(
+            title = R.string.key_radius,
+            key = "key_radius",
+            defaultValue = 4,
+            min = 0,
+            max = 48,
+            unit = "dp"
+        )
+    )
 
-    val textEditingButtonRadius =
-        int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
+    val textEditingButtonRadius = int(
+        IntPreferenceSpec(
+            title = R.string.text_editing_button_radius,
+            key = "text_editing_button_radius",
+            defaultValue = 8,
+            min = 0,
+            max = 48,
+            unit = "dp"
+        )
+    )
 
-    val clipboardEntryRadius =
-        int(R.string.clipboard_entry_radius, "clipboard_entry_radius", 2, 0, 48, "dp")
+    val clipboardEntryRadius = int(
+        IntPreferenceSpec(
+            title = R.string.clipboard_entry_radius,
+            key = "clipboard_entry_radius",
+            defaultValue = 2,
+            min = 0,
+            max = 48,
+            unit = "dp"
+        )
+    )
 
     enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
         None(R.string.punctuation_pos_none),

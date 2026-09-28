@@ -126,16 +126,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.keyboard_height,
-                R.string.portrait,
-                "keyboard_height_percent",
-                30,
-                R.string.landscape,
-                "keyboard_height_percent_landscape",
-                49,
-                10,
-                90,
-                "%"
+                TwinIntPreferenceSpec(
+                    title = R.string.keyboard_height,
+                    primary = TwinIntSide(R.string.portrait, "keyboard_height_percent", 30),
+                    secondary = TwinIntSide(R.string.landscape, "keyboard_height_percent_landscape", 49),
+                    min = 10,
+                    max = 90,
+                    unit = "%"
+                )
             )
             keyboardHeightPercent = primary
             keyboardHeightPercentLandscape = secondary
@@ -146,16 +144,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.keyboard_side_padding,
-                R.string.portrait,
-                "keyboard_side_padding",
-                0,
-                R.string.landscape,
-                "keyboard_side_padding_landscape",
-                0,
-                0,
-                300,
-                "dp"
+                TwinIntPreferenceSpec(
+                    title = R.string.keyboard_side_padding,
+                    primary = TwinIntSide(R.string.portrait, "keyboard_side_padding", 0),
+                    secondary = TwinIntSide(R.string.landscape, "keyboard_side_padding_landscape", 0),
+                    min = 0,
+                    max = 300,
+                    unit = "dp"
+                )
             )
             keyboardSidePadding = primary
             keyboardSidePaddingLandscape = secondary
@@ -166,16 +162,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.keyboard_bottom_padding,
-                R.string.portrait,
-                "keyboard_bottom_padding",
-                0,
-                R.string.landscape,
-                "keyboard_bottom_padding_landscape",
-                0,
-                0,
-                100,
-                "dp"
+                TwinIntPreferenceSpec(
+                    title = R.string.keyboard_bottom_padding,
+                    primary = TwinIntSide(R.string.portrait, "keyboard_bottom_padding", 0),
+                    secondary = TwinIntSide(R.string.landscape, "keyboard_bottom_padding_landscape", 0),
+                    min = 0,
+                    max = 100,
+                    unit = "dp"
+                )
             )
             keyboardBottomPadding = primary
             keyboardBottomPaddingLandscape = secondary
@@ -188,13 +182,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         )
 
         val keyTextScale = int(
-            R.string.key_text_scale,
-            "key_text_scale",
-            KeyTextScale.DEFAULT_PERCENT,
-            KeyTextScale.MIN_PERCENT,
-            KeyTextScale.MAX_PERCENT,
-            "%",
-            KeyTextScale.STEP_PERCENT
+            IntPreferenceSpec(
+                title = R.string.key_text_scale,
+                key = "key_text_scale",
+                defaultValue = KeyTextScale.DEFAULT_PERCENT,
+                min = KeyTextScale.MIN_PERCENT,
+                max = KeyTextScale.MAX_PERCENT,
+                unit = "%",
+                step = KeyTextScale.STEP_PERCENT
+            )
         )
 
         val splitKeyboardCompact = switch(
@@ -215,17 +211,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.split_keyboard_compact_gap,
-                R.string.portrait,
-                "split_keyboard_compact_gap_portrait",
-                48,
-                R.string.landscape,
-                "split_keyboard_compact_gap_landscape",
-                72,
-                24,
-                180,
-                "dp",
-                4
+                TwinIntPreferenceSpec(
+                    title = R.string.split_keyboard_compact_gap,
+                    primary = TwinIntSide(R.string.portrait, "split_keyboard_compact_gap_portrait", 48),
+                    secondary = TwinIntSide(R.string.landscape, "split_keyboard_compact_gap_landscape", 72),
+                    min = 24,
+                    max = 180,
+                    unit = "dp",
+                    step = 4
+                )
             ) { splitKeyboardCompact.getValue() }
             splitKeyboardCompactGapPortrait = primary
             splitKeyboardCompactGapLandscape = secondary
@@ -236,17 +230,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.split_keyboard_expanded_gap,
-                R.string.portrait,
-                "split_keyboard_expanded_gap_portrait",
-                96,
-                R.string.landscape,
-                "split_keyboard_expanded_gap_landscape",
-                128,
-                32,
-                240,
-                "dp",
-                4
+                TwinIntPreferenceSpec(
+                    title = R.string.split_keyboard_expanded_gap,
+                    primary = TwinIntSide(R.string.portrait, "split_keyboard_expanded_gap_portrait", 96),
+                    secondary = TwinIntSide(R.string.landscape, "split_keyboard_expanded_gap_landscape", 128),
+                    min = 32,
+                    max = 240,
+                    unit = "dp",
+                    step = 4
+                )
             ) { splitKeyboardExpanded.getValue() }
             splitKeyboardExpandedGapPortrait = primary
             splitKeyboardExpandedGapLandscape = secondary
@@ -259,13 +251,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
         val longPressDelay = int(
-            R.string.keyboard_long_press_delay,
-            "keyboard_long_press_delay",
-            300,
-            100,
-            700,
-            "ms",
-            10
+            IntPreferenceSpec(
+                title = R.string.keyboard_long_press_delay,
+                key = "keyboard_long_press_delay",
+                defaultValue = 300,
+                min = 100,
+                max = 700,
+                unit = "ms",
+                step = 10
+            )
         )
         val swipeSymbolDirection = enumList(
             R.string.swipe_symbol_behavior,
@@ -317,17 +311,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.button_vibration_milliseconds,
-                R.string.button_press,
-                "button_vibration_press_milliseconds",
-                0,
-                R.string.button_long_press,
-                "button_vibration_long_press_milliseconds",
-                0,
-                0,
-                100,
-                "ms",
-                defaultLabel = R.string.system_default
+                TwinIntPreferenceSpec(
+                    title = R.string.button_vibration_milliseconds,
+                    primary = TwinIntSide(R.string.button_press, "button_vibration_press_milliseconds", 0),
+                    secondary = TwinIntSide(R.string.button_long_press, "button_vibration_long_press_milliseconds", 0),
+                    min = 0,
+                    max = 100,
+                    unit = "ms",
+                    defaultLabel = R.string.system_default
+                )
             ) { hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled }
             buttonPressVibrationMilliseconds = primary
             buttonLongPressVibrationMilliseconds = secondary
@@ -338,16 +330,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.button_vibration_amplitude,
-                R.string.button_press,
-                "button_vibration_press_amplitude",
-                0,
-                R.string.button_long_press,
-                "button_vibration_long_press_amplitude",
-                0,
-                0,
-                255,
-                defaultLabel = R.string.system_default
+                TwinIntPreferenceSpec(
+                    title = R.string.button_vibration_amplitude,
+                    primary = TwinIntSide(R.string.button_press, "button_vibration_press_amplitude", 0),
+                    secondary = TwinIntSide(R.string.button_long_press, "button_vibration_long_press_amplitude", 0),
+                    min = 0,
+                    max = 255,
+                    defaultLabel = R.string.system_default
+                )
             ) {
                 (hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled)
                         // hide this if using default duration
@@ -364,13 +354,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             InputFeedbackMode.FollowingSystem
         )
         val soundOnKeyPressVolume = int(
-            R.string.button_sound_volume,
-            "button_sound_volume",
-            0,
-            0,
-            100,
-            "%",
-            defaultLabel = R.string.system_default
+            IntPreferenceSpec(
+                title = R.string.button_sound_volume,
+                key = "button_sound_volume",
+                defaultValue = 0,
+                min = 0,
+                max = 100,
+                unit = "%",
+                defaultLabel = R.string.system_default
+            )
         ) {
             soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
         }
@@ -415,15 +407,13 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.expanded_candidate_grid_span_count,
-                R.string.portrait,
-                "expanded_candidate_grid_span_count_portrait",
-                6,
-                R.string.landscape,
-                "expanded_candidate_grid_span_count_landscape",
-                8,
-                4,
-                12,
+                TwinIntPreferenceSpec(
+                    title = R.string.expanded_candidate_grid_span_count,
+                    primary = TwinIntSide(R.string.portrait, "expanded_candidate_grid_span_count_portrait", 6),
+                    secondary = TwinIntSide(R.string.landscape, "expanded_candidate_grid_span_count_landscape", 8),
+                    min = 4,
+                    max = 12
+                )
             )
             expandedCandidateGridSpanCount = primary
             expandedCandidateGridSpanCountLandscape = secondary
@@ -453,39 +443,63 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         )
 
         val windowMinWidth = int(
-            R.string.candidates_window_min_width,
-            "candidates_window_min_width",
-            0,
-            0,
-            640,
-            "dp",
-            10
+            IntPreferenceSpec(
+                title = R.string.candidates_window_min_width,
+                key = "candidates_window_min_width",
+                defaultValue = 0,
+                min = 0,
+                max = 640,
+                unit = "dp",
+                step = 10
+            )
         )
 
-        val windowPadding =
-            int(R.string.candidates_window_padding, "candidates_window_padding", 4, 0, 32, "dp")
+        val windowPadding = int(
+            IntPreferenceSpec(
+                title = R.string.candidates_window_padding,
+                key = "candidates_window_padding",
+                defaultValue = 4,
+                min = 0,
+                max = 32,
+                unit = "dp"
+            )
+        )
 
-        val fontSize =
-            int(R.string.candidates_font_size, "candidates_window_font_size", 20, 4, 64, "sp")
+        val fontSize = int(
+            IntPreferenceSpec(
+                title = R.string.candidates_font_size,
+                key = "candidates_window_font_size",
+                defaultValue = 20,
+                min = 4,
+                max = 64,
+                unit = "sp"
+            )
+        )
 
-        val windowRadius =
-            int(R.string.candidates_window_radius, "candidates_window_radius", 0, 0, 48, "dp")
+        val windowRadius = int(
+            IntPreferenceSpec(
+                title = R.string.candidates_window_radius,
+                key = "candidates_window_radius",
+                defaultValue = 0,
+                min = 0,
+                max = 48,
+                unit = "dp"
+            )
+        )
 
         val itemPaddingVertical: ManagedPreference.PInt
         val itemPaddingHorizontal: ManagedPreference.PInt
 
         init {
             val (primary, secondary) = twinInt(
-                R.string.candidates_padding,
-                R.string.vertical,
-                "candidates_item_padding_vertical",
-                2,
-                R.string.horizontal,
-                "candidates_item_padding_horizontal",
-                4,
-                0,
-                64,
-                "dp"
+                TwinIntPreferenceSpec(
+                    title = R.string.candidates_padding,
+                    primary = TwinIntSide(R.string.vertical, "candidates_item_padding_vertical", 2),
+                    secondary = TwinIntSide(R.string.horizontal, "candidates_item_padding_horizontal", 4),
+                    min = 0,
+                    max = 64,
+                    unit = "dp"
+                )
             )
             itemPaddingVertical = primary
             itemPaddingHorizontal = secondary
@@ -495,20 +509,20 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     inner class Clipboard : ManagedPreferenceCategory(R.string.clipboard, sharedPreferences) {
         val clipboardListening = switch(R.string.clipboard_listening, "clipboard_enable", false)
         val clipboardHistoryLimit = int(
-            R.string.clipboard_limit,
-            "clipboard_limit",
-            10,
+            IntPreferenceSpec(R.string.clipboard_limit, "clipboard_limit", 10)
         ) { clipboardListening.getValue() }
         val clipboardSuggestion = switch(
             R.string.clipboard_suggestion, "clipboard_suggestion", true
         ) { clipboardListening.getValue() }
         val clipboardItemTimeout = int(
-            R.string.clipboard_suggestion_timeout,
-            "clipboard_item_timeout",
-            30,
-            -1,
-            Int.MAX_VALUE,
-            "s"
+            IntPreferenceSpec(
+                title = R.string.clipboard_suggestion_timeout,
+                key = "clipboard_item_timeout",
+                defaultValue = 30,
+                min = -1,
+                max = Int.MAX_VALUE,
+                unit = "s"
+            )
         ) { clipboardListening.getValue() && clipboardSuggestion.getValue() }
         val clipboardReturnAfterPaste = switch(
             R.string.clipboard_return_after_paste, "clipboard_return_after_paste", false

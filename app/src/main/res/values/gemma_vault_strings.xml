@@ -21,4 +21,12 @@
     <string name="gemma_vault_personal_sync_completed">Reflected your personal input. %1$d sentences analyzed</string>
     <string name="gemma_vault_personal_sync_no_new">No new personal input to reflect. %1$d sentences analyzed</string>
     <string name="gemma_vault_personal_sync_failed">Couldn\'t reflect your personal input. Please try again.</string>
+    <string name="gemma_vault_status_error">Sentence preparation error</string>
+    <string name="gemma_vault_status_model_needed">The Gemma model needs to be set up.</string>
+    <string name="gemma_vault_status_running">Preparing sentences.</string>
+    <string name="gemma_vault_status_attempts_exhausted">Stopped enriching because no new sentences were added. You can try again from model management.</string>
+    <string name="gemma_vault_status_queued">Waiting for Android to schedule the run.</string>
+    <string name="gemma_vault_status_manual_waiting">Waiting to resume the one-time enrichment request.</string>
+    <string name="gemma_vault_status_automatic_off">Automatic preparation is off.</string>
+    <string name="gemma_vault_status_interrupted">Stopped. Waiting for the next preparation.</string>
 </resources>

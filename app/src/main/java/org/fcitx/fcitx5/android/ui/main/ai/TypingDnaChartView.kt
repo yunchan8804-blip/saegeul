@@ -163,16 +163,16 @@ class TypingDnaChartView @JvmOverloads constructor(
         var currentY = paddingTop + dp(16f)
 
         if (compact) {
-            canvas.drawText("학습 축적 미니 그래프", paddingL, currentY, textPaint)
+            canvas.drawText(context.getString(R.string.typing_dna_chart_mini_title), paddingL, currentY, textPaint)
             currentY += dp(18f)
             val maxVal = maxOf(s.totalSentences, s.bigramsCount, s.endingsCount, s.phrasesCount, 8).toFloat()
-            drawMetricBar(canvas, "문장", s.totalSentences, maxVal, primaryBlue, paddingL, currentY, availableWidth, compact = true)
+            drawMetricBar(canvas, context.getString(R.string.typing_dna_chart_mini_label_sentences), s.totalSentences, maxVal, primaryBlue, paddingL, currentY, availableWidth, compact = true)
             currentY += dp(22f)
-            drawMetricBar(canvas, "단어쌍", s.bigramsCount, maxVal, emeraldGreen, paddingL, currentY, availableWidth, compact = true)
+            drawMetricBar(canvas, context.getString(R.string.typing_dna_chart_mini_label_word_pairs), s.bigramsCount, maxVal, emeraldGreen, paddingL, currentY, availableWidth, compact = true)
             currentY += dp(22f)
-            drawMetricBar(canvas, "어미", s.endingsCount, maxVal, amberOrange, paddingL, currentY, availableWidth, compact = true)
+            drawMetricBar(canvas, context.getString(R.string.typing_dna_chart_mini_label_endings), s.endingsCount, maxVal, amberOrange, paddingL, currentY, availableWidth, compact = true)
             currentY += dp(22f)
-            drawMetricBar(canvas, "상용구", s.phrasesCount, maxVal, purpleViolet, paddingL, currentY, availableWidth, compact = true)
+            drawMetricBar(canvas, context.getString(R.string.typing_dna_chart_mini_label_phrases), s.phrasesCount, maxVal, purpleViolet, paddingL, currentY, availableWidth, compact = true)
             return
         }
 
@@ -270,7 +270,7 @@ class TypingDnaChartView @JvmOverloads constructor(
         }
 
         val animatedValue = (value * animationProgress).toInt()
-        val valStr = if (compact) "$animatedValue" else "${animatedValue}개"
+        val valStr = if (compact) "$animatedValue" else context.getString(R.string.item_count_value, animatedValue)
         subTextPaint.isFakeBoldText = true
         canvas.drawText(valStr, barStartX + barWidth + dp(8f), y + dp(8.5f), subTextPaint)
         subTextPaint.isFakeBoldText = false

@@ -236,7 +236,7 @@ class ThemeListFragment : Fragment() {
         val ownership = ThemeOwnershipStore(ctx)
         val balanceView = TextView(ctx).apply {
             setPadding(48, 16, 48, 0)
-            text = "현재 포인트: ${ledger.balance()}점"
+            text = ctx.getString(R.string.theme_shop_balance, ledger.balance())
         }
         var dialog: AlertDialog? = null
         fun tryPurchase() {
@@ -251,29 +251,29 @@ class ThemeListFragment : Fragment() {
                         dialog?.dismiss()
                         ThemeManager.setNormalModeTheme(shop.theme)
                         updateSelectedThemes()
-                        ctx.toast("${shop.displayName} 테마를 구매했어요")
+                        ctx.toast(ctx.getString(R.string.theme_shop_purchased, shop.displayName))
                     } else {
-                        ctx.toast("포인트가 부족해요")
+                        ctx.toast(R.string.theme_shop_not_enough_points)
                     }
                 }
             }
         }
         val rewarded = ThemePointRewardedController(requireActivity()) { earned ->
-            balanceView.text = "현재 포인트: ${ledger.balance()}점"
-            ctx.toast("포인트 +${earned}점")
+            balanceView.text = ctx.getString(R.string.theme_shop_balance, ledger.balance())
+            ctx.toast(ctx.getString(R.string.theme_shop_points_earned, earned))
             tryPurchase()
         }
         rewarded.prepare()
         dialog = AlertDialog.Builder(ctx)
-            .setTitle("테마 상점 · ${shop.displayName}")
-            .setMessage("이 테마는 포인트 ${shop.price}점이면 사용할 수 있어요. 광고 1편을 시청하면 포인트 1점을 모을 수 있어요.")
+            .setTitle(ctx.getString(R.string.theme_shop_dialog_title, shop.displayName))
+            .setMessage(ctx.getString(R.string.theme_shop_dialog_message, shop.price))
             .setView(balanceView)
-            .setPositiveButton("구매") { _, _ -> tryPurchase() }
-            .setNeutralButton("광고 보고 +1") { _, _ ->
+            .setPositiveButton(R.string.theme_shop_buy) { _, _ -> tryPurchase() }
+            .setNeutralButton(R.string.theme_shop_watch_ad) { _, _ ->
                 if (rewarded.isEligible()) {
                     rewarded.showIfEligible()
                 } else {
-                    ctx.toast("포인트 적립은 하루 3회, 20분 간격으로 할 수 있어요")
+                    ctx.toast(R.string.theme_shop_earn_limit)
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)

@@ -21,4 +21,12 @@
     <string name="gemma_vault_personal_sync_completed">개인 입력을 반영했습니다. 분석 문장 %1$d개</string>
     <string name="gemma_vault_personal_sync_no_new">새로 반영할 개인 입력이 없습니다. 분석 문장 %1$d개</string>
     <string name="gemma_vault_personal_sync_failed">개인 입력을 반영하지 못했습니다. 다시 시도하세요.</string>
+    <string name="gemma_vault_status_error">문장 준비 오류</string>
+    <string name="gemma_vault_status_model_needed">Gemma 모델 준비가 필요합니다.</string>
+    <string name="gemma_vault_status_running">문장을 준비하고 있습니다.</string>
+    <string name="gemma_vault_status_attempts_exhausted">새 문장이 추가되지 않아 보강을 멈췄습니다. 모델 관리에서 다시 시도할 수 있습니다.</string>
+    <string name="gemma_vault_status_queued">Android 실행 일정을 기다리고 있습니다.</string>
+    <string name="gemma_vault_status_manual_waiting">한 번 보강 요청의 재개를 기다리고 있습니다.</string>
+    <string name="gemma_vault_status_automatic_off">자동 준비가 꺼져 있습니다.</string>
+    <string name="gemma_vault_status_interrupted">중단 후 다음 준비를 기다리고 있습니다.</string>
 </resources>

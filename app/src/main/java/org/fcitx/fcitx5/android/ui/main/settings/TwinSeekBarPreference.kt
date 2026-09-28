@@ -110,8 +110,8 @@ class TwinSeekBarPreference @JvmOverloads constructor(
         val seekBar = seekBar {
             max = progressForValue(this@TwinSeekBarPreference.max)
             progress = progressForValue(initialValue)
-            setOnChangeListener {
-                valueLabel.text = textForValue(valueForProgress(it), defaultValue)
+            setOnChangeListener { progress, _ ->
+                valueLabel.text = textForValue(valueForProgress(progress), defaultValue)
             }
         }
         val textMargin = dp(24)
