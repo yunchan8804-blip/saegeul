@@ -18,7 +18,7 @@ internal object LocalAvenueCatalog {
     val typingDnaSyncComplete = AdVenue(
         id = TYPING_DNA_SYNC_COMPLETE,
         screen = "AI 언어 지문 대시보드",
-        trigger = "지금 즉시 분석 및 동기화 완료 뒤",
+        trigger = "금고 동기화 완료 뒤(안내 창이 있으면 닫은 뒤)",
         format = AdFormat.INTERSTITIAL,
         requiresConsent = true,
         dailyCap = 1,

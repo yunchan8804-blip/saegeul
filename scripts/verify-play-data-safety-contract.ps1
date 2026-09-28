@@ -107,17 +107,42 @@ if (($actualProviders -join "`n") -ne (($expectedProviders | Sort-Object) -join 
     throw "Release provider set does not match the locked Play declaration."
 }
 
+# Google Mobile Ads SDK collects and shares IP address, user product interactions, diagnostic
+# information and device identifiers for advertising, analytics and fraud prevention:
+# https://developers.google.com/admob/android/privacy/play-data-disclosure (checked 2026-09-28).
 $expectedDataTypes = [ordered]@{
-    approximate_location = @("Location", "Approximate location", "App functionality", "Advertising")
+    approximate_location = @(
+        "Location",
+        "Approximate location",
+        "App functionality",
+        "Analytics",
+        "Advertising",
+        "Fraud prevention, security, and compliance"
+    )
     in_app_search_history = @("App activity", "In-app search history", "App functionality")
     voice_or_sound_recordings = @("Audio files", "Voice or sound recordings", "App functionality")
-    app_interactions = @("App activity", "App interactions", "App functionality", "Analytics", "Advertising")
+    app_interactions = @(
+        "App activity",
+        "App interactions",
+        "App functionality",
+        "Analytics",
+        "Advertising",
+        "Fraud prevention, security, and compliance"
+    )
     device_or_other_ids = @(
         "Device or other IDs",
         "Device or other IDs",
         "App functionality",
         "Analytics",
-        "Advertising"
+        "Advertising",
+        "Fraud prevention, security, and compliance"
+    )
+    diagnostics = @(
+        "App info and performance",
+        "Diagnostics",
+        "Analytics",
+        "Advertising",
+        "Fraud prevention, security, and compliance"
     )
 }
 

@@ -10,7 +10,7 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
-/** Persists the timestamp of the last "지금 즉시 분석 및 동기화" run. Timestamps only, not sensitive. */
+/** Persists the timestamp of the last vault dashboard sync run. Timestamps only, not sensitive. */
 class TypingDnaSyncStatusStore(context: Context) {
     private val prefs = context.getSharedPreferences("typing_dna_sync_status", Context.MODE_PRIVATE)
 

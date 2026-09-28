@@ -27,7 +27,7 @@ Google Play Data Safety 분류
 - 선택형 온라인 기능은 대략적 위치(IP 주소에서 추론), 앱 내 검색 기록(GIF 검색어), 음성 또는 소리 녹음(받아쓰기·회의 파일)을 수집·공유하는 것으로 보수적으로 신고합니다.
 - 승인된 GIPHY를 사용하면 기기 또는 기타 ID(임의 앱 식별자)와 앱 상호작용(노출·클릭·전송 이벤트)도 선택적으로 수집·공유한다고 신고합니다.
 - Google AdMob 광고(대시보드 배너, 전면 광고, 테마 상점 보상형 광고)는 대략적 위치(IP 주소에서 추론), 기기 또는 기타 ID(광고 ID, App set ID), 앱 상호작용(광고 노출·클릭·보상 이벤트), 진단(앱과 SDK 성능 정보)을 수집·공유한다고 신고합니다.
-- 모든 전송 데이터 유형은 선택 사항으로 신고합니다. 진단을 뺀 유형은 앱 기능 목적으로 사용하고, GIPHY 식별자와 이벤트는 분석 목적도 함께 신고합니다. AdMob이 받는 대략적 위치·기기 ID·앱 상호작용·진단 정보는 광고와 사기 방지·보안·규정 준수 목적으로, 이 가운데 기기 ID·앱 상호작용·진단 정보는 분석 목적으로도 신고합니다.
+- 모든 전송 데이터 유형은 선택 사항으로 신고합니다. 진단을 뺀 유형은 앱 기능 목적으로 사용하고, GIPHY 식별자와 이벤트는 분석 목적도 함께 신고합니다. AdMob이 받는 대략적 위치·기기 ID·앱 상호작용·진단 정보는 광고, 분석, 사기 방지·보안·규정 준수 목적으로 신고합니다.
 - store=false 또는 앱의 로컬 비보관만으로 공급자 처리를 일시적 처리로 간주하지 않습니다.
 
 제어와 삭제
@@ -63,7 +63,7 @@ Google Play Data Safety classification
 - Optional online features are conservatively declared as collecting and sharing approximate location inferred from an IP address, in-app search history for GIF queries, and voice or sound recordings for dictation and meeting transcription.
 - An approved GIPHY configuration also declares optional collection and sharing of a device or other ID (the random app identifier) and app interactions (load, click, and send events).
 - Google AdMob ads (the dashboard banner, interstitial ads, and theme shop rewarded ads) are declared as collecting and sharing approximate location inferred from an IP address, a device or other ID (the advertising ID and App set ID), app interactions (ad impression, click, and reward events), and diagnostics (app and SDK performance information).
-- Every transmitted data type is declared as optional. Types other than diagnostics are used for app functionality, and GIPHY identifiers and events are also declared for analytics. The approximate location, device IDs, app interactions, and diagnostics received by AdMob are declared for advertising and for fraud prevention, security, and compliance, and the device IDs, app interactions, and diagnostics are also declared for analytics.
+- Every transmitted data type is declared as optional. Types other than diagnostics are used for app functionality, and GIPHY identifiers and events are also declared for analytics. The approximate location, device IDs, app interactions, and diagnostics received by AdMob are declared for advertising, analytics, and fraud prevention, security, and compliance.
 - store=false and local non-retention alone are not treated as proof of ephemeral provider processing.
 
 Controls and deletion
