@@ -75,16 +75,16 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
 
     /**
      * The last complete Hangul syllable the host's preedit signal reported as still composing,
-     * fed in from outside via [setComposingSyllable] (K21). Used only to recover a batchim a
-     * multitap/transform key's first guess caused libhangul to commit early — see
-     * [doubleBatchimRecovery].
+     * fed in from outside via [setComposingSyllable] (K21/K22). Used only to recover a syllable
+     * an earlier consonant of a multitap/transform chain caused libhangul to commit early — see
+     * [batchimRecovery].
      */
     private var composingSyllable: Char? = null
 
     /**
      * `S` (the syllable open before the *current* [lastJamo] consonant was typed), captured once
      * per fresh consonant emission (a cycle's first tap, or a plain jamo press) and left
-     * unchanged by every later replace/transform within that same chain (K21).
+     * unchanged by every later replace/transform within that same chain (K21/K22).
      */
     private var pendingConsonantAnchor: Char? = null
 
@@ -111,11 +111,12 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
     fun pendingDotCount(): Int = pendingDots
 
     /**
-     * K21: tells the composer which Hangul syllable the host's preedit currently shows as still
-     * composing (or null when nothing is composing), so a later multitap/transform key press can
-     * recover a batchim libhangul committed early because its first guessed consonant could not
-     * extend it. Pass the *last* syllable of the preedit text; anything that is not a complete
-     * precomposed Hangul syllable (a bare jamo, punctuation, …) should be passed as null.
+     * K21/K22: tells the composer which Hangul syllable the host's preedit currently shows as
+     * still composing (or null when nothing is composing), so a later multitap/transform key
+     * press can recover a syllable libhangul committed early because an earlier consonant of the
+     * same chain could not attach to it as a batchim. Pass the *last* syllable of the preedit
+     * text; anything that is not a complete precomposed Hangul syllable (a bare jamo,
+     * punctuation, …) should be passed as null.
      */
     fun setComposingSyllable(ch: Char?) {
         composingSyllable = ch
@@ -175,10 +176,10 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
         lastCycleTimeout = token.timeoutMillis
         lastCycleAt = nowMillis
 
-        // K21: a replacing consonant tap may need to recover a batchim libhangul already
-        // committed because the previously selected consonant could not extend it.
+        // K21/K22: a replacing consonant tap may need to recover a syllable libhangul already
+        // committed because the previously selected consonant could not attach to it as a batchim.
         if (replacing && !selected.isVowel()) {
-            doubleBatchimRecovery(selected, cycleTailKeys.length)?.let { recovery ->
+            batchimRecovery(selected, cycleTailKeys.length)?.let { recovery ->
                 cycleTailKeys = encode(selected.toString())
                 cycleTailIncludesPrevious = false
                 cyclePreviousVowelReleased = false
@@ -326,10 +327,10 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
     private fun transformLast(mapping: Map<Char, Char>): List<Output> {
         val current = lastJamo ?: return emptyList()
         val next = mapping[current] ?: return emptyList()
-        // K21: the jamo this transform is replacing may itself have already been committed by
-        // libhangul because it could not extend the syllable before it as a batchim.
+        // K21/K22: the jamo this transform is replacing may have made libhangul commit the
+        // syllable before it, because it could not attach to that syllable as a batchim.
         val recovery = if (!current.isVowel()) {
-            doubleBatchimRecovery(next, encode(current.toString()).length)
+            batchimRecovery(next, encode(current.toString()).length)
         } else null
         lastJamo = next
         clearCycle()
@@ -339,29 +340,40 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
     }
 
     /**
-     * K21: when [newConsonant] would extend [pendingConsonantAnchor]'s own batchim into a
-     * standard compound batchim, but the *previously* selected consonant ([lastJamo]) did not —
-     * meaning libhangul already committed that anchor syllable the instant the previous
-     * consonant's key landed — rebuilds it: clears whatever this key still controls
-     * ([tailLength] Dubeolsik keys), backspaces once more for the committed anchor itself, then
-     * retypes the anchor from its own jamo followed by [newConsonant], so the compound batchim
-     * forms while everything is still open. Returns null when no recovery is needed (or
-     * possible), in which case the caller's normal replace/transform logic applies unchanged.
+     * K21/K22: when [newConsonant] could attach to [pendingConsonantAnchor] as a batchim, but the
+     * *previously* selected consonant ([lastJamo]) could not — meaning libhangul already
+     * committed that anchor syllable the instant the previous consonant's key landed — rebuilds
+     * it: clears whatever this key still controls ([tailLength] Dubeolsik keys), backspaces once
+     * more for the committed anchor itself, then retypes the anchor from its own jamo followed by
+     * [newConsonant], so the batchim forms while everything is still open. Returns null when no
+     * recovery is needed (or possible), in which case the caller's normal replace/transform
+     * logic applies unchanged.
      */
-    private fun doubleBatchimRecovery(newConsonant: Char, tailLength: Int): List<Output>? {
+    private fun batchimRecovery(newConsonant: Char, tailLength: Int): List<Output>? {
         val anchor = pendingConsonantAnchor ?: return null
         val previous = lastJamo ?: return null
         if (previous.isVowel()) return null
-        val batchim = finalConsonantOf(anchor) ?: return null
-        if (doubleBatchim.containsKey(batchim to previous)) return null
-        if (!doubleBatchim.containsKey(batchim to newConsonant)) return null
+        if (attachesAsBatchim(anchor, previous)) return null
+        if (!attachesAsBatchim(anchor, newConsonant)) return null
         return List(tailLength) { Output.Backspace } +
             Output.Backspace +
             Output.Keys(keysForSyllable(anchor) + encode(newConsonant.toString()))
     }
 
-    /** The batchim (종성) of a complete precomposed Hangul syllable, or null when it has none. */
-    private fun finalConsonantOf(ch: Char): Char? = decomposeSyllable(ch)?.third
+    /**
+     * Whether libhangul's Dubeolsik takes [consonant], typed right after the still-open
+     * [syllable], into that syllable's batchim instead of committing it: a syllable without a
+     * batchim takes any consonant that has a jongseong form, i.e. all but ㄸ/ㅃ/ㅉ (K22), and one
+     * with a batchim only takes a consonant forming a standard compound batchim with it (K21).
+     */
+    private fun attachesAsBatchim(syllable: Char, consonant: Char): Boolean {
+        val (_, _, batchim) = decomposeSyllable(syllable) ?: return false
+        return if (batchim == null) {
+            consonant in jongseongTable
+        } else {
+            doubleBatchim.containsKey(batchim to consonant)
+        }
+    }
 
     /** [ch] re-encoded as the Dubeolsik keys that would type it from scratch. */
     private fun keysForSyllable(ch: Char): String {
