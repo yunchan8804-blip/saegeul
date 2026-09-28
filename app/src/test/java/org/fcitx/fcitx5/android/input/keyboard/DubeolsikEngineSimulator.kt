@@ -97,7 +97,15 @@ class DubeolsikEngineSimulator {
                 if (choseongKey != null) committed.append(choseongKey)
                 choseongKey = c
             }
-            jongseongKeys.isEmpty() -> jongseongKeys.add(c)
+            // libhangul's Dubeolsik has no jongseong form for ㄸ/ㅃ/ㅉ (hangul_ic_choseong_to_jongseong
+            // returns 0 once the jongseong is not conjoinable), so such a consonant commits the open
+            // syllable and starts the next one as its choseong instead of hiding inside it.
+            jongseongKeys.isEmpty() -> if (c in JONGSEONG_LIST) {
+                jongseongKeys.add(c)
+            } else {
+                flush()
+                choseongKey = c
+            }
             else -> {
                 val combinable = JONGSEONG_COMBINE.containsKey(jongseongKeys.last() to c)
                 if (combinable) {

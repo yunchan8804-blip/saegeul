@@ -81,6 +81,17 @@ object MobileLayoutTypingPlanner {
     private const val SUB_FRONTIER = 2_000
     private const val SUB_STEP_BUDGET = 2_000_000
 
+    /**
+     * How many replace presses in a row [batchimRecoverable] may try while looking for a K21
+     * recovery. Two cover every chain a mobile layout has: Naratgul's ㄹ + ㄴ → 획추가 ㄷ → 획추가 ㅌ
+     * for ㄾ, or a multitap cycle wrapping from its tense third entry (ㅆ) back through its first
+     * (ㅅ) to the second one that completes the batchim (ㅎ).
+     */
+    private const val MAX_REPLACE_CHAIN = 2
+
+    private const val HANGUL_SYLLABLE_BASE = 0xAC00
+    private const val BATCHIM_SLOT_COUNT = 28 // index 0 = no batchim
+
     private const val GESTURE_OFFSET = 1_000f
 
     /**
@@ -259,26 +270,29 @@ object MobileLayoutTypingPlanner {
         val noOvershoot: Boolean,
         /**
          * Whether [DubeolsikEngineSimulator.committedText] is still a plain-string prefix of
-         * [target]. A flushed syllable can never be un-flushed by any move this planner has
-         * available (Backspace isn't a typing move — see [extractKeys]), so a node that fails this
-         * is permanently dead even when [jamoMatchScore] alone would call it a match: a `ㄴ`
-         * jongseong that misses combining with a following `ㅎ` commits "만" as its own syllable
-         * before the bare `ㅎ` opens, and flattened that is `ㅁㅏㄴ`+`ㅎ` — identical to still-open
-         * "많"'s own flattening — even though "만" is already the wrong, permanently-committed
-         * syllable and can never become "많" again.
+         * [target]. Only this counts as reaching a unit, even when [jamoMatchScore] alone would
+         * call it a match: a `ㄴ` jongseong that misses combining with a following bare `ㅎ`
+         * commits "만" as its own syllable before the `ㅎ` opens, and flattened that is
+         * `ㅁㅏㄴ`+`ㅎ` — identical to still-open "많"'s own flattening — even though "만" is
+         * already committed and only a replace press could still take it back (see
+         * [recoverable]).
          */
         val committedOk: Boolean,
         /**
          * Whether this result is worth keeping in the search frontier at all when [committedOk]
-         * is false. A flushed Hangul syllable can never be un-flushed by any move this planner
-         * has available, so such a node is truly dead and only wastes the frontier's width cap
-         * ([SUB_FRONTIER]) if kept — but [MobileHangulComposer.Token.SymbolCycle]'s own literal
-         * commit is not dead the same way: its very next replace tap backspaces exactly that one
-         * character and resends the next symbol in its cycle (a fresh press always lands on the
-         * cycle's first symbol — see [solveOneJamo]'s own doc comment), same as a jamo cycle
-         * landing on its own first jamo. This is true only when the drift is confined to a single
-         * *non-syllable* trailing character (a raw punctuation mark, never a composed Hangul
-         * block), so a syllable flush is never mistaken for one of these recoverable commits.
+         * is false. Most committed drift is permanent (Backspace isn't a typing move — see
+         * [extractKeys]), so such a node only wastes the frontier's width cap ([SUB_FRONTIER]) if
+         * kept. Two kinds of commit are not dead, because a replace press takes them back:
+         * - [MobileHangulComposer.Token.SymbolCycle]'s own literal commit: its very next replace
+         *   tap backspaces exactly that one character and resends the next symbol in its cycle (a
+         *   fresh press always lands on the cycle's first symbol — see [solveOneJamo]'s own doc
+         *   comment), same as a jamo cycle landing on its own first jamo. This covers only drift
+         *   confined to a single *non-syllable* trailing character (a raw punctuation mark, never
+         *   a composed Hangul block).
+         * - A syllable libhangul committed because the consonant just typed could not extend its
+         *   batchim, when replacing that consonant rebuilds the syllable with a compound batchim
+         *   (K21, see [batchimRecoverable]): "만" committed with `ㅅ` open is how 천지인 reaches
+         *   "많", one more ㅅㅎ tap away.
          */
         val recoverable: Boolean
     ) {
@@ -286,15 +300,24 @@ object MobileLayoutTypingPlanner {
         fun reaches(unitIndex: Int) = committedOk && noOvershoot && jamoMatchScore > unitIndex
     }
 
+    private fun simulate(
+        actions: List<Pair<PlannerKey, Long>>,
+        family: MobileHangulFamily
+    ): Pair<MobileHangulComposer, DubeolsikEngineSimulator> {
+        val composer = MobileHangulComposer(family)
+        val engine = DubeolsikEngineSimulator()
+        for ((key, atMillis) in actions) applyOne(composer, engine, key, atMillis)
+        return composer to engine
+    }
+
     private fun replay(
         actions: List<Pair<PlannerKey, Long>>,
+        transformKeys: List<PlannerKey>,
         family: MobileHangulFamily,
         target: String,
         targetJamo: List<Char>
     ): ReplayResult {
-        val composer = MobileHangulComposer(family)
-        val engine = DubeolsikEngineSimulator()
-        for ((key, atMillis) in actions) applyOne(composer, engine, key, atMillis)
+        val (composer, engine) = simulate(actions, family)
         val content = engine.content()
         val contentJamo = engine.flattenJamo(content)
         val matchScore = contentJamo.indices.firstOrNull { i -> i >= targetJamo.size || contentJamo[i] != targetJamo[i] }
@@ -303,8 +326,12 @@ object MobileLayoutTypingPlanner {
         val committedOk = target.startsWith(committedText)
         val recoverable = committedOk || (
             committedText.isNotEmpty() &&
-                committedText.last() !in '가'..'힣' &&
-                target.startsWith(committedText.dropLast(1))
+                target.startsWith(committedText.dropLast(1)) &&
+                if (committedText.last() in '가'..'힣') {
+                    batchimRecoverable(actions, content, committedText, transformKeys, family, target)
+                } else {
+                    true
+                }
             )
         return ReplayResult(
             content,
@@ -314,6 +341,47 @@ object MobileLayoutTypingPlanner {
             committedOk,
             recoverable
         )
+    }
+
+    private fun Char.hasBatchim() = (code - HANGUL_SYLLABLE_BASE) % BATCHIM_SLOT_COUNT != 0
+
+    private fun PlannerKey.isCycle() =
+        (action as? PlanAction.Composer)?.token is MobileHangulComposer.Token.Cycle
+
+    /**
+     * K21 "겹받침을 만드는 자음 교체": whether [actions], whose [committedText] is off [target] only
+     * by its last syllable, can still get that syllable back. That takes the K21 shape — the
+     * committed syllable has a batchim and [content] holds exactly one open bare consonant after
+     * it, the one libhangul could not extend that batchim with — and a replace of that consonant
+     * (the same multitap key tapped again, or a 획추가/쌍자음 transform) that
+     * [MobileHangulComposer] turns into a recovery, backspacing the committed syllable and
+     * retyping it with the compound batchim. Instead of re-deriving the composer's
+     * compound-batchim table and cycle order here, this actually presses those replace keys (up
+     * to [MAX_REPLACE_CHAIN] in a row, each well inside the cycle's timeout) and asks whether the
+     * committed text becomes a prefix of [target] again, so it only ever says yes when the real
+     * composer would recover.
+     */
+    private fun batchimRecoverable(
+        actions: List<Pair<PlannerKey, Long>>,
+        content: String,
+        committedText: String,
+        transformKeys: List<PlannerKey>,
+        family: MobileHangulFamily,
+        target: String
+    ): Boolean {
+        if (!committedText.last().hasBatchim()) return false
+        val open = content.substring(committedText.length).singleOrNull() ?: return false
+        if (open !in 'ㄱ'..'ㅎ') return false
+        var chains = listOf(actions)
+        repeat(MAX_REPLACE_CHAIN) {
+            chains = chains.flatMap { chain ->
+                val (lastKey, lastAt) = chain.last()
+                val replaceKeys = if (lastKey.isCycle()) listOf(lastKey) + transformKeys else transformKeys
+                replaceKeys.map { key -> chain + (key to lastAt + PRESS_GAP_MS) }
+            }
+            if (chains.any { target.startsWith(simulate(it, family).second.committedText()) }) return true
+        }
+        return false
     }
 
     private class JamoSolution(val suffix: List<Pair<PlannerKey, Long>>, val clock: Long, val presses: Int)
@@ -340,6 +408,7 @@ object MobileLayoutTypingPlanner {
         prefixActions: List<Pair<PlannerKey, Long>>,
         startClock: Long,
         keys: List<PlannerKey>,
+        transformKeys: List<PlannerKey>,
         family: MobileHangulFamily,
         target: String,
         targetJamo: List<Char>,
@@ -347,7 +416,7 @@ object MobileLayoutTypingPlanner {
     ): JamoSolution? {
         data class Node(val suffix: List<Pair<PlannerKey, Long>>, val jamoMatchScore: Int, val clock: Long, val presses: Int)
 
-        val already = replay(prefixActions, family, target, targetJamo)
+        val already = replay(prefixActions, transformKeys, family, target, targetJamo)
         if (already.reaches(unitIndex)) return JamoSolution(emptyList(), startClock, 0)
 
         var frontier = listOf(Node(emptyList(), already.jamoMatchScore, startClock, 0))
@@ -365,7 +434,7 @@ object MobileLayoutTypingPlanner {
                         if (steps > SUB_STEP_BUDGET) return best
                         val atMillis = node.clock + gap
                         val newSuffix = node.suffix + (key to atMillis)
-                        val result = replay(prefixActions + newSuffix, family, target, targetJamo)
+                        val result = replay(prefixActions + newSuffix, transformKeys, family, target, targetJamo)
                         // A node that is neither reachable now nor [ReplayResult.recoverable]
                         // later (a flushed Hangul syllable already off target, permanently so —
                         // see [ReplayResult.recoverable]) is dropped outright rather than kept in
@@ -417,12 +486,16 @@ object MobileLayoutTypingPlanner {
             }
         }
 
+        val transformKeys = keys.filter { key ->
+            val token = (key.action as? PlanAction.Composer)?.token
+            token == MobileHangulComposer.Token.AddStroke || token == MobileHangulComposer.Token.DoubleConsonant
+        }
         val resolvedActions = mutableListOf<Pair<PlannerKey, Long>>()
         var clock = 0L
         var totalPresses = 0
 
         for (unitIndex in targetJamo.indices) {
-            val solution = solveOneJamo(resolvedActions, clock, keys, family, target, targetJamo, unitIndex)
+            val solution = solveOneJamo(resolvedActions, clock, keys, transformKeys, family, target, targetJamo, unitIndex)
             if (solution == null) {
                 val charIndex = jamoCharIndex[unitIndex].coerceIn(0, target.length)
                 return PlanOutcome(false, target.substring(0, charIndex), target.getOrNull(charIndex), totalPresses)
@@ -432,7 +505,7 @@ object MobileLayoutTypingPlanner {
             totalPresses += solution.presses
         }
 
-        val finalContent = replay(resolvedActions, family, target, targetJamo).content
+        val finalContent = replay(resolvedActions, transformKeys, family, target, targetJamo).content
         return if (finalContent == target) {
             PlanOutcome(true, target, null, totalPresses)
         } else {
