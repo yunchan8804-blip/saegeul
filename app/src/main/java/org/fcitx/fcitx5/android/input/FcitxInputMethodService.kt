@@ -4281,7 +4281,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     if (allowsTextInspectionFeatures()) {
                         correctionSessionTracker.onBackspace(currentWordBeforeCursor())
                     }
-                    if (bufferedHangul.deleteLastCodePoint()) {
+                    if (bufferedHangul.deleteLastCharacter()) {
                         inputView?.refreshBufferedHangulPreedit()
                     } else {
                         handleBackspaceKey()

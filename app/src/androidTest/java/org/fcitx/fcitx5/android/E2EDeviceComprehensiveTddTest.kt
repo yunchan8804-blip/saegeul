@@ -155,7 +155,7 @@ class E2EDeviceComprehensiveTddTest {
 
             // Delete characters backward
             while (!bufferController.isEmpty) {
-                assertTrue(bufferController.deleteLastCodePoint())
+                assertTrue(bufferController.deleteLastCharacter())
             }
             assertTrue(bufferController.isEmpty)
         }

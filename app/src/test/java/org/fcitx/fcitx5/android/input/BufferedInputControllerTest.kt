@@ -25,56 +25,33 @@ class BufferedInputControllerTest {
         val controller = BufferedInputController()
         controller.capture("한😀")
 
-        assertTrue(controller.deleteLastCodePoint())
+        assertTrue(controller.deleteLastCharacter())
         assertEquals("한", controller.prefix)
-        assertTrue(controller.deleteLastCodePoint())
+        assertTrue(controller.deleteLastCharacter())
         assertTrue(controller.isEmpty)
-        assertFalse(controller.deleteLastCodePoint())
-    }
-
-    @Test
-    fun deletesZwjEmojiSequenceAsOneCharacter() {
-        val family = "👨‍👩‍👧"
-        val controller = BufferedInputController()
-        controller.capture("가$family")
-
-        assertTrue(controller.deleteLastCodePoint())
-        assertEquals("가", controller.prefix)
-    }
-
-    @Test
-    fun deletesOneFlagAtATime() {
-        val korea = "🇰🇷"
-        val japan = "🇯🇵"
-        val controller = BufferedInputController()
-        controller.capture("가$korea$japan")
-
-        assertTrue(controller.deleteLastCodePoint())
-        assertEquals("가$korea", controller.prefix)
-        assertTrue(controller.deleteLastCodePoint())
-        assertEquals("가", controller.prefix)
+        assertFalse(controller.deleteLastCharacter())
     }
 
     @Test
     fun deletesLetterWithCombiningMarkAsOneCharacter() {
         val controller = BufferedInputController()
-        controller.capture("가é")
+        controller.capture("가e\u0301")
 
-        assertTrue(controller.deleteLastCodePoint())
+        assertTrue(controller.deleteLastCharacter())
         assertEquals("가", controller.prefix)
     }
 
     @Test
     fun deletesPrecomposedAndConjoiningHangulSyllablesWhole() {
-        val conjoiningHan = "한"
+        val conjoiningHan = "\u1112\u1161\u11AB"
         val controller = BufferedInputController()
         controller.capture("새글$conjoiningHan")
 
-        assertTrue(controller.deleteLastCodePoint())
+        assertTrue(controller.deleteLastCharacter())
         assertEquals("새글", controller.prefix)
-        assertTrue(controller.deleteLastCodePoint())
+        assertTrue(controller.deleteLastCharacter())
         assertEquals("새", controller.prefix)
-        assertTrue(controller.deleteLastCodePoint())
+        assertTrue(controller.deleteLastCharacter())
         assertTrue(controller.isEmpty)
     }
 
@@ -85,7 +62,7 @@ class BufferedInputControllerTest {
         controller.capture("\uDE00")
 
         assertEquals("가😀", controller.prefix)
-        assertTrue(controller.deleteLastCodePoint())
+        assertTrue(controller.deleteLastCharacter())
         assertEquals("가", controller.prefix)
     }
 

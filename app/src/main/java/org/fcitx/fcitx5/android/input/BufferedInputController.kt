@@ -84,10 +84,12 @@ class BufferedInputController {
     }
 
     /**
-     * Deletes the last user-perceived character (grapheme cluster), so a ZWJ emoji sequence,
-     * a flag or a letter with combining marks disappears with one Backspace.
+     * Deletes one grapheme cluster, the last character as the user sees it, so a letter with
+     * combining marks or a surrogate pair disappears with one Backspace.
+     * On devices (ICU) and JDK 20+ ZWJ emoji and flags are also one character; JDK 17's
+     * BreakIterator lacks extended grapheme support, so JVM tests leave those cases out.
      */
-    fun deleteLastCodePoint(): Boolean {
+    fun deleteLastCharacter(): Boolean {
         if (committed.isEmpty()) {
             state = BufferedSessionState.Idle
             return false

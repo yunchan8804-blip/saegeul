@@ -85,20 +85,20 @@ class KeyboardBufferCompatibilityDeepEngineTest {
     }
 
     @Test
-    fun testDeleteLastCodePointWithSurrogatePairsAndHangul() {
+    fun testDeleteLastCharacterWithSurrogatePairsAndHangul() {
         controller.capture("새글😀")
         assertEquals("새글😀", controller.prefix)
 
-        assertTrue(controller.deleteLastCodePoint()) // deletes surrogate pair emoji 😀
+        assertTrue(controller.deleteLastCharacter()) // deletes surrogate pair emoji 😀
         assertEquals("새글", controller.prefix)
 
-        assertTrue(controller.deleteLastCodePoint()) // deletes '글'
+        assertTrue(controller.deleteLastCharacter()) // deletes '글'
         assertEquals("새", controller.prefix)
 
-        assertTrue(controller.deleteLastCodePoint()) // deletes '새'
+        assertTrue(controller.deleteLastCharacter()) // deletes '새'
         assertTrue(controller.isEmpty)
 
-        assertFalse(controller.deleteLastCodePoint()) // empty buffer returns false
+        assertFalse(controller.deleteLastCharacter()) // empty buffer returns false
     }
 
     @Test

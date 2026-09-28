@@ -32,14 +32,14 @@ class BufferedInputControllerLongInputTest {
         var expectedLength = text.length
 
         for (index in characters.indices.reversed()) {
-            assertTrue(controller.deleteLastCodePoint())
+            assertTrue(controller.deleteLastCharacter())
             expectedLength -= characters[index].length
             val prefix = controller.prefix
             assertEquals(text.substring(0, expectedLength), prefix)
             assertFalse(prefix.isNotEmpty() && Character.isHighSurrogate(prefix.last()))
         }
         assertTrue(controller.isEmpty)
-        assertFalse(controller.deleteLastCodePoint())
+        assertFalse(controller.deleteLastCharacter())
     }
 
     @Test
@@ -76,9 +76,9 @@ class BufferedInputControllerLongInputTest {
             "가",
             "😀",
             "a",
-            "é",
-            "𠀀",
-            "한"
+            "e\u0301",
+            "\uD840\uDC00",
+            "\u1112\u1161\u11AB"
         )
     }
 }
