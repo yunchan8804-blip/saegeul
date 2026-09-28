@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.typo
 
+import org.fcitx.fcitx5.android.input.ai.HalfLifeDecay
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
@@ -12,7 +13,6 @@ import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import kotlin.math.pow
 
 /**
  * 사용자가 "지우고 다시 쓴" 오타-교정 쌍을 온디바이스로 학습하는 저장소.
@@ -215,10 +215,8 @@ class CorrectionPatternStore(
     }
 
     private fun decayedCount(record: PairRecord, now: Long): Float {
-        val elapsedMs = (now - record.lastSeenMs).coerceAtLeast(0L)
         val halfLifeMs = 30L * 24 * 60 * 60 * 1000
-        val halfLives = elapsedMs.toDouble() / halfLifeMs
-        return (record.count * 0.5.pow(halfLives)).toFloat()
+        return (record.count * HalfLifeDecay.factor(record.lastSeenMs, now, halfLifeMs)).toFloat()
     }
 
     private fun pairKey(typed: String, corrected: String): String = "$typed $corrected"

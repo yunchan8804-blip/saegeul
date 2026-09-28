@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rag
 
+import org.fcitx.fcitx5.android.input.ai.HalfLifeDecay
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
 import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
@@ -14,7 +15,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import kotlin.math.ln
-import kotlin.math.pow
 
 /**
  * On-device personal sentence RAG (retrieval-augmented) vault.
@@ -146,7 +146,7 @@ class PersonalSentenceVault(
 
             var score = rawScore
             if (doc.category == category) score *= CATEGORY_BOOST
-            score *= decayFactor(doc.lastSeenMs, now)
+            score *= HalfLifeDecay.factor(doc.lastSeenMs, now, halfLifeMs)
 
             val docTokens = doc.tokens
             val startsWith = docTokens.size >= queryTokens.size &&
@@ -276,10 +276,8 @@ class PersonalSentenceVault(
             .forEach { removeDoc(it.id) }
     }
 
-    private fun decayFactor(lastSeenMs: Long, now: Long): Double =
-        2.0.pow(-(now - lastSeenMs).coerceAtLeast(0L).toDouble() / halfLifeMs)
-
-    private fun decayedCount(doc: Doc, now: Long): Double = doc.count * decayFactor(doc.lastSeenMs, now)
+    private fun decayedCount(doc: Doc, now: Long): Double =
+        doc.count * HalfLifeDecay.factor(doc.lastSeenMs, now, halfLifeMs)
 
     private fun load() {
         val vf = vaultFile ?: return

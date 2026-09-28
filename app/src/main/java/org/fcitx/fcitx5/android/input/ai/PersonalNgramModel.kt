@@ -419,11 +419,8 @@ class PersonalNgramModel(
         bumpEntry(t.tri.getOrPut(key) { HashMap() }, next, weight, now)
     }
 
-    private fun decayed(e: Entry, now: Long): Float {
-        val elapsed = (now - e.lastSeenMs).coerceAtLeast(0L)
-        val exponent = -(elapsed.toDouble() / halfLifeMs.toDouble())
-        return (e.count * Math.pow(2.0, exponent)).toFloat()
-    }
+    private fun decayed(e: Entry, now: Long): Float =
+        (e.count * HalfLifeDecay.factor(e.lastSeenMs, now, halfLifeMs)).toFloat()
 
     private fun tableScores(t: Table, prev2: String?, prev1: String, now: Long): Map<String, Scored> {
         val triMap: Map<String, Entry>? = prev2?.let { t.tri[it + SEP + prev1] }?.takeIf { it.isNotEmpty() }
