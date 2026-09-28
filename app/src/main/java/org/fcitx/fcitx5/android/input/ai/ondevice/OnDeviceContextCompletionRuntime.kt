@@ -4,13 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
-import android.app.ActivityManager
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.os.BatteryManager
-import android.os.Build
-import android.os.PowerManager
 import android.os.SystemClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -271,39 +265,9 @@ class OnDeviceContextCompletionRuntime(context: Context) {
     }
 
     private fun requireEligibleResources() {
-        val battery = appContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val level = battery?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = battery?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-        val batteryPercent = if (level >= 0 && scale > 0 && level <= scale) {
-            (level.toLong() * 100L / scale).toInt()
-        } else {
-            null
-        }
-        val batteryStatus = battery?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-        val batteryPlugged = battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
-        val charging = batteryStatus == BatteryManager.BATTERY_STATUS_CHARGING ||
-            batteryStatus == BatteryManager.BATTERY_STATUS_FULL ||
-            batteryPlugged != 0
-        val powerManager = appContext.getSystemService(PowerManager::class.java)
-        val activityManager = appContext.getSystemService(ActivityManager::class.java)
-        val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
-        val thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            powerManager.currentThermalStatus
-        } else {
-            null
-        }
-        when {
-            batteryPercent == null || (batteryPercent < MINIMUM_BATTERY_PERCENT && !charging) -> {
-                throw ContextCompletionException("RESOURCE_BATTERY")
-            }
-            powerManager.isPowerSaveMode && !charging -> throw ContextCompletionException("RESOURCE_POWER_SAVE")
-            memoryInfo.lowMemory -> throw ContextCompletionException("RESOURCE_LOW_MEMORY")
-            // Light and moderate throttling are normal while a GPU model runs; only severe or
-            // worse stops on-device generation. Devices without a thermal API are not blocked.
-            thermalStatus != null && thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE -> {
-                throw ContextCompletionException("RESOURCE_THERMAL")
-            }
-        }
+        OnDeviceResourceSnapshot.read(appContext)
+            .foregroundGenerationBlockCode(MINIMUM_BATTERY_PERCENT)
+            ?.let { throw ContextCompletionException(it) }
     }
 
     private class Run(
