@@ -67,51 +67,6 @@ class DubeolsikEngineSimulator {
         return decomposeCombined(pair.first, combine) + pair.second
     }
 
-    /**
-     * Whether this state is still a plausible waypoint toward eventually typing [target].
-     *
-     * The already-committed text is checked as *characters*, not jamo: `committed` can never
-     * shrink again (Backspace is not among the search's own moves), so once a syllable is flushed
-     * its boundary is permanently frozen — decomposing it into jamo and comparing in flattened
-     * jamo space would silently let a *wrongly split* commit through whenever its jamo sequence
-     * happens to coincide with a *different* split of target's jamo. Concretely: typing "많다" can
-     * flush "만" (ㅁㅏㄴ) the moment ㅅ fails to combine with jong ㄴ, then leave a bare open ㅎ;
-     * flattened, "만"+ㅎ is ㅁㅏㄴㅎ — identical to "많"'s own flattening — even though "만" is
-     * already the wrong, permanently-committed syllable and can never become "많" again. Comparing
-     * the committed portion as characters against target's corresponding substring catches exactly
-     * this, since "만" (as committed text) is simply not a prefix of "많다".
-     *
-     * The still-open syllable's choseong and jungseong are allowed to not yet match target there,
-     * for as long as they could still be rewritten outright rather than merely grown: several
-     * primitives (the Chunjiin ㅣ/ㆍ/ㅡ keys, a [MobileHangulComposer.Token.Cycle]'s multitap
-     * replace, [MobileHangulComposer.Token.AddStroke]) send Backspace then a fresh, unrelated key
-     * instead of combining onto what's already open (choseong ㄴ on the way to ㄹ, say). A
-     * choseong locks in the moment its jungseong starts (any further consonant becomes a jongseong
-     * instead); a jungseong locks in the moment *its* jongseong starts. The jongseong itself is
-     * never checked against target at all, at any point: a consonant that does not belong on this
-     * syllable is not a dead end, because it is exactly a "tentative batchim" — the instant the
-     * *next* syllable's vowel is pressed, 도깨비불 moves it off to become that syllable's
-     * choseong, which is how a syllable with no batchim of its own is normally typed right before
-     * a following consonant-initial syllable. Reaching [target] exactly is decided separately, by
-     * plain string equality on [content].
-     */
-    fun isOnTrackTo(target: String): Boolean {
-        val committedSoFar = committed.toString()
-        if (committedSoFar.length > target.length || !target.startsWith(committedSoFar)) return false
-        val openJung = jungseongValue()
-        if (choseongKey == null && openJung == null) return true
-        if (committedSoFar.length >= target.length) return false
-        val sIndex = target[committedSoFar.length].code - 0xAC00
-        if (sIndex < 0 || sIndex >= HANGUL_SYLLABLE_COUNT) return false
-        val choT = CHOSEONG_LIST[sIndex / (21 * 28)]
-        val jungT = JUNGSEONG_LIST[(sIndex % (21 * 28)) / 28]
-        if (choseongKey == null) return false
-        if (openJung == null) return true
-        if (choseongKey != choT) return false
-        if (jongseongKeys.isEmpty()) return true
-        return openJung == jungT
-    }
-
     private fun pressRawKey(rawKey: Char) {
         val jamo = ATOMIC_KEYS[rawKey]
         if (jamo == null) {
