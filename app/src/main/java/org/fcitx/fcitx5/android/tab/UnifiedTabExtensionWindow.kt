@@ -35,7 +35,6 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.media.MediaFavoritesManager
 import org.fcitx.fcitx5.android.media.MediaItem
-import org.fcitx.fcitx5.android.media.MediaRetryQueue
 import org.fcitx.fcitx5.android.media.MediaType
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -61,8 +60,6 @@ class UnifiedTabExtensionWindow(
     private val windowManager: InputWindowManager by manager.must()
 
     private val tabManager = TabManager()
-    private val syncManager by lazy { UserTabSyncManager(tabManager) }
-    private val mediaRetryQueue = MediaRetryQueue(maxQueueSize = 50, maxRetryAttempts = 3)
     private val mediaFavoritesManager = MediaFavoritesManager(maxCapacity = 100)
 
     private val tabButtonsLayout by lazy { LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL } }
@@ -374,14 +371,6 @@ class UnifiedTabExtensionWindow(
                     setPadding(dp(12), dp(8), dp(12), dp(12))
 
                     add(createCard(
-                        title = "🔄 사용자 탭 구성 내보내기",
-                        desc = "현재 탭 배치 및 개인화 구성을 JSON으로 백업합니다."
-                    ) {
-                        val json = syncManager.exportToJson()
-                        Toast.makeText(context, "탭 구성 내보내기 완료!", Toast.LENGTH_SHORT).show()
-                    }, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
-
-                    add(createCard(
                         title = "⚙️ 탭 기본값으로 초기화",
                         desc = "탭 순서와 표시 상태를 공장 기본값으로 복원합니다."
                     ) {
@@ -438,6 +427,8 @@ class UnifiedTabExtensionWindow(
         }
     }
 
+    // 의도적으로 비움: 이 창은 붙거나 뗄 때 따로 할 일이 없다.
     override fun onAttached() {}
+    // 의도적으로 비움: 이 창은 붙거나 뗄 때 따로 할 일이 없다.
     override fun onDetached() {}
 }

@@ -545,6 +545,7 @@ class OnDeviceSuggestionEngine(
                     if (unclosedConversation === pending) unclosedConversation = null
                 }
             } catch (error: Throwable) {
+                Timber.w(error, "OnDeviceSuggestionEngine native conversation close failed")
                 latchTerminalFailure("NATIVE_CLOSE_FAILED")
                 throw OnDeviceSuggestionException("NATIVE_CLOSE_FAILED")
             }

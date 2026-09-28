@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.input.panel.PanelRecoveries
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.mechdancer.dependency.manager.must
+import timber.log.Timber
 
 /** Local Korean OCR with one-shot image access, explicit review, and exactly-once insertion. */
 class OcrWindow(
@@ -101,6 +102,7 @@ class OcrWindow(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                Timber.w(exception, "OcrWindow model check failed")
                 modelInstalled = false
                 if (attached) showModelMissing(failed = true)
             }
@@ -128,6 +130,7 @@ class OcrWindow(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                Timber.w(exception, "OcrWindow model download failed")
                 modelInstalled = false
                 if (attached) showModelMissing(failed = true)
             } finally {
@@ -185,6 +188,7 @@ class OcrWindow(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                Timber.w(exception, "OcrWindow resume-after-picker recognition failed")
                 if (attached) {
                     clearReviewState(keepTarget = true)
                     ui.showRecognitionError(R.string.ocr_failed, canRetry = true)

@@ -118,6 +118,7 @@ class InlineSuggestionsUi(override val ctx: Context) : Ui {
                         .apply()
                 }
 
+                // 의도적으로 비움: SurfaceControl은 뷰가 없어지면서 함께 정리되므로 따로 할 일이 없다.
                 override fun onDestroyed(surfaceControl: SurfaceControl) {}
             })
             flexbox.addView(it)

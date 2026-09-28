@@ -48,7 +48,7 @@ class PersonalGraphEnricherTest {
     fun enrichPopulatesGraphOnSuccessfulSingleChunk() = runBlocking {
         val vault = PersonalSentenceVault(clock = { 1000L })
         vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
-        val store = PersonalGraphStore(clock = { 55555L })
+        val store = PersonalGraphStore()
         val enricher = PersonalGraphEnricher(vault, store, clock = { 55555L })
 
         val result = enricher.enrich(generate = { _, _ -> listOf(validGraphJson) })

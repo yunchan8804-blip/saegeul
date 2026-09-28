@@ -100,7 +100,7 @@ class SharedWarmResource<K : Any, T : Any, F : Any>(
         if (closeNow) closeExecutor.execute(::closeIfIdle)
     }
 
-    private fun release(use: Use<T, F>) {
+    private fun release(@Suppress("UNUSED_PARAMETER") use: Use<T, F>) {
         val closeNow = synchronized(stateLock) {
             uses = (uses - 1).coerceAtLeast(0)
             uses == 0 && pendingCloseReason != null

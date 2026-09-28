@@ -56,6 +56,7 @@ class OnDeviceAutomaticSuggestionRuntime(
         try {
             prepareIfNeeded()
         } catch (error: OnDeviceSuggestionEngine.OnDeviceSuggestionException) {
+            Timber.w(error, "OnDeviceAutomaticSuggestionRuntime warmUp failed code=%s", error.code)
             throw OnDeviceSuggestionCoordinator.BackendException(error.code)
         }
     }
@@ -67,6 +68,7 @@ class OnDeviceAutomaticSuggestionRuntime(
             writeLastPromptDebugFile(prompt, response)
             response
         } catch (error: OnDeviceSuggestionEngine.OnDeviceSuggestionException) {
+            Timber.w(error, "OnDeviceAutomaticSuggestionRuntime generate failed code=%s", error.code)
             throw OnDeviceSuggestionCoordinator.BackendException(error.code)
         }
     }
@@ -115,6 +117,7 @@ class OnDeviceAutomaticSuggestionRuntime(
                     if (preparation === pending) preparation = null
                 }
             } catch (error: OnDeviceSuggestionEngine.OnDeviceSuggestionException) {
+                Timber.w(error, "OnDeviceAutomaticSuggestionRuntime close failed code=%s", error.code)
                 throw OnDeviceSuggestionCoordinator.BackendException(error.code)
             }
         }

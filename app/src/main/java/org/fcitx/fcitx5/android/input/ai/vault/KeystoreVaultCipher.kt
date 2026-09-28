@@ -50,10 +50,6 @@ class KeystoreVaultCipher(
         }
     }
 
-    private val legacyDirect: AesGcmVaultCipher? by lazy {
-        if (hasKey(legacyAlias)) AesGcmVaultCipher(keyOrCreate(legacyAlias)) else null
-    }
-
     override val id: String get() = envelope.id
 
     /** True when the active wrapping key lives inside a TEE or StrongBox; false if unknown/software-backed. */

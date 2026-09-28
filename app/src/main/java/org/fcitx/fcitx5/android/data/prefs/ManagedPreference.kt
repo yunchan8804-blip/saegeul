@@ -73,6 +73,7 @@ abstract class ManagedPreference<T : Any>(
             return try {
                 sharedPreferences.getBoolean(key, defaultValue)
             } catch (e: Exception) {
+                // 저장된 값이 타입이 안 맞는 등 손상됐으면 기본값으로 되돌려 자가복구한다.
                 setValue(defaultValue)
                 defaultValue
             }
@@ -94,6 +95,7 @@ abstract class ManagedPreference<T : Any>(
             return try {
                 sharedPreferences.getString(key, defaultValue)!!
             } catch (e: Exception) {
+                // 저장된 값이 타입이 안 맞는 등 손상됐으면 기본값으로 되돌려 자가복구한다.
                 setValue(defaultValue)
                 defaultValue
             }
@@ -121,6 +123,7 @@ abstract class ManagedPreference<T : Any>(
                     codec.decode(it)
                 } ?: defaultValue
             } catch (e: Exception) {
+                // 저장된 값이 타입이 안 맞는 등 손상됐으면 기본값으로 되돌려 자가복구한다.
                 setValue(defaultValue)
                 defaultValue
             }
@@ -143,6 +146,7 @@ abstract class ManagedPreference<T : Any>(
             return try {
                 sharedPreferences.getInt(key, defaultValue)
             } catch (e: Exception) {
+                // 저장된 값이 타입이 안 맞는 등 손상됐으면 기본값으로 되돌려 자가복구한다.
                 setValue(defaultValue)
                 defaultValue
             }
@@ -163,6 +167,7 @@ abstract class ManagedPreference<T : Any>(
             return try {
                 sharedPreferences.getFloat(key, defaultValue)
             } catch (e: Exception) {
+                // 저장된 값이 타입이 안 맞는 등 손상됐으면 기본값으로 되돌려 자가복구한다.
                 setValue(defaultValue)
                 defaultValue
             }

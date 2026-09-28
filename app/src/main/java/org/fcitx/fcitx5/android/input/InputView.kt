@@ -570,7 +570,7 @@ class InputView(
 
     private fun finishInternalPromptInput(submit: Boolean) {
         if (submit) {
-            when (val result = service.finishInternalPromptCapture()) {
+            when (service.finishInternalPromptCapture()) {
                 InternalPromptFinishResult.Pending -> {
                     promptInputBar.setSubmitPending(true)
                     requestLayout()

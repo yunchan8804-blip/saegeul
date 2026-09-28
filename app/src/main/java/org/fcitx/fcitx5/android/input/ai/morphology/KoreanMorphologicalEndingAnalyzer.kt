@@ -23,17 +23,14 @@ object KoreanMorphologicalEndingAnalyzer {
     // --- Hangul Syllable Constants ---
     private const val HANGUL_BASE = 0xAC00
     private const val HANGUL_END = 0xD7A3
-    private const val MEDIAL_COUNT = 21
     private const val FINAL_COUNT = 28
 
     // Final consonants (받침 종성 인덱스)
     // 0: 없음, 4: ㄴ, 8: ㄹ, 16: ㅁ, 17: ㅂ, 20: ㅆ
-    private const val FINAL_NONE = 0
     private const val FINAL_NIEUN = 4
     private const val FINAL_RIEUL = 8
     private const val FINAL_MIEUM = 16
     private const val FINAL_BIEUP = 17
-    private const val FINAL_SSANGSIOT = 20
 
     private val TRAILING_SYMBOLS = setOf(
         '.', ',', '!', '?', '~', '^', ';', ':', '…',

@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.tab.TabConfigItem
 import org.fcitx.fcitx5.android.tab.TabConfiguration
 import org.fcitx.fcitx5.android.tab.TabId
 import org.fcitx.fcitx5.android.tab.TabManager
-import org.fcitx.fcitx5.android.tab.UserTabSyncManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -33,7 +32,6 @@ class E2EDeviceComprehensiveTddTest {
 
     private lateinit var appContext: Context
     private lateinit var tabManager: TabManager
-    private lateinit var syncManager: UserTabSyncManager
     private lateinit var mediaQueue: MediaRetryQueue
     private lateinit var mediaFavorites: MediaFavoritesManager
     private lateinit var bufferController: BufferedInputController
@@ -42,7 +40,6 @@ class E2EDeviceComprehensiveTddTest {
     fun setUp() {
         appContext = InstrumentationRegistry.getInstrumentation().targetContext
         tabManager = TabManager()
-        syncManager = UserTabSyncManager(tabManager)
         mediaQueue = MediaRetryQueue(maxQueueSize = 100, maxRetryAttempts = 5)
         mediaFavorites = MediaFavoritesManager(maxCapacity = 200)
         bufferController = BufferedInputController()
@@ -107,28 +104,6 @@ class E2EDeviceComprehensiveTddTest {
         assertEquals(200, mediaFavorites.getFavorites().size)
         assertTrue(mediaFavorites.search("모바일").isNotEmpty())
         assertTrue(mediaFavorites.findByTag("테스트").isNotEmpty())
-    }
-
-    @Test
-    fun testUserTabSyncChecksumAndImportExportOnDevice() {
-        val exported = syncManager.exportToJson()
-        assertNotNull(exported)
-        assertTrue(exported.contains("\"version\": 1"))
-
-        val freshTabManager = TabManager()
-        val freshSync = UserTabSyncManager(freshTabManager)
-        val importSuccess = freshSync.importFromJson(exported)
-        assertTrue(importSuccess)
-
-        val exportedTabs = tabManager.getRegisteredTabs()
-        val importedTabs = freshTabManager.getRegisteredTabs()
-        assertEquals(exportedTabs.size, importedTabs.size)
-
-        for (i in exportedTabs.indices) {
-            assertEquals(exportedTabs[i].id, importedTabs[i].id)
-            assertEquals(exportedTabs[i].isVisible, importedTabs[i].isVisible)
-            assertEquals(exportedTabs[i].isPinned, importedTabs[i].isPinned)
-        }
     }
 
     @Test

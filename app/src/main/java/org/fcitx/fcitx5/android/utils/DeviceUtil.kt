@@ -30,6 +30,7 @@ object DeviceUtil {
                 .getInt(null)
             semPlatformInt > 90000
         } catch (e: Exception) {
+            // 리플렉션 대상 필드가 없는 기기(삼성이 아니거나 One UI 이전)는 One UI가 아닌 것으로 본다.
             false
         }
     }

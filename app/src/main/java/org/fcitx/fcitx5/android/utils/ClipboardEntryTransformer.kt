@@ -15,6 +15,7 @@ fun IClipboardEntryTransformer.descEquals(other: IClipboardEntryTransformer): Bo
     return try {
         description!! == other.description!!
     } catch (e: Exception) {
+        // IPC로 넘어온 설명을 읽다 실패하면(원격 프로세스 죽음 등) 다르다고 취급한다.
         false
     }
 }

@@ -80,7 +80,6 @@ class KoreanSemanticSentencePredictor {
 
     companion object {
         private val SENTENCE_SPLIT_REGEX = Regex("[,.!?;~\\n]+")
-        private val NORMALIZE_REGEX = Regex("[.!?~\\s,;]+")
         private val HOUR_REGEX = Regex("(\\d{1,2}시(?:\\s*반)?)")
         private val PLACE_PARTICLE_REGEX = Regex("([가-힣]{2,6})(?:에서|역에서|쪽에서|근처)")
     }

@@ -14,6 +14,7 @@ fun getSystemProperty(key: String): String {
             .getMethod("get", String::class.java)
             .invoke(null, key) as String
     } catch (e: Exception) {
+        // 숨은 API 접근이 막힌 기기/버전에서는 빈 값으로 취급해 OEM 감지 로직이 false로 떨어지게 한다.
         ""
     }
 }

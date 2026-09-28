@@ -102,6 +102,7 @@ internal object VaultBackupCrypto {
             return try {
                 DecryptResult.Ok(cipher.doFinal(ciphertext))
             } catch (e: GeneralSecurityException) {
+                // GCM 인증 실패는 손상되었거나 다른 버전으로 만든 백업 파일에서 정상적으로 발생한다.
                 DecryptResult.Corrupted
             }
         } finally {

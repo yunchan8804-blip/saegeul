@@ -24,7 +24,6 @@ object PersonalNgramTokenizer {
 
     private val PARTICLES_REQUIRING_BATCHIM = setOf("이", "을", "과", "은")
     private val PARTICLES_FORBIDDING_BATCHIM = setOf("가", "를", "와", "는")
-    private val PII_KEYWORDS = setOf("이메일", "주민번호", "카드번호", "전화번호", "계좌번호", "인증코드")
 
     fun tokenize(sentence: String): List<String> {
         if (sentence.isBlank()) return emptyList()

@@ -134,6 +134,7 @@ class OnDeviceContextCompletionRuntime(context: Context) {
                 failure = ContextCompletionException("GENERATION_TIMEOUT")
                 null
             } catch (error: CancellationException) {
+                // CancellationException 자체는 부가 정보가 없다: 취소 사유는 run의 상태 플래그로만 구분한다.
                 failure = when {
                     run.resourceGateFailed.get() -> ContextCompletionException(run.resourceGateCode)
                     run.cancelled.get() -> ContextCompletionException("CANCELLED")
@@ -175,6 +176,7 @@ class OnDeviceContextCompletionRuntime(context: Context) {
         } catch (error: ContextCompletionException) {
             failure = error
         } catch (error: CancellationException) {
+            // CancellationException 자체는 부가 정보가 없다: 취소 사유는 run의 상태 플래그로만 구분한다.
             failure = when {
                 run.resourceGateFailed.get() -> ContextCompletionException(run.resourceGateCode)
                 run.cancelled.get() -> ContextCompletionException("CANCELLED")

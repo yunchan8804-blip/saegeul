@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.utils.BackgroundProgressNotifier
+import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -69,7 +70,7 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
         }
 
         val installStore = GemmaModelInstallStore.get(applicationContext)
-        trySetForeground(existingBytes, 0L, installStore.allowMobileData)
+        trySetForeground(existingBytes, 0L)
 
         return try {
             transferOneAttempt(part, existingBytes, installStore)
@@ -99,6 +100,7 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
                 GemmaDownloadFailureClassification.RETRYABLE -> Result.retry()
             }
         } catch (error: Exception) {
+            Timber.w(error, "Gemma model download failed with an unclassified error")
             Result.failure(failureData(GemmaInstallFailure.UNKNOWN))
         }
     }
@@ -150,7 +152,7 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
                         lastProgressAt = now
                         val bps = speedTracker.sample(now, received)
                         setProgress(progressData(received, bps, verifying = false))
-                        trySetForeground(received, bps, installStore.allowMobileData)
+                        trySetForeground(received, bps)
                     }
                 }
                 output.fd.sync()
@@ -160,9 +162,9 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
         }
     }
 
-    private suspend fun trySetForeground(downloadedBytes: Long, bytesPerSecond: Long, allowMobileData: Boolean) {
+    private suspend fun trySetForeground(downloadedBytes: Long, bytesPerSecond: Long) {
         try {
-            setForeground(foregroundInfoFor(downloadedBytes, bytesPerSecond, allowMobileData))
+            setForeground(foregroundInfoFor(downloadedBytes, bytesPerSecond))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -171,7 +173,7 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
         }
     }
 
-    private fun foregroundInfoFor(downloadedBytes: Long, bytesPerSecond: Long, allowMobileData: Boolean): ForegroundInfo {
+    private fun foregroundInfoFor(downloadedBytes: Long, bytesPerSecond: Long): ForegroundInfo {
         val total = GemmaModelFiles.MODEL_BYTES
         val text = if (bytesPerSecond > 0L) {
             applicationContext.getString(

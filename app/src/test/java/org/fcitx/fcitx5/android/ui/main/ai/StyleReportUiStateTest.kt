@@ -70,7 +70,6 @@ class StyleReportUiStateTest {
             stats = stats(totalSentences = 0),
             vaultCategoryCounts = mapOf("messenger" to 5),
             metrics = metrics(recent = listOf(dayStat("2026-09-20", 3))),
-            nowMs = 0L
         )
 
         assertTrue(state.isEmpty)
@@ -92,7 +91,6 @@ class StyleReportUiStateTest {
             stats = stats(totalSentences = 10),
             vaultCategoryCounts = counts,
             metrics = metrics(),
-            nowMs = 0L
         )
 
         assertEquals(3, state.categoryRows.size)
@@ -111,7 +109,6 @@ class StyleReportUiStateTest {
             stats = stats(totalSentences = 5),
             vaultCategoryCounts = mapOf("messenger" to 4, "work" to 0, "email" to 0),
             metrics = metrics(),
-            nowMs = 0L
         )
 
         assertEquals(listOf("messenger"), state.categoryRows.map { it.personaId })
@@ -123,7 +120,6 @@ class StyleReportUiStateTest {
             stats = stats(totalSentences = 5),
             vaultCategoryCounts = emptyMap(),
             metrics = metrics(),
-            nowMs = 0L
         )
 
         assertTrue(state.categoryRows.isEmpty())
@@ -137,7 +133,6 @@ class StyleReportUiStateTest {
             stats = stats(totalSentences = 5, topBigrams = bigrams),
             vaultCategoryCounts = emptyMap(),
             metrics = metrics(),
-            nowMs = 0L
         )
 
         assertEquals(6, state.topTransitionChips.size)
@@ -152,7 +147,6 @@ class StyleReportUiStateTest {
             stats = stats(totalSentences = 5, topEndings = endings),
             vaultCategoryCounts = emptyMap(),
             metrics = metrics(),
-            nowMs = 0L
         )
 
         assertEquals(endings.take(6), state.topEndingChips)
@@ -166,7 +160,6 @@ class StyleReportUiStateTest {
             metrics = metrics(
                 recent = listOf(dayStat("2026-09-19", 2), dayStat("2026-09-20", 5), dayStat("2026-09-21", 1))
             ),
-            nowMs = 0L
         )
 
         assertEquals(8, state.recentTotalSentences)

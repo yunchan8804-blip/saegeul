@@ -120,7 +120,7 @@ class StyleReportSections(root: View) {
             val stats = app.typingDnaRepository.getStats()
             val metrics = app.predictionMetricsStore.summary()
             val state = StyleReportUiState.from(
-                stats, app.personalSentenceVault.categoryCounts(), metrics, System.currentTimeMillis()
+                stats, app.personalSentenceVault.categoryCounts(), metrics
             )
             return Data(state, stats, metrics)
         }

@@ -23,6 +23,7 @@ fun Context.navbarFrameHeight(): Int {
     return try {
         resources.getDimensionPixelSize(resId)
     } catch (e: Resources.NotFoundException) {
+        // 일부 OEM/버전에는 이 내부 dimen 리소스가 없다. 고정 대체값으로 넘어간다.
         dp(FALLBACK_NAVBAR_HEIGHT)
     }
 }
