@@ -512,8 +512,21 @@ class ContextualPredictionController(private val host: Host) {
                 }
             )
 
-        val words = resolved.predictions.filter { !it.isSentenceCompletion }
-            .take(wordLimit)
+        val rankedWords = resolved.predictions.filter { !it.isSentenceCompletion }
+        val selectedWords = when {
+            wordLimit <= 0 -> emptyList()
+            else -> {
+                val topWords = rankedWords.take(wordLimit)
+                val deferredDiscourse = rankedWords.drop(wordLimit)
+                    .firstOrNull { it.source == "discourse_continuation" }
+                if (topWords.any { it.source == "discourse_continuation" } || deferredDiscourse == null) {
+                    topWords
+                } else {
+                    topWords.dropLast(1) + deferredDiscourse
+                }
+            }
+        }
+        val words = selectedWords
             .mapIndexed { index, prediction -> toCandidate(prediction, index + 1) }
         val sentences = resolved.predictions.filter { it.isSentenceCompletion }
             .take(sentenceLimit)

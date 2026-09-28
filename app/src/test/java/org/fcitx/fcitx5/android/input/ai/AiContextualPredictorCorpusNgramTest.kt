@@ -69,6 +69,16 @@ class AiContextualPredictorCorpusNgramTest {
     }
 
     @Test
+    fun corpusPredictorRetainsConnectiveDiscourseContinuation() {
+        val context = "밥 먹었는데 "
+        val results = predictor().predict("", context, "com.example.chat", limit = 10)
+        val discourse = results.firstOrNull { it.source == "discourse_continuation" }
+
+        assertTrue(results.toString(), discourse != null)
+        assertTrue(discourse?.append?.insertionFor(context) != null)
+    }
+
+    @Test
     fun corpusDeuridaIsNotOfferedDetachedFromTheNounBeforeTheSpace() {
         val results = predictor().predict("", "확인 부탁 ", "com.example.chat", limit = 10)
         val detached = results.filter { prediction ->

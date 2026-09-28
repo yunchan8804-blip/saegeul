@@ -155,7 +155,7 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
                 )
                 val lastKeyStartedAt = sendPhysicalKeys(ime, physicalKeys)
                 waitForEditorText(editor, expectedContext)
-                val candidate = waitForDiscourseCandidate(ime, lastKeyStartedAt)
+                val candidate = waitForDiscourseCandidate(editor, ime, lastKeyStartedAt)
                 val source = requireNotNull(candidate.candidate.metricsCandidate).source
                 evidence = evidence.copy(
                     candidateAvailable = true,
@@ -367,6 +367,7 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
             candidate.text.none { it in COMPATIBILITY_JAMO }
 
     private suspend fun waitForDiscourseCandidate(
+        editor: EditText,
         ime: FcitxInputMethodService,
         startedAt: Long
     ): DiscourseCandidate {
@@ -384,7 +385,23 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
                 .distinct()
             SystemClock.sleep(POLL_INTERVAL_MS)
         }
-        throw AssertionError("Local discourse continuation did not appear within $CANDIDATE_READY_TIMEOUT_MS ms. sources=$latestSources")
+        val editorText = onMain { editor.text.toString() }
+        val selection = onMain { editor.selectionStart to editor.selectionEnd }
+        val textBeforeCursor = onMain {
+            requireNotNull(ime.currentInputConnection) {
+                "이어쓰기 후보 진단에서 currentInputConnection이 없어 textBeforeCursor를 읽을 수 없다."
+            }.getTextBeforeCursor(128, 0)?.toString() ?: "<null>"
+        }
+        val preedit = readLivePreedit(ime)
+        val activePreedit = readActivePreeditForContextualInput(ime)
+        throw AssertionError(
+            "Local discourse continuation did not appear within $CANDIDATE_READY_TIMEOUT_MS ms. " +
+                "sources=$latestSources editorText=[$editorText] " +
+                "selection=[${selection.first},${selection.second}] " +
+                "textBeforeCursor=[$textBeforeCursor] " +
+                "preeditEngine=[${preedit.engine}] preeditClient=[${preedit.client}] " +
+                "activePreedit=[$activePreedit]"
+        )
     }
 
     private fun waitForVisibleCandidateNode(
@@ -419,7 +436,8 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
                 candidate.getBoundsInScreen(bounds)
                 if (
                     candidate.isVisibleToUser && bounds.width() > 0 && bounds.height() > 0 &&
-                    (candidateTarget.badgeText == null || hasExactTextDescendant(candidate, candidateTarget.badgeText))
+                    (candidateTarget.contentDescription == null ||
+                        candidate.contentDescription?.toString() == candidateTarget.contentDescription)
                 ) return candidate
             }
         }
@@ -431,32 +449,21 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
         return null
     }
 
-    private fun hasExactTextDescendant(node: AccessibilityNodeInfo, expectedText: String): Boolean {
-        if (node.text?.toString() == expectedText) return true
-        for (index in 0 until node.childCount) {
-            node.getChild(index)?.let { child ->
-                if (hasExactTextDescendant(child, expectedText)) return true
-            }
-        }
-        return false
-    }
-
     private fun candidateDisplayTarget(candidate: CandidateWord): CandidateDisplayTarget {
         val commentIsVisible = candidate.comment.isNotBlank() &&
             candidate.comment != "추천" &&
             !candidate.comment.contains("추천") &&
             !candidate.comment.contains("🌐")
-        val badgeIcon = CandidateItemUi.resolveBadgeIcon(candidate.comment)
-        return if (commentIsVisible && badgeIcon.isNotEmpty()) {
+        return if (CandidateItemUi.resolveBadgeIcon(candidate.comment).isNotEmpty()) {
             CandidateDisplayTarget(
                 visibleText = candidate.text,
-                badgeText = badgeIcon,
+                contentDescription = "${candidate.comment.trim()}: ${candidate.text}",
                 canonicalLabel = candidate.textWithComment()
             )
         } else {
             CandidateDisplayTarget(
                 visibleText = if (commentIsVisible) candidate.textWithComment() else candidate.text,
-                badgeText = null,
+                contentDescription = null,
                 canonicalLabel = candidate.textWithComment()
             )
         }
@@ -495,6 +502,13 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
             engine = inputPanelCached.preedit.toString(),
             client = clientPreeditCached.toString()
         )
+    }
+
+    private fun readActivePreeditForContextualInput(ime: FcitxInputMethodService): String = onMain {
+        val method = FcitxInputMethodService::class.java.getDeclaredMethod("activePreeditForContextualInput")
+        method.isAccessible = true
+        method.invoke(ime) as? String
+            ?: throw AssertionError("activePreeditForContextualInput 진단이 String을 반환하지 않았다.")
     }
 
     private fun configureUiAutomation(): UiAutomationState {
@@ -690,11 +704,26 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
         requireNotNull(activity.window.decorView.findByContentDescription("AI E2E normal editor")) as EditText
     }
 
-    private fun requestEditorFocusAndIme(activity: AiEditorTestActivity, editor: EditText) = onMain {
-        editor.requestFocus()
-        assertTrue("synthetic editor must hold focus before IME candidate checks.", editor.hasFocus())
-        val inputMethodManager = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        inputMethodManager.showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT)
+    private fun requestEditorFocusAndIme(activity: AiEditorTestActivity, editor: EditText) {
+        val deadline = SystemClock.elapsedRealtime() + READY_TIMEOUT_MS
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (onMain { activity.hasWindowFocus() && editor.hasWindowFocus() && editor.isShown }) break
+            SystemClock.sleep(POLL_INTERVAL_MS)
+        }
+        val windowState = onMain {
+            Triple(activity.hasWindowFocus(), editor.hasWindowFocus(), editor.isShown)
+        }
+        assertTrue(
+            "synthetic editor는 IME 표시 전 activity/editor window focus와 표시 상태를 확보해야 한다. " +
+                "activityWindowFocus=${windowState.first} editorWindowFocus=${windowState.second} editorShown=${windowState.third}",
+            windowState.first && windowState.second && windowState.third
+        )
+        onMain {
+            editor.requestFocus()
+            assertTrue("synthetic editor must hold focus before IME candidate checks.", editor.hasFocus())
+            val inputMethodManager = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            inputMethodManager.showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     private fun waitForCurrentEditor(target: EditorTarget): FcitxInputMethodService {
@@ -855,7 +884,7 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
 
     private data class CandidateDisplayTarget(
         val visibleText: String,
-        val badgeText: String?,
+        val contentDescription: String?,
         val canonicalLabel: String
     )
 

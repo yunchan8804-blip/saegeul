@@ -61,6 +61,20 @@ class KoreanDiscourseContinuationTest {
     }
 
     @Test
+    fun `connective discourse continuation survives immediate and predictor paths`() {
+        val context = "밥 먹었는데 "
+        val immediate = ImmediateContextualPredictions.collect(
+            input = ImmediateContextualPredictions.Input(context, "com.example", 0L, 8),
+            sentencePackLookup = null
+        )
+        assertTrue(immediate.any { it.source == "discourse_continuation" })
+
+        val predictor = AiContextualPredictor(ChoseongMorphologyEngine())
+        val predicted = predictor.predict("", context, "com.example", limit = 8)
+        assertTrue(predicted.any { it.source == "discourse_continuation" })
+    }
+
+    @Test
     fun `predictor keeps a higher priority learned word over matching discourse candidate`() {
         val ngram = PersonalNgramModel()
         ngram.learn("밥 먹었어. 그리고 쉬었어", "com.example")
