@@ -82,15 +82,12 @@ object MobileLayoutTypingPlanner {
     private const val SUB_STEP_BUDGET = 2_000_000
 
     /**
-     * How many replace presses in a row [batchimRecoverable] may try while looking for a K21
-     * recovery. Two cover every chain a mobile layout has: Naratgul's ㄹ + ㄴ → 획추가 ㄷ → 획추가 ㅌ
-     * for ㄾ, or a multitap cycle wrapping from its tense third entry (ㅆ) back through its first
-     * (ㅅ) to the second one that completes the batchim (ㅎ).
+     * How many replace presses in a row [batchimRecoverable] may try while looking for a
+     * K21/K22 recovery. Two cover every chain a mobile layout has: Naratgul's ㄹ + ㄴ → 획추가 ㄷ →
+     * 획추가 ㅌ for ㄾ, or a multitap cycle wrapping from its tense third entry (ㅆ) back through
+     * its first (ㅅ) to the second one that completes the batchim (ㅎ).
      */
     private const val MAX_REPLACE_CHAIN = 2
-
-    private const val HANGUL_SYLLABLE_BASE = 0xAC00
-    private const val BATCHIM_SLOT_COUNT = 28 // index 0 = no batchim
 
     private const val GESTURE_OFFSET = 1_000f
 
@@ -211,9 +208,9 @@ object MobileLayoutTypingPlanner {
         when (val action = key.action) {
             is PlanAction.Composer -> {
                 engine.apply(composer.press(action.token, atMillis))
-                // K21: mirrors the host feeding the client-preedit signal back into the composer
-                // after every key press, so a later replace/transform can recover a batchim
-                // libhangul already committed.
+                // K21/K22: mirrors the host feeding the client-preedit signal back into the
+                // composer after every key press, so a later replace/transform can recover a
+                // syllable libhangul already committed.
                 composer.setComposingSyllable(engine.composingSyllable())
             }
             is PlanAction.ComposerSequence ->
@@ -289,10 +286,10 @@ object MobileLayoutTypingPlanner {
          *   comment), same as a jamo cycle landing on its own first jamo. This covers only drift
          *   confined to a single *non-syllable* trailing character (a raw punctuation mark, never
          *   a composed Hangul block).
-         * - A syllable libhangul committed because the consonant just typed could not extend its
-         *   batchim, when replacing that consonant rebuilds the syllable with a compound batchim
-         *   (K21, see [batchimRecoverable]): "만" committed with `ㅅ` open is how 천지인 reaches
-         *   "많", one more ㅅㅎ tap away.
+         * - A syllable libhangul committed because the consonant just typed could not attach to
+         *   it as a batchim, when replacing that consonant rebuilds the syllable with one (K21/K22,
+         *   see [batchimRecoverable]): "만" committed with `ㅅ` open is how 천지인 reaches "많", one
+         *   more ㅅㅎ tap away, and "나" committed with `ㅃ` open is "납" one ㅂㅍ tap away.
          */
         val recoverable: Boolean
     ) {
@@ -343,21 +340,19 @@ object MobileLayoutTypingPlanner {
         )
     }
 
-    private fun Char.hasBatchim() = (code - HANGUL_SYLLABLE_BASE) % BATCHIM_SLOT_COUNT != 0
-
     private fun PlannerKey.isCycle() =
         (action as? PlanAction.Composer)?.token is MobileHangulComposer.Token.Cycle
 
     /**
-     * K21 "겹받침을 만드는 자음 교체": whether [actions], whose [committedText] is off [target] only
-     * by its last syllable, can still get that syllable back. That takes the K21 shape — the
-     * committed syllable has a batchim and [content] holds exactly one open bare consonant after
-     * it, the one libhangul could not extend that batchim with — and a replace of that consonant
-     * (the same multitap key tapped again, or a 획추가/쌍자음 transform) that
+     * K21/K22 "앞 글자에 받침으로 붙는 자음 교체": whether [actions], whose [committedText] is off
+     * [target] only by its last syllable, can still get that syllable back. That takes the
+     * recovery shape — [content] holds exactly one open bare consonant after the committed
+     * syllable, the one libhangul could not attach to it as a batchim — and a replace of that
+     * consonant (the same multitap key tapped again, or a 획추가/쌍자음 transform) that
      * [MobileHangulComposer] turns into a recovery, backspacing the committed syllable and
-     * retyping it with the compound batchim. Instead of re-deriving the composer's
-     * compound-batchim table and cycle order here, this actually presses those replace keys (up
-     * to [MAX_REPLACE_CHAIN] in a row, each well inside the cycle's timeout) and asks whether the
+     * retyping it with the new consonant as its batchim. Instead of re-deriving the composer's
+     * batchim rules and cycle order here, this actually presses those replace keys (up to
+     * [MAX_REPLACE_CHAIN] in a row, each well inside the cycle's timeout) and asks whether the
      * committed text becomes a prefix of [target] again, so it only ever says yes when the real
      * composer would recover.
      */
@@ -369,7 +364,6 @@ object MobileLayoutTypingPlanner {
         family: MobileHangulFamily,
         target: String
     ): Boolean {
-        if (!committedText.last().hasBatchim()) return false
         val open = content.substring(committedText.length).singleOrNull() ?: return false
         if (open !in 'ㄱ'..'ㅎ') return false
         var chains = listOf(actions)
