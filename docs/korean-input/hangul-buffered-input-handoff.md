@@ -10,12 +10,18 @@
 
 관련 문서: [기능·빌드 개요](hangul-buffered-input.md), [우선순위 백로그](hangul-buffered-input-backlog.md)
 
+> **현재 상태(2026-09-28)**: 이 문서는 2026-07-25 옛 로컬 저장소(`D:\workspace\fcitx5-android`) 기준 기록이다.
+> 구현 커밋 `5338d80a`는 현재 저장소(`D:\workspace\Saegul`, `origin` = `yunchan8804-blip/saegeul`)의
+> `main` 이력에 들어와 있고 HEAD의 조상이다. 옛 저장소와 로컬 기능 브랜치를 보존하라는 안내(1절, 9.2절,
+> 18절, 20절)는 보관용 기록이며 더 따를 필요가 없다. 이후 바뀐 사실은
+> [백로그](hangul-buffered-input-backlog.md) 2.5절이 기준이다.
+
 ## 1. 한눈에 보는 현재 상태
 
 > 이 표는 2026-07-25 작성 시점의 Git 원격 모델(단일 `origin` = `fcitx5-android/fcitx5-android`)을
 > 기준으로 한 기록이다. 이후 독립 포크 전환으로 `origin` = `yunchan8804-blip/saegeul`,
 > `upstream` = `fcitx5-android/fcitx5-android`로 재편됐다. 현재 Git 소유권 계약은
-> [`docs/independent-fork/README.md`](independent-fork/README.md) §2를 따른다.
+> [`docs/independent-fork/README.md`](../independent-fork/README.md) §2를 따른다.
 
 | 항목 | 현재 값 |
 | --- | --- |
@@ -32,6 +38,8 @@
 | 지원 키캡 | 현대 두벌식 `Dubeolsik`만 |
 | 버퍼 전달 방식 | System paste, Ctrl+V, Direct commit |
 | 실기기 검증 | Samsung SM-F956N, Android 16 / API 36에서 핵심 System paste 흐름 통과 |
+
+> 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상). 아래 보존 안내와 확인 명령은 옛 로컬 저장소 기준이다.
 
 구현 커밋 자체는 깨끗한 상태로 만들어졌고, 백로그·인수인계·문서 링크는 그 뒤의 문서 전용 커밋으로 분리한다. `D:\workspace\fcitx5-android`는 당시 원격에 없는 기능 커밋을 보유한 현재 작업본이므로, 승인된 원격 push나 검증된 bundle/patch 백업 전에는 삭제하거나 새 clone으로 교체하지 마라. 다음 작업 시작 시 아래 명령으로 동적 상태를 다시 확인해라.
 
@@ -204,10 +212,10 @@ finalized prefix + current engine preedit
 Backspace 규칙은 다음과 같다.
 
 - 엔진 preedit이 있으면 fcitx5-hangul이 먼저 조합 단계를 되돌린다.
-- 엔진 preedit이 비었고 prefix가 있으면 prefix의 마지막 Unicode code point 하나를 지운다.
+- 엔진 preedit이 비었고 prefix가 있으면 prefix의 마지막 글자(grapheme cluster) 하나를 지운다.
 - 둘 다 비었으면 대상 editor의 일반 Backspace로 전달한다.
 
-UTF-16 `Char` 하나가 아니라 code point 단위로 지우므로 surrogate pair인 emoji도 반쪽만 남기지 않는다. 다만 grapheme cluster 전체를 지우는 구현은 아니어서 ZWJ emoji나 결합 문자는 여러 번 눌러야 할 수 있다.
+2026-09-28부터 `java.text.BreakIterator.getCharacterInstance()`로 사용자가 한 글자로 보는 단위를 지운다. surrogate pair emoji, ZWJ emoji(👨‍👩‍👧), 국기(🇰🇷), 결합 문자(e+U+0301), 조합형 한글 자모도 한 번에 지운다. 기기에서는 ICU 규칙을 따르고, JVM 테스트는 JDK 20 이상에서만 ZWJ·국기를 한 글자로 본다(JDK 17은 쪼갠다).
 
 ### 4.4 구간 제출 경계
 
@@ -215,13 +223,13 @@ UTF-16 `Char` 하나가 아니라 code point 단위로 지우므로 surrogate pa
 
 - Hangul 엔진이 소비하지 않고 forward한 Unicode 문자: 해당 문자를 prefix에 붙인 뒤 제출한다. 일반적으로 공백, 숫자, 문장부호가 여기에 들어간다.
 - Return: 먼저 제출에 성공한 뒤 기존 Return 동작을 실행한다.
-- Left/Right: 먼저 제출에 성공한 뒤 커서를 이동한다.
+- 방향키(상하좌우), Home/End, PageUp/PageDown, Tab: 먼저 제출에 성공한 뒤 같은 키를 `sendDownUpKeyEvents`로 보낸다. 2026-09-28 전에는 Left/Right만 이렇게 했다.
 - 툴바·emoji·클립보드 항목 등 `service.commitText()`를 직접 호출하는 삽입: 기존 버퍼를 먼저 제출하고 직접 삽입한다.
 - 입력기 전환, input view 종료, input 종료: 누수 방지를 위해 제출을 시도하고 엔진을 reset한다.
 - 버퍼 모드 설정 끄기: 기존 editor-owned composing을 끝내고 버퍼를 제출한 뒤 capability를 갱신한다.
 - Ctrl/Alt/Meta/Super/Hyper shortcut: 보류 중 한글을 `DirectCommit`으로 먼저 비우고 shortcut을 전달한다.
 
-Up/Down, Tab, Home/End, 선택 확장 등 모든 navigation 동작을 별도로 정의한 것은 아니다. 실제 문제 앱에서 이 키들이 필요하면 상태 전이와 중복 제출 여부를 먼저 instrumentation test로 고정한 뒤 확장해라.
+2026-09-28 전에는 Up/Down, Home/End, PageUp/PageDown이 버퍼 대상이 아니어서 editor로 바로 넘어갔고, 커서가 움직이면 외부 selection 경로에서 버퍼가 조용히 버려졌다. Tab은 fcitx `keySymToUnicode`가 9를 돌려주므로 탭 문자로 버퍼에 붙어 함께 제출됐다. 지금은 모두 Left/Right와 같이 먼저 제출한다. Shift+방향키 같은 선택 확장은 이 경로에서 modifier를 전달하지 않으므로 아직 정의되지 않았다. 실기기 검증은 대기 중이다.
 
 ### 4.5 엔진 reset 경합 방지
 
@@ -359,7 +367,7 @@ Caps Lock을 normal label로 두는 이유는 앞서 설명한 것처럼 fcitx5-
 | `app/src/main/java/org/fcitx/fcitx5/android/data/clipboard/ClipboardMarkers.kt` | transient label 상수와 판별 extension 추가 | label은 보안 토큰이 아니라 내부 분류 표식임 |
 | `app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt` | Advanced에 enable switch와 transport enum preference 추가 | 기본값은 off, 기본 transport는 SystemPaste |
 | `app/src/main/java/org/fcitx/fcitx5/android/input/BufferedHangulMode.kt` | 활성화 정책, Preedit capability 제거, 민감 필드 판단 | 가능한 한 pure policy로 유지해 unit test 가능하게 할 것 |
-| `app/src/main/java/org/fcitx/fcitx5/android/input/BufferedInputController.kt` | finalized prefix 누적·snapshot·code-point 삭제·clear | editor나 Android API를 넣지 말고 순수 상태 객체로 유지 |
+| `app/src/main/java/org/fcitx/fcitx5/android/input/BufferedInputController.kt` | finalized prefix 누적·snapshot·글자(grapheme) 단위 삭제·clear | editor나 Android API를 넣지 말고 순수 상태 객체로 유지 |
 | `app/src/main/java/org/fcitx/fcitx5/android/input/BufferedInputTransport.kt` | SystemPaste/CtrlV/DirectCommit enum과 문자열 리소스 연결 | 자동 fallback 순서를 나타내는 enum이 아님 |
 | `app/src/main/java/org/fcitx/fcitx5/android/input/FcitxInputMethodService.kt` | 버퍼 세션, event interception, UI decoration, 세 transport, selection 예측, lifecycle, shortcut·physical key 처리 | 가장 위험한 파일. 변경 전 상태 전이와 중복/누수 시나리오를 테스트로 고정할 것 |
 | `app/src/main/java/org/fcitx/fcitx5/android/input/InputView.kt` | InputPanel event를 service에서 decorate하고 강제 refresh 가능하게 함 | target composing이 아니라 Fcitx 내부 표시용 |
@@ -368,7 +376,7 @@ Caps Lock을 normal label로 두는 이유는 앞서 설명한 것처럼 fcitx5-
 | `app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt` | active IM config의 `cfg/Keyboard` 비동기 조회와 stale request guard | input method를 빠르게 바꿀 때 오래된 배열이 적용되지 않아야 함 |
 | `app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt` | main key와 popup preview에 Hangul legend 적용, Caps 상태 반영 | 실제 key action은 Latin으로 유지 |
 | `app/src/main/res/values/strings.xml` | 영어 실험 기능·transport 문자열 추가, 신규 문자열의 미번역 lint 억제 | 전체 번역 정책을 정하면 `tools:ignore` 재검토 |
-| `app/src/main/res/values-ko/strings.xml` | 동일 설정의 한국어 번역 추가 | 사용자에게 clipboard overwrite를 더 명확히 알리는 문구는 후속 과제 |
+| `app/src/main/res/values-ko/strings.xml` | 동일 설정의 한국어 번역 추가 | 2026-09-28에 System paste·Ctrl+V 설명에 clipboard 교체·잔존 고지를 넣었다 |
 
 ### 8.2 테스트와 문서
 
@@ -376,7 +384,8 @@ Caps Lock을 normal label로 두는 이유는 앞서 설명한 것처럼 fcitx5-
 | --- | --- |
 | `app/src/test/java/org/fcitx/fcitx5/android/core/CapabilityFlagsTest.kt` | 숫자 비밀번호가 Password capability로 분류되는지 |
 | `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedHangulModeTest.kt` | Hangul에서만 활성화, Preedit만 제거, Password/Sensitive clipboard 금지 |
-| `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedInputControllerTest.kt` | prefix+preedit 결합, Unicode code point 삭제, clear |
+| `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedInputControllerTest.kt` | prefix+preedit 결합, 글자(grapheme) 단위 삭제(surrogate pair·ZWJ·국기·결합 문자·한글), clear |
+| `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedInputControllerLongInputTest.kt` | 1만 글자 입력의 추가·추출·한 글자씩 삭제·제출·실패 보존, surrogate 경계 |
 | `app/src/test/java/org/fcitx/fcitx5/android/input/keyboard/HangulKeyLegendsTest.kt` | 두벌식 normal/Shift mapping, unsupported fallback, 언어·addon 판별 |
 | `docs/korean-input/hangul-buffered-input.md` | 사용자·개발자용 요약, 빌드 절차, test matrix, 알려진 위험 |
 | `docs/korean-input/hangul-buffered-input-handoff.md` | 현재 파일. 다음 작업자를 위한 상세 SSOT |
@@ -418,7 +427,9 @@ Caps Lock을 normal label로 두는 이유는 앞서 설명한 것처럼 fcitx5-
 
 Android 버전의 source of truth는 `build-logic/convention/src/main/kotlin/Versions.kt`다. README보다 이 파일을 먼저 확인해라.
 
-### 9.2 로컬 기능 브랜치 보존과 upstream clone
+### 9.2 로컬 기능 브랜치 보존과 upstream clone (보관)
+
+> 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상). 아래 bundle·patch 보존 절차는 더 필요 없고 기록으로만 남긴다.
 
 `upstream` 저장소(`fcitx5-android/fcitx5-android`, 독립 포크 전 원 프로젝트)를 clone하면 `master` 기준선만 받을 수 있다. 현재 `feat/hangul-buffered-input`은 이 upstream에도, 현재 `origin`(`yunchan8804-blip/saegeul`)에도 없으므로 아래 clone 명령만으로 구현 커밋이나 이 문서를 복구할 수 없다. 현재 `D:\workspace\fcitx5-android`를 보존한 채 별도 baseline이 필요할 때만 다른 빈 경로에 clone해라.
 
@@ -544,7 +555,10 @@ java -version
 .\gradlew.bat :app:testDebugUnitTest -PbuildABI=arm64-v8a
 ```
 
-결과: **14/15 PASS, 1 FAIL**
+결과: **14/15 PASS, 1 FAIL** (작성 당시)
+
+> 해결됨: 이 실패는 `a539c26d`에서 테스트를 실제 serializer 계약(2.0 입력은 현재 버전으로 마이그레이션)에 맞춰
+> 고쳐 없앴다. 테스트 이름은 `version2MigratesToCurrentVersion`이고, 지금 `CURRENT_VERSION`은 3.0(`CustomThemeSerializer.kt`)이다.
 
 실패 항목:
 
@@ -611,6 +625,8 @@ app/build/reports/lint-results-debug.txt
 app/build/reports/lint-results-debug.xml
 plugin/hangul/build/reports/lint-results-debug.html
 ```
+
+> 해결됨(2026-09-28): `DataDescriptorPlugin`이 lint 모델·분석 task를 `generateDataDescriptor` 뒤에 돌게 선언해 이제 한 invocation에서 함께 돌려도 된다. 아래는 작성 당시 기록이다.
 
 확인된 필수 제한은 Hangul plugin assembly와 Hangul plugin lint를 같은 Gradle invocation에 넣지 않는 것이다. 현재 upstream task graph에서 `generateDataDescriptor`와 `generateDebugLintReportModel` 사이의 implicit-dependency 검증 오류가 날 수 있다. app lint와 plugin lint만 함께 실행하는 것은 이 제한과 다르지만, 알려진 app lint 부채와 plugin 결과를 분리하려고 위에서는 별도로 실행한다.
 
@@ -977,8 +993,8 @@ System paste와 Ctrl+V는 사용자의 기존 primary clipboard를 새 segment�
 7. **Physical keyboard 미검증**
    forwarded down/up deduplication 코드는 있으나 실기기 테스트가 없다.
 
-8. **Grapheme 삭제 미지원**
-   code point 단위라 복합 emoji/결합 문자를 한 번에 지우지 않는다.
+8. **Grapheme 삭제 (해결됨, 2026-09-28)**
+   버퍼 안 Backspace가 글자(grapheme cluster) 하나를 지운다. 4.3절 참고.
 
 9. **Hanja/WordCommit 미검증**
    native engine의 commit 경계가 달라질 수 있으므로 후보 선택과 buffer snapshot을 따로 시험해야 한다.
@@ -996,7 +1012,9 @@ System paste와 Ctrl+V는 사용자의 기존 primary clipboard를 새 segment�
 
 이 feature와 무관한 실패를 숨기거나 feature 성공으로 포장하지 마라.
 
-### 17.1 전체 unit test 1건
+### 17.1 전체 unit test 1건 (해결됨)
+
+> 해결됨: `a539c26d`에서 고쳤다. 10.2절 참고. 아래는 작성 당시 기록이다.
 
 ```text
 ThemeSerializationTest.version2
@@ -1016,7 +1034,9 @@ baseline 없음
 
 대표적으로 기존 번역 누락, format type 불일치, resource lint가 포함된다. 새 feature line의 finding은 없었다. 이 브랜치에서 lint 315건을 한꺼번에 고치면 feature diff와 리뷰 범위가 오염된다. 별도 cleanup branch가 맞다.
 
-### 17.3 plugin task graph
+### 17.3 plugin task graph (해결됨)
+
+> 해결됨(2026-09-28): 10.4절 참고. 아래는 작성 당시 기록이다.
 
 Plugin assemble와 lint를 한 invocation에 섞으면 Gradle implicit dependency validation이 실패할 수 있다. 명령을 나누면 각각 통과한다. 빌드 스크립트의 task dependency를 고치는 작업도 별도 concern으로 분리해라.
 
@@ -1040,6 +1060,8 @@ git rev-parse HEAD
 git rev-list --left-right --count origin/master...HEAD
 git branch -vv
 ```
+
+> 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상). 아래 문단은 작성 당시 기록이다.
 
 원격 push나 PR 생성은 아직 하지 않았다. 다음 작업자는 사용자 승인 없이 공개 원격에 push하지 마라. 작업 브랜치가 로컬에만 있으므로 현재 checkout을 보존하고, 장기 보관이나 다른 장비 인계가 필요하면 9.2절의 승인된 원격 또는 검증된 bundle/patch 절차를 먼저 완료해라.
 
@@ -1076,7 +1098,7 @@ Debug APK는 개발·검증용이다. release 배포에는 release signing, upda
 - Ctrl+V main key-down 1회와 modifier 순서
 - Direct commit 1회
 - Password/Sensitive/Numeric password에서 clipboard 변경 0회
-- Return/Left/Right는 flush 성공 뒤 editor action
+- Return·방향키·Home/End·PageUp/PageDown·Tab은 flush 성공 뒤 editor action
 - physical key down/up이 중복 전달되지 않음
 - input restart/finish/unbind에서 cross-editor leak 없음
 - 예상 selection과 외부 selection 변화 분리
@@ -1128,9 +1150,9 @@ Service private method를 억지 reflection으로 시험하기보다 transport d
 
 ### P2: upstream 정리 분리
 
-- stale theme serialization test
+- stale theme serialization test (해결됨, `a539c26d`)
 - app lint baseline 또는 기존 315개 issue
-- plugin assemble/lint task dependency
+- plugin assemble/lint task dependency (해결됨, 2026-09-28)
 
 이 세 가지는 feature 기능 검증과 분리된 커밋 또는 별도 PR이 적절하다.
 
@@ -1138,8 +1160,8 @@ Service private method를 억지 reflection으로 시험하기보다 transport d
 
 다음 작업 시작 시 위에서부터 순서대로 확인해라.
 
-- [ ] `D:\workspace\fcitx5-android`가 로컬 기능 커밋을 보유한 현재 작업본인지 확인
-- [ ] branch가 `feat/hangul-buffered-input`인지 확인
+- [x] `D:\workspace\fcitx5-android`가 로컬 기능 커밋을 보유한 현재 작업본인지 확인 — 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상)
+- [x] branch가 `feat/hangul-buffered-input`인지 확인 — 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상)
 - [ ] HEAD와 base hash 확인
 - [ ] 예상하지 못한 working-tree 변경 보존 및 소유자 확인
 - [ ] 모든 submodule initialized/clean 확인

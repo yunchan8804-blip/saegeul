@@ -66,6 +66,7 @@ AI가 미리 만든 재료를 검증·저장하고 입력할 때 로컬에서 �
 | `BACKLOG` | 계약은 있으나 구현 순서가 오지 않음 |
 | `GATE` | 다음 단계 진입 전에 반드시 만족해야 하는 조건 |
 | `BLOCK` | 외부 권한, 공급자 계약 또는 재현 환경이 없어 진행 불가 |
+| `제거됨` | 제품에서 뺀 기능. 표에는 기록으로만 남긴다 |
 
 내부 구현 플래그나 파일 존재만으로 `DONE`으로 표시하지 않는다. 사용자가 실제로 볼 수 있는
 동작 또는 재현 가능한 테스트 증거가 있어야 한다.
@@ -103,7 +104,7 @@ Android APK를 그대로 옮겨 기능 100% 동일한 아이폰 앱을 만드는
 | 영역 | 현재 기능 | 상태 |
 | --- | --- | --- |
 | 입력 엔진 | Fcitx5 addon과 외부 APK plugin 구조 | `DONE` |
-| 언어 | 영어, 중국어, 일본어, 한국어, 베트남어, 태국어, Sinhala, RIME | `DONE` |
+| 언어 | 영어, 한국어. 중국어 Pinyin·Table 엔진은 `5a35fe8a`, 일본어·주음·월어·RIME·Sinhala·태국어·베트남어 plugin은 `3e63b4ad`에서 뺐다 | `DONE` |
 | 후보 | 가로 후보, 확장 후보, 물리 키보드 floating 후보 | `DONE` |
 | 편집 | Undo, Redo, 커서 이동, 선택, 잘라내기, 복사, 붙여넣기 | `DONE` |
 | 클립보드 | plain text 기록, 고정, 편집, 공유, 삭제, 민감 항목 마스킹 | `DONE` |
@@ -118,7 +119,7 @@ Android APK를 그대로 옮겨 기능 100% 동일한 아이폰 앱을 만드는
 | ID | 기능 | 상태 | 핵심 증거 |
 | --- | --- | --- | --- |
 | `KO-BASE-01` | 현대 두벌식 한글 key legend | `DONE` | JVM 테스트와 Fold6 실제 기기 |
-| `KO-BASE-02` | 한글 버퍼 호환 입력 및 Direct commit | `DONE` | 문제 surface와 Samsung clipboard 부작용 검증 |
+| `KO-BASE-02` | 한글 버퍼 호환 입력 및 Direct commit | 구현 완료, 원래 문제 앱 인수 검증 대기(P0-01) | JVM 테스트와 Fold6 Settings 검색 입력칸의 System paste·hide/show 통과. 원래 문제 앱과 Ctrl+V·Direct commit의 실기기 증거는 아직 없다([백로그](hangul-buffered-input-backlog.md) P0-01) |
 | `KO-BASE-03` | 세벌식 390·Final·Noshift·옛글·Ahnmatae surface | `DONE` | generated table 테스트와 Fold6 입력 |
 | `KO-BASE-04` | 천지인·천지인+·단모음·모아키·베가·나랏글 surface | `DONE` | 42 JVM 테스트, A35와 Fold6 실제 기기 |
 | `KO-BASE-05` | 스페이스바 길게 눌러 한글 표면 전환 | `DONE` | 두 기기 왕복·설정 유지 |
@@ -506,19 +507,23 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
 
 ### 6.3 AI 텍스트 기능
 
+> **제거됨(2026-09-24 결정)**: 외부 글쓰기 AI(API 키, OAuth 로그인, 컴퓨터 연결, 키보드 안 AI 글쓰기 창)는
+> 앱에서 뺐다(커밋 `ec872659`, `04f23481`, `a5ae3eb5`, `fd0f6748`). 아래 표는 기록으로만 남긴다.
+> 현재 AI는 기기 안 Gemma만 쓰며 1절의 온디바이스 계약을 따른다.
+
 | ID | 기능 | 상태 | MVP 계약 | 난이도 |
 | --- | --- | --- | --- | --- |
-| `AI-00` | AI provider·보안 기반 | `DONE` | provider profile, key vault, privacy gate, usage 표시 | L |
-| `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `DONE` | Unicode-safe diff·선택 적용·정확히 1회 교체·undo와 emulator 실제 Codex 교정 통과 | M |
-| `AI-02` | 존댓말·말투 변환 | `DONE` | 존댓말·카톡·업무·거절·사과·고객응대 action과 실제 Codex/Claude 결과 matrix 통과 | M |
-| `AI-03` | 빠른 문장 생성 | `DONE` | 프리셋·활성 키보드 직접 지시·빈 입력창 생성, 서로 다른 후보 정확히 3개, 실제 Codex/Claude 생성·교체·undo 통과 | M |
-| `AI-04` | 답장 초안 | `DONE` | 선택·명시적 AI 진입 뒤 전체 editor source(불가 시 bounded cursor fallback)·명시적 clipboard·Sharesheet intake, TTL·privacy·정확히 1회 입력과 실제 답장 생성 통과 | M |
-| `AI-05` | 키보드 번역 | `DONE` | 한↔영·일·중 action·preview·정확히 1회 교체와 emulator 실제 OAuth companion 번역 통과 | M |
-| `AI-06` | AI provider profile | `DONE` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
-| `AI-07` | 원격 호환 endpoint OAuth | `DONE` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인. 2026-07-29 매니페스트 병합이 browser query를 지운 회귀를 수정했고, 최신 arm64 debug APK를 Z Fold6에 설치했다. 실제 Samsung Internet Custom Tab, 사용자 승인·callback 뒤 암호화 session metadata 존재와 live action result/replace/undo를 확인했다. credential·token 내용은 읽지 않았다 | L |
-| `AI-08` | 일반 사용자 AI 연결 안내 | `DONE` | 미연결·OAuth profile만 남고 암호화 session이 없는 상태·OAuth 만료 상태에 prompt 전 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
-| `AI-09` | 내 컴퓨터 자동 발견·연결 | `DONE` | mDNS 발견, Tailscale HTTPS manifest 검증, 연결 확인, AppAuth login과 PC 재시작 후 DPAPI grant 복구; A35·Z Fold6 통과 | L |
-| `AI-10` | 직접 지시 터치 안전·인증 복구 | `DONE` | prompt 상단까지 IME touchable inset으로 보고해 뒤 editor touch 관통을 차단하고 API key 401은 사용자용 `설정하기` 상태로 복구 | S |
+| `AI-00` | AI provider·보안 기반 | `제거됨` | provider profile, key vault, privacy gate, usage 표시 | L |
+| `AI-01` | 한국어 맞춤법·띄어쓰기·조사 교정 | `제거됨` | Unicode-safe diff·선택 적용·정확히 1회 교체·undo와 emulator 실제 Codex 교정 통과 | M |
+| `AI-02` | 존댓말·말투 변환 | `제거됨` | 존댓말·카톡·업무·거절·사과·고객응대 action과 실제 Codex/Claude 결과 matrix 통과 | M |
+| `AI-03` | 빠른 문장 생성 | `제거됨` | 프리셋·활성 키보드 직접 지시·빈 입력창 생성, 서로 다른 후보 정확히 3개, 실제 Codex/Claude 생성·교체·undo 통과 | M |
+| `AI-04` | 답장 초안 | `제거됨` | 선택·명시적 AI 진입 뒤 전체 editor source(불가 시 bounded cursor fallback)·명시적 clipboard·Sharesheet intake, TTL·privacy·정확히 1회 입력과 실제 답장 생성 통과 | M |
+| `AI-05` | 키보드 번역 | `제거됨` | 한↔영·일·중 action·preview·정확히 1회 교체와 emulator 실제 OAuth companion 번역 통과 | M |
+| `AI-06` | AI provider profile | `제거됨` | OpenAI·OpenAI-compatible endpoint, model tier, 암호화 BYOK 분리 | M |
+| `AI-07` | 원격 호환 endpoint OAuth | `제거됨` | public client Authorization Code + PKCE S256, 외부 브라우저, 암호화 token refresh·revoke·명시적 재로그인. 2026-07-29 매니페스트 병합이 browser query를 지운 회귀를 수정했고, 최신 arm64 debug APK를 Z Fold6에 설치했다. 실제 Samsung Internet Custom Tab, 사용자 승인·callback 뒤 암호화 session metadata 존재와 live action result/replace/undo를 확인했다. credential·token 내용은 읽지 않았다 | L |
+| `AI-08` | 일반 사용자 AI 연결 안내 | `제거됨` | 미연결·OAuth profile만 남고 암호화 session이 없는 상태·OAuth 만료 상태에 prompt 전 설명과 `설정하기` CTA를 제공하고 개인정보·AI 화면으로 직행; private/offline/policy 차단과 분리 | S |
+| `AI-09` | 내 컴퓨터 자동 발견·연결 | `제거됨` | mDNS 발견, Tailscale HTTPS manifest 검증, 연결 확인, AppAuth login과 PC 재시작 후 DPAPI grant 복구; A35·Z Fold6 통과 | L |
+| `AI-10` | 직접 지시 터치 안전·인증 복구 | `제거됨` | prompt 상단까지 IME touchable inset으로 보고해 뒤 editor touch 관통을 차단하고 API key 401은 사용자용 `설정하기` 상태로 복구 | S |
 
 ### 6.4 음성·멀티모달 기능
 
