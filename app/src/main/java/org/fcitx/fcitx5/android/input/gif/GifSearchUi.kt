@@ -24,8 +24,9 @@ import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
 import org.fcitx.fcitx5.android.input.panel.PanelRecovery
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
 import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelQueryField
+import org.fcitx.fcitx5.android.input.panel.panelResultsFrame
 import org.fcitx.fcitx5.android.input.panel.pressableChipSurface
-import org.fcitx.fcitx5.android.input.panel.pressablePanelSurface
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import splitties.dimensions.dp
 
@@ -39,14 +40,7 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         orientation = LinearLayout.VERTICAL
     }
 
-    private val queryText = TextView(context).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        setTextColor(theme.keyTextColor)
-        textSize = PanelStyle.TEXT_EMPHASIS
-        setPadding(dp(PanelStyle.CARD_PADDING_H_DP), 0, dp(PanelStyle.GAP_M_DP), 0)
-        background = context.pressablePanelSurface(theme, theme.altKeyBackgroundColor)
-        setOnClickListener { onQueryClick?.invoke() }
-    }
+    private val queryText = context.panelQueryField(theme) { onQueryClick?.invoke() }
 
     private val searchButton = ImageButton(context).apply {
         setImageResource(R.drawable.ic_baseline_search_24)
@@ -199,21 +193,7 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         visibility = View.GONE
     }
 
-    private val content = FrameLayout(context).apply {
-        addView(recyclerView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-        addView(statusOverlay, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-        addView(actionStatus, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP
-        ))
-    }
+    private val content = context.panelResultsFrame(recyclerView, statusOverlay, actionStatus)
 
     var onQueryClick: (() -> Unit)? = null
     var onKeyword: ((String) -> Unit)? = null

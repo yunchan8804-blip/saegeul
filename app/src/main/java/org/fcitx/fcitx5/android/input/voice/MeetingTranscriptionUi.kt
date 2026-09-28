@@ -5,12 +5,8 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.content.Context
-import android.content.res.ColorStateList
-import android.view.Gravity
 import android.view.View
-import android.widget.CheckBox
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
@@ -18,8 +14,16 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
 import org.fcitx.fcitx5.android.input.panel.PanelRecovery
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.addStatusWithPreview
 import org.fcitx.fcitx5.android.input.panel.panelButton
-import org.fcitx.fcitx5.android.input.panel.panelSurface
+import org.fcitx.fcitx5.android.input.panel.panelButtonPair
+import org.fcitx.fcitx5.android.input.panel.panelCheckRow
+import org.fcitx.fcitx5.android.input.panel.panelColumn
+import org.fcitx.fcitx5.android.input.panel.panelProgress
+import org.fcitx.fcitx5.android.input.panel.panelStatusText
+import org.fcitx.fcitx5.android.input.panel.showDisabledPanelAction
+import org.fcitx.fcitx5.android.input.panel.showPanelAction
+import org.fcitx.fcitx5.android.input.panel.showPanelActionOrRecovery
 import splitties.dimensions.dp
 
 class MeetingTranscriptionUi(
@@ -38,17 +42,8 @@ class MeetingTranscriptionUi(
         setTextColor(theme.altKeyTextColor)
         textSize = PanelStyle.TEXT_CAPTION
     }
-    private val status = TextView(context).apply {
-        setTextColor(theme.keyTextColor)
-        textSize = PanelStyle.TEXT_BODY
-        gravity = Gravity.CENTER
-        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-    }
-    private val progress = ProgressBar(context).apply {
-        isIndeterminate = true
-        indeterminateTintList = ColorStateList.valueOf(theme.accentKeyBackgroundColor)
-        visibility = View.GONE
-    }
+    private val status = context.panelStatusText(theme)
+    private val progress = context.panelProgress(theme)
     private val segments = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
     }
@@ -59,12 +54,7 @@ class MeetingTranscriptionUi(
     private val primary = context.panelButton(theme, PanelButtonKind.Primary)
     private val secondary = context.panelButton(theme, PanelButtonKind.Secondary)
 
-    val root: View = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(
-            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP),
-            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP)
-        )
+    val root: View = context.panelColumn().apply {
         setBackgroundColor(theme.keyboardColor)
         addView(TextView(context).apply {
             setText(R.string.meeting_title)
@@ -72,48 +62,16 @@ class MeetingTranscriptionUi(
             textSize = PanelStyle.TEXT_TITLE
         }, matchWrap())
         addView(provider, matchWrap())
-        addView(status, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            0,
-            1f
-        ))
-        addView(progress, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            bottomMargin = dp(PanelStyle.GAP_S_DP)
-        })
-        addView(scroller, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            0,
-            3f
-        ))
-        addView(LinearLayout(context).apply {
-            gravity = Gravity.CENTER
-            addView(primary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
-                marginEnd = dp(PanelStyle.GAP_S_DP)
-            })
-            addView(secondary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
-                marginStart = dp(PanelStyle.GAP_S_DP)
-            })
-        }, matchWrap())
+        addStatusWithPreview(status, progress, scroller)
+        addView(context.panelButtonPair(primary, secondary), matchWrap())
     }
 
     fun showReady(providerName: String) {
         provider.text = context.getString(R.string.voice_connection_label, providerName)
         status.setText(R.string.meeting_ready)
         clearSegments()
-        primary.apply {
-            isEnabled = true
-            setText(R.string.voice_meeting_disclosure_continue)
-            setOnClickListener { onPickFile?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
+        primary.showPanelAction(R.string.voice_meeting_disclosure_continue) { onPickFile?.invoke() }
+        showBack()
     }
 
     fun showLoading(durationMillis: Long? = null) {
@@ -127,16 +85,8 @@ class MeetingTranscriptionUi(
         }
         clearSegments()
         progress.visibility = View.VISIBLE
-        primary.apply {
-            isEnabled = false
-            setText(R.string.meeting_processing_button)
-            setOnClickListener(null)
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
+        primary.showDisabledPanelAction(R.string.meeting_processing_button)
+        showCancel()
     }
 
     fun showPreview(items: List<MeetingSpeakerSegment>) {
@@ -144,44 +94,25 @@ class MeetingTranscriptionUi(
         status.setText(R.string.meeting_preview)
         segments.removeAllViews()
         items.forEach { segment ->
-            segments.addView(CheckBox(context).apply {
-                isChecked = false
-                buttonTintList = ColorStateList.valueOf(theme.accentKeyBackgroundColor)
-                setTextColor(theme.keyTextColor)
-                textSize = PanelStyle.TEXT_BODY
-                text = buildString {
-                    append('[')
-                    append(MeetingTranscriptSelection.timestamp(segment.startSeconds))
-                    append("–")
-                    append(MeetingTranscriptSelection.timestamp(segment.endSeconds))
-                    append("] ")
-                    append(segment.speaker.ifBlank { speakerPrefix() })
-                    append("\n")
-                    append(segment.text)
-                }
-                setPadding(
-                    dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_S_DP),
-                    dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_S_DP)
-                )
-                background = context.panelSurface(theme.keyBackgroundColor)
-                setOnCheckedChangeListener { _, checked ->
-                    if (checked) selectedIds += segment.id else selectedIds -= segment.id
-                    primary.isEnabled = onSelectionChanged?.invoke(selectedIds.toSet()) == true
-                }
+            val text = buildString {
+                append('[')
+                append(MeetingTranscriptSelection.timestamp(segment.startSeconds))
+                append("–")
+                append(MeetingTranscriptSelection.timestamp(segment.endSeconds))
+                append("] ")
+                append(segment.speaker.ifBlank { speakerPrefix() })
+                append("\n")
+                append(segment.text)
+            }
+            segments.addView(context.panelCheckRow(theme, text) { checked ->
+                if (checked) selectedIds += segment.id else selectedIds -= segment.id
+                primary.isEnabled = onSelectionChanged?.invoke(selectedIds.toSet()) == true
             }, matchWrap().apply { bottomMargin = context.dp(PanelStyle.GAP_S_DP) })
         }
         progress.visibility = View.GONE
         scroller.visibility = View.VISIBLE
-        primary.apply {
-            isEnabled = false
-            setText(R.string.voice_insert)
-            setOnClickListener { onInsert?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
+        primary.showPanelAction(R.string.voice_insert, enabled = false) { onInsert?.invoke() }
+        showCancel()
     }
 
     /**
@@ -191,49 +122,25 @@ class MeetingTranscriptionUi(
     fun showError(message: String, canRetry: Boolean, recovery: PanelRecovery? = null) {
         status.text = message
         clearSegments()
-        primary.apply {
-            when {
-                canRetry -> {
-                    isEnabled = true
-                    setText(R.string.meeting_choose_again)
-                    setOnClickListener { onPickFile?.invoke() }
-                }
-                recovery != null -> {
-                    isEnabled = true
-                    setText(recovery.labelRes)
-                    setOnClickListener { recovery.run() }
-                }
-                else -> {
-                    isEnabled = false
-                    setText(R.string.meeting_choose_again)
-                    setOnClickListener(null)
-                }
-            }
+        primary.showPanelActionOrRecovery(canRetry, R.string.meeting_choose_again, recovery) {
+            onPickFile?.invoke()
         }
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
+        showBack()
     }
 
     fun showSetupRequired(message: String) {
         provider.text = ""
         status.text = message
         clearSegments()
-        primary.apply {
-            isEnabled = true
-            setText(R.string.ai_setup_action)
-            setOnClickListener { onSetupRequested?.invoke() }
-        }
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
+        primary.showPanelAction(R.string.ai_setup_action) { onSetupRequested?.invoke() }
+        showBack()
     }
 
     fun speakerPrefix(): String = context.getString(R.string.meeting_speaker_prefix)
+
+    private fun showBack() = secondary.showPanelAction(R.string.ai_back) { onClose?.invoke() }
+
+    private fun showCancel() = secondary.showPanelAction(android.R.string.cancel) { onCancel?.invoke() }
 
     private fun clearSegments() {
         selectedIds.clear()

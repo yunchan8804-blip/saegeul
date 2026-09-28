@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.ondevice.gemma
 
 import android.os.PowerManager
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceResourceSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -52,10 +53,10 @@ class GemmaGenerationEligibilityTest {
 
     @Test
     fun `invalid battery readings are unknown and do not overflow`() {
-        assertNull(GemmaGenerationEligibility.batteryPercent(-1, 100))
-        assertNull(GemmaGenerationEligibility.batteryPercent(1, 0))
-        assertNull(GemmaGenerationEligibility.batteryPercent(101, 100))
-        assertEquals(100, GemmaGenerationEligibility.batteryPercent(Int.MAX_VALUE, Int.MAX_VALUE))
+        assertNull(OnDeviceResourceSnapshot.batteryPercent(-1, 100))
+        assertNull(OnDeviceResourceSnapshot.batteryPercent(1, 0))
+        assertNull(OnDeviceResourceSnapshot.batteryPercent(101, 100))
+        assertEquals(100, OnDeviceResourceSnapshot.batteryPercent(Int.MAX_VALUE, Int.MAX_VALUE))
         assertWaitReason(
             GemmaGenerationWaitReason.BATTERY_LEVEL_UNKNOWN,
             snapshot(batteryPercent = 101)

@@ -5,12 +5,8 @@
 package org.fcitx.fcitx5.android.input.ocr
 
 import android.content.Context
-import android.content.res.ColorStateList
-import android.view.Gravity
 import android.view.View
-import android.widget.CheckBox
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
@@ -18,8 +14,16 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
 import org.fcitx.fcitx5.android.input.panel.PanelRecovery
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.addStatusWithPreview
 import org.fcitx.fcitx5.android.input.panel.panelButton
-import org.fcitx.fcitx5.android.input.panel.panelSurface
+import org.fcitx.fcitx5.android.input.panel.panelButtonPair
+import org.fcitx.fcitx5.android.input.panel.panelCheckRow
+import org.fcitx.fcitx5.android.input.panel.panelColumn
+import org.fcitx.fcitx5.android.input.panel.panelProgress
+import org.fcitx.fcitx5.android.input.panel.panelStatusText
+import org.fcitx.fcitx5.android.input.panel.showDisabledPanelAction
+import org.fcitx.fcitx5.android.input.panel.showPanelAction
+import org.fcitx.fcitx5.android.input.panel.showPanelActionOrRecovery
 import splitties.dimensions.dp
 
 class OcrUi(
@@ -34,17 +38,8 @@ class OcrUi(
     var onSelectionChanged: ((Set<String>) -> Boolean)? = null
 
     private val selectedIds = linkedSetOf<String>()
-    private val status = TextView(context).apply {
-        setTextColor(theme.keyTextColor)
-        textSize = PanelStyle.TEXT_BODY
-        gravity = Gravity.CENTER
-        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-    }
-    private val progress = ProgressBar(context).apply {
-        isIndeterminate = true
-        indeterminateTintList = ColorStateList.valueOf(theme.accentKeyBackgroundColor)
-        visibility = View.GONE
-    }
+    private val status = context.panelStatusText(theme)
+    private val progress = context.panelProgress(theme)
     private val blocks = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
     }
@@ -55,12 +50,7 @@ class OcrUi(
     private val primary = context.panelButton(theme, PanelButtonKind.Primary)
     private val secondary = context.panelButton(theme, PanelButtonKind.Secondary)
 
-    val root: View = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(
-            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP),
-            dp(PanelStyle.PANEL_PADDING_H_DP), dp(PanelStyle.PANEL_PADDING_V_DP)
-        )
+    val root: View = context.panelColumn().apply {
         setBackgroundColor(theme.keyboardColor)
         addView(TextView(context).apply {
             setText(R.string.ocr_title)
@@ -72,43 +62,15 @@ class OcrUi(
             setTextColor(theme.altKeyTextColor)
             textSize = PanelStyle.TEXT_CAPTION
         }, matchWrap())
-        addView(status, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            0,
-            1f
-        ))
-        addView(progress, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            bottomMargin = dp(PanelStyle.GAP_S_DP)
-        })
-        addView(scroller, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            0,
-            3f
-        ))
-        addView(LinearLayout(context).apply {
-            gravity = Gravity.CENTER
-            addView(primary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
-                marginEnd = dp(PanelStyle.GAP_S_DP)
-            })
-            addView(secondary, LinearLayout.LayoutParams(0, dp(PanelStyle.BUTTON_HEIGHT_DP), 1f).apply {
-                marginStart = dp(PanelStyle.GAP_S_DP)
-            })
-        }, matchWrap())
+        addStatusWithPreview(status, progress, scroller)
+        addView(context.panelButtonPair(primary, secondary), matchWrap())
     }
 
     fun showCheckingModel() {
         status.setText(R.string.ocr_checking_model)
         clearBlocks()
         progress.visibility = View.VISIBLE
-        primary.apply {
-            isEnabled = false
-            setText(R.string.ocr_checking_model)
-            setOnClickListener(null)
-        }
+        primary.showDisabledPanelAction(R.string.ocr_checking_model)
         showBack()
     }
 
@@ -129,24 +91,8 @@ class OcrUi(
             }
         )
         clearBlocks()
-        primary.apply {
-            when {
-                canDownload -> {
-                    isEnabled = true
-                    setText(R.string.ocr_model_download)
-                    setOnClickListener { onDownloadModel?.invoke() }
-                }
-                recovery != null -> {
-                    isEnabled = true
-                    setText(recovery.labelRes)
-                    setOnClickListener { recovery.run() }
-                }
-                else -> {
-                    isEnabled = false
-                    setText(R.string.ocr_model_download)
-                    setOnClickListener(null)
-                }
-            }
+        primary.showPanelActionOrRecovery(canDownload, R.string.ocr_model_download, recovery) {
+            onDownloadModel?.invoke()
         }
         showBack()
     }
@@ -155,33 +101,21 @@ class OcrUi(
         status.setText(R.string.ocr_model_downloading)
         clearBlocks()
         progress.visibility = View.VISIBLE
-        primary.apply {
-            isEnabled = false
-            setText(R.string.ocr_model_downloading)
-            setOnClickListener(null)
-        }
+        primary.showDisabledPanelAction(R.string.ocr_model_downloading)
         showCancel()
     }
 
     fun showReady() {
         status.setText(R.string.ocr_ready)
         clearBlocks()
-        primary.apply {
-            isEnabled = true
-            setText(R.string.ocr_pick_image)
-            setOnClickListener { onPickImage?.invoke() }
-        }
+        primary.showPanelAction(R.string.ocr_pick_image) { onPickImage?.invoke() }
         showBack()
     }
 
     fun showWaitingForImage() {
         status.setText(R.string.ocr_waiting_for_image)
         clearBlocks()
-        primary.apply {
-            isEnabled = false
-            setText(R.string.ocr_pick_image)
-            setOnClickListener(null)
-        }
+        primary.showDisabledPanelAction(R.string.ocr_pick_image)
         showCancel()
     }
 
@@ -189,11 +123,7 @@ class OcrUi(
         status.setText(R.string.ocr_recognizing)
         clearBlocks()
         progress.visibility = View.VISIBLE
-        primary.apply {
-            isEnabled = false
-            setText(R.string.ocr_recognizing)
-            setOnClickListener(null)
-        }
+        primary.showDisabledPanelAction(R.string.ocr_recognizing)
         showCancel()
     }
 
@@ -202,59 +132,31 @@ class OcrUi(
         status.setText(R.string.ocr_preview)
         blocks.removeAllViews()
         items.forEach { block ->
-            blocks.addView(CheckBox(context).apply {
-                isChecked = false
-                buttonTintList = ColorStateList.valueOf(theme.accentKeyBackgroundColor)
-                setTextColor(theme.keyTextColor)
-                textSize = PanelStyle.TEXT_BODY
-                text = block.text
-                setPadding(
-                    dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_S_DP),
-                    dp(PanelStyle.GAP_M_DP), dp(PanelStyle.GAP_S_DP)
-                )
-                background = context.panelSurface(theme.keyBackgroundColor)
-                setOnCheckedChangeListener { _, checked ->
-                    if (checked) selectedIds += block.id else selectedIds -= block.id
-                    primary.isEnabled = onSelectionChanged?.invoke(selectedIds.toSet()) == true
-                }
+            blocks.addView(context.panelCheckRow(theme, block.text) { checked ->
+                if (checked) selectedIds += block.id else selectedIds -= block.id
+                primary.isEnabled = onSelectionChanged?.invoke(selectedIds.toSet()) == true
             }, matchWrap().apply { bottomMargin = context.dp(PanelStyle.GAP_S_DP) })
         }
         progress.visibility = View.GONE
         scroller.visibility = View.VISIBLE
-        primary.apply {
-            isEnabled = false
-            setText(R.string.ocr_insert)
-            setOnClickListener { onInsert?.invoke() }
-        }
+        primary.showPanelAction(R.string.ocr_insert, enabled = false) { onInsert?.invoke() }
         showCancel()
     }
 
     fun showRecognitionError(message: Int, canRetry: Boolean) {
         status.setText(message)
         clearBlocks()
-        primary.apply {
-            isEnabled = canRetry
-            setText(R.string.ocr_pick_image)
-            setOnClickListener(if (canRetry) View.OnClickListener { onPickImage?.invoke() } else null)
+        if (canRetry) {
+            primary.showPanelAction(R.string.ocr_pick_image) { onPickImage?.invoke() }
+        } else {
+            primary.showDisabledPanelAction(R.string.ocr_pick_image)
         }
         showBack()
     }
 
-    private fun showBack() {
-        secondary.apply {
-            isEnabled = true
-            setText(R.string.ai_back)
-            setOnClickListener { onClose?.invoke() }
-        }
-    }
+    private fun showBack() = secondary.showPanelAction(R.string.ai_back) { onClose?.invoke() }
 
-    private fun showCancel() {
-        secondary.apply {
-            isEnabled = true
-            setText(android.R.string.cancel)
-            setOnClickListener { onCancel?.invoke() }
-        }
-    }
+    private fun showCancel() = secondary.showPanelAction(android.R.string.cancel) { onCancel?.invoke() }
 
     private fun clearBlocks() {
         selectedIds.clear()

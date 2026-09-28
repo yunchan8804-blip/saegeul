@@ -20,6 +20,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.emotion.KoreanEmotionLexicon
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
+import org.fcitx.fcitx5.android.input.panel.panelQueryField
+import org.fcitx.fcitx5.android.input.panel.panelResultsFrame
 import org.fcitx.fcitx5.android.input.panel.pressableChipSurface
 import org.fcitx.fcitx5.android.input.panel.pressablePanelSurface
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
@@ -33,14 +35,7 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
         clipToPadding = false
     }
 
-    private val queryText = TextView(context).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        setTextColor(theme.keyTextColor)
-        textSize = PanelStyle.TEXT_EMPHASIS
-        setPadding(context.dp(PanelStyle.CARD_PADDING_H_DP), 0, context.dp(PanelStyle.GAP_M_DP), 0)
-        background = context.pressablePanelSurface(theme, theme.altKeyBackgroundColor)
-        setOnClickListener { onQueryClick?.invoke() }
-    }
+    private val queryText = context.panelQueryField(theme) { onQueryClick?.invoke() }
     private val searchButton = ImageButton(context).apply {
         setImageResource(R.drawable.ic_baseline_search_24)
         imageTintList = ColorStateList.valueOf(theme.altKeyTextColor)
@@ -207,21 +202,7 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ))
         }
-        val content = FrameLayout(context).apply {
-            addView(recyclerView, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ))
-            addView(statusOverlay, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ))
-            addView(actionStatus, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP
-            ))
-        }
+        val content = context.panelResultsFrame(recyclerView, statusOverlay, actionStatus)
         root.addView(LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(queryRow)

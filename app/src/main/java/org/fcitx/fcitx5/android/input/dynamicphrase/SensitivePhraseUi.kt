@@ -8,9 +8,7 @@ import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
-import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.SensitivePhrase
@@ -19,24 +17,14 @@ import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
 import org.fcitx.fcitx5.android.input.panel.PanelRecovery
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
 import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelColumn
+import org.fcitx.fcitx5.android.input.panel.panelScrollRoot
 import org.fcitx.fcitx5.android.input.panel.panelSurface
 import splitties.dimensions.dp
 
 class SensitivePhraseUi(private val context: Context, private val theme: Theme) {
-    val root = ScrollView(context).apply {
-        setBackgroundColor(theme.barColor)
-        isFillViewport = true
-    }
-
-    private val column = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(
-            context.dp(PanelStyle.PANEL_PADDING_H_DP),
-            context.dp(PanelStyle.PANEL_PADDING_V_DP),
-            context.dp(PanelStyle.PANEL_PADDING_H_DP),
-            context.dp(PanelStyle.PANEL_PADDING_V_DP)
-        )
-    }
+    private val column = context.panelColumn()
+    val root = context.panelScrollRoot(theme, column)
     private val status = TextView(context).apply {
         setTextColor(theme.keyTextColor)
         textSize = PanelStyle.TEXT_BODY
@@ -96,10 +84,6 @@ class SensitivePhraseUi(private val context: Context, private val theme: Theme) 
         column.addView(recoveryButton, blockParams())
         column.addView(preview, blockParams())
         column.addView(actionRow, blockParams())
-        root.addView(column, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
     }
 
     fun showLocked(authenticationAvailable: Boolean) {

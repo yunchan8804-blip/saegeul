@@ -9,9 +9,7 @@ import android.content.Intent
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
-import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Switch
 import androidx.core.view.setPadding
@@ -35,6 +33,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
 import org.fcitx.fcitx5.android.input.panel.PanelStyle
 import org.fcitx.fcitx5.android.input.panel.panelButton
+import org.fcitx.fcitx5.android.input.panel.panelColumn
+import org.fcitx.fcitx5.android.input.panel.panelScrollRoot
 import org.fcitx.fcitx5.android.input.panel.panelSurface
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -385,19 +385,8 @@ private class OnDeviceContextCompletionUi(
     private val context: Context,
     private val theme: Theme
 ) {
-    val root = ScrollView(context).apply {
-        setBackgroundColor(theme.barColor)
-        isFillViewport = true
-    }
-    private val column = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(
-            context.dp(PanelStyle.PANEL_PADDING_H_DP),
-            context.dp(PanelStyle.PANEL_PADDING_V_DP),
-            context.dp(PanelStyle.PANEL_PADDING_H_DP),
-            context.dp(PanelStyle.PANEL_PADDING_V_DP)
-        )
-    }
+    private val column = context.panelColumn()
+    val root = context.panelScrollRoot(theme, column)
     private val sourceLabel = TextView(context).apply {
         text = context.getString(R.string.gemma_context_source_label)
         setTextColor(theme.altKeyTextColor)
@@ -579,10 +568,6 @@ private class OnDeviceContextCompletionUi(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = context.dp(PanelStyle.GAP_M_DP) })
-        root.addView(column, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
     }
 
     fun updateAutomaticSuggestions(
