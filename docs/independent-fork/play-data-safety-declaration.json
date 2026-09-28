@@ -100,7 +100,8 @@
       "optional": true,
       "purposes": [
         "App functionality",
-        "Advertising"
+        "Advertising",
+        "Fraud prevention, security, and compliance"
       ]
     },
     {
@@ -141,14 +142,15 @@
       "purposes": [
         "App functionality",
         "Analytics",
-        "Advertising"
+        "Advertising",
+        "Fraud prevention, security, and compliance"
       ]
     },
     {
       "id": "device_or_other_ids",
       "playCategory": "Device or other IDs",
       "playType": "Device or other IDs",
-      "source": "Random app identifier used only by an approved GIPHY configuration; Google advertising ID collected by the AdMob SDK for the Typing DNA dashboard banner, the interstitial after a dashboard sync, and the theme shop rewarded ad",
+      "source": "Random app identifier used only by an approved GIPHY configuration; Google advertising ID and App set ID collected by the Google Mobile Ads SDK for the Typing DNA dashboard banner, the interstitial after a dashboard sync, and the theme shop rewarded ad",
       "collected": true,
       "shared": true,
       "processedEphemerally": false,
@@ -156,7 +158,23 @@
       "purposes": [
         "App functionality",
         "Analytics",
-        "Advertising"
+        "Advertising",
+        "Fraud prevention, security, and compliance"
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "playCategory": "App info and performance",
+      "playType": "Diagnostics",
+      "source": "App and SDK performance information, such as app launch time, hang rate, and energy usage, collected by the Google Mobile Ads SDK used for the Typing DNA dashboard banner, the interstitial after a dashboard sync, and the theme shop rewarded ad",
+      "collected": true,
+      "shared": true,
+      "processedEphemerally": false,
+      "optional": true,
+      "purposes": [
+        "Analytics",
+        "Advertising",
+        "Fraud prevention, security, and compliance"
       ]
     }
   ],
@@ -167,7 +185,7 @@
     "Personal dictionary",
     "Files and docs other than audio classified above",
     "Crash logs",
-    "Diagnostics",
+    "Diagnostics other than the Google Mobile Ads SDK performance information classified above",
     "Personal language vault (learned style, recorded sentences, relationship graph) processed only by the on-device Gemma model",
     "On-device AI prompts and generated suggestions",
     "Encrypted vault backup files, created only when the user exports them to a location they choose"

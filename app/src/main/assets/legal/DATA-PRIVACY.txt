@@ -5,7 +5,7 @@ PRIVACY & DATA / 개인정보·데이터 안내
 일반 입력
 - 이 키보드는 사용자가 입력하는 일반 텍스트를 개발자 서버로 보내지 않습니다.
 - 비밀번호, 민감 입력창, 개인화 학습 금지 입력창에서는 텍스트 검사와 네트워크 입력 기능을 차단합니다.
-- 전체 오프라인 모드를 켜면 온라인 음성 전사, 네트워크 GIF, OCR 모델 다운로드, Google AdMob 광고(대시보드 배너, 전면 광고, 테마 상점 보상형 광고)를 차단합니다.
+- 전체 오프라인 모드를 켜면 새글 AI 모델 받기, 선택 문장팩 받기, 온라인 음성 전사, 네트워크 GIF, OCR 모델 다운로드, Google AdMob 광고(대시보드 배너, 전면 광고, 테마 상점 보상형 광고)를 차단합니다.
 
 기기 안에만 남는 데이터
 - 클립보드 기록은 새 설치에서 기본으로 꺼져 있습니다. 사용자가 직접 켜면 앱 전용 데이터베이스에 저장됩니다. Android 클라우드 백업, 기기 이전, 새 사용자 데이터 ZIP 내보내기, 네트워크 전송에서 제외되며 앱에서 지울 수 있습니다.
@@ -21,13 +21,13 @@ PRIVACY & DATA / 개인정보·데이터 안내
 - 대시보드 배너 광고: 내 언어 금고(AI 언어 지문 대시보드) 화면을 열면 화면 아래쪽에 배너 광고를 자동으로 요청해 보여 줍니다. 횟수 제한이 없고, 끄려면 전체 오프라인 모드를 켜야 합니다. 언어 지문 삭제 확인 창이나 권한 요청 창이 떠 있는 동안에도 배너는 화면에 남아 있습니다.
 - 전면 광고: 「분석하고 LLM 강화」, 「언어 금고 보강」, 학습 카드의 「지금 반영하기」로 시작한 동기화가 끝난 뒤(안내 창이 있으면 닫은 뒤)에만 표시할 수 있습니다. 하루 1회, 24시간 간격이며 대시보드 동기화를 3번 이상 한 뒤부터입니다. 이 조건을 만족하면 대시보드를 열 때 광고를 미리 받아 둡니다. 언어 지문 삭제와 권한 요청은 전면 광고를 띄우지 않습니다.
 - 보상형 광고: 테마 상점에서 가지지 않은 테마를 눌러 구매 창을 열면 광고를 미리 받아 두고, 「광고 보고 +1」을 누를 때만 보여 줍니다. 끝까지 보면 테마 포인트 1점을 모읍니다. 하루 3회, 20분 간격입니다.
-- 광고 공통: 앱은 광고 요청에 입력한 글, 언어 금고, 키워드, 콘텐츠 주소를 넣지 않습니다. 광고 ID, IP 주소, 기기 정보, 광고 노출·클릭 이벤트는 Google AdMob SDK가 수집합니다. 전체 오프라인 모드에서는 광고를 요청하지 않습니다.
+- 광고 공통: 앱은 광고 요청에 입력한 글, 언어 금고, 키워드, 콘텐츠 주소를 넣지 않습니다. 광고 ID와 App set ID, IP 주소, 기기 정보, 광고 노출·클릭 이벤트, 앱과 SDK 성능 진단 정보(앱 실행 시간, 멈춤 비율, 에너지 사용 등)는 Google AdMob SDK가 수집해 Google과 공유합니다. 전체 오프라인 모드에서는 광고를 요청하지 않습니다.
 
 Google Play Data Safety 분류
 - 선택형 온라인 기능은 대략적 위치(IP 주소에서 추론), 앱 내 검색 기록(GIF 검색어), 음성 또는 소리 녹음(받아쓰기·회의 파일)을 수집·공유하는 것으로 보수적으로 신고합니다.
 - 승인된 GIPHY를 사용하면 기기 또는 기타 ID(임의 앱 식별자)와 앱 상호작용(노출·클릭·전송 이벤트)도 선택적으로 수집·공유한다고 신고합니다.
-- Google AdMob 광고(대시보드 배너, 전면 광고, 테마 상점 보상형 광고)는 대략적 위치(IP 주소에서 추론), 기기 또는 기타 ID(광고 ID), 앱 상호작용(광고 노출·클릭·보상 이벤트)을 수집·공유한다고 신고합니다.
-- 모든 전송 데이터 유형은 선택 사항으로 신고하며 앱 기능 목적으로 사용합니다. GIPHY 식별자와 이벤트는 분석 목적도, AdMob이 받는 대략적 위치·광고 ID·앱 상호작용은 광고 목적도 함께 신고합니다.
+- Google AdMob 광고(대시보드 배너, 전면 광고, 테마 상점 보상형 광고)는 대략적 위치(IP 주소에서 추론), 기기 또는 기타 ID(광고 ID, App set ID), 앱 상호작용(광고 노출·클릭·보상 이벤트), 진단(앱과 SDK 성능 정보)을 수집·공유한다고 신고합니다.
+- 모든 전송 데이터 유형은 선택 사항으로 신고합니다. 진단을 뺀 유형은 앱 기능 목적으로 사용하고, GIPHY 식별자와 이벤트는 분석 목적도 함께 신고합니다. AdMob이 받는 대략적 위치·기기 ID·앱 상호작용·진단 정보는 광고와 사기 방지·보안·규정 준수 목적으로, 이 가운데 기기 ID·앱 상호작용·진단 정보는 분석 목적으로도 신고합니다.
 - store=false 또는 앱의 로컬 비보관만으로 공급자 처리를 일시적 처리로 간주하지 않습니다.
 
 제어와 삭제
@@ -41,7 +41,7 @@ English
 General input
 - The keyboard does not send ordinary typed text to a developer-operated server.
 - Password, sensitive, and no-personalized-learning fields block text inspection and network input features.
-- Completely offline mode blocks online speech transcription, network GIF providers, OCR model downloads, and Google AdMob ads (the dashboard banner, interstitial ads, and theme shop rewarded ads).
+- Completely offline mode blocks Saegeul AI model downloads, optional sentence pack downloads, online speech transcription, network GIF providers, OCR model downloads, and Google AdMob ads (the dashboard banner, interstitial ads, and theme shop rewarded ads).
 
 On-device data
 - Clipboard history is off by default on a new install. If enabled, it is stored in an app-private database. It is excluded from Android cloud backup, device transfer, new user-data ZIP exports, and network transmission, and can be cleared in the app.
@@ -57,13 +57,13 @@ User-initiated network transfers
 - Dashboard banner ad: opening the My Language Vault (Typing DNA dashboard) screen automatically requests and shows a banner ad at the bottom of the screen. It has no frequency limit, and completely offline mode is the only way to turn it off. The banner stays on screen while a Typing DNA deletion confirmation or a permission prompt is open.
 - Interstitial ads: may appear only after a sync started with “Analyze and enrich with LLM”, “Enrich language vault”, or “Apply now” on the learning card has finished (after its notice dialog is closed, if one appears). They are limited to once a day, at least 24 hours apart, and only after at least three dashboard syncs. When these conditions are met, an ad is preloaded when the dashboard opens. Typing DNA deletion and permission prompts do not show interstitial ads.
 - Rewarded ads: opening the purchase dialog for a theme shop theme you do not own preloads an ad, which is shown only when you tap “광고 보고 +1” (watch an ad for +1). Watching it to the end earns one theme point. They are limited to three a day, at least 20 minutes apart.
-- All ads: the app puts no typed text, language vault data, keywords, or content URLs into ad requests. The Google AdMob SDK collects the advertising ID, IP address, device information, and ad impression and click events. Completely offline mode does not request ads.
+- All ads: the app puts no typed text, language vault data, keywords, or content URLs into ad requests. The Google AdMob SDK collects and shares with Google the advertising ID and App set ID, IP address, device information, ad impression and click events, and app and SDK performance diagnostics (such as app launch time, hang rate, and energy usage). Completely offline mode does not request ads.
 
 Google Play Data Safety classification
 - Optional online features are conservatively declared as collecting and sharing approximate location inferred from an IP address, in-app search history for GIF queries, and voice or sound recordings for dictation and meeting transcription.
 - An approved GIPHY configuration also declares optional collection and sharing of a device or other ID (the random app identifier) and app interactions (load, click, and send events).
-- Google AdMob ads (the dashboard banner, interstitial ads, and theme shop rewarded ads) are declared as collecting and sharing approximate location inferred from an IP address, a device or other ID (the advertising ID), and app interactions (ad impression, click, and reward events).
-- Every transmitted data type is declared as optional and used for app functionality. GIPHY identifiers and events are also declared for analytics, and the approximate location, advertising ID, and app interactions received by AdMob are also declared for advertising.
+- Google AdMob ads (the dashboard banner, interstitial ads, and theme shop rewarded ads) are declared as collecting and sharing approximate location inferred from an IP address, a device or other ID (the advertising ID and App set ID), app interactions (ad impression, click, and reward events), and diagnostics (app and SDK performance information).
+- Every transmitted data type is declared as optional. Types other than diagnostics are used for app functionality, and GIPHY identifiers and events are also declared for analytics. The approximate location, device IDs, app interactions, and diagnostics received by AdMob are declared for advertising and for fraud prevention, security, and compliance, and the device IDs, app interactions, and diagnostics are also declared for analytics.
 - store=false and local non-retention alone are not treated as proof of ephemeral provider processing.
 
 Controls and deletion
