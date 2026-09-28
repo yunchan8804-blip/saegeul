@@ -107,7 +107,7 @@
             </article>
             <article>
               <h3>클립보드 기록</h3>
-              <p>새 설치 시 기본값은 꺼짐입니다. 켜더라도 기기 내 앱 전용 암호화 데이터베이스에만 저장되며, Android 클라우드 백업과 기기 이전 대상에서 제외됩니다.</p>
+              <p>새 설치 시 기본값은 꺼짐입니다. 켜더라도 기기 내 앱 전용 암호화 데이터베이스에만 저장되며, Android 클라우드 백업과 기기 이전 대상에서 제외됩니다. 사용자가 고른 클립보드 글을 바꾸는 스마트 클립보드도 기기 안에서만 처리하고, 바꾼 결과는 미리 보여 준 뒤 넣거나 취소할 뿐 따로 보관하지 않습니다.</p>
             </article>
             <article>
               <h3>온디바이스 OCR &amp; 단어장</h3>
@@ -141,9 +141,33 @@
               </div>
             </article>
             <article>
+              <h3>회의 파일 전사</h3>
+              <div>
+                <p>파일 업로드 안내에 동의하고 시스템 파일 선택기에서 음성 파일(최대 24MB·60분)을 직접 골랐을 때만, 그 파일을 설정한 OpenAI 호환 음성 공급자에게 HTTPS로 보냅니다. 이때 연결 IP가 공급자에게 보입니다. 앱은 파일 사본을 보관하지 않으며, 선택이나 전사를 취소하거나 키를 지울 수 있습니다.</p>
+              </div>
+            </article>
+            <article>
               <h3>GIF 및 미디어</h3>
               <div>
-                <p>Animated Noto Emoji는 기기 내에서 키워드를 매칭합니다. KLIPY, GIPHY, Wikimedia를 선택해 검색했을 때만 검색어가 해당 미디어 공급자에게 전송됩니다.</p>
+                <p>Animated Noto Emoji는 기기 내에서 키워드를 매칭합니다. 다만 GIF 도구를 열거나 미디어를 보여 줄 때 목록과 미디어를 Google Fonts에서 받아 오며, 이때 연결 IP는 보이지만 검색어는 보내지 않습니다. KLIPY, GIPHY, Wikimedia를 선택해 검색했을 때만 검색어가 해당 미디어 공급자에게 전송됩니다. GIPHY는 승인된 설정에서만 쓰며, 앱별 임의 식별자와 시각, 노출·클릭·전송 이벤트도 함께 보냅니다. GIF 캐시는 최대 24시간 보관합니다.</p>
+              </div>
+            </article>
+            <article>
+              <h3>OCR 모델 받기</h3>
+              <div>
+                <p>사용자가 '한국어 모델 받기'를 눌렀을 때만 GitHub raw content에서 고정된 OCR 모델 파일을 받습니다. 이때 연결 IP와 User-Agent가 보입니다. 검증된 모델 파일만 기기에 보관하며, 전체 오프라인 모드나 앱별 네트워크 정책으로 막을 수 있습니다.</p>
+              </div>
+            </article>
+            <article>
+              <h3>선택 문장팩</h3>
+              <div>
+                <p>설치 후 안내나 설정에서 사용자가 다운로드를 고를 때만 GitHub raw content에서 고정된 공개 예문 파일을 받습니다. 이때 연결 IP와 User-Agent가 보이며, 입력 문맥·개인 금고·인증 정보는 보내지 않습니다. 자동 다운로드나 원격 업데이트 조회는 없습니다. 받은 문장팩은 검증한 뒤 개인 금고와 분리해 백업 제외 저장소에 두고, 추가팩은 지울 수 있습니다. 소형 기본팩은 오프라인으로 제공됩니다.</p>
+              </div>
+            </article>
+            <article>
+              <h3>AdMob 전면 광고</h3>
+              <div>
+                <p>내 언어 금고에서 [지금 반영하기]를 마친 뒤에만 Google AdMob에 전면 광고를 요청합니다. 이때 광고 ID, 연결 IP, 노출 이벤트가 AdMob에 전송되고 광고 SDK 캐시가 남습니다. 설정 진입, 키보드 입력, 권한 요청, 삭제 확인에서는 요청하지 않습니다. 전체 오프라인 모드로 막을 수 있고, 광고 ID를 재설정할 수 있습니다.</p>
               </div>
             </article>
             <article>
@@ -201,7 +225,7 @@
             <h2>방침 변경 및 문의처</h2>
           </div>
           <div class="contact-panel">
-            <div><span>최종 적용일</span><strong>2026년 8월 18일</strong></div>
+            <div><span>최종 적용일</span><strong>2026년 9월 28일</strong></div>
             <div><span>개인정보 및 보안 문의</span><a href="mailto:yunchan@chanpaca.net">yunchan@chanpaca.net</a></div>
             <div><span>공개 저장소 및 이슈</span><a href="https://github.com/yunchan8804-blip/saegeul">GitHub Issues</a></div>
           </div>
