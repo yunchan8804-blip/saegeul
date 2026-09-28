@@ -1055,4 +1055,27 @@
     <string name="notify_channel_ai_alerts">AI 조치 필요</string>
     <string name="sync_done_title">분석 및 동기화 완료</string>
     <string name="typing_dna_persistence_failed">언어 지문을 저장하지 못했습니다. 다시 시도해 주세요.</string>
+
+    <string name="item_count_value">%1$d개</string>
+    <string name="typing_dna_chart_mini_title">학습 축적 미니 그래프</string>
+    <string name="typing_dna_chart_mini_label_sentences">문장</string>
+    <string name="typing_dna_chart_mini_label_word_pairs">단어쌍</string>
+    <string name="typing_dna_chart_mini_label_endings">어미</string>
+    <string name="typing_dna_chart_mini_label_phrases">상용구</string>
+    <string name="vault_level_up_title">레벨업!</string>
+    <string name="vault_level_up_message">Lv.%1$d 달성! 레벨당 포인트 10점이 지급됐어요. 테마 상점에서 쓸 수 있어요.</string>
+    <string name="vault_widget_level_up">Lv.%1$d 달성! 탭해서 확인</string>
+    <string name="vault_widget_sentences">분석 문장 %1$d개</string>
+    <string name="vault_widget_streak_suffix"> · 연속 %1$d일</string>
+    <string name="vault_widget_last_sync">마지막 분석 %1$s</string>
+    <string name="vault_widget_not_synced">분석 전</string>
+    <string name="theme_shop_balance">현재 포인트: %1$d점</string>
+    <string name="theme_shop_purchased">%1$s 테마를 구매했어요</string>
+    <string name="theme_shop_not_enough_points">포인트가 부족해요</string>
+    <string name="theme_shop_points_earned">포인트 +%1$d점</string>
+    <string name="theme_shop_dialog_title">테마 상점 · %1$s</string>
+    <string name="theme_shop_dialog_message">이 테마는 포인트 %1$d점이면 사용할 수 있어요. 광고 1편을 시청하면 포인트 1점을 모을 수 있어요.</string>
+    <string name="theme_shop_buy">구매</string>
+    <string name="theme_shop_watch_ad">광고 보고 +1</string>
+    <string name="theme_shop_earn_limit">포인트 적립은 하루 3회, 20분 간격으로 할 수 있어요</string>
 </resources>

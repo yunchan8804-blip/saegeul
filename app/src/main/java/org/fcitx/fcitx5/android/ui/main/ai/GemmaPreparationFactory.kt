@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationScheduler
@@ -80,16 +81,17 @@ private class GemmaPreparationControllerImpl(
         }
         val error = state.error
         val status = when {
-            error != null -> "문장 준비 오류"
-            !modelReady -> "Gemma 모델 준비가 필요합니다."
-            running -> "문장을 준비하고 있습니다."
+            error != null -> applicationContext.getString(R.string.gemma_vault_status_error)
+            !modelReady -> applicationContext.getString(R.string.gemma_vault_status_model_needed)
+            running -> applicationContext.getString(R.string.gemma_vault_status_running)
             eligibilityWaitReason != null -> eligibilityWaitReason.message
             state.status == GemmaAccumulationState.STATUS_ATTEMPTS_EXHAUSTED ->
-                "새 문장이 추가되지 않아 보강을 멈췄습니다. 모델 관리에서 다시 시도할 수 있습니다."
-            canAttempt && queued -> "Android 실행 일정을 기다리고 있습니다."
-            state.manualRequested && !activeWork -> "한 번 보강 요청의 재개를 기다리고 있습니다."
-            !state.enabled -> "자동 준비가 꺼져 있습니다."
-            state.status == GemmaAccumulationState.STATUS_RUNNING -> "중단 후 다음 준비를 기다리고 있습니다."
+                applicationContext.getString(R.string.gemma_vault_status_attempts_exhausted)
+            canAttempt && queued -> applicationContext.getString(R.string.gemma_vault_status_queued)
+            state.manualRequested && !activeWork -> applicationContext.getString(R.string.gemma_vault_status_manual_waiting)
+            !state.enabled -> applicationContext.getString(R.string.gemma_vault_status_automatic_off)
+            state.status == GemmaAccumulationState.STATUS_RUNNING ->
+                applicationContext.getString(R.string.gemma_vault_status_interrupted)
             else -> state.status
         }
         GemmaPreparationSnapshot(

@@ -68,7 +68,7 @@ class VaultWidgetProvider : AppWidgetProvider() {
                 )
                 views.setTextViewText(
                     R.id.widget_level,
-                    "🎉 Lv.$pendingLevel 달성! 탭해서 확인"
+                    context.getString(R.string.vault_widget_level_up, pendingLevel)
                 )
             } else {
                 views.setInt(
@@ -81,15 +81,15 @@ class VaultWidgetProvider : AppWidgetProvider() {
                     "Lv.${stats.level} · ${stats.levelTitle}"
                 )
             }
-            val sentences = StringBuilder("분석 문장 ${stats.totalSentences}개")
-            if (habit.streak > 0) sentences.append(" · 🔥 ").append(habit.streak).append("일")
+            val sentences = StringBuilder(context.getString(R.string.vault_widget_sentences, stats.totalSentences))
+            if (habit.streak > 0) sentences.append(context.getString(R.string.vault_widget_streak_suffix, habit.streak))
             views.setTextViewText(
                 R.id.widget_sentences,
                 sentences.toString()
             )
             views.setTextViewText(
                 R.id.widget_last_sync,
-                "마지막 분석 ${formatTime(snapshot.lastSyncMs)}"
+                context.getString(R.string.vault_widget_last_sync, formatTime(context, snapshot.lastSyncMs))
             )
             views.setInt(R.id.widget_progress, "setMax", 100)
             views.setInt(R.id.widget_progress, "setProgress", stats.levelProgressPercent)
@@ -104,8 +104,8 @@ class VaultWidgetProvider : AppWidgetProvider() {
             return views
         }
 
-        private fun formatTime(epochMs: Long): String {
-            if (epochMs <= 0L) return "분석 전"
+        private fun formatTime(context: Context, epochMs: Long): String {
+            if (epochMs <= 0L) return context.getString(R.string.vault_widget_not_synced)
             return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(epochMs))
         }
     }

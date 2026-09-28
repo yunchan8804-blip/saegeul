@@ -835,7 +835,7 @@ class CustomThemeActivity : AppCompatActivity() {
         }
 
         theme.particleEffect?.let { p ->
-            particleCountValue.text = "${p.particleCount}개"
+            particleCountValue.text = getString(R.string.item_count_value, p.particleCount)
             particleLifetimeValue.text = "${p.lifetimeMs}ms"
             particleSpeedValue.text = "%.1fx".format(p.speed)
         }

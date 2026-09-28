@@ -272,8 +272,8 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
             )
         )
         AlertDialog.Builder(this)
-            .setTitle("🎉 레벨업!")
-            .setMessage("Lv.$level 달성! 레벨당 포인트 10점이 지급됐어요. 테마 상점에서 쓸 수 있어요.")
+            .setTitle(R.string.vault_level_up_title)
+            .setMessage(getString(R.string.vault_level_up_message, level))
             .setPositiveButton(android.R.string.ok, null)
             .show()
     }

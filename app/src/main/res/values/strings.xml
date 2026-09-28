@@ -1061,4 +1061,27 @@
     <string name="notify_channel_ai_alerts" tools:ignore="MissingTranslation">AI action needed</string>
     <string name="sync_done_title" tools:ignore="MissingTranslation">Analysis and sync complete</string>
     <string name="typing_dna_persistence_failed" tools:ignore="MissingTranslation">Couldn\'t save your language profile. Please try again.</string>
+
+    <string name="item_count_value" tools:ignore="MissingTranslation">%1$d</string>
+    <string name="typing_dna_chart_mini_title" tools:ignore="MissingTranslation">Learning at a glance</string>
+    <string name="typing_dna_chart_mini_label_sentences" tools:ignore="MissingTranslation">Sentences</string>
+    <string name="typing_dna_chart_mini_label_word_pairs" tools:ignore="MissingTranslation">Pairs</string>
+    <string name="typing_dna_chart_mini_label_endings" tools:ignore="MissingTranslation">Endings</string>
+    <string name="typing_dna_chart_mini_label_phrases" tools:ignore="MissingTranslation">Phrases</string>
+    <string name="vault_level_up_title" tools:ignore="MissingTranslation">Level up!</string>
+    <string name="vault_level_up_message" tools:ignore="MissingTranslation">You reached Lv.%1$d! You got 10 points for the level. You can spend them in the theme shop.</string>
+    <string name="vault_widget_level_up" tools:ignore="MissingTranslation">Reached Lv.%1$d! Tap to see</string>
+    <string name="vault_widget_sentences" tools:ignore="MissingTranslation">%1$d sentences analyzed</string>
+    <string name="vault_widget_streak_suffix" tools:ignore="MissingTranslation"> · %1$d-day streak</string>
+    <string name="vault_widget_last_sync" tools:ignore="MissingTranslation">Last analyzed %1$s</string>
+    <string name="vault_widget_not_synced" tools:ignore="MissingTranslation">not yet</string>
+    <string name="theme_shop_balance" tools:ignore="MissingTranslation">Points: %1$d</string>
+    <string name="theme_shop_purchased" tools:ignore="MissingTranslation">Bought the %1$s theme</string>
+    <string name="theme_shop_not_enough_points" tools:ignore="MissingTranslation">Not enough points</string>
+    <string name="theme_shop_points_earned" tools:ignore="MissingTranslation">+%1$d points</string>
+    <string name="theme_shop_dialog_title" tools:ignore="MissingTranslation">Theme shop · %1$s</string>
+    <string name="theme_shop_dialog_message" tools:ignore="MissingTranslation">This theme costs %1$d points. Watch one ad to earn 1 point.</string>
+    <string name="theme_shop_buy" tools:ignore="MissingTranslation">Buy</string>
+    <string name="theme_shop_watch_ad" tools:ignore="MissingTranslation">Watch ad +1</string>
+    <string name="theme_shop_earn_limit" tools:ignore="MissingTranslation">You can earn points 3 times a day, 20 minutes apart</string>
 </resources>

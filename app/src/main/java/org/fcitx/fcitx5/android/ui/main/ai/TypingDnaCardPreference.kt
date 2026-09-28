@@ -236,20 +236,27 @@ class TypingDnaCardPreference @JvmOverloads constructor(
     ) {
         val stats = snapshot.stats
         levelBadge?.text = "Lv.${stats.level}"
-        levelBadge?.contentDescription = "학습 레벨 ${stats.level}"
+        levelBadge?.contentDescription = context.getString(R.string.vault_level_content_description, stats.level)
         title?.text = if (loadFailed) {
             context.getString(R.string.typing_dna_card_load_failed_title)
         } else {
-            "${stats.levelTitle} · 온디바이스 학습 중"
+            context.getString(R.string.typing_dna_card_title, stats.levelTitle)
         }
         summary?.text = buildString {
             if (stats.totalSentences == 0) {
-                append("키보드를 사용하면 내 말투와 어휘 습관이 이곳에 축적됩니다.")
+                append(context.getString(R.string.typing_dna_card_empty_summary))
                 if (snapshot.ngramUnigrams >= 1) {
                     append(context.getString(R.string.typing_dna_card_ngram_suffix, snapshot.ngramUnigrams))
                 }
             } else {
-                append("분석 문장 ${stats.totalSentences}개 · 단어쌍 ${stats.bigramsCount}개 · 종결어미 ${stats.endingsCount}개")
+                append(
+                    context.getString(
+                        R.string.typing_dna_card_stats_summary,
+                        stats.totalSentences,
+                        stats.bigramsCount,
+                        stats.endingsCount
+                    )
+                )
                 append(context.getString(R.string.typing_dna_card_ngram_suffix, snapshot.ngramUnigrams))
             }
             if (snapshot.pendingSentences >= 1) {
@@ -260,7 +267,7 @@ class TypingDnaCardPreference @JvmOverloads constructor(
             }
             val balance = PointLedger(context).balance()
             if (balance > 0) {
-                append(" · 💎 포인트 ${balance}점")
+                append(context.getString(R.string.typing_dna_card_points_suffix, balance))
             }
         }
         progressBar?.apply {
@@ -269,17 +276,21 @@ class TypingDnaCardPreference @JvmOverloads constructor(
             progress = stats.levelProgressPercent
         }
 
-        metricSentences?.text = "문장 ${stats.totalSentences}"
-        metricBigrams?.text = "단어쌍 ${stats.bigramsCount}"
-        metricEndings?.text = "어미 ${stats.endingsCount}"
-        metricPhrases?.text = "상용구 ${stats.phrasesCount}"
+        metricSentences?.text = context.getString(R.string.typing_dna_card_metric_sentences, stats.totalSentences)
+        metricBigrams?.text = context.getString(R.string.typing_dna_card_metric_bigrams, stats.bigramsCount)
+        metricEndings?.text = context.getString(R.string.typing_dna_card_metric_endings, stats.endingsCount)
+        metricPhrases?.text = context.getString(R.string.typing_dna_card_metric_phrases, stats.phrasesCount)
 
         miniChart?.apply {
             visibility = View.VISIBLE
             setStats(stats, animate = lastRenderedChartStats != stats)
         }
         lastRenderedChartStats = stats
-        itemView.contentDescription =
-            "AI 언어 지문 학습 현황. 레벨 ${stats.level} ${stats.levelTitle}. 분석 문장 ${stats.totalSentences}개. 탭하면 상세 그래프 대시보드를 엽니다."
+        itemView.contentDescription = context.getString(
+            R.string.typing_dna_card_content_description,
+            stats.level,
+            stats.levelTitle,
+            stats.totalSentences
+        )
     }
 }
