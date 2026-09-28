@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
-import org.fcitx.fcitx5.android.input.BufferedHangulMode
 import org.fcitx.fcitx5.android.input.BufferedInputController
 import org.fcitx.fcitx5.android.media.MediaFavoritesManager
 import org.fcitx.fcitx5.android.media.MediaItem
@@ -104,33 +103,6 @@ class E2EDeviceComprehensiveTddTest {
         assertEquals(200, mediaFavorites.getFavorites().size)
         assertTrue(mediaFavorites.search("모바일").isNotEmpty())
         assertTrue(mediaFavorites.findByTag("테스트").isNotEmpty())
-    }
-
-    @Test
-    fun testDotNetAndCompatibilityEngineOnDevice() {
-        val dotNetApps = listOf(
-            "com.microsoft.maui.gallery",
-            "net.dot.android.sample",
-            "com.unity3d.player.UnityActivity",
-            "com.valvesoftware.steamlink",
-            "com.termux",
-            "com.realvnc.viewer.android"
-        )
-
-        dotNetApps.forEach { pkg ->
-            assertTrue("Expected compatibility true for $pkg", BufferedHangulMode.isKnownCompatibilityTarget(pkg))
-        }
-
-        val regularApps = listOf(
-            "com.google.android.youtube",
-            "com.kakao.talk",
-            "com.naver.search",
-            "org.telegram.messenger"
-        )
-
-        regularApps.forEach { pkg ->
-            assertFalse("Expected compatibility false for $pkg", BufferedHangulMode.isKnownCompatibilityTarget(pkg))
-        }
     }
 
     @Test

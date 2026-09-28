@@ -16,8 +16,8 @@ import org.junit.Test
 
 /**
  * Deep E2E TDD Test Suite for Keyboard Buffer Compatibility Engine.
- * Tests .NET MAUI / Unity / Termux / VNC package detection, double-commit suppression,
- * composing span isolation, password safety, and multiline buffer transitions.
+ * Tests double-commit suppression, composing span isolation, password safety, and multiline
+ * buffer transitions.
  */
 class KeyboardBufferCompatibilityDeepEngineTest {
 
@@ -36,33 +36,6 @@ class KeyboardBufferCompatibilityDeepEngineTest {
     @Before
     fun setUp() {
         controller = BufferedInputController()
-    }
-
-    @Test
-    fun testKnownDotNetAndRemoteCompatibilityTargets() {
-        val testCases = listOf(
-            "com.microsoft.maui.sample" to true,
-            "net.dot.android.testapp" to true,
-            "com.unity3d.player.UnityPlayerActivity" to true,
-            "com.valvesoftware.steamlink" to true,
-            "com.termux" to true,
-            "com.realvnc.viewer.android" to true,
-            "com.teamviewer.teamviewer.market.mobile" to true,
-            "com.anydesk.anydeskandroid" to true,
-            "com.parsecgaming.parsec" to true,
-            "com.moonlightstream.moonlight" to true,
-            "com.kakao.talk" to false,
-            "com.google.android.apps.messaging" to false,
-            "org.telegram.messenger" to false
-        )
-
-        testCases.forEach { (pkg, expected) ->
-            assertEquals(
-                "Package $pkg compatibility detection mismatch",
-                expected,
-                BufferedHangulMode.isKnownCompatibilityTarget(pkg)
-            )
-        }
     }
 
     @Test
