@@ -58,7 +58,6 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardViewportReader
 import org.fcitx.fcitx5.android.input.keyboard.ThumbSplitPreferences
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
-import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionWarmupState
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceFailureText
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
@@ -751,10 +750,6 @@ class HorizontalCandidateComponent :
         bar.candidateConnectionHintVisible = visible
     }
 
-    private enum class StatusRowLogicalState {
-        WARMUP, GENERATING, NO_CANDIDATE, ERROR, WARMUP_FAILED, COLLECTION_FEEDBACK
-    }
-
     private data class StatusRowContent(val spinner: Boolean, val text: String)
 
     private fun cancelStatusRowNoCandidateHide() {
@@ -778,75 +773,68 @@ class HorizontalCandidateComponent :
             statusRowNoCandidateHidden = false
             return null
         }
-        val warmupState = service.automaticSuggestionWarmupState
-        var nextState = when {
-            warmupState == OnDeviceAutomaticSuggestionWarmupState.Preparing -> StatusRowLogicalState.WARMUP
-            status.state == OnDeviceSuggestionCoordinator.State.DEBOUNCING ||
-                status.state == OnDeviceSuggestionCoordinator.State.GENERATING -> StatusRowLogicalState.GENERATING
-            status.state == OnDeviceSuggestionCoordinator.State.NO_CANDIDATE -> StatusRowLogicalState.NO_CANDIDATE
-            status.state == OnDeviceSuggestionCoordinator.State.ERROR &&
-                status.errorCode != "INVALID_INPUT" -> StatusRowLogicalState.ERROR
-            service.automaticSuggestionWarmupFailureCode != null -> StatusRowLogicalState.WARMUP_FAILED
-            activeCollectionFeedbackEvent != null -> StatusRowLogicalState.COLLECTION_FEEDBACK
-            else -> null
-        }
-        // NO_CANDIDATE also fires for reasons unrelated to "generated, but got nothing" (input
-        // rejected, session invalidated, a candidate just applied). Only enter the NO_CANDIDATE
-        // display on the specific edge where the coordinator was actually GENERATING right before;
-        // once entered, the timer/hidden bookkeeping below keeps it up regardless of later reads.
-        if (nextState == StatusRowLogicalState.NO_CANDIDATE &&
-            statusRowLogicalState != StatusRowLogicalState.NO_CANDIDATE &&
-            previousCoordinatorState != OnDeviceSuggestionCoordinator.State.GENERATING
-        ) {
-            nextState = null
-        }
+        val requestedState = StatusRowPolicy.requestedState(
+            warmupState = service.automaticSuggestionWarmupState,
+            status = status,
+            warmupFailed = service.automaticSuggestionWarmupFailureCode != null,
+            collectionFeedbackActive = activeCollectionFeedbackEvent != null
+        )
+        val nextState = StatusRowPolicy.nextState(requestedState, statusRowLogicalState, previousCoordinatorState)
         if (nextState != statusRowLogicalState) {
             cancelStatusRowNoCandidateHide()
             statusRowNoCandidateHidden = false
         }
         statusRowLogicalState = nextState
-        return when (nextState) {
-            StatusRowLogicalState.WARMUP -> StatusRowContent(
-                spinner = true,
-                text = context.getString(R.string.gemma_automatic_warmup_content_description)
-            )
-            StatusRowLogicalState.GENERATING -> StatusRowContent(
-                spinner = true,
-                text = context.getString(R.string.gemma_automatic_generating)
-            )
-            StatusRowLogicalState.NO_CANDIDATE -> {
-                if (statusRowNoCandidateHidden) {
-                    null
-                } else {
-                    if (statusRowNoCandidateHideRunnable == null) {
-                        val runnable = Runnable {
-                            statusRowNoCandidateHideRunnable = null
-                            statusRowNoCandidateHidden = true
-                            refreshContextualCandidatesIfNeeded()
-                        }
-                        statusRowNoCandidateHideRunnable = runnable
-                        view.postDelayed(runnable, STATUS_ROW_NO_CANDIDATE_TIMEOUT_MS)
-                    }
-                    StatusRowContent(
-                        spinner = false,
-                        text = context.getString(R.string.gemma_automatic_no_candidate)
-                    )
-                }
-            }
-            StatusRowLogicalState.ERROR -> StatusRowContent(
-                spinner = false,
-                text = automaticFailureText(context, status.errorCode)
-            )
-            StatusRowLogicalState.WARMUP_FAILED -> StatusRowContent(
-                spinner = false,
-                text = automaticFailureText(context, service.automaticSuggestionWarmupFailureCode)
-            )
-            StatusRowLogicalState.COLLECTION_FEEDBACK -> {
-                val event = activeCollectionFeedbackEvent
-                if (event == null) null else StatusRowContent(spinner = false, text = collectionFeedbackText(event))
-            }
-            null -> null
+        return statusRowContentFor(nextState, status)
+    }
+
+    private fun statusRowContentFor(
+        state: StatusRowLogicalState?,
+        status: OnDeviceSuggestionCoordinator.Status
+    ): StatusRowContent? = when (state) {
+        StatusRowLogicalState.WARMUP -> StatusRowContent(
+            spinner = true,
+            text = context.getString(R.string.gemma_automatic_warmup_content_description)
+        )
+        StatusRowLogicalState.GENERATING -> StatusRowContent(
+            spinner = true,
+            text = context.getString(R.string.gemma_automatic_generating)
+        )
+        StatusRowLogicalState.NO_CANDIDATE -> noCandidateStatusRowContent()
+        StatusRowLogicalState.ERROR -> StatusRowContent(
+            spinner = false,
+            text = automaticFailureText(context, status.errorCode)
+        )
+        StatusRowLogicalState.WARMUP_FAILED -> StatusRowContent(
+            spinner = false,
+            text = automaticFailureText(context, service.automaticSuggestionWarmupFailureCode)
+        )
+        StatusRowLogicalState.COLLECTION_FEEDBACK -> {
+            val event = activeCollectionFeedbackEvent
+            if (event == null) null else StatusRowContent(spinner = false, text = collectionFeedbackText(event))
         }
+        null -> null
+    }
+
+    /**
+     * NO_CANDIDATE stays up for [STATUS_ROW_NO_CANDIDATE_TIMEOUT_MS] after it is first shown, then
+     * hides itself until the logical state changes again.
+     */
+    private fun noCandidateStatusRowContent(): StatusRowContent? {
+        if (statusRowNoCandidateHidden) return null
+        if (statusRowNoCandidateHideRunnable == null) {
+            val runnable = Runnable {
+                statusRowNoCandidateHideRunnable = null
+                statusRowNoCandidateHidden = true
+                refreshContextualCandidatesIfNeeded()
+            }
+            statusRowNoCandidateHideRunnable = runnable
+            view.postDelayed(runnable, STATUS_ROW_NO_CANDIDATE_TIMEOUT_MS)
+        }
+        return StatusRowContent(
+            spinner = false,
+            text = context.getString(R.string.gemma_automatic_no_candidate)
+        )
     }
 
     /**
@@ -1028,10 +1016,7 @@ class HorizontalCandidateComponent :
             // otherwise show nothing while a fresh suggestion is being generated. This spinner
             // covers that gap; it stays hidden whenever the status row itself is already showing
             // a spinner (statusRowForcesBar), so the two never double up.
-            val generating = service.automaticSuggestionStatus.state in setOf(
-                OnDeviceSuggestionCoordinator.State.DEBOUNCING,
-                OnDeviceSuggestionCoordinator.State.GENERATING
-            )
+            val generating = StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
             generatingSpinner.visibility = if (generating && !statusRowForcesBar) View.VISIBLE else View.GONE
 
             hairlineDivider.visibility = View.VISIBLE
@@ -1219,10 +1204,7 @@ class HorizontalCandidateComponent :
             }
         }
 
-        val generating = service.automaticSuggestionStatus.state in setOf(
-            OnDeviceSuggestionCoordinator.State.DEBOUNCING,
-            OnDeviceSuggestionCoordinator.State.GENERATING
-        )
+        val generating = StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
         singleRowGeneratingSpinner.visibility = if (generating) View.VISIBLE else View.GONE
 
         bar.isCandidateTwoRow = false
