@@ -1,6 +1,6 @@
 {
   "schema": "saegeul-ios-backlog/v1",
-  "updated": "2026-09-13",
+  "updated": "2026-09-28",
   "ssot": [
     "docs/ios/HANDOFF-ios-port.md",
     "docs/ios/ios-dual-platform-plan.md",
@@ -233,7 +233,8 @@
       ],
       "files": [
         "docs/ios/ios-dual-platform-plan.md"
-      ]
+      ],
+      "note": "0-GO 사후 판정 필요: IOS-1-01·IOS-2-01·IOS-2-03이 0-GO pending 상태에서 done이 됐다. 상태는 그대로 두고 IOS-0-13 측정 뒤 판정한다(2026-09-28 확인)"
     },
     {
       "id": "IOS-1-01",
@@ -263,7 +264,7 @@
     {
       "id": "IOS-1-03",
       "phase": 1,
-      "status": "in_progress",
+      "status": "pending",
       "title": "이메일/URL/숫자 키면",
       "blocked_by": [
         "IOS-0-07"
@@ -271,7 +272,8 @@
       "files": [
         "ios/Keyboard/"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-28",
+      "note": "ios/에 keyboardType·UIKeyboardType 코드가 0건이라 in_progress에서 pending으로 되돌림"
     },
     {
       "id": "IOS-1-04",
@@ -761,38 +763,44 @@
     {
       "id": "IOS-5-02",
       "phase": 5,
-      "status": "pending",
+      "status": "cancelled",
       "title": "컴패니언 iOS redirect URI",
       "blocked_by": [
         "IOS-5-01"
       ],
       "files": [
         "scripts/ai-provider-companion.py"
-      ]
+      ],
+      "updated": "2026-09-28",
+      "note": "2026-09-24 외부 AI 제거(기기 안 Gemma만). 컴패니언 스크립트는 fd0f6748에서 삭제"
     },
     {
       "id": "IOS-5-03",
       "phase": 5,
-      "status": "pending",
+      "status": "cancelled",
       "title": "호스트 BYOK/OAuth",
       "blocked_by": [
         "IOS-5-01"
       ],
       "files": [
         "ios/App/"
-      ]
+      ],
+      "updated": "2026-09-28",
+      "note": "2026-09-24 외부 AI 제거(기기 안 Gemma만)"
     },
     {
       "id": "IOS-5-04",
       "phase": 5,
-      "status": "pending",
+      "status": "cancelled",
       "title": "store=false 강제",
       "blocked_by": [
         "IOS-5-03"
       ],
       "files": [
         "ios/App/"
-      ]
+      ],
+      "updated": "2026-09-28",
+      "note": "2026-09-24 외부 AI 제거(기기 안 Gemma만)"
     },
     {
       "id": "IOS-5-05",
@@ -853,7 +861,8 @@
       ],
       "files": [
         "ios/App/"
-      ]
+      ],
+      "note": "결정 대기: 제품 AI는 기기 안 Gemma만 쓰기로 정했다(2026-09-24). 이 방향에 맞춰 엔진 선택을 오케스트레이터가 다시 정한다"
     },
     {
       "id": "IOS-6-02",
