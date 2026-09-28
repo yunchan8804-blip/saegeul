@@ -40,10 +40,18 @@ class OnDeviceSuggestionSession {
     }
 
     data class Proposal internal constructor(
-        var snapshot: Snapshot,
+        private var trackedSnapshot: Snapshot,
         val suffix: String,
         val origin: Origin
     ) {
+        /** Only the session's [OnDeviceSuggestionSession.rebase] moves this, keeping the proposal's identity. */
+        val snapshot: Snapshot
+            get() = trackedSnapshot
+
+        internal fun rebaseTo(snapshot: Snapshot) {
+            trackedSnapshot = snapshot
+        }
+
         override fun toString(): String =
             "Proposal(snapshot=$snapshot, suffixLength=${suffix.length}, origin=$origin)"
     }
@@ -181,7 +189,7 @@ class OnDeviceSuggestionSession {
         activeTicket?.snapshot = snapshot
         storedCompletion?.let { completion ->
             completion.snapshot = snapshot
-            completion.proposal?.snapshot = snapshot
+            completion.proposal?.rebaseTo(snapshot)
         }
         true
     }
