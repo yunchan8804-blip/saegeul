@@ -185,7 +185,7 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             val bkgColor = applyTranslucency(rawBkgColor)
             val glowWidth = dp(glowDef?.glowRadius ?: 4f).toInt()
             appearanceView.background = glowingKeyBackgroundDrawable(
-                bkgColor, glowColor, customRadius, glowWidth, hMargin, vMargin
+                KeyBackgroundStyle(bkgColor, glowColor, customRadius, glowWidth, hMargin, vMargin)
             )
             setupPressHighlight()
         } else if ((bordered && def.border != Border.Off) || def.border == Border.On || customStyle?.keyBackgroundColor != null) {
@@ -197,13 +197,15 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             val bkgColor = applyTranslucency(rawBkgColor)
             val borderOrShadowWidth = dp(1)
             val borderColor = customStyle?.keyBorderColor ?: theme.keyShadowColor
-            appearanceView.background = if (borderStroke || customStyle?.keyBorderColor != null) borderedKeyBackgroundDrawable(
-                bkgColor, borderColor,
-                customRadius, borderOrShadowWidth, hMargin, vMargin
-            ) else shadowedKeyBackgroundDrawable(
+            val backgroundStyle = KeyBackgroundStyle(
                 bkgColor, borderColor,
                 customRadius, borderOrShadowWidth, hMargin, vMargin
             )
+            appearanceView.background = if (borderStroke || customStyle?.keyBorderColor != null) {
+                borderedKeyBackgroundDrawable(backgroundStyle)
+            } else {
+                shadowedKeyBackgroundDrawable(backgroundStyle)
+            }
             // foreground: press highlight or ripple
             setupPressHighlight()
         } else {
@@ -228,8 +230,10 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
                 addState(
                     intArrayOf(android.R.attr.state_pressed),
                     borderedKeyBackgroundDrawable(
-                        Color.TRANSPARENT, theme.keyShadowColor,
-                        radius, dp(2), hMargin, vMargin
+                        KeyBackgroundStyle(
+                            Color.TRANSPARENT, theme.keyShadowColor,
+                            radius, dp(2), hMargin, vMargin
+                        )
                     )
                 )
             }

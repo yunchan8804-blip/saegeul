@@ -42,51 +42,52 @@ fun insetOvalDrawable(
     hInset, vInset, hInset, vInset
 )
 
-fun shadowedKeyBackgroundDrawable(
-    @ColorInt bkgColor: Int,
-    @ColorInt shadowColor: Int,
-    radius: Float,
-    shadowWidth: Int,
-    hMargin: Int,
-    vMargin: Int
-): Drawable = LayerDrawable(
-    arrayOf(
-        radiusDrawable(radius, shadowColor),
-        radiusDrawable(radius, bkgColor),
-    )
-).apply {
-    setLayerInset(0, hMargin, vMargin, hMargin, vMargin - shadowWidth)
-    setLayerInset(1, hMargin, vMargin, hMargin, vMargin)
+/**
+ * Colors and geometry shared by the key background drawables below.
+ *
+ * @param edgeColor shadow, border or glow color, depending on the drawable
+ * @param edgeWidth shadow height, border stroke width or glow width, in pixels
+ */
+data class KeyBackgroundStyle(
+    @ColorInt val backgroundColor: Int,
+    @ColorInt val edgeColor: Int,
+    val radius: Float,
+    val edgeWidth: Int,
+    val hMargin: Int,
+    val vMargin: Int
+)
+
+fun shadowedKeyBackgroundDrawable(style: KeyBackgroundStyle): Drawable {
+    val (bkgColor, shadowColor, radius, shadowWidth, hMargin, vMargin) = style
+    return LayerDrawable(
+        arrayOf(
+            radiusDrawable(radius, shadowColor),
+            radiusDrawable(radius, bkgColor),
+        )
+    ).apply {
+        setLayerInset(0, hMargin, vMargin, hMargin, vMargin - shadowWidth)
+        setLayerInset(1, hMargin, vMargin, hMargin, vMargin)
+    }
 }
 
-fun borderedKeyBackgroundDrawable(
-    @ColorInt bkgColor: Int,
-    @ColorInt shadowColor: Int,
-    radius: Float,
-    strokeWidth: Int,
-    hMargin: Int,
-    vMargin: Int
-): Drawable = LayerDrawable(
-    arrayOf(
-        GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = radius
-            setColor(bkgColor)
-            setStroke(strokeWidth, shadowColor)
-        }
-    )
-).apply {
-    setLayerInset(0, hMargin, vMargin, hMargin, vMargin)
+fun borderedKeyBackgroundDrawable(style: KeyBackgroundStyle): Drawable {
+    val (bkgColor, shadowColor, radius, strokeWidth, hMargin, vMargin) = style
+    return LayerDrawable(
+        arrayOf(
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = radius
+                setColor(bkgColor)
+                setStroke(strokeWidth, shadowColor)
+            }
+        )
+    ).apply {
+        setLayerInset(0, hMargin, vMargin, hMargin, vMargin)
+    }
 }
 
-fun glowingKeyBackgroundDrawable(
-    @ColorInt bkgColor: Int,
-    @ColorInt glowColor: Int,
-    radius: Float,
-    glowWidth: Int,
-    hMargin: Int,
-    vMargin: Int
-): Drawable {
+fun glowingKeyBackgroundDrawable(style: KeyBackgroundStyle): Drawable {
+    val (bkgColor, glowColor, radius, glowWidth, hMargin, vMargin) = style
     val glowAlpha = Color.argb(
         (Color.alpha(glowColor) * 0.45f).toInt(),
         Color.red(glowColor),
