@@ -8,6 +8,9 @@ import org.fcitx.fcitx5.android.input.ai.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.vault.AesGcmVaultCipher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -182,6 +185,116 @@ class PersonalSentenceVaultTest {
     }
 
     @Test
+    fun retrieveReusesTheLastResultForAnIdenticalCallWithinTheSameSecond() {
+        var now = 1_000L
+        val vault = PersonalSentenceVault(clock = { now })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+
+        val first = vault.retrieve("회의", "com.android.chrome")
+        now = 1_999L
+        val second = vault.retrieve("회의", "com.android.chrome")
+
+        assertSame(first, second)
+    }
+
+    @Test
+    fun retrieveRecomputesWhenAnyPartOfTheQueryChanges() {
+        val vault = PersonalSentenceVault(clock = { 1_000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val first = vault.retrieve("회의", "com.android.chrome")
+
+        assertNotSame(first, vault.retrieve("회의 ", "com.android.chrome"))
+        assertNotSame(first, vault.retrieve("회의", "com.slack"))
+        assertNotSame(first, vault.retrieve("회의", "com.android.chrome", limit = 3))
+    }
+
+    @Test
+    fun retrieveRecomputesOnceTheSecondChanges() {
+        var now = 1_000L
+        val vault = PersonalSentenceVault(clock = { now })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val first = vault.retrieve("회의", "com.android.chrome")
+
+        now = 2_000L
+        val second = vault.retrieve("회의", "com.android.chrome")
+
+        assertNotSame(first, second)
+        assertEquals(first.map { it.sentence }, second.map { it.sentence })
+    }
+
+    @Test
+    fun retrieveSeesSentencesAddedAfterTheCachedCall() {
+        val vault = PersonalSentenceVault(clock = { 1_000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        vault.record("회의 자료 검토했습니다", "com.android.chrome")
+        val before = vault.retrieve("회의", "com.android.chrome")
+
+        vault.record("회의 끝나고 연락드릴게요", "com.android.chrome")
+        val after = vault.retrieve("회의", "com.android.chrome")
+
+        assertEquals(before.size + 1, after.size)
+        assertTrue(after.any { it.sentence == "회의 끝나고 연락드릴게요" })
+    }
+
+    @Test
+    fun retrieveSeesARepeatedSentenceRefreshedAfterTheCachedCall() {
+        var now = 0L
+        val vault = PersonalSentenceVault(clock = { now })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        now = 500L
+        val before = vault.retrieve("회의", "com.android.chrome").single()
+
+        now = 600L
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val after = vault.retrieve("회의", "com.android.chrome").single()
+
+        assertTrue(after.score > before.score)
+    }
+
+    @Test
+    fun retrieveSeesSentencesEvictedAfterTheCachedCall() {
+        var now = 0L
+        val vault = PersonalSentenceVault(clock = { now }, maxSentences = 2)
+        vault.record("문장 하나 입니다", "com.android.chrome")
+        now = 100L
+        vault.record("문장 둘 입니다", "com.android.chrome")
+        assertTrue(vault.retrieve("문장", "com.android.chrome").any { it.sentence == "문장 하나 입니다" })
+
+        now = 200L
+        vault.record("다른 셋 입니다", "com.android.chrome")
+
+        assertFalse(vault.retrieve("문장", "com.android.chrome").any { it.sentence == "문장 하나 입니다" })
+    }
+
+    @Test
+    fun retrieveReturnsNothingOnceTheVaultIsClearedAfterTheCachedCall() {
+        val vault = PersonalSentenceVault(clock = { 1_000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        assertTrue(vault.retrieve("회의", "com.android.chrome").isNotEmpty())
+
+        vault.clear()
+        assertTrue(vault.retrieve("회의", "com.android.chrome").isEmpty())
+
+        vault.record("회의 자료 검토했습니다", "com.android.chrome")
+        assertEquals(
+            listOf("회의 자료 검토했습니다"),
+            vault.retrieve("회의", "com.android.chrome").map { it.sentence }
+        )
+    }
+
+    @Test
+    fun retrieveResultCannotBeModifiedThroughACast() {
+        val vault = PersonalSentenceVault(clock = { 1_000L })
+        vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")
+        val results = vault.retrieve("회의", "com.android.chrome")
+
+        assertThrows(UnsupportedOperationException::class.java) {
+            (results as MutableList<PersonalSentenceVault.Retrieved>).clear()
+        }
+        assertEquals(1, vault.retrieve("회의", "com.android.chrome").size)
+    }
+
+    @Test
     fun retrievePerformsWithinBudgetAtMaxCapacity() {
         val vault = PersonalSentenceVault(clock = { System.currentTimeMillis() }, maxSentences = 3000)
         val words = listOf("회의", "보고서", "프로젝트", "일정", "자료", "점검", "확인", "작성", "공유", "검토")
@@ -192,8 +305,9 @@ class PersonalSentenceVaultTest {
         }
         assertEquals(3000, vault.stats().sentences)
 
-        // Warm up JIT before measuring.
-        repeat(5) { vault.retrieve("회의 보고서", "com.android.chrome") }
+        // Warm up JIT before measuring, with queries other than the measured one so the measured
+        // call is not served from the last-result cache.
+        words.drop(1).take(5).forEach { vault.retrieve("$it 보고서", "com.android.chrome") }
 
         val start = System.nanoTime()
         vault.retrieve("회의 보고서", "com.android.chrome")

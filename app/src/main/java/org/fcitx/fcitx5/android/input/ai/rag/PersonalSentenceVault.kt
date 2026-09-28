@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.Collections
 import kotlin.math.ln
 
 /**
@@ -56,6 +57,22 @@ class PersonalSentenceVault(
     // docId -> token count
     private val docLen = HashMap<String, Int>()
 
+    private data class RetrieveKey(
+        val context: String,
+        val packageName: String,
+        val limit: Int,
+        val revision: Long,
+        val nowSecond: Long
+    )
+
+    // Bumped on every change to the stored sentences so [retrieve] never serves a stale cached result.
+    private var revision = 0L
+
+    // Candidate refreshes often ask for the same context again before the text changes, so the
+    // most recent call is remembered to skip rescoring the whole index.
+    private var lastRetrieveKey: RetrieveKey? = null
+    private var lastRetrieveResult: List<Retrieved> = emptyList()
+
     private val vaultFile: VaultFile? = storeFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
     private val persistenceLock = Any()
 
@@ -76,6 +93,7 @@ class PersonalSentenceVault(
         if (tokens.size < 2) return false
 
         val now = clock()
+        revision++
         val existing = docs[scrubbed]
         if (existing != null) {
             docs[scrubbed] = existing.copy(count = existing.count + 1, lastSeenMs = now)
@@ -101,10 +119,23 @@ class PersonalSentenceVault(
      * ranked by BM25 score (k1=1.2, b=0.75) with a category-match boost (x1.3), a recency decay
      * boost (halving every [halfLifeMs]), and a continuation boost (x1.5) for sentences whose
      * leading tokens already match the full query so far - useful to resume typing from.
+     *
+     * The last result is reused for an identical call within the same wall-clock second while the
+     * stored sentences are unchanged; the recency boost moves too little within a second to matter.
      */
     @Synchronized
     fun retrieve(contextBeforeCursor: String, packageName: String, limit: Int = 5): List<Retrieved> {
         if (docs.isEmpty()) return emptyList()
+        val now = clock()
+        val key = RetrieveKey(contextBeforeCursor, packageName, limit, revision, now / 1000)
+        if (key == lastRetrieveKey) return lastRetrieveResult
+        val result = Collections.unmodifiableList(rank(contextBeforeCursor, packageName, limit, now))
+        lastRetrieveKey = key
+        lastRetrieveResult = result
+        return result
+    }
+
+    private fun rank(contextBeforeCursor: String, packageName: String, limit: Int, now: Long): List<Retrieved> {
         val scrubbedContext = KoreanPiiScrubber.scrub(contextBeforeCursor).trim()
         val queryTokens = PersonalNgramTokenizer.tokenize(scrubbedContext)
         if (queryTokens.isEmpty()) return emptyList()
@@ -112,7 +143,6 @@ class PersonalSentenceVault(
         val n = docs.size
         val avgDocLen = docLen.values.sum().toDouble() / n
         val category = TypingDnaVault.categorizePackage(packageName)
-        val now = clock()
 
         val scores = HashMap<String, Double>()
 
@@ -213,6 +243,7 @@ class PersonalSentenceVault(
                 docs.clear()
                 postings.clear()
                 docLen.clear()
+                revision++
             }
             vaultFile?.delete()
         }
