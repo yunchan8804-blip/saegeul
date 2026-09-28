@@ -48,6 +48,8 @@ import org.fcitx.fcitx5.android.ui.main.ai.dashboard.GemmaVaultSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.LearningCardSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.LearningStatsSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.LevelHeroSection
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.PostSyncAdSequence
+import org.fcitx.fcitx5.android.ui.main.ai.dashboard.ShownGuide
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.StorageCardSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.StyleCardSection
 import org.fcitx.fcitx5.android.ui.main.ai.dashboard.VaultMetricsSection
@@ -479,19 +481,8 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
                 if (personalResult == null) {
                     Toast.makeText(this@TypingDnaDashboardActivity, feedbackMessage, Toast.LENGTH_SHORT).show()
                 }
-                val guide = try {
-                    continueWithEnrichment()
-                } catch (error: Throwable) {
-                    // No guide was shown, so the ad keeps its place right after the sync.
-                    if (error !is CancellationException) interstitial.showAfterAction()
-                    throw error
-                }
-                // The ad waits until the enrichment guide is closed so it never covers the guide.
-                if (guide == null) {
-                    interstitial.showAfterAction()
-                } else {
-                    guide.setOnDismissListener { interstitial.showAfterAction() }
-                }
+                PostSyncAdSequence(interstitial::recordAction, interstitial::showIfAllowed)
+                    .run(::continueWithEnrichment)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: TypingDnaPersistenceException) {
@@ -538,8 +529,8 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         }
     }
 
-    /** Requests graph enrichment after a sync and returns the guide dialog it shows, if any. */
-    private suspend fun continueWithEnrichment(): AlertDialog? {
+    /** Requests graph enrichment after a sync and returns the guide it shows, if any. */
+    private suspend fun continueWithEnrichment(): ShownGuide? {
         val controller = gemmaPreparationController
             ?: return showGuide(R.string.sync_done_title, R.string.enrichment_unavailable_release_build)
         ensureNotificationPermission()
@@ -548,12 +539,14 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         return if (scheduled) showGuide(R.string.enrich_bg_title, R.string.enrich_bg_message) else null
     }
 
-    private fun showGuide(@StringRes title: Int, @StringRes message: Int): AlertDialog =
-        AlertDialog.Builder(this)
+    private fun showGuide(@StringRes title: Int, @StringRes message: Int): ShownGuide {
+        val dialog = AlertDialog.Builder(this)
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton(android.R.string.ok, null)
             .show()
+        return ShownGuide { action -> dialog.setOnDismissListener { action() } }
+    }
 
     private fun renderDashboard(snapshot: DashboardSnapshot, animate: Boolean) {
         levelHero.render(snapshot)
