@@ -1,0 +1,22 @@
+[
+  {"id": "q01", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "내일 회의 시간이 3시로 바뀌었어요. 장소는 ", "good": "장소 정보(예: 2층 회의실 그대로예요.)"},
+  {"id": "q02", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "오늘 저녁에 시간 돼? 오랜만에 ", "good": "같이 밥 먹자 / 얼굴 보자"},
+  {"id": "q03", "appCategory": "work", "packageName": "com.Slack", "text": "보고서 초안 공유드렸습니다. 수정할 부분 있으면 ", "good": "말씀해 주세요."},
+  {"id": "q04", "appCategory": "email", "packageName": "com.google.android.gm", "text": "안녕하세요, 지난주 미팅에서 논의한 견적서를 첨부합니다. 검토하시고 ", "good": "회신 부탁드립니다."},
+  {"id": "q05", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "엄마 나 오늘 좀 늦을 것 같아. 저녁은 ", "good": "먼저 먹어 / 밖에서 먹고 갈게"},
+  {"id": "q06", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "택배가 문 앞에 와 있대. 퇴근하면서 ", "good": "좀 챙겨 줘."},
+  {"id": "q07", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "어제 본 영화 진짜 재밌었어. 너도 꼭 ", "good": "봐 / 보러 가"},
+  {"id": "q08", "appCategory": "work", "packageName": "com.Slack", "text": "서버 배포는 오늘 밤 10시에 진행할 예정입니다. 배포 중에는 ", "good": "서비스 접속이 잠시 중단될 수 있습니다."},
+  {"id": "q09", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "생일 축하해! 올 한 해도 ", "good": "행복하게 보내 / 좋은 일만 가득하길"},
+  {"id": "q10", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "이번 주말에 부산 가기로 했어. 토요일엔 해운대 가고 일요일엔 ", "good": "부산 안 다른 장소(감천문화마을 등)"},
+  {"id": "q11", "appCategory": "commerce", "packageName": "com.coupang.mobile", "text": "주문한 상품이 아직 도착하지 않았습니다. 배송 조회를 해 보니 ", "good": "며칠째 같은 상태로 멈춰 있습니다."},
+  {"id": "q12", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "혹시 장소 바뀌면 ", "recentSentences": ["다음 주 화요일 저녁 7시 강남역 어때?", "응 좋아 그때 보자"], "good": "미리 알려 줘."},
+  {"id": "q13", "appCategory": "work", "packageName": "com.Slack", "text": "회의록 정리해서 공유드릴게", "good": "요. (붙여 쓰기)"},
+  {"id": "q14", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "점심 맛있게 드세요. ", "good": "새 문장(오후도 힘내세요.)"},
+  {"id": "q15", "appCategory": "work", "packageName": "com.Slack", "text": "혹시 내일 오전에 ", "good": "시간 괜찮으세요?"},
+  {"id": "q16", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "감기 걸려서 오늘 출근 못 할 것 같아요. 병원 들렀다가 ", "good": "오후에 연락드릴게요."},
+  {"id": "q17", "appCategory": "notes", "packageName": "com.samsung.android.app.notes", "text": "다음 달 목표: 매일 30분씩 운동하기. 주말에는 ", "good": "등산 가기 등"},
+  {"id": "q18", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "비 온다는데 우산 챙겼", "good": "어? (어미 붙여 쓰기)"},
+  {"id": "q19", "appCategory": "email", "packageName": "com.google.android.gm", "text": "요청하신 자료는 내일까지 정리해서 ", "good": "보내 드리겠습니다."},
+  {"id": "q20", "appCategory": "messenger", "packageName": "com.kakao.talk", "text": "고마워 덕분에 이사 잘 끝났어. 다음에 ", "good": "밥 한번 살게."}
+]

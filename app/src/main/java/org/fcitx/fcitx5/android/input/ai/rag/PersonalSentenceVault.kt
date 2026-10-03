@@ -237,6 +237,15 @@ class PersonalSentenceVault(
             .map { it.text }
     }
 
+    /**
+     * How many stored sentences were last seen strictly after [sinceMs] - the same criterion
+     * [exportSince] filters by, without materializing them. A size difference against an earlier
+     * snapshot cannot count this once the vault sits at [maxSentences] (every new sentence evicts an
+     * old one, so the size never grows). Read-only.
+     */
+    @Synchronized
+    fun countSince(sinceMs: Long): Int = docs.values.count { it.lastSeenMs > sinceMs }
+
     fun clear() {
         synchronized(persistenceLock) {
             synchronized(this) {

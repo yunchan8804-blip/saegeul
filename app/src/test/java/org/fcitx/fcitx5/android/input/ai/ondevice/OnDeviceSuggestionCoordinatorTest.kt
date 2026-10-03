@@ -196,12 +196,12 @@ class OnDeviceSuggestionCoordinatorTest {
 
         fixture.coordinator.setEnabled(true)
         fixture.observe(snapshot)
-        fixture.backend.awaitRequest(0).complete(" 일정")
+        fixture.backend.awaitRequest(0).complete(" 일정,")
         fixture.awaitReady()
 
         assertEquals(1, fixture.coordinator.candidates.size)
         assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, fixture.coordinator.candidates.single().mode)
-        assertEquals(" 일정", fixture.coordinator.candidates.single().insertion)
+        assertEquals(" 일정,", fixture.coordinator.candidates.single().insertion)
     }
 
     @Test

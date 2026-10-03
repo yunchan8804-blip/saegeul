@@ -8,6 +8,8 @@ import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Conversation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceBackendFallbackPolicy
@@ -41,7 +43,7 @@ class GemmaGraphGenerationSession {
      * genuine `CancellationException` escape here instead made `WorkManager` treat every keyboard
      * tap as a hard, non-retryable cancellation of the whole job (see the class doc's on-device trace).
      */
-    class LeaseLostException(message: String) : Exception(message)
+    class LeaseLostException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     @Volatile
     private var engineUse: OnDeviceSharedEngine.Use? = null
@@ -140,33 +142,52 @@ class GemmaGraphGenerationSession {
         val conversation = activeEngine.createConversation()
         activeConversation = conversation
         try {
-            val response = StringBuilder()
-            try {
-                conversation.sendMessageAsync(prompt).collect { message ->
-                    if (cancelled) return@collect
-                    message.contents.contents.filterIsInstance<Content.Text>().forEach { response.append(it.text) }
+            return collectGenerated(
+                conversation.sendMessageAsync(prompt).map { message ->
+                    message.contents.contents.filterIsInstance<Content.Text>().joinToString("") { it.text }
                 }
-            } catch (realCancellation: CancellationException) {
-                // requestCancel() cancels the native process from a side coroutine
-                // (FcitxApplication.applicationScope), which can surface here as this collection's
-                // own coroutine being cancelled - a genuine CancellationException, not the
-                // LeaseLostException the flag checks below throw. [cancelled] is what tells the two
-                // apart: true means WE caused this (keyboard/watchdog), so it is reinterpreted the
-                // same way; false means the collecting coroutine itself was cancelled for some other,
-                // real reason (e.g. WorkManager stopping the whole worker) and must propagate as-is.
-                // On-device trace this fixes: a raw CancellationException reaching here escaped all
-                // the way out of doWork(), which WorkManager then treated as a hard, non-retryable
-                // cancellation of the whole job on every keyboard tap.
-                if (cancelled) throw LeaseLostException("Gemma 생성이 중간에 중단되었습니다.")
-                throw realCancellation
-            }
-            if (cancelled) throw LeaseLostException("Gemma 생성이 중간에 중단되었습니다.")
-            if (response.isBlank()) throw IllegalStateException("Gemma가 텍스트 응답을 반환하지 않았습니다.")
-            return response.toString()
+            )
         } finally {
             activeConversation = null
             runCatching { conversation.close() }
         }
+    }
+
+    /**
+     * Collects the generated text pieces from [responses]. A failure while collecting is only
+     * reinterpreted as [LeaseLostException] when this session itself was cancelled ([cancelled] is
+     * set by [requestCancel], i.e. the lease was preempted or the watchdog broke): cancelling the
+     * native process makes the engine surface its own error (for example a `LiteRtLmJniException`)
+     * from the collection, and that error is then the preemption, not a generation failure. An engine
+     * error with no cancellation behind it propagates unchanged so a real failure stays a failure.
+     */
+    internal suspend fun collectGenerated(responses: Flow<String>): String {
+        val response = StringBuilder()
+        try {
+            responses.collect { text ->
+                if (cancelled) return@collect
+                response.append(text)
+            }
+        } catch (realCancellation: CancellationException) {
+            // requestCancel() cancels the native process from a side coroutine
+            // (FcitxApplication.applicationScope), which can surface here as this collection's
+            // own coroutine being cancelled - a genuine CancellationException, not the
+            // LeaseLostException the flag checks below throw. [cancelled] is what tells the two
+            // apart: true means WE caused this (keyboard/watchdog), so it is reinterpreted the
+            // same way; false means the collecting coroutine itself was cancelled for some other,
+            // real reason (e.g. WorkManager stopping the whole worker) and must propagate as-is.
+            // On-device trace this fixes: a raw CancellationException reaching here escaped all
+            // the way out of doWork(), which WorkManager then treated as a hard, non-retryable
+            // cancellation of the whole job on every keyboard tap.
+            if (cancelled) throw LeaseLostException("Gemma 생성이 중간에 중단되었습니다.", realCancellation)
+            throw realCancellation
+        } catch (engineError: Exception) {
+            if (cancelled) throw LeaseLostException("Gemma 생성이 중간에 중단되었습니다.", engineError)
+            throw engineError
+        }
+        if (cancelled) throw LeaseLostException("Gemma 생성이 중간에 중단되었습니다.")
+        if (response.isBlank()) throw IllegalStateException("Gemma가 텍스트 응답을 반환하지 않았습니다.")
+        return response.toString()
     }
 
     private fun requestCancel() {

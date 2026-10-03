@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.ai.prediction.source
 
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
 import org.fcitx.fcitx5.android.input.ai.KoreanTypoCorrectionEngine
+import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 
 /**
  * Legacy-engine corrections of the sentence being typed, plus [normalizedFullContext]: the full
@@ -17,8 +18,13 @@ internal class SentenceTypoCorrections(val candidates: List<AiPrediction>, val n
 /**
  * Sentence-level typo correction (`typo_sentence_correction`, `typo_word_correction`) by the legacy
  * [KoreanTypoCorrectionEngine], skipping the fragment keyboard-aware correction already handled.
+ * The last word of the context is normalized only when it is an explicit typo or not an ordinary
+ * base-vocabulary word.
  */
-internal class SentenceTypoCorrectionSource(private val typoEngine: KoreanTypoCorrectionEngine) {
+internal class SentenceTypoCorrectionSource(
+    private val typoEngine: KoreanTypoCorrectionEngine,
+    private val baseVocabulary: BaseKoreanVocabulary?
+) {
 
     fun correct(input: PredictionInput, handledFragment: String?): SentenceTypoCorrections {
         val currentSentence = input.currentSentence
@@ -55,7 +61,9 @@ internal class SentenceTypoCorrectionSource(private val typoEngine: KoreanTypoCo
 
     private fun normalizedFullContext(input: PredictionInput, sentenceCorrectedText: String?): String {
         val lastWord = input.lastWordInContext
-        val correctedLastWord = if (lastWord.isNotBlank()) typoEngine.correct(lastWord).firstOrNull() else null
+        val correctable = lastWord.isNotBlank() &&
+            (typoEngine.hasExplicitTypo(lastWord) || !baseVocabulary.knowsOrdinaryWord(lastWord))
+        val correctedLastWord = if (correctable) typoEngine.correct(lastWord).firstOrNull() else null
         return if (sentenceCorrectedText != null && input.currentSentence.isNotBlank()) {
             input.fullContext.replace(input.currentSentence, sentenceCorrectedText)
         } else if (correctedLastWord != null && correctedLastWord != lastWord) {

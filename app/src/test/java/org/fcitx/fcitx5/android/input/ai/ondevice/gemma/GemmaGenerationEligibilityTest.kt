@@ -14,8 +14,8 @@ import org.junit.Test
 
 class GemmaGenerationEligibilityTest {
     @Test
-    fun `30 percent without charging is eligible`() {
-        val snapshot = snapshot(batteryPercent = 30, isCharging = false)
+    fun `30 percent while charging is eligible`() {
+        val snapshot = snapshot(batteryPercent = 30, isCharging = true)
 
         assertTrue(GemmaGenerationEligibility.canGenerate(snapshot))
         assertNull(GemmaGenerationEligibility.evaluate(snapshot))
@@ -69,18 +69,18 @@ class GemmaGenerationEligibilityTest {
     }
 
     @Test
-    fun `moderate thermal status is eligible`() {
-        val snapshot = snapshot(thermalStatus = PowerManager.THERMAL_STATUS_MODERATE)
+    fun `severe thermal status is eligible`() {
+        val snapshot = snapshot(thermalStatus = PowerManager.THERMAL_STATUS_SEVERE)
 
         assertTrue(GemmaGenerationEligibility.canGenerate(snapshot))
         assertNull(GemmaGenerationEligibility.evaluate(snapshot))
     }
 
     @Test
-    fun `severe thermal status is blocked`() {
+    fun `critical thermal status is blocked`() {
         assertWaitReason(
             GemmaGenerationWaitReason.THERMAL_LIMITED,
-            snapshot(thermalStatus = PowerManager.THERMAL_STATUS_SEVERE)
+            snapshot(thermalStatus = PowerManager.THERMAL_STATUS_CRITICAL)
         )
     }
 
@@ -93,11 +93,11 @@ class GemmaGenerationEligibilityTest {
         )
         assertEquals(
             1,
-            GemmaGenerationEligibility.contextLimitForThermalStatus(PowerManager.THERMAL_STATUS_MODERATE)
+            GemmaGenerationEligibility.contextLimitForThermalStatus(PowerManager.THERMAL_STATUS_SEVERE)
         )
         assertEquals(
             0,
-            GemmaGenerationEligibility.contextLimitForThermalStatus(PowerManager.THERMAL_STATUS_SEVERE)
+            GemmaGenerationEligibility.contextLimitForThermalStatus(PowerManager.THERMAL_STATUS_CRITICAL)
         )
     }
 
@@ -113,14 +113,14 @@ class GemmaGenerationEligibilityTest {
         assertEquals(
             1,
             GemmaGenerationEligibility.contextLimitForThermalStatus(
-                PowerManager.THERMAL_STATUS_MODERATE,
+                PowerManager.THERMAL_STATUS_SEVERE,
                 GemmaGenerationMode.MANUAL
             )
         )
         assertEquals(
             0,
             GemmaGenerationEligibility.contextLimitForThermalStatus(
-                PowerManager.THERMAL_STATUS_SEVERE,
+                PowerManager.THERMAL_STATUS_CRITICAL,
                 GemmaGenerationMode.MANUAL
             )
         )
@@ -140,7 +140,7 @@ class GemmaGenerationEligibilityTest {
 
         runContextLimit = GemmaGenerationEligibility.reduceContextLimit(
             runContextLimit,
-            PowerManager.THERMAL_STATUS_MODERATE
+            PowerManager.THERMAL_STATUS_SEVERE
         )
         assertEquals(1, runContextLimit)
 
@@ -152,7 +152,7 @@ class GemmaGenerationEligibilityTest {
 
         runContextLimit = GemmaGenerationEligibility.reduceContextLimit(
             runContextLimit,
-            PowerManager.THERMAL_STATUS_SEVERE
+            PowerManager.THERMAL_STATUS_CRITICAL
         )
         assertEquals(0, runContextLimit)
     }
@@ -182,10 +182,65 @@ class GemmaGenerationEligibilityTest {
     }
 
     @Test
+    fun `automatic generation waits while not charging`() {
+        assertWaitReason(
+            GemmaGenerationWaitReason.NOT_CHARGING,
+            snapshot(isCharging = false, screenInteractive = false)
+        )
+    }
+
+    @Test
+    fun `automatic generation waits while the screen is on`() {
+        assertWaitReason(
+            GemmaGenerationWaitReason.SCREEN_ON,
+            snapshot(isCharging = true, screenInteractive = true)
+        )
+    }
+
+    @Test
+    fun `automatic generation is eligible only while charging with the screen off`() {
+        val eligible = snapshot(isCharging = true, screenInteractive = false)
+
+        assertTrue(GemmaGenerationEligibility.canGenerate(eligible))
+        assertNull(GemmaGenerationEligibility.evaluate(eligible))
+    }
+
+    @Test
+    fun `automatic generation still reports the harder blockers before charging and screen`() {
+        assertWaitReason(
+            GemmaGenerationWaitReason.BATTERY_BELOW_MINIMUM,
+            snapshot(batteryPercent = 29, isCharging = false, screenInteractive = true)
+        )
+        assertWaitReason(
+            GemmaGenerationWaitReason.KEYBOARD_ACTIVE,
+            snapshot(isCharging = false, screenInteractive = true, inputViewVisible = true)
+        )
+    }
+
+    @Test
+    fun `screen and charging wait reasons use the plain explanation`() {
+        assertEquals("충전 중이고 화면이 꺼져 있을 때 만들어요.", GemmaGenerationWaitReason.SCREEN_ON.message)
+        assertEquals("충전 중이고 화면이 꺼져 있을 때 만들어요.", GemmaGenerationWaitReason.NOT_CHARGING.message)
+    }
+
+    @Test
+    fun `manual generation ignores charging and screen state`() {
+        listOf(
+            snapshot(isCharging = false, screenInteractive = false),
+            snapshot(isCharging = false, screenInteractive = true),
+            snapshot(isCharging = true, screenInteractive = true),
+            snapshot(isCharging = true, screenInteractive = false)
+        ).forEach { snapshot ->
+            assertTrue(GemmaGenerationEligibility.canGenerate(snapshot, GemmaGenerationMode.MANUAL))
+            assertNull(GemmaGenerationEligibility.evaluate(snapshot, GemmaGenerationMode.MANUAL))
+        }
+    }
+
+    @Test
     fun `manual mode keeps every hard safety guard`() {
         listOf(
             snapshot(batteryPercent = null) to GemmaGenerationWaitReason.BATTERY_LEVEL_UNKNOWN,
-            snapshot(thermalStatus = PowerManager.THERMAL_STATUS_SEVERE) to
+            snapshot(thermalStatus = PowerManager.THERMAL_STATUS_CRITICAL) to
                 GemmaGenerationWaitReason.THERMAL_LIMITED,
             snapshot(lowMemory = true) to GemmaGenerationWaitReason.LOW_MEMORY,
             snapshot(inputViewVisible = true) to GemmaGenerationWaitReason.KEYBOARD_ACTIVE
@@ -206,17 +261,19 @@ class GemmaGenerationEligibilityTest {
 
     private fun snapshot(
         batteryPercent: Int? = 80,
-        isCharging: Boolean = false,
+        isCharging: Boolean = true,
         powerSaveMode: Boolean = false,
         thermalStatus: Int? = null,
         lowMemory: Boolean = false,
-        inputViewVisible: Boolean = false
+        inputViewVisible: Boolean = false,
+        screenInteractive: Boolean = false
     ) = GemmaGenerationSnapshot(
         batteryPercent = batteryPercent,
         isCharging = isCharging,
         powerSaveMode = powerSaveMode,
         thermalStatus = thermalStatus,
         lowMemory = lowMemory,
-        inputViewVisible = inputViewVisible
+        inputViewVisible = inputViewVisible,
+        screenInteractive = screenInteractive
     )
 }

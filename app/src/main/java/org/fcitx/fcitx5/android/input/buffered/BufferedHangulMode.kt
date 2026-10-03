@@ -11,7 +11,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.input.keyboard.HangulKeyLegends
 
 /**
- * Compatibility policy for editors that cannot handle Hangul composing spans.
+ * Compatibility policy for editors that cannot handle composing spans.
  */
 object BufferedHangulMode {
 
@@ -21,10 +21,15 @@ object BufferedHangulMode {
     fun effectiveCapabilities(
         capabilities: CapabilityFlags,
         enabled: Boolean,
-        ime: InputMethodEntry
+        ime: InputMethodEntry,
+        packageName: String?
     ): CapabilityFlags {
-        if (!isActive(enabled, ime)) return capabilities
-        return CapabilityFlags(capabilities.flags and CapabilityFlag.Preedit.flag.inv())
+        val withoutPreedit = capabilities.flags and CapabilityFlag.Preedit.flag.inv()
+        if (HangulKeyLegends.isHangulInputMethod(ime.addon, ime.languageCode)) {
+            return if (enabled) CapabilityFlags(withoutPreedit) else capabilities
+        }
+        if (!enabled && !RemoteEditorPackages.isRemote(packageName)) return capabilities
+        return CapabilityFlags(withoutPreedit or CapabilityFlag.NoSpellCheck.flag)
     }
 
     fun mustAvoidClipboard(capabilities: CapabilityFlags): Boolean =

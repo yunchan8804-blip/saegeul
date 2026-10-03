@@ -43,14 +43,14 @@ class OnDeviceResourceSnapshotTest {
     }
 
     @Test
-    fun `only severe or worse thermal status blocks`() {
+    fun `only critical or worse thermal status blocks`() {
         assertNull(snapshot(thermalStatus = null).foregroundGenerationBlockCode(20))
         assertNull(
-            snapshot(thermalStatus = PowerManager.THERMAL_STATUS_MODERATE).foregroundGenerationBlockCode(20)
+            snapshot(thermalStatus = PowerManager.THERMAL_STATUS_SEVERE).foregroundGenerationBlockCode(20)
         )
         assertEquals(
             "RESOURCE_THERMAL",
-            snapshot(thermalStatus = PowerManager.THERMAL_STATUS_SEVERE).foregroundGenerationBlockCode(20)
+            snapshot(thermalStatus = PowerManager.THERMAL_STATUS_CRITICAL).foregroundGenerationBlockCode(20)
         )
         assertEquals(
             "RESOURCE_THERMAL",
@@ -64,7 +64,7 @@ class OnDeviceResourceSnapshotTest {
             batteryPercent = 5,
             powerSaveMode = true,
             lowMemory = true,
-            thermalStatus = PowerManager.THERMAL_STATUS_SEVERE
+            thermalStatus = PowerManager.THERMAL_STATUS_CRITICAL
         )
         assertEquals("RESOURCE_BATTERY", everythingBlocked.foregroundGenerationBlockCode(20))
         assertEquals(

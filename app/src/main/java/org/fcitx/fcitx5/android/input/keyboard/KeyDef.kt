@@ -114,6 +114,15 @@ open class KeyDef(
         class DoubleTap(
             val action: KeyAction
         ) : Behavior()
+
+        /**
+         * A long press that lasts as long as the finger: [start] fires when the long press
+         * elapses and [end] when the touch is lifted or cancelled, wherever the finger is by then.
+         */
+        class Hold(
+            val start: KeyAction,
+            val end: KeyAction
+        ) : Behavior()
     }
 
     sealed class Popup {

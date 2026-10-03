@@ -223,13 +223,15 @@ class RedTeamRound8ImeCandidatePreemptionDeviceTest {
             OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
             assertFalse("isInputViewVisible은 false로 복귀해야 합니다.", OnDeviceGenerationControl.isInputViewVisible)
 
+            // 자동 생성은 충전 중이고 화면이 꺼져 있을 때만 허용된다(2026-10-03 제품 결정).
             val idleSnapshot = GemmaGenerationSnapshot(
                 batteryPercent = 80,
-                isCharging = false,
+                isCharging = true,
                 powerSaveMode = false,
                 thermalStatus = null,
                 lowMemory = false,
-                inputViewVisible = OnDeviceGenerationControl.isInputViewVisible
+                inputViewVisible = OnDeviceGenerationControl.isInputViewVisible,
+                screenInteractive = false
             )
             assertFalse("Snapshot.inputViewVisible은 false여야 합니다.", idleSnapshot.inputViewVisible)
 

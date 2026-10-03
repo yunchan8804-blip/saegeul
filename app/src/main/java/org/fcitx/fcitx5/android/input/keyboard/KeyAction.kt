@@ -44,4 +44,9 @@ sealed class KeyAction {
     data class PickerSwitchAction(val key: PickerWindow.Key? = null) : KeyAction()
 
     data object SpaceLongPressAction : KeyAction()
+
+    /** The microphone key: a tap, or the start and end of a hold that lasts as long as the finger. */
+    data class VoiceInputAction(val phase: Phase) : KeyAction() {
+        enum class Phase { Tap, HoldStart, HoldEnd }
+    }
 }

@@ -262,8 +262,8 @@ class GemmaContextCompletionDeviceTest {
         assertTrue("$phase 배터리 잔량을 확인할 수 없습니다.", snapshot.batteryPercent != null)
         assertTrue("$phase 배터리가 20% 미만입니다: ${snapshot.batteryPercent}", snapshot.batteryPercent!! >= 20)
         assertTrue(
-            "$phase 열 상태를 확인할 수 없거나 MODERATE 이상입니다: ${snapshot.thermalStatus}",
-            snapshot.thermalStatus?.let { it < PowerManager.THERMAL_STATUS_MODERATE } == true
+            "$phase 열 상태를 확인할 수 없거나 CRITICAL 이상입니다: ${snapshot.thermalStatus}",
+            snapshot.thermalStatus?.let { it < PowerManager.THERMAL_STATUS_CRITICAL } == true
         )
         val reason = GemmaGenerationEligibility.evaluate(snapshot, GemmaGenerationMode.MANUAL)
         assertTrue("$phase 수동 생성 안전 조건이 충족되지 않았습니다: ${reason?.message}", reason == null)

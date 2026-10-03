@@ -384,8 +384,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             true
         ) { !showNumberRow.getValue() }
 
-        val showVoiceInputButton =
-            switch(R.string.show_voice_input_button, "show_voice_input_button", false)
+        val showVoiceInputButton = switch(
+            R.string.show_voice_input_button,
+            "show_voice_input_button",
+            true,
+            R.string.show_voice_input_button_summary
+        )
         val preferredVoiceInput = voiceInputPreference(
             R.string.preferred_voice_input, "preferred_voice_input", ""
         ) { showVoiceInputButton.getValue() }

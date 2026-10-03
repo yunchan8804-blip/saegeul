@@ -6,13 +6,19 @@ package org.fcitx.fcitx5.android.input.ai.prediction.source
 
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
 import org.fcitx.fcitx5.android.input.ai.KoreanTypoCorrectionEngine
+import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 
 /**
  * Word-level typo correction (`typo_correction`) by the legacy [KoreanTypoCorrectionEngine] for the
  * stroke and the word before the cursor, skipping the fragment keyboard-aware correction handled
- * and the words of a sentence that already ended.
+ * and the words of a sentence that already ended. The engine's fuzzy match against its small
+ * dictionary would rewrite ordinary words, so a word the base vocabulary knows (top
+ * [BaseKoreanVocabulary.TYPO_VOCAB_LIMIT]) is corrected only by the explicit typo rules.
  */
-internal class WordTypoCorrectionSource(private val typoEngine: KoreanTypoCorrectionEngine) {
+internal class WordTypoCorrectionSource(
+    private val typoEngine: KoreanTypoCorrectionEngine,
+    private val baseVocabulary: BaseKoreanVocabulary?
+) {
 
     fun collect(input: PredictionInput, handledFragment: String?): List<AiPrediction> {
         val cleanStroke = input.cleanStroke
@@ -36,6 +42,7 @@ internal class WordTypoCorrectionSource(private val typoEngine: KoreanTypoCorrec
 
         return typoCandidates.distinct()
             .filter { it != handledFragment }
+            .filter { typoEngine.hasExplicitTypo(it) || !baseVocabulary.knowsOrdinaryWord(it) }
             .flatMap { candidateWord ->
                 typoEngine.correct(candidateWord).map { correctedWord ->
                     AiPrediction(

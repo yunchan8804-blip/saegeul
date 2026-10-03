@@ -83,18 +83,28 @@ internal fun decideLeaseLossOutcome(waitReason: GemmaGenerationWaitReason?, manu
  * When a graph already exists, a new cycle only exports sentences new since it was last built
  * ([org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault.exportSince], capped at
  * [MAX_INCREMENTAL_SENTENCES]) instead of re-scanning the whole vault - see [startNewCycleOrNull].
+ * "New" is counted by last-seen time ([org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault.countSince]),
+ * not by a size difference, so a vault already at its capacity still reports new sentences.
+ *
+ * Each chunk is sized so its prompt plus the generated JSON fits the engine's context
+ * ([GemmaGraphPrompt.maxChunkChars]). If the engine still rejects a chunk as too long (a chunk saved
+ * by an older build, or a token estimate that was too optimistic), it is split in half and retried;
+ * a single sentence that still does not fit is skipped and counted
+ * ([PersonalGraphEnrichmentStagingStore.State.skippedSentenceCount]) instead of failing the cycle -
+ * see [PersonalGraphEnricher.enrichChunkSplittingOnOverflow].
  *
  * [GemmaGraphGenerationSession] keeps one Gemma engine open across the whole cycle (GPU first, CPU
  * fallback) instead of paying a fresh engine initialization per chunk, the majority of each chunk's
  * measured 90-130s wall time.
  *
- * Automatic runs (periodic, [GemmaGenerationMode.AUTOMATIC]) additionally require the screen to be
- * off, on top of [GemmaGenerationEligibility]'s battery/thermal/memory/keyboard gate and the
- * `WorkManager` charging + battery-not-low constraints the periodic request itself carries. Manual
- * runs (dashboard button, [GemmaGenerationMode.MANUAL]) have neither the charging/screen
- * requirement, but still wait for [GemmaGenerationEligibility] and for the keyboard to be hidden;
- * they also run as a foreground service ([trySetForeground]) since a plain background job can be
- * stopped by the system well before a multi-minute Gemma run finishes.
+ * Automatic runs (periodic, [GemmaGenerationMode.AUTOMATIC]) run only while charging with the screen
+ * off: the periodic request carries `WorkManager`'s charging + battery-not-low constraints, and
+ * [GemmaGenerationEligibility] re-checks charging and the screen (on top of battery/thermal/memory/
+ * keyboard) before every chunk and every [WATCHDOG_INTERVAL_MS] during generation, pausing the cycle
+ * (resumable) as soon as either is lost. Manual runs (dashboard button, [GemmaGenerationMode.MANUAL])
+ * have neither the charging/screen requirement, but still wait for [GemmaGenerationEligibility] and
+ * for the keyboard to be hidden; they also run as a foreground service ([trySetForeground]) since a
+ * plain background job can be stopped by the system well before a multi-minute Gemma run finishes.
  *
  * When the on-device generation lease is held by another purpose (material generation, or the
  * keyboard), this worker no longer fails immediately: [GraphEnrichmentLeaseWaiter] retries every
@@ -298,7 +308,9 @@ class GemmaGraphEnrichmentWorker(
         val graphStats = app.personalGraphStore.stats()
         val vaultStats = app.personalSentenceVault.stats()
         val hasExistingGraph = graphStats.builtMs > 0L
-        val newSentences = (vaultStats.sentences - graphStats.sourceSentenceCount).coerceAtLeast(0)
+        val newSentences = PersonalGraphEnrichmentCycle.newSentenceCount(
+            hasExistingGraph, app.personalSentenceVault, graphStats.builtMs
+        )
         val msSinceBuild = System.currentTimeMillis() - graphStats.builtMs
         if (!PersonalGraphEnrichmentCycle.shouldStart(hasExistingGraph, newSentences, msSinceBuild, manual)) {
             return null
@@ -314,7 +326,7 @@ class GemmaGraphEnrichmentWorker(
             if (manual) GraphEnrichmentRunner.notifyCompletion(applicationContext, result, GraphEnrichmentFailure.NONE)
             return null
         }
-        val chunks = PersonalGraphEnricher.chunksFor(sentences, MAX_CHARS_PER_CHUNK)
+        val chunks = PersonalGraphEnricher.chunksFor(sentences, maxCharsPerChunk())
         val state = PersonalGraphEnrichmentStagingStore.State(
             cycleStartedMs = System.currentTimeMillis(),
             sourceSentenceCountAtStart = vaultStats.sentences,
@@ -415,6 +427,12 @@ class GemmaGraphEnrichmentWorker(
                         current = applyChunkResultIncrementally(current, outcome.result, elapsedMs, waitMs, statusStore)
                         stagingStore.save(current)
                         processedThisRun++
+                        if (outcome.result.skippedSentences > 0) {
+                            Timber.tag(GemmaGraphGenerationSession.LOG_TAG).i(
+                                "chunk %d/%d skipped %d sentence(s) the engine rejected as too long",
+                                current.nextChunkIndex, current.chunks.size, outcome.result.skippedSentences
+                            )
+                        }
                         if (manual) updateManualForeground(current)
                         Timber.tag(GemmaGraphGenerationSession.LOG_TAG).i(
                             "chunk %d/%d done ms=%d backend=%s",
@@ -447,6 +465,8 @@ class GemmaGraphEnrichmentWorker(
         GemmaGenerationWaitReason.THERMAL_LIMITED -> GraphEnrichmentPauseReason.THERMAL
         GemmaGenerationWaitReason.LOW_MEMORY -> GraphEnrichmentPauseReason.LOW_MEMORY
         GemmaGenerationWaitReason.KEYBOARD_ACTIVE -> GraphEnrichmentPauseReason.KEYBOARD_ACTIVE
+        GemmaGenerationWaitReason.SCREEN_ON -> GraphEnrichmentPauseReason.SCREEN_ON
+        GemmaGenerationWaitReason.NOT_CHARGING -> GraphEnrichmentPauseReason.NOT_CHARGING
     }
 
     /**
@@ -488,7 +508,8 @@ class GemmaGraphEnrichmentWorker(
             failCount = state.failCount + if (succeeded) 0 else 1,
             completedChunkDurationMsSum = state.completedChunkDurationMsSum + elapsedMs,
             lastWaitMs = waitMs,
-            pauseReason = GraphEnrichmentPauseReason.NONE
+            pauseReason = GraphEnrichmentPauseReason.NONE,
+            skippedSentenceCount = state.skippedSentenceCount + chunkResult.skippedSentences
         )
     }
 
@@ -558,8 +579,10 @@ class GemmaGraphEnrichmentWorker(
         try {
             var leaseTimedOut = false
             var pausedReason: GraphEnrichmentPauseReason? = null
-            val enriched = PersonalGraphEnricher.enrichChunk(chunkText) { instruction, input ->
-                val prompt = buildPrompt(instruction, input)
+            val enriched = PersonalGraphEnricher.enrichChunkSplittingOnOverflow(
+                chunkText, GemmaGraphPrompt.maxChunkChars()
+            ) { instruction, input ->
+                val prompt = GemmaGraphPrompt.build(instruction, input)
                 var text: String? = null
                 while (text == null && !leaseTimedOut && pausedReason == null) {
                     val ready = session.ensureReady(
@@ -605,14 +628,8 @@ class GemmaGraphEnrichmentWorker(
         }
     }
 
-    private fun buildPrompt(instruction: String, chunk: String): String = """
-        $instruction
-        JSON 객체 하나만 출력하고, 설명이나 코드펜스는 절대 포함하지 마라.
-        노드는 최대 20개, 엣지는 최대 25개, 토픽은 최대 3개까지만 만들어라.
-        ---BEGIN SENTENCES---
-        $chunk
-        ---END SENTENCES---
-    """.trimIndent()
+    /** A chunk never exceeds what fits in the engine's context together with the prompt text and the generated JSON. */
+    private fun maxCharsPerChunk(): Int = minOf(MAX_CHARS_PER_CHUNK, GemmaGraphPrompt.maxChunkChars())
 
     private fun stagingStore(): PersonalGraphEnrichmentStagingStore = PersonalGraphEnrichmentStagingStore(
         File(applicationContext.filesDir, "personal_graph_staging.json"),

@@ -141,6 +141,7 @@ import org.fcitx.fcitx5.android.input.search.KoreanDictionaryQuery
 import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
 import org.fcitx.fcitx5.android.input.typo.TypoRecoverySnapshot
+import org.fcitx.fcitx5.android.input.voice.DictationErasePolicy
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.clipboardManager
@@ -164,6 +165,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     val isDirectBootInputMode: Boolean
         get() = FcitxApplication.getInstance().isDirectBootMode
+
+    private val allowsCredentialProtectedFeatures: Boolean
+        get() = DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode)
 
     private lateinit var fcitx: FcitxConnection
     private var fcitxEventCollectorJob: Job? = null
@@ -391,7 +395,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 personalLearning.enqueueContextualSelectionFeedback(context, selected, reinforced, packageName)
             },
             scheduleNgramSave = { personalLearning.scheduleNgramSave() },
-            observeCommittedEditorText = { text -> personalLearning.observeCommittedEditorText(text) },
+            observeCommittedEditorText = ::observeCommittedEditorText,
             captureCorrectionBoundarySnapshot = { personalLearning.captureCorrectionBoundarySnapshot() },
             onEditorSuffixDeleted = { packageName, removedText, inspectionAllowed ->
                 personalLearning.typingDnaCommitSink.onEditorSuffixDeleted(packageName, removedText, inspectionAllowed)
@@ -455,6 +459,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.showNumberRow,
         // KeyView text sizes are also set once per key, at keyboard-build time.
         prefs.keyboard.keyTextScale,
+        // The bottom rows are built with or without the microphone key (and the period comma key
+        // that comes with it), so the setting only takes effect by rebuilding the input view.
+        prefs.keyboard.showVoiceInputButton,
         prefs.advanced.disableAnimation,
         prefs.advanced.ignoreSystemWindowInsets,
     )
@@ -511,11 +518,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun effectiveCapabilityFlags(
         flags: CapabilityFlags,
-        ime: InputMethodEntry
+        ime: InputMethodEntry,
+        packageName: String?
     ): CapabilityFlags = BufferedHangulMode.effectiveCapabilities(
         flags,
         bufferedHangulInputPref.getValue(),
-        ime
+        ime,
+        packageName
     )
 
     @Keep
@@ -537,7 +546,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
         if (!bufferedHangulSessionActive) clearBufferedHangul()
         postFcitxJob {
-            setCapFlags(effectiveCapabilityFlags(capabilityFlags, inputMethodEntryCached))
+            setCapFlags(
+                effectiveCapabilityFlags(
+                    capabilityFlags,
+                    inputMethodEntryCached,
+                    currentInputEditorInfo?.packageName
+                )
+            )
         }
     }
 
@@ -644,7 +659,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             activate(latestPlan.uid, latestPlan.packageName)
             latestPlan.inputMethodUniqueName?.takeIf { it.isNotBlank() }?.let { activateIme(it) }
             setCandidatePagingMode(if (latestPlan.isVirtualKeyboard) 0 else 1)
-            setCapFlags(effectiveCapabilityFlags(latestPlan.capabilityFlags, inputMethodEntryCached))
+            setCapFlags(
+                effectiveCapabilityFlags(
+                    latestPlan.capabilityFlags,
+                    inputMethodEntryCached,
+                    latestPlan.packageName
+                )
+            )
             if (latestPlan.shouldFocus) focus(true)
         }
         restoreJob.invokeOnCompletion { cause -> failure.set(cause) }
@@ -724,7 +745,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         prefs.candidates.registerOnChangeListener(recreateCandidatesViewListener)
         bufferedHangulInputPref.registerOnChangeListener(bufferedHangulInputListener)
-        automaticSuggestion.registerListeners()
         ThemeManager.addOnChangedListener(onThemeChangeListener)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             postFcitxJob {
@@ -732,10 +752,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
         }
         super.onCreate()
-        contextualPrediction.observeSentencePackRevision()
         decorView = window.window!!.decorView
         contentView = decorView.findViewById(android.R.id.content)
         lastKnownConfig = resources.configuration
+        if (allowsCredentialProtectedFeatures) {
+            attachCredentialProtectedFeatures()
+        }
+    }
+
+    /**
+     * Direct Boot (before the first unlock after a reboot) has no credential-encrypted storage, and
+     * the process is restarted on unlock. Everything that reads or writes it is therefore attached
+     * only here, never in Direct Boot, so the keyboard keeps just the basic typing path alive.
+     */
+    private fun attachCredentialProtectedFeatures() {
+        automaticSuggestion.registerListeners()
+        contextualPrediction.observeSentencePackRevision()
         refreshSnippetCatalog()
         personalLearning.attachTypingDnaBatchCompiler()
     }
@@ -856,11 +888,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                             } else {
                                 null
                             }
-                            personalLearning.typingDnaCommitSink.onEditorContinuityLost(
-                                currentInputEditorInfo?.packageName,
-                                dnaRemovedText,
-                                dnaInspectionAllowed
-                            )
+                            notifyTypingDnaContinuityLost(dnaRemovedText, dnaInspectionAllowed)
                         }
                         currentInputConnection?.sendKeyEvent(keyEvent)
                         if (keyEvent.action == KeyEvent.ACTION_DOWN) {
@@ -958,7 +986,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     showStatusIcon(StatusIconMapping.fromEntry(event.data))
                 }
                 postFcitxJob {
-                    setCapFlags(effectiveCapabilityFlags(capabilityFlags, event.data))
+                    setCapFlags(
+                        effectiveCapabilityFlags(
+                            capabilityFlags,
+                            event.data,
+                            currentInputEditorInfo?.packageName
+                        )
+                    )
                 }
             }
             is FcitxEvent.SwitchInputMethodEvent -> {
@@ -985,11 +1019,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             } else {
                 null
             }
-            personalLearning.typingDnaCommitSink.onEditorContinuityLost(
-                currentInputEditorInfo?.packageName,
-                dnaRemovedText,
-                dnaInspectionAllowed
-            )
+            notifyTypingDnaContinuityLost(dnaRemovedText, dnaInspectionAllowed)
         }
         if (before > 0) {
             selection.predictOffset(-before)
@@ -1014,11 +1044,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             null
         }
-        personalLearning.typingDnaCommitSink.onEditorContinuityLost(
-            currentInputEditorInfo?.packageName,
-            dnaRemovedText,
-            dnaInspectionAllowed
-        )
+        notifyTypingDnaContinuityLost(dnaRemovedText, dnaInspectionAllowed)
         if (dnaInspectionAllowed) {
             personalLearning.correctionSessionTracker.onBackspace(personalLearning.currentWordBeforeCursor())
         }
@@ -1057,7 +1083,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             inputView?.submitInternalPromptInput()
             return
         }
-        personalLearning.flushTypingDnaForCurrentEditor()
+        flushTypingDnaForCurrentEditor()
         personalLearning.finalizeCorrectionSessionAtBoundary()
         currentInputEditorInfo.run {
             if (inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL ||
@@ -1342,6 +1368,39 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return true
     }
 
+    /** Typing DNA collection lives in credential-protected storage, so Direct Boot never starts it. */
+    private fun notifyTypingDnaContinuityLost(removedText: String?, inspectionAllowed: Boolean) {
+        if (!allowsCredentialProtectedFeatures) return
+        personalLearning.typingDnaCommitSink.onEditorContinuityLost(
+            currentInputEditorInfo?.packageName,
+            removedText,
+            inspectionAllowed
+        )
+    }
+
+    private fun flushTypingDnaForCurrentEditor() {
+        if (!allowsCredentialProtectedFeatures) return
+        personalLearning.flushTypingDnaForCurrentEditor()
+    }
+
+    /**
+     * A messenger clears its input field after sending, so an emptied editor means the pending
+     * sentence was sent and is flushed whole; any other external cursor move only breaks continuity.
+     */
+    private fun notifyTypingDnaExternalCursorMove(newSelStart: Int, newSelEnd: Int) {
+        val inspectionAllowed = allowsTextInspectionFeatures()
+        if (inspectionAllowed && isEditorEmptied(newSelStart, newSelEnd, currentInputConnection)) {
+            flushTypingDnaForCurrentEditor()
+        } else {
+            notifyTypingDnaContinuityLost(null, inspectionAllowed)
+        }
+    }
+
+    private fun observeCommittedEditorText(text: String) {
+        if (!allowsCredentialProtectedFeatures) return
+        personalLearning.observeCommittedEditorText(text)
+    }
+
     fun allowsTextInspectionFeatures(): Boolean = featurePolicy.allowsTextInspectionFeatures()
 
     fun allowsNetworkInputFeatures(): Boolean = featurePolicy.allowsNetworkInputFeatures()
@@ -1509,6 +1568,32 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun prepareOcrCommit(): Boolean {
         if (!allowsTextInspectionFeatures()) return false
         return finishCompositionForDirectAction()
+    }
+
+    /** Finishes composition for on-device dictation so its text lands after everything already typed. */
+    fun prepareDictationCommit(): Boolean {
+        if (!allowsTextInspectionFeatures()) return false
+        return finishCompositionForDirectAction()
+    }
+
+    /**
+     * Removes [expected] in front of the cursor, but only while it is exactly what is there. Text
+     * typed or a cursor moved since it was dictated makes this do nothing and return false.
+     */
+    fun eraseDictatedText(expected: String): Boolean {
+        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return false
+        if (!finishCompositionForDirectAction()) return false
+        val ic = currentInputConnection ?: return false
+        if (!DictationErasePolicy.canErase(ic.getTextBeforeCursor(expected.length, 0), expected)) {
+            return false
+        }
+        val deleted = ic.deleteSurroundingText(expected.length, 0)
+        if (deleted) {
+            selection.predictOffset(-expected.length)
+            onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
+            inputView?.postRefreshContextualCandidates(16L)
+        }
+        return deleted
     }
 
     /** Captures only the explicitly selected or cursor-adjacent Korean headword for local lookup. */
@@ -1752,7 +1837,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 dispatched = ic.finishComposingText() && dispatched
             }
             if (dispatched) {
-                personalLearning.observeCommittedEditorText(text)
+                observeCommittedEditorText(text)
                 inputView?.postRefreshContextualCandidates(16L)
             }
             return dispatched
@@ -1776,7 +1861,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (dispatchedResult) {
             onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
-            personalLearning.observeCommittedEditorText(text)
+            observeCommittedEditorText(text)
             inputView?.postRefreshContextualCandidates(16L)
         }
         return dispatchedResult
@@ -1993,7 +2078,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         currentInputConnection?.performContextMenuAction(android.R.id.paste) == true
                     if (dispatched) {
                         predictBufferedInsertion(text)
-                        personalLearning.observeCommittedEditorText(text)
+                        observeCommittedEditorText(text)
                     }
                     dispatched
                 } catch (exception: RuntimeException) {
@@ -2010,7 +2095,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 )
                 if (dispatched) {
                     predictBufferedInsertion(text)
-                    personalLearning.observeCommittedEditorText(text)
+                    observeCommittedEditorText(text)
                 }
                 dispatched
             }
@@ -2407,7 +2492,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         bufferedHangulSessionActive = nextBufferedHangulSessionActive
         inputView?.refreshBufferedHangulPreedit()
-        personalLearning.typingDnaCommitSink.onEditorSessionStarted(attribute.packageName, attribute.fieldId, restarting)
+        if (allowsCredentialProtectedFeatures) {
+            // An app that clears its field after sending (setText("")) restarts the same field empty
+            // instead of moving the cursor, so the pending text was sent and must not glue onto the next one.
+            if (restarting && allowsTextInspectionFeatures() &&
+                isEditorEmptied(attribute.initialSelStart, attribute.initialSelEnd, currentInputConnection)
+            ) {
+                flushTypingDnaForCurrentEditor()
+            }
+            personalLearning.typingDnaCommitSink.onEditorSessionStarted(attribute.packageName, attribute.fieldId, restarting)
+        }
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
@@ -2440,7 +2534,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             // EditorInfo can be different in onStartInput and onStartInputView,
             // especially in browsers
-            setCapFlags(effectiveCapabilityFlags(flags, inputMethodEntryCached))
+            setCapFlags(
+                effectiveCapabilityFlags(flags, inputMethodEntryCached, attribute.packageName)
+            )
             // for hardware keyboard, focus to allow switching input methods before onStartInputView
             if (!isNullType) {
                 focus(true)
@@ -2450,7 +2546,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
-        automaticSuggestion.cancelAutomaticSuggestionHideClose()
+        if (allowsCredentialProtectedFeatures) {
+            automaticSuggestion.cancelAutomaticSuggestionHideClose()
+        }
         OnDeviceGenerationControl.onKeyboardVisibilityChanged(true)
         OnDeviceGenerationControl.onInputViewVisibilityChanged(true)
         val viewCapabilityFlags = CapabilityFlags.fromEditorInfo(info)
@@ -2489,7 +2587,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             showStatusIcon(StatusIconMapping.fromEntry(fcitx.runImmediately { inputMethodEntryCached }))
         }
-        automaticSuggestion.onStartInputView(info, viewCapabilityFlags)
+        if (allowsCredentialProtectedFeatures) {
+            automaticSuggestion.onStartInputView(info, viewCapabilityFlags)
+        }
     }
 
     override fun onUpdateSelection(
@@ -2524,7 +2624,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             cursorUpdateIndex
         )
         inputView?.updateSelection(newSelStart, newSelEnd)
-        personalLearning.flushTypingDnaIfEditorEmptied(newSelStart, newSelEnd)
+        if (allowsCredentialProtectedFeatures) {
+            personalLearning.flushTypingDnaIfEditorEmptied(newSelStart, newSelEnd)
+        }
     }
 
     override fun onUpdateExtractedText(token: Int, text: ExtractedText?) {
@@ -2610,11 +2712,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (bufferedHangulSessionActive) {
             if (!selection.consume(newSelStart, newSelEnd)) {
-                personalLearning.typingDnaCommitSink.onEditorContinuityLost(
-                    currentInputEditorInfo?.packageName,
-                    null,
-                    allowsTextInspectionFeatures()
-                )
+                notifyTypingDnaExternalCursorMove(newSelStart, newSelEnd)
                 val engineHasPreedit = !bufferedHangulEngineResetPending &&
                     fcitx.runImmediately { inputPanelCached.preedit.isNotEmpty() }
                 if (!bufferedHangul.isEmpty || engineHasPreedit) {
@@ -2643,11 +2741,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             // cursor update can't match any prediction: it's treated as a user input
             if (composing.isEmpty() || newSelStart != newSelEnd || !composing.contains(newSelStart)) {
-                personalLearning.typingDnaCommitSink.onEditorContinuityLost(
-                    currentInputEditorInfo?.packageName,
-                    null,
-                    allowsTextInspectionFeatures()
-                )
+                notifyTypingDnaExternalCursorMove(newSelStart, newSelEnd)
             }
             selection.resetTo(newSelStart, newSelEnd)
         }
@@ -2842,11 +2936,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        inputView?.finishInlineDictation()
         // 재료 생성의 경계는 입력 뷰 가시성이다. 자동 추천의 웜 유예(onKeyboardVisibilityChanged)와
         // 분리되어 숨김 즉시 배경 축적이 가능해진다.
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
-        automaticSuggestion.onFinishInputView()
+        if (allowsCredentialProtectedFeatures) {
+            automaticSuggestion.onFinishInputView()
+        }
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
@@ -2854,7 +2951,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (wasBufferedHangul) {
             submitBufferedHangul()
         }
-        personalLearning.flushTypingDnaForCurrentEditor()
+        flushTypingDnaForCurrentEditor()
         if (finishingInput) {
             bufferedHangulSessionActive = false
             bufferedHangul.clear()
@@ -2877,7 +2974,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         Timber.d("onFinishInput")
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
-        automaticSuggestion.onFinishInput()
+        if (allowsCredentialProtectedFeatures) {
+            automaticSuggestion.onFinishInput()
+        }
         engineRestartEditorRehydrationGate.onFinishInput()
         personalLearning.finalizeCorrectionSessionAtBoundary()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
@@ -2886,9 +2985,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (wasBufferedHangul) {
             submitBufferedHangul()
         }
-        personalLearning.flushTypingDnaForCurrentEditor()
+        flushTypingDnaForCurrentEditor()
         contextualPrediction.onFinishInput()
-        personalLearning.onFinishInput()
+        if (allowsCredentialProtectedFeatures) {
+            personalLearning.onFinishInput()
+        }
         bufferedHangulSessionActive = false
         bufferedHangul.clear()
         postFcitxJob {
@@ -2926,16 +3027,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val pressure = level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
             level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
             level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE
-        if (!pressure) return
+        if (!pressure || !allowsCredentialProtectedFeatures) return
         automaticSuggestion.onTrimMemory(level)
     }
 
     override fun onDestroy() {
-        automaticSuggestion.onDestroy()
+        val credentialProtectedFeaturesAttached = allowsCredentialProtectedFeatures
+        if (credentialProtectedFeaturesAttached) {
+            automaticSuggestion.onDestroy()
+        }
         OnDeviceGenerationControl.onKeyboardVisibilityChanged(false)
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
         contextualPrediction.onDestroy()
-        personalLearning.onDestroy()
+        if (credentialProtectedFeaturesAttached) {
+            personalLearning.onDestroy()
+        }
         if (activeInstance === this) {
             activeInstance = null
         }
@@ -2945,7 +3051,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
         bufferedHangulInputPref.unregisterOnChangeListener(bufferedHangulInputListener)
-        automaticSuggestion.unregisterListeners()
+        if (credentialProtectedFeaturesAttached) {
+            automaticSuggestion.unregisterListeners()
+        }
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
         super.onDestroy()
         // Fcitx might be used in super.onDestroy()
@@ -2991,3 +3099,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         private const val SNIPPET_CONTEXT_CHARS = 128
     }
 }
+
+/** True only when the cursor is at 0 and the editor confirms there is no text on either side. */
+internal fun isEditorEmptied(newSelStart: Int, newSelEnd: Int, ic: InputConnection?): Boolean {
+    if (newSelStart != 0 || newSelEnd != 0 || ic == null) return false
+    return isEditorEmptied(newSelStart, newSelEnd, ic.getTextBeforeCursor(1, 0), ic.getTextAfterCursor(1, 0))
+}
+
+internal fun isEditorEmptied(
+    newSelStart: Int,
+    newSelEnd: Int,
+    textBefore: CharSequence?,
+    textAfter: CharSequence?
+): Boolean = newSelStart == 0 && newSelEnd == 0 && textBefore?.isEmpty() == true && textAfter?.isEmpty() == true

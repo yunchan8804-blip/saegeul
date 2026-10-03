@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
 import java.io.BufferedReader
 import java.io.Reader
 import kotlin.math.ln
+import timber.log.Timber
 
 /**
  * 앱에 번들되는 기본 한국어 어휘. TSV(단어\t빈도)를 로드해 표면형·자모열·초성열
@@ -121,7 +122,8 @@ class BaseKoreanVocabulary(private val source: () -> Reader) {
                 }
             }
             snapshot = buildSnapshot(raw)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.w(e, "Base Korean vocabulary load failed; typo correction has no base words")
             snapshot = null
         }
     }
@@ -222,6 +224,19 @@ class BaseKoreanVocabulary(private val source: () -> Reader) {
         val snap = snapshot ?: return false
         val id = snap.indexOfWord(word)
         return id in 0 until limit
+    }
+
+    /** 빈도 순위(1부터, 1이 가장 흔함). 어휘에 없으면 0. */
+    fun rankOf(word: String): Int {
+        val snap = snapshot ?: return 0
+        return snap.indexOfWord(word) + 1
+    }
+
+    /** [rankOf]가 돌려준 순위의 사전확률. [prior]와 같은 값이다. */
+    fun priorAtRank(rank: Int): Float {
+        val snap = snapshot ?: return 0f
+        if (rank < 1 || rank > snap.size) return 0f
+        return snap.priorOf(rank - 1)
     }
 
     fun prior(word: String): Float {

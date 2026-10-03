@@ -13,6 +13,7 @@ import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
 import androidx.core.view.updateLayoutParams
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -191,6 +192,9 @@ abstract class BaseKeyboard(
                 is ReturnKey -> InputFeedbacks.SoundEffect.Return
                 else -> InputFeedbacks.SoundEffect.Standard
             }
+            if (def is MicKey) {
+                contentDescription = context.getString(R.string.voice_input_button)
+            }
             if (def is SpaceKey) {
                 bindSpaceCursorSwipe()
             } else if (def is BackspaceKey) {
@@ -288,6 +292,26 @@ abstract class BaseKeyboard(
                     onAction(behavior.action)
                 }
             }
+            is KeyDef.Behavior.Hold -> bindHoldBehavior(behavior)
+        }
+    }
+
+    /**
+     * The long press starts the hold. [GestureType.Up] is dispatched for both a lifted and a
+     * cancelled touch, and for a touch that has slid off the key, so it ends the hold everywhere.
+     */
+    private fun KeyView.bindHoldBehavior(behavior: KeyDef.Behavior.Hold) {
+        val hold = HoldGesture(behavior)
+        setOnLongClickListener { _ ->
+            onAction(hold.onLongPress())
+            true
+        }
+        val oldOnGestureListener = onGestureListener ?: OnGestureListener.Empty
+        onGestureListener = OnGestureListener { view, event ->
+            if (event.type == GestureType.Up) {
+                hold.onRelease()?.let { onAction(it) }
+            }
+            oldOnGestureListener.onGesture(view, event)
         }
     }
 

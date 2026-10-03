@@ -218,6 +218,7 @@ data class GraphEnrichmentUiState(
             GraphEnrichmentPauseReason.LOW_MEMORY -> R.string.enrichment_pause_reason_low_memory
             GraphEnrichmentPauseReason.KEYBOARD_ACTIVE -> R.string.enrichment_pause_reason_keyboard_active
             GraphEnrichmentPauseReason.SCREEN_ON -> R.string.enrichment_pause_reason_screen_on
+            GraphEnrichmentPauseReason.NOT_CHARGING -> R.string.enrichment_pause_reason_not_charging
             GraphEnrichmentPauseReason.USER_STOPPED -> R.string.enrichment_pause_reason_user_stopped
             GraphEnrichmentPauseReason.LEASE_WAIT_TIMEOUT -> R.string.enrichment_pause_reason_lease_wait_timeout
             // Every controlled pause path records a concrete reason before returning - NONE surviving

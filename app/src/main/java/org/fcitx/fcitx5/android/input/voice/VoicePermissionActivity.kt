@@ -21,7 +21,15 @@ object VoicePermissionCoordinator {
     private val nextId = AtomicLong(1L)
     private val resumeQueue = VoicePermissionResumeQueue()
 
-    fun request(context: Context, target: VoiceEditorTarget): Long? {
+    /**
+     * [skipOnlineDisclosure] is for recognition that sends nothing from this app, so the
+     * screen asks only for the Android microphone permission.
+     */
+    fun request(
+        context: Context,
+        target: VoiceEditorTarget,
+        skipOnlineDisclosure: Boolean = false
+    ): Long? {
         val id = nextId.getAndIncrement()
         resumeQueue.begin(id, target)
         val launched = runCatching {
@@ -29,6 +37,7 @@ object VoicePermissionCoordinator {
                 Intent(context, VoicePermissionActivity::class.java)
                     .putExtra(VoicePermissionActivity.EXTRA_REQUEST_ID, id)
                     .putExtra(VoicePermissionActivity.EXTRA_MODE, VoicePermissionActivity.MODE_PERMISSION)
+                    .putExtra(VoicePermissionActivity.EXTRA_SKIP_ONLINE_DISCLOSURE, skipOnlineDisclosure)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
             )
         }.isSuccess
@@ -151,7 +160,9 @@ class VoicePermissionActivity : Activity() {
     }
 
     private fun beginMicrophoneFlow() {
-        if (!disclosureStore.hasAccepted(VoiceDisclosureKind.Microphone)) {
+        val skipOnlineDisclosure =
+            intent?.getBooleanExtra(EXTRA_SKIP_ONLINE_DISCLOSURE, false) == true
+        if (!skipOnlineDisclosure && !disclosureStore.hasAccepted(VoiceDisclosureKind.Microphone)) {
             showDisclosure(
                 kind = VoiceDisclosureKind.Microphone,
                 title = R.string.voice_microphone_disclosure_title,
@@ -239,6 +250,7 @@ class VoicePermissionActivity : Activity() {
     companion object {
         internal const val EXTRA_REQUEST_ID = "voice_permission_request_id"
         internal const val EXTRA_MODE = "voice_activity_mode"
+        internal const val EXTRA_SKIP_ONLINE_DISCLOSURE = "voice_skip_online_disclosure"
         internal const val MODE_PERMISSION = "permission"
         internal const val MODE_AUDIO_DOCUMENT = "audio_document"
         private const val INVALID_REQUEST_ID = -1L

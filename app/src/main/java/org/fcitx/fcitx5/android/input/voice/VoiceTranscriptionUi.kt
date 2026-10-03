@@ -9,9 +9,11 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.panel.PanelButtonKind
@@ -77,6 +79,19 @@ class VoiceTranscriptionUi(
             LinearLayout.LayoutParams.WRAP_CONTENT
         ))
     }
+    private val levelBar = View(context).apply {
+        pivotX = 0f
+        scaleX = 0f
+        background = context.panelSurface(theme.accentKeyBackgroundColor)
+    }
+    private val level = FrameLayout(context).apply {
+        visibility = View.GONE
+        background = context.panelSurface(theme.keyBackgroundColor)
+        addView(levelBar, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+    }
     private val primary = context.panelButton(theme, PanelButtonKind.Primary)
     private val secondary = context.panelButton(theme, PanelButtonKind.Secondary)
     private val meeting = context.panelButton(theme, PanelButtonKind.Secondary).apply {
@@ -92,6 +107,10 @@ class VoiceTranscriptionUi(
             0,
             1f
         ))
+        addView(level, matchWrap().apply {
+            height = dp(LEVEL_HEIGHT_DP)
+            bottomMargin = dp(PanelStyle.GAP_M_DP)
+        })
         addView(transcriptScroller, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
@@ -105,6 +124,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showReady(providerName: String, realtime: Boolean, showMeeting: Boolean) {
+        level.visibility = View.GONE
         title.setText(
             if (realtime) R.string.voice_realtime_title else R.string.voice_precision_title
         )
@@ -119,6 +139,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showPermissionRequired(denied: Boolean = false) {
+        level.visibility = View.GONE
         status.setText(
             if (denied) R.string.voice_permission_denied else R.string.voice_permission_required
         )
@@ -129,6 +150,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showRecording(elapsedSeconds: Int) {
+        level.visibility = View.GONE
         status.text = recordingStatus(context.getString(R.string.voice_recording, elapsedSeconds))
         transcriptScroller.visibility = View.GONE
         hideMeeting()
@@ -137,6 +159,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showRealtimeConnecting() {
+        level.visibility = View.GONE
         title.setText(R.string.voice_realtime_title)
         status.setText(R.string.voice_realtime_connecting)
         transcriptScroller.visibility = View.GONE
@@ -146,6 +169,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showRealtimeRecording(elapsedSeconds: Int, partial: String) {
+        level.visibility = View.GONE
         title.setText(R.string.voice_realtime_title)
         status.text = recordingStatus(
             context.getString(R.string.voice_realtime_recording, elapsedSeconds)
@@ -157,6 +181,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showRealtimeFinalizing(partial: String) {
+        level.visibility = View.GONE
         title.setText(R.string.voice_realtime_title)
         status.setText(R.string.voice_realtime_finalizing)
         showTranscript(partial)
@@ -166,6 +191,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showTranscribing() {
+        level.visibility = View.GONE
         status.setText(R.string.voice_transcribing_segment)
         transcriptScroller.visibility = View.GONE
         hideMeeting()
@@ -174,6 +200,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showPreview(text: String) {
+        level.visibility = View.GONE
         status.setText(R.string.voice_preview_instruction)
         transcript.text = text
         transcriptScroller.visibility = View.VISIBLE
@@ -187,6 +214,7 @@ class VoiceTranscriptionUi(
      * panel still offers the setting that unblocks it rather than a dead button.
      */
     fun showError(message: String, canRetry: Boolean, recovery: PanelRecovery? = null) {
+        level.visibility = View.GONE
         status.text = message
         transcriptScroller.visibility = View.GONE
         hideMeeting()
@@ -197,6 +225,7 @@ class VoiceTranscriptionUi(
     }
 
     fun showSetupRequired(message: String) {
+        level.visibility = View.GONE
         provider.text = ""
         status.text = message
         transcriptScroller.visibility = View.GONE
@@ -205,37 +234,82 @@ class VoiceTranscriptionUi(
         showBack()
     }
 
-    fun showDeviceDictation(
-        providerName: String,
-        message: String,
-        action: VoiceUnavailableAction,
-        showMeeting: Boolean
-    ) {
-        title.setText(
-            if (action == VoiceUnavailableAction.DeviceDictation) {
-                R.string.voice_device_dictation_title
-            } else {
-                R.string.voice_precision_title
-            }
-        )
-        provider.text = context.getString(R.string.voice_connection_label, providerName)
+    fun showDeviceReady(notice: String?, showMeeting: Boolean) {
+        showDeviceFrame(notice)
+        status.setText(R.string.voice_device_ready)
+        transcriptScroller.visibility = View.GONE
+        level.visibility = View.GONE
+        renderMeeting(showMeeting)
+        primary.showPanelAction(R.string.voice_device_start) { onStart?.invoke() }
+        showBack()
+    }
+
+    fun showDeviceStarting(notice: String?) {
+        showDeviceFrame(notice)
+        status.setText(R.string.voice_device_starting)
+        transcriptScroller.visibility = View.GONE
+        level.visibility = View.GONE
+        hideMeeting()
+        primary.showDisabledPanelAction(R.string.voice_device_starting_button)
+        showCancel()
+    }
+
+    fun showDeviceListening(notice: String?, partial: String) {
+        showDeviceFrame(notice)
+        status.text = recordingStatus(context.getString(R.string.voice_device_listening))
+        showTranscript(partial)
+        level.visibility = View.VISIBLE
+        hideMeeting()
+        primary.showPanelAction(R.string.voice_device_stop) { onStop?.invoke() }
+        showCancel()
+    }
+
+    fun showDeviceFinishing(notice: String?, partial: String) {
+        showDeviceFrame(notice)
+        status.setText(R.string.voice_device_finishing)
+        showTranscript(partial)
+        setDeviceLevel(0f)
+        level.visibility = View.GONE
+        hideMeeting()
+        primary.showDisabledPanelAction(R.string.voice_device_finishing_button)
+        showCancel()
+    }
+
+    fun showDeviceNoSpeech(notice: String?) {
+        showDeviceFrame(notice)
+        status.setText(R.string.voice_device_no_speech)
+        transcriptScroller.visibility = View.GONE
+        level.visibility = View.GONE
+        hideMeeting()
+        primary.showPanelAction(R.string.voice_device_speak_again) { onStart?.invoke() }
+        showBack()
+    }
+
+    /**
+     * The device cannot listen inside the keyboard. Another voice keyboard is only an extra way
+     * out; the primary action opens the setting that picks a different dictation method.
+     */
+    fun showDeviceUnavailable(message: String, canSwitchKeyboard: Boolean) {
+        showDeviceFrame(null)
         status.text = message
         transcriptScroller.visibility = View.GONE
-        renderMeeting(showMeeting)
-        primary.showPanelAction(
-            if (action == VoiceUnavailableAction.DeviceDictation) {
-                R.string.voice_use_device_dictation
-            } else {
-                R.string.ai_setup_action
-            }
-        ) {
-            if (action == VoiceUnavailableAction.DeviceDictation) {
-                onDeviceDictation?.invoke()
-            } else {
-                onSetupRequested?.invoke()
-            }
+        level.visibility = View.GONE
+        if (canSwitchKeyboard) {
+            showExtra(R.string.voice_use_other_voice_keyboard) { onDeviceDictation?.invoke() }
+        } else {
+            hideMeeting()
         }
+        primary.showPanelAction(R.string.ai_setup_action) { onSetupRequested?.invoke() }
         showBack()
+    }
+
+    fun setDeviceLevel(fraction: Float) {
+        levelBar.scaleX = fraction
+    }
+
+    private fun showDeviceFrame(notice: String?) {
+        title.setText(R.string.voice_device_dictation_title)
+        provider.text = notice.orEmpty()
     }
 
     /** Recording states carry a leading dot in the recording-red convention. */
@@ -262,17 +336,25 @@ class VoiceTranscriptionUi(
             hideMeeting()
             return
         }
+        showExtra(R.string.meeting_entry_button) { onMeeting?.invoke() }
+    }
+
+    private fun showExtra(@StringRes label: Int, action: () -> Unit) {
         meeting.apply {
             visibility = View.VISIBLE
             isEnabled = true
-            setText(R.string.meeting_entry_button)
-            setOnClickListener { onMeeting?.invoke() }
+            setText(label)
+            setOnClickListener { action() }
         }
     }
 
     private fun showTranscript(text: String) {
         transcript.text = text
         transcriptScroller.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+    }
+
+    private companion object {
+        const val LEVEL_HEIGHT_DP = 4
     }
 
     private fun matchWrap() = LinearLayout.LayoutParams(

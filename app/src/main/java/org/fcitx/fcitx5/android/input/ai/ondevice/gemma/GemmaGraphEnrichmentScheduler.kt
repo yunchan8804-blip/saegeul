@@ -51,7 +51,9 @@ internal fun decideManualGraphEnrichmentAction(
 /**
  * Schedules the on-device [GemmaGraphEnrichmentWorker]: a periodic automatic run (paired 1:1 with
  * material-generation's own automatic toggle, since both share the dashboard's single "automatic"
- * switch) and a manual one-shot run triggered from the dashboard button.
+ * switch) and a manual one-shot run triggered from the dashboard button. The periodic run only
+ * starts while charging (and the worker itself additionally requires the screen to be off, see
+ * [GemmaGenerationEligibility]); the manual run has no charging requirement.
  */
 object GemmaGraphEnrichmentScheduler {
 
@@ -78,19 +80,20 @@ object GemmaGraphEnrichmentScheduler {
 
     /**
      * Idempotently (re)registers the periodic automatic run when material-generation's own
-     * automatic toggle ([GemmaAccumulationState.enabled]) is on, without disturbing an
-     * already-scheduled run's next execution time ([ExistingPeriodicWorkPolicy.KEEP], unlike
-     * [setEnabled]'s [ExistingPeriodicWorkPolicy.UPDATE]). This exists because the periodic work
-     * is otherwise only (re-)registered when the user flips the automatic switch: a user who had it
-     * on before this feature shipped would otherwise never get the periodic work registered until
-     * they toggle it off and back on. Safe to call repeatedly (e.g. every time the dashboard is
-     * opened); a no-op when automatic is off.
+     * automatic toggle ([GemmaAccumulationState.enabled]) is on, with
+     * [ExistingPeriodicWorkPolicy.UPDATE] so an already-registered run picks up the current
+     * constraints (an older build registered it without the charging requirement) while keeping its
+     * schedule and any run already in progress. This exists because the periodic work is otherwise
+     * only (re-)registered when the user flips the automatic switch: a user who had it on before
+     * this feature shipped would otherwise never get the periodic work registered until they toggle
+     * it off and back on. Safe to call repeatedly (e.g. every time the dashboard is opened); a
+     * no-op when automatic is off.
      */
     suspend fun reconcileAutomaticIfEnabled(context: Context) = withContext(Dispatchers.IO) {
         val applicationContext = context.applicationContext
         val automaticEnabled = GemmaAccumulationStore.get(applicationContext).load().enabled
         if (!automaticEnabled) return@withContext
-        enqueuePeriodic(WorkManager.getInstance(applicationContext), ExistingPeriodicWorkPolicy.KEEP)
+        enqueuePeriodic(WorkManager.getInstance(applicationContext), ExistingPeriodicWorkPolicy.UPDATE)
     }
 
     private fun enqueuePeriodic(workManager: WorkManager, policy: ExistingPeriodicWorkPolicy) {
@@ -101,6 +104,7 @@ object GemmaGraphEnrichmentScheduler {
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiresBatteryNotLow(true)
+                        .setRequiresCharging(true)
                         .build()
                 )
                 .build()

@@ -684,8 +684,15 @@ class InputView(
             info.fieldId,
             info.inputType
         )?.let { voiceResume ->
-            windowManager.attachWindow(VoiceTranscriptionWindow(voiceResume))
+            if (!kawaiiBar.resumeInlineDictation(voiceResume)) {
+                windowManager.attachWindow(VoiceTranscriptionWindow(voiceResume))
+            }
         }
+    }
+
+    /** The keyboard is going away: dictation must give the microphone back. */
+    fun finishInlineDictation() {
+        kawaiiBar.closeInlineDictation()
     }
 
     override fun onStartHandleFcitxEvent() {

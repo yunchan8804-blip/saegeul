@@ -4,10 +4,13 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rag
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -343,6 +346,174 @@ class PersonalGraphEnricherTest {
         val chunks = PersonalGraphEnricher.chunksFor(sentences, maxCharsPerChunk = 8)
 
         assertEquals(listOf("가나다라마바사", "아자차카타파하"), chunks)
+    }
+
+    @Test
+    fun chunksForCutsASingleLongSentenceToTheLimitKeepingItsFrontInsteadOfDroppingIt() {
+        val longSentence = "가".repeat(30) + "끝"
+
+        val chunks = PersonalGraphEnricher.chunksFor(listOf(longSentence), maxCharsPerChunk = 12)
+
+        assertEquals(listOf("가".repeat(12)), chunks)
+    }
+
+    @Test
+    fun chunksForSplitsExactlyWhenTheJoinedChunkWouldExceedTheLimit() {
+        val sentences = listOf("가나다", "라마바", "사아자")
+
+        assertEquals(listOf("가나다\n라마바", "사아자"), PersonalGraphEnricher.chunksFor(sentences, maxCharsPerChunk = 7))
+        assertEquals(listOf("가나다", "라마바", "사아자"), PersonalGraphEnricher.chunksFor(sentences, maxCharsPerChunk = 6))
+        assertEquals(listOf("가나다\n라마바\n사아자"), PersonalGraphEnricher.chunksFor(sentences, maxCharsPerChunk = 11))
+    }
+
+    @Test
+    fun chunksForNeverProducesAChunkOverTheLimitForManyShortSentences() {
+        val sentences = (0 until 200).map { "문장${(0xAC00 + it).toChar()}" }
+
+        val chunks = PersonalGraphEnricher.chunksFor(sentences, maxCharsPerChunk = 40)
+
+        assertTrue(chunks.all { it.length <= 40 })
+        assertEquals(sentences, chunks.flatMap { it.split('\n') })
+    }
+
+    private class NativeError(message: String) : RuntimeException(message)
+
+    private fun jsonFor(id: String) =
+        """{"nodes":[{"id":"$id","tags":[],"w":1.0}],"edges":[],"topics":[]}"""
+
+    @Test
+    fun isTokenOverflowRecognizesTheNativeMessageAndNothingElse() {
+        val nativeMessage =
+            "13 INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 2417 >= 2048"
+
+        assertTrue(PersonalGraphEnricher.isTokenOverflow(NativeError(nativeMessage)))
+        assertTrue(PersonalGraphEnricher.isTokenOverflow(NativeError("Exceeding the Maximum Number Of Tokens")))
+        assertTrue(PersonalGraphEnricher.isTokenOverflow(IllegalStateException("wrapped", NativeError(nativeMessage))))
+        assertFalse(PersonalGraphEnricher.isTokenOverflow(NativeError("INTERNAL: decoder crashed")))
+        assertFalse(PersonalGraphEnricher.isTokenOverflow(RuntimeException()))
+    }
+
+    @Test
+    fun enrichChunkSplittingOnOverflowDoesNotSplitWhenTheEngineAccepts() = runBlocking {
+        var calls = 0
+
+        val result = PersonalGraphEnricher.enrichChunkSplittingOnOverflow("가\n나", maxSentenceChars = 10) { _, _ ->
+            calls++
+            listOf(validGraphJson)
+        }
+
+        assertEquals(1, calls)
+        assertEquals(GraphEnrichmentChunkOutcome.VALID, result.outcome)
+        assertEquals(0, result.skippedSentences)
+    }
+
+    @Test
+    fun enrichChunkSplittingOnOverflowRetriesHalvesAndMergesTheirGraphs() = runBlocking {
+        val inputs = mutableListOf<String>()
+        val chunk = "가가가가가가가\n나나나나나나나\n다다다다다다다\n라라라라라라라"
+
+        val result = PersonalGraphEnricher.enrichChunkSplittingOnOverflow(chunk, maxSentenceChars = 100) { _, input ->
+            inputs += input
+            if (input.length > 20) throw NativeError("Input token ids are too long")
+            listOf(jsonFor(input.first().toString()))
+        }
+
+        assertEquals(listOf(chunk, "가가가가가가가\n나나나나나나나", "다다다다다다다\n라라라라라라라"), inputs)
+        assertEquals(GraphEnrichmentChunkOutcome.VALID, result.outcome)
+        assertEquals(setOf("가", "다"), result.nodes.map { it.id }.toSet())
+        assertEquals(0, result.skippedSentences)
+    }
+
+    @Test
+    fun enrichChunkSplittingOnOverflowKeepsHalvingDownToSingleSentences() = runBlocking {
+        val inputs = mutableListOf<String>()
+        val chunk = (1..4).joinToString("\n") { "문장$it" }
+
+        val result = PersonalGraphEnricher.enrichChunkSplittingOnOverflow(chunk, maxSentenceChars = 100) { _, input ->
+            inputs += input
+            if ('\n' in input) throw NativeError("maximum number of tokens exceeded")
+            listOf(jsonFor(input))
+        }
+
+        assertEquals(setOf("문장1", "문장2", "문장3", "문장4"), result.nodes.map { it.id }.toSet())
+        assertEquals(0, result.skippedSentences)
+        assertEquals(chunk, inputs.first())
+        assertEquals(1 + 2 + 4, inputs.size)
+    }
+
+    @Test
+    fun enrichChunkSplittingOnOverflowSkipsASentenceTheEngineStillRejectsAlone() = runBlocking {
+        val chunk = "정상 문장\n거부되는 문장"
+
+        val result = PersonalGraphEnricher.enrichChunkSplittingOnOverflow(chunk, maxSentenceChars = 100) { _, input ->
+            if ("거부" in input) throw NativeError("Input token ids are too long")
+            listOf(validGraphJson)
+        }
+
+        assertEquals(GraphEnrichmentChunkOutcome.VALID, result.outcome)
+        assertEquals(1, result.skippedSentences)
+        assertTrue(result.nodes.isNotEmpty())
+    }
+
+    @Test
+    fun enrichChunkSplittingOnOverflowSkipsEverythingWithoutFailingWhenNothingFits() = runBlocking {
+        val result = PersonalGraphEnricher.enrichChunkSplittingOnOverflow("가\n나\n다", maxSentenceChars = 100) { _, _ ->
+            throw NativeError("Input token ids are too long")
+        }
+
+        assertEquals(GraphEnrichmentChunkOutcome.EMPTY_OUTPUT, result.outcome)
+        assertEquals(3, result.skippedSentences)
+        assertTrue(result.nodes.isEmpty())
+    }
+
+    @Test
+    fun enrichChunkSplittingOnOverflowRetriesAnOverlongSingleSentenceCutToTheLimit() = runBlocking {
+        val inputs = mutableListOf<String>()
+        val sentence = "가".repeat(30)
+
+        val result = PersonalGraphEnricher.enrichChunkSplittingOnOverflow(sentence, maxSentenceChars = 10) { _, input ->
+            inputs += input
+            if (input.length > 10) throw NativeError("Input token ids are too long")
+            listOf(validGraphJson)
+        }
+
+        assertEquals(listOf(sentence, "가".repeat(10)), inputs)
+        assertEquals(GraphEnrichmentChunkOutcome.VALID, result.outcome)
+        assertEquals(0, result.skippedSentences)
+    }
+
+    @Test
+    fun enrichChunkSplittingOnOverflowLeavesOtherEngineErrorsAsFailures() {
+        var calls = 0
+        val engineError = NativeError("INTERNAL: decoder crashed")
+
+        val thrown = assertThrows(NativeError::class.java) {
+            runBlocking {
+                PersonalGraphEnricher.enrichChunkSplittingOnOverflow("가\n나", maxSentenceChars = 10) { _, _ ->
+                    calls++
+                    throw engineError
+                }
+            }
+        }
+
+        assertSame(engineError, thrown)
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun enrichChunkSplittingOnOverflowDoesNotSwallowCancellation() {
+        var calls = 0
+
+        assertThrows(CancellationException::class.java) {
+            runBlocking {
+                PersonalGraphEnricher.enrichChunkSplittingOnOverflow("가\n나", maxSentenceChars = 10) { _, _ ->
+                    calls++
+                    throw CancellationException("input too long but cancelled")
+                }
+            }
+        }
+
+        assertEquals(1, calls)
     }
 
     @Test

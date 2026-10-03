@@ -552,7 +552,10 @@ class AutomaticSuggestionController(
      * 화면 그리기와 GPU를 다퉈 키보드가 1초 넘게 멈춘다.
      */
     private suspend fun awaitWarmupWindow(since: Long) {
-        while (!OnDeviceSharedEngine.isWarm && OnDeviceGenerationControl.isInputViewVisible) {
+        // CPU 초기화는 GPU를 쓰지 않아 키보드 그리기를 멈추지 않으므로 숨겨질 때까지 기다리지 않는다.
+        while (automaticSuggestionsUseGpuInternal && !OnDeviceSharedEngine.isWarm &&
+            OnDeviceGenerationControl.isInputViewVisible
+        ) {
             delay(AUTOMATIC_SUGGESTION_WARMUP_HIDDEN_POLL_MS)
         }
         if (OnDeviceGenerationControl.isInputViewVisible) awaitEditorIdle(since)

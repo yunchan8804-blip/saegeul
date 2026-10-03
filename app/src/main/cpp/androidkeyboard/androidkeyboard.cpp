@@ -297,8 +297,9 @@ bool AndroidKeyboardEngine::updateBuffer(InputContext *inputContext, const KeyEv
     }
 
     auto *state = inputContext->propertyFor(&factory_);
-    // word hint is disabled, input is password, or language not supported
+    // word hint is disabled, input is password, client cannot render preedit, or language not supported
     if (!*config_.enableWordHint ||
+        !inputContext->capabilityFlags().test(CapabilityFlag::Preedit) ||
         (!*config_.hintOnPhysicalKeyboard && !event.isVirtual()) ||
         (*config_.editorControlledWordHint && inputContext->capabilityFlags().test(CapabilityFlag::NoSpellCheck)) ||
         inputContext->capabilityFlags().test(CapabilityFlag::Password) ||

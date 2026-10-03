@@ -309,6 +309,8 @@ class PredictionMetricsStore(
         val TYPO_SOURCES = setOf(
             "typo_personal",
             "typo_keyboard",
+            "typo_keyboard_stem",
+            "typo_keyboard_known",
             "typo_correction",
             "typo_word_correction",
             "typo_sentence_correction"

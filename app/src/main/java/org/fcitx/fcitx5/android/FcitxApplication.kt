@@ -16,6 +16,7 @@ import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import androidx.work.Configuration as WorkConfiguration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackRepository
 import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher
+import org.fcitx.fcitx5.android.input.policy.DirectBootInputPolicy
 import org.fcitx.fcitx5.android.data.points.LevelRewardStore
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.VaultHabitStore
@@ -53,7 +55,13 @@ import timber.log.Timber
 import java.io.File
 import kotlin.system.exitProcess
 
-class FcitxApplication : Application() {
+class FcitxApplication : Application(), WorkConfiguration.Provider {
+
+    /**
+     * WorkManager starts on its first use instead of at process start, because its default
+     * initializer opens a credential-encrypted database and kills the process in Direct Boot.
+     */
+    override val workManagerConfiguration: WorkConfiguration = WorkConfiguration.Builder().build()
 
     val coroutineScope = MainScope() + CoroutineName("FcitxApplication")
 
@@ -61,7 +69,18 @@ class FcitxApplication : Application() {
         kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
     )
 
+    /**
+     * Credential-encrypted storage (filesDir, noBackupFilesDir, default SharedPreferences) does not
+     * exist in Direct Boot. Every lazy below that reads or writes it calls this first, so a caller
+     * that reaches it before the first unlock fails at once with the offending name instead of
+     * failing later inside a storage API.
+     */
+    private fun requireCredentialStorage(name: String) {
+        DirectBootInputPolicy.requireCredentialProtectedStorage(isDirectBootMode, name)
+    }
+
     val typingDnaRepository: TypingDnaRepository by lazy {
+        requireCredentialStorage("typingDnaRepository")
         TypingDnaRepository.onSentencesAnalyzed = { analyzed, newLevel ->
             val now = System.currentTimeMillis()
             VaultHabitStore(this).record(now, analyzed)
@@ -71,6 +90,7 @@ class FcitxApplication : Application() {
     }
 
     val typingDnaVault: TypingDnaVault by lazy {
+        requireCredentialStorage("typingDnaVault")
         TypingDnaVault(
             stagingFile = File(filesDir, "typing_dna_pending.json"),
             cipher = vaultCipher,
@@ -79,34 +99,44 @@ class FcitxApplication : Application() {
     }
 
     val collectionDiagnostics: org.fcitx.fcitx5.android.input.ai.CollectionDiagnostics by lazy {
+        requireCredentialStorage("collectionDiagnostics")
         org.fcitx.fcitx5.android.input.ai.CollectionDiagnostics(this)
     }
 
     val personalNgramModel: PersonalNgramModel by lazy {
+        requireCredentialStorage("personalNgramModel")
         PersonalNgramModel(storeFile = File(filesDir, "personal_ngram.json"), cipher = vaultCipher)
     }
 
     val personalSentenceVault: PersonalSentenceVault by lazy {
+        requireCredentialStorage("personalSentenceVault")
         PersonalSentenceVault(storeFile = File(filesDir, "personal_rag.json"), cipher = vaultCipher)
     }
 
     val generatedSentenceBank: GeneratedSentenceBank by lazy {
+        requireCredentialStorage("generatedSentenceBank")
         GeneratedSentenceBank(file = File(noBackupFilesDir, "gemma_materials.json"), cipher = vaultCipher)
     }
 
     val sentencePacks: SentencePackRepository by lazy {
+        requireCredentialStorage("sentencePacks")
         SentencePackRepository(this, applicationScope) {
             !AppPrefs.getInstance().advanced.offlineMode.getValue()
         }
     }
 
     val personalGraphStore: org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore by lazy {
+        requireCredentialStorage("personalGraphStore")
         org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore(storeFile = File(filesDir, "personal_graph.json"), cipher = vaultCipher)
     }
 
-    val vaultCipher: KeystoreVaultCipher by lazy { KeystoreVaultCipher() }
+    val vaultCipher: KeystoreVaultCipher by lazy {
+        requireCredentialStorage("vaultCipher")
+        KeystoreVaultCipher()
+    }
 
     val predictionMetricsStore: PredictionMetricsStore by lazy {
+        requireCredentialStorage("predictionMetricsStore")
         PredictionMetricsStore(storeFile = File(filesDir, "prediction_metrics.json"), cipher = vaultCipher)
     }
 
@@ -120,34 +150,45 @@ class FcitxApplication : Application() {
         private set
 
     val correctionPatternStore: CorrectionPatternStore by lazy {
+        requireCredentialStorage("correctionPatternStore")
         CorrectionPatternStore(storeFile = File(filesDir, "personal_corrections.json"), cipher = vaultCipher)
     }
 
     val typoCorrector: KeyboardAwareTypoCorrector by lazy {
+        requireCredentialStorage("typoCorrector")
         KeyboardAwareTypoCorrector(substitutionCost = correctionPatternStore::personalizedSubstitutionCost)
     }
 
     /**
      * 기본 어휘 TSV와 개인 n-gram 유니그램을 오타 교정 트라이에 미리 채워 둔다.
      * 실패해도 앱 기동에는 영향이 없어야 하므로 예외는 삼키지 않고 로그만 남긴다.
+     *
+     * Direct Boot에서는 문장팩·생성 문장 은행·개인 n-gram·오타 교정 트라이(개인 교정 기록에 기대는)가
+     * 모두 잠금 해제 전에는 없는 저장소를 쓰므로 건너뛰고, 앱 번들(assets)만 읽는다.
      */
     fun warmUpLanguageAssets() {
-        sentencePacks.prepare()
-        if (OnDeviceAiSupport.isSupported) {
-            applicationScope.launch {
-                try {
-                    generatedSentenceBank.load()
-                } catch (e: Exception) {
-                    Timber.w("Generated sentence material load failed: ${e.javaClass.simpleName}")
+        val credentialStorageAvailable =
+            DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootMode)
+        if (credentialStorageAvailable) {
+            sentencePacks.prepare()
+            if (OnDeviceAiSupport.isSupported) {
+                applicationScope.launch {
+                    try {
+                        generatedSentenceBank.load()
+                    } catch (e: Exception) {
+                        Timber.w("Generated sentence material load failed: ${e.javaClass.simpleName}")
+                    }
                 }
             }
         }
         coroutineScope.launch(Dispatchers.IO) {
             try {
                 baseKoreanVocabulary.load()
-                baseKoreanVocabulary.forEachWord(BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) { word, prior -> typoCorrector.addWord(word, prior) }
-                personalNgramModel.forEachUnigram { word, count ->
-                    typoCorrector.addWord(word, PersonalNgramModel.personalPrior(count))
+                if (credentialStorageAvailable) {
+                    baseKoreanVocabulary.forEachWord(BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) { word, prior -> typoCorrector.addWord(word, prior) }
+                    personalNgramModel.forEachUnigram { word, count ->
+                        typoCorrector.addWord(word, PersonalNgramModel.personalPrior(count))
+                    }
                 }
             } catch (e: Exception) {
                 Timber.w(e, "Failed to warm up language assets")

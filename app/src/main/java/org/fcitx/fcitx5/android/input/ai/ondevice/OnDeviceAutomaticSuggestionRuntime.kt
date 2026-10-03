@@ -20,7 +20,7 @@ import java.io.File
 /** Native backend for the automatic coordinator, gated per-device by [OnDeviceAiSupport]. */
 class OnDeviceAutomaticSuggestionRuntime(
     context: Context,
-    useGpu: Boolean = true
+    private val useGpu: Boolean = true
 ) : OnDeviceSuggestionCoordinator.Backend {
 
     private val appContext = context.applicationContext
@@ -101,10 +101,11 @@ class OnDeviceAutomaticSuggestionRuntime(
 
     /**
      * 키보드가 떠 있는 동안에는 차가운 엔진을 GPU로 초기화하지 않는다. GPU 가중치 변환이 화면 그리기와 GPU를
-     * 다퉈 키보드가 1초 넘게 멈추기 때문이다. 초기화는 키보드가 숨겨진 뒤 워밍업이 맡는다.
+     * 다퉈 키보드가 1초 넘게 멈추기 때문이다. 초기화는 키보드가 숨겨진 뒤 워밍업이 맡는다. CPU 백엔드는 화면
+     * 그리기와 GPU를 다투지 않으므로 키보드가 떠 있어도 바로 초기화한다.
      */
     override fun isReadyToGenerate(): Boolean =
-        engine.isWarm || OnDeviceSharedEngine.isWarm || !OnDeviceGenerationControl.isInputViewVisible
+        !useGpu || engine.isWarm || OnDeviceSharedEngine.isWarm || !OnDeviceGenerationControl.isInputViewVisible
 
     override suspend fun close() {
         val pending = synchronized(preparationLock) { preparation }

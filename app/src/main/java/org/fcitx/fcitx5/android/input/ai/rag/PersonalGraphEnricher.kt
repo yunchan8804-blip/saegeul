@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rag
 
+import kotlinx.coroutines.CancellationException
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.json.JSONObject
 
@@ -19,12 +20,15 @@ enum class GraphEnrichmentChunkOutcome {
  * Result of enriching a single chunk via [PersonalGraphEnricher.enrichChunk]: the parse [outcome],
  * plus any nodes/edges/topics that parsed successfully with PII-flagged node ids and topic members
  * already dropped. Empty lists when [outcome] is not [GraphEnrichmentChunkOutcome.VALID].
+ * [skippedSentences] counts sentences dropped because the engine rejected even that one sentence
+ * alone as too long for its context (see [PersonalGraphEnricher.enrichChunkSplittingOnOverflow]).
  */
 data class ChunkEnrichResult(
     val outcome: GraphEnrichmentChunkOutcome,
     val nodes: List<PersonalGraphStore.Node> = emptyList(),
     val edges: List<PersonalGraphStore.Edge> = emptyList(),
-    val topics: List<PersonalGraphStore.Topic> = emptyList()
+    val topics: List<PersonalGraphStore.Topic> = emptyList(),
+    val skippedSentences: Int = 0
 )
 
 /**
@@ -100,7 +104,10 @@ class PersonalGraphEnricher(
     companion object {
         const val ENRICHMENT_INSTRUCTION = """다음은 한 사용자가 실제로 입력한 한국어 문장들이다. 이 문장들에서 자주 쓰는 핵심 어절/구절과 그 사이의 관계를 추출해 개인 지식 그래프를 만들어라. 다른 설명 없이, 정확히 1개의 제안으로 아래 형식의 JSON 객체 문자열만 반환하라: {"nodes":[{"id":"어절","tags":["주제"],"w":가중치}],"edges":[{"a":"어절1","b":"어절2","w":관계강도}],"topics":[{"id":"t0","label":"주제명","members":["어절"]}]}. 개인정보(이름·번호 등)는 노드로 만들지 마라. Return exactly 1 suggestion."""
 
-        /** Greedily packs [sentences] (newline-joined) into chunks no longer than [maxCharsPerChunk]. */
+        /**
+         * Greedily packs [sentences] (newline-joined) into chunks no longer than [maxCharsPerChunk];
+         * a single sentence longer than that is cut to [maxCharsPerChunk] (front kept), never dropped.
+         */
         fun chunksFor(sentences: List<String>, maxCharsPerChunk: Int = 3500): List<String> =
             packSentencesIntoChunks(sentences, maxCharsPerChunk)
 
@@ -125,6 +132,61 @@ class PersonalGraphEnricher(
                 topic.copy(members = topic.members.filterNot { KoreanPiiScrubber.containsPii(it) })
             }
             return ChunkEnrichResult(parsed.outcome, safeNodes, safeEdges, safeTopics)
+        }
+
+        /**
+         * Whether [error] (or anything in its cause chain) is the engine rejecting a prompt for
+         * exceeding its token limit. Identified by the native message text only - an engine error of
+         * any other kind is not an overflow and must stay a failure.
+         */
+        fun isTokenOverflow(error: Throwable): Boolean = generateSequence(error) { it.cause }.any { cause ->
+            cause.message?.let { message ->
+                message.contains("too long", ignoreCase = true) ||
+                    message.contains("maximum number of tokens", ignoreCase = true)
+            } == true
+        }
+
+        /**
+         * [enrichChunk] that survives the engine rejecting [chunk] as too long: the chunk is split
+         * in half (by sentence lines) and each half is enriched on its own, recursively, and the
+         * fragments are merged. A single sentence longer than [maxSentenceChars] is retried cut to
+         * that length (front kept); a single sentence the engine still rejects is skipped and
+         * counted in [ChunkEnrichResult.skippedSentences] rather than failing the whole cycle. Any
+         * other error - including cancellation and lease loss - propagates unchanged.
+         */
+        suspend fun enrichChunkSplittingOnOverflow(
+            chunk: String,
+            maxSentenceChars: Int,
+            generate: suspend (instruction: String, input: String) -> List<String>
+        ): ChunkEnrichResult {
+            try {
+                return enrichChunk(chunk, generate)
+            } catch (error: Exception) {
+                if (error is CancellationException || !isTokenOverflow(error)) throw error
+            }
+            val lines = chunk.split('\n')
+            if (lines.size > 1) {
+                val middle = lines.size / 2
+                val first = enrichChunkSplittingOnOverflow(lines.take(middle).joinToString("\n"), maxSentenceChars, generate)
+                val second = enrichChunkSplittingOnOverflow(lines.drop(middle).joinToString("\n"), maxSentenceChars, generate)
+                return mergeChunkResults(listOf(first, second))
+            }
+            if (chunk.length > maxSentenceChars) {
+                return enrichChunkSplittingOnOverflow(chunk.take(maxSentenceChars), maxSentenceChars, generate)
+            }
+            return ChunkEnrichResult(GraphEnrichmentChunkOutcome.EMPTY_OUTPUT, skippedSentences = 1)
+        }
+
+        private fun mergeChunkResults(parts: List<ChunkEnrichResult>): ChunkEnrichResult {
+            val skipped = parts.sumOf { it.skippedSentences }
+            val valid = parts.filter { it.outcome == GraphEnrichmentChunkOutcome.VALID }
+            if (valid.isEmpty()) return ChunkEnrichResult(parts.first().outcome, skippedSentences = skipped)
+            val merged = valid.drop(1).fold(Triple(valid.first().nodes, valid.first().edges, valid.first().topics)) { acc, part ->
+                mergeGraphs(acc.first, acc.second, acc.third, part.nodes, part.edges, part.topics)
+            }
+            return ChunkEnrichResult(
+                GraphEnrichmentChunkOutcome.VALID, merged.first, merged.second, merged.third, skipped
+            )
         }
 
         /**
@@ -157,8 +219,9 @@ class PersonalGraphEnricher(
 private fun packSentencesIntoChunks(sentences: List<String>, maxCharsPerChunk: Int): List<String> {
     val chunks = mutableListOf<String>()
     val current = StringBuilder()
+    val pieceCap = minOf(HARD_CHAR_CAP, maxCharsPerChunk)
     for (sentence in sentences) {
-        val piece = sentence.take(HARD_CHAR_CAP)
+        val piece = sentence.take(pieceCap)
         when {
             current.isEmpty() -> current.append(piece)
             current.length + 1 + piece.length <= maxCharsPerChunk -> current.append('\n').append(piece)

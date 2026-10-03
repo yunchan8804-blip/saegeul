@@ -307,7 +307,7 @@
     <string name="theme_migrated">Theme has been migrated to the current version</string>
     <string name="keep_keyboard_letters_uppercase">Keep keyboard letters uppercase</string>
     <string name="buffered_hangul_input" tools:ignore="MissingTranslation">Buffered Hangul compatibility mode</string>
-    <string name="buffered_hangul_input_summary" tools:ignore="MissingTranslation">Keep Hangul composition inside Fcitx and send each completed segment as one unit. Experimental; verify behavior in the target app.</string>
+    <string name="buffered_hangul_input_summary" tools:ignore="MissingTranslation">Keep Hangul composition inside the keyboard and send each completed segment as one unit; English letters are sent as soon as they are typed. Turn on for apps such as remote desktops that do not show text being composed.</string>
     <string name="auto_snippet_expansion" tools:ignore="MissingTranslation">Automatic snippet expansion</string>
     <string name="auto_snippet_expansion_summary" tools:ignore="MissingTranslation">Expand built-in aliases such as :address1 and enabled quick-phrase keywords beginning with : when Space or Enter is pressed</string>
     <string name="offline_mode" tools:ignore="MissingTranslation">Completely offline mode</string>
@@ -404,7 +404,9 @@
     <string name="path_conflict">Path \"%1$s\" is already owned by %2$s</string>
     <string name="main_program">main program</string>
     <string name="edit_theme">Edit Theme</string>
-    <string name="show_voice_input_button">Show voice input button</string>
+    <string name="show_voice_input_button">Show microphone key on keyboard</string>
+    <string name="show_voice_input_button_summary">Puts a microphone key next to the language key on the bottom row. Tap to dictate, or hold to dictate only while you press.</string>
+    <string name="voice_key_blocked">Dictation is not available in this field</string>
     <string name="fcitx_daemon">Fcitx Daemon</string>
     <string name="restarting_fcitx">Restarting Fcitx</string>
     <string name="plugin_needs_reload">Plugin changes detected, click here to reload</string>
@@ -726,16 +728,16 @@
     <string name="personal_dictionary_privacy_summary">Stored in app-owned no-backup storage and excluded from user-data export. The keyboard never learns input automatically or stores source text, selection history, or app package names. Personal candidates are disabled in password, private, no-spellcheck, and no-personalized-learning editors.</string>
     <string name="voice_provider_settings">Voice dictation</string>
     <string name="voice_provider_mode_title">Dictation method</string>
-    <string name="voice_provider_mode_device">Device dictation (recommended)</string>
+    <string name="voice_provider_mode_device">Saegeul dictation (recommended)</string>
     <string name="voice_provider_mode_openai_realtime">OpenAI realtime dictation</string>
     <string name="voice_provider_mode_openai">OpenAI API precision transcription</string>
-    <string name="voice_provider_mode_device_summary">Uses the device voice input. This app does not send an STT API key.</string>
+    <string name="voice_provider_mode_device_summary">Uses the device speech recognition right inside the keyboard. The keyboard is not switched.</string>
     <string name="voice_provider_mode_openai_realtime_summary">Streams audio to the official OpenAI Realtime API and previews transcript deltas while you speak.</string>
     <string name="voice_provider_mode_openai_summary">Sends audio to the official OpenAI Audio API only after recording stops.</string>
     <string name="voice_openai_api_settings">OpenAI speech-to-text</string>
     <string name="voice_provider_status_missing">Not connected · enter a separate STT API key</string>
     <string name="voice_provider_status_optional_missing">Optional · set this up only if you want OpenAI realtime or higher-accuracy transcription</string>
-    <string name="voice_provider_status_optional_configured">Ready when selected · %1$s · not used by device dictation</string>
+    <string name="voice_provider_status_optional_configured">Ready when selected · %1$s · not used by Saegeul dictation</string>
     <string name="voice_provider_status_unreadable">The encrypted STT setting cannot be read · remove and reconnect it</string>
     <string name="voice_provider_configured_summary">Connected · %1$s · Keystore encrypted</string>
     <string name="voice_models_configured">precision %1$s / realtime %2$s</string>
@@ -748,13 +750,10 @@
     <string name="voice_provider_save_failed">Could not save the voice transcription setting</string>
     <string name="voice_provider_saved">OpenAI speech-to-text connected</string>
     <string name="voice_provider_key_remove">Remove STT API key</string>
-    <string name="voice_provider_key_remove_confirm">Remove the separately stored STT API key and return to device dictation?</string>
-    <string name="voice_provider_removed">STT API key removed · device dictation selected</string>
+    <string name="voice_provider_key_remove_confirm">Remove the separately stored STT API key and return to Saegeul dictation?</string>
+    <string name="voice_provider_removed">STT API key removed · Saegeul dictation selected</string>
     <string name="voice_provider_setup_required">OpenAI online transcription is selected, but its separate STT API key is missing. Connect it in Voice dictation settings.</string>
     <string name="voice_provider_auth_failed">OpenAI rejected the STT API key. Reconnect it in Voice dictation settings.</string>
-    <string name="voice_device_provider_name">Device voice input</string>
-    <string name="voice_device_dictation_ready">Your selected device voice input handles speech and inserts its result directly into the current field.</string>
-    <string name="voice_device_dictation_unavailable">No device voice input is enabled. Enable one or connect OpenAI speech-to-text in settings.</string>
     <string name="voice_openai_provider_name">OpenAI speech-to-text</string>
     <string name="voice_openai_provider_label">OpenAI STT · %1$s</string>
     <string name="voice_openai_realtime_provider_label">OpenAI realtime STT · %1$s</string>
@@ -767,8 +766,42 @@
     <string name="voice_realtime_recording">Live recording %1$d sec · stop to review the final transcript</string>
     <string name="voice_realtime_finalizing">Recording stopped · finalizing the transcript…</string>
     <string name="voice_record_start">Start recording</string>
-    <string name="voice_device_dictation_title">Device dictation</string>
-    <string name="voice_use_device_dictation">Use device dictation</string>
+    <string name="voice_device_dictation_title">Saegeul dictation</string>
+    <string name="voice_input_button">Voice input</string>
+    <string name="voice_device_ready">Tap Start speaking, then talk.</string>
+    <string name="voice_device_start">Start speaking</string>
+    <string name="voice_device_starting">Getting ready…</string>
+    <string name="voice_device_starting_button">Getting ready…</string>
+    <string name="voice_device_listening">Listening</string>
+    <string name="voice_device_stop">Stop</string>
+    <string name="voice_device_finishing">Turning your voice into text…</string>
+    <string name="voice_device_finishing_button">Working…</string>
+    <string name="voice_device_no_speech">I could not hear any speech</string>
+    <string name="voice_device_speak_again">Speak again</string>
+    <string name="voice_device_service_notice">The device speech service processes your voice</string>
+    <string name="voice_device_unavailable">This device cannot dictate inside the keyboard. You can pick another method in settings.</string>
+    <string name="voice_device_unavailable_offline">Network input is blocked right now, and this device has no on-device speech recognizer.</string>
+    <string name="voice_device_error">Dictation did not work. Please speak again.</string>
+    <string name="voice_device_error_language">This device cannot recognize this language right now.</string>
+    <string name="voice_device_error_busy">Speech recognition is in use elsewhere. Please try again in a moment.</string>
+    <string name="voice_device_error_network">Speech recognition failed because of a network problem.</string>
+    <string name="voice_use_other_voice_keyboard">Switch to another voice keyboard</string>
+    <string name="voice_strip_starting">Getting ready</string>
+    <string name="voice_strip_prompt">Go ahead and speak</string>
+    <string name="voice_strip_finishing">Turning it into text</string>
+    <string name="voice_strip_service_notice">The device speech service handles your voice</string>
+    <string name="voice_strip_paused_user">Paused — tap the microphone to listen again</string>
+    <string name="voice_strip_paused_silence">No voice heard — tap the microphone to listen again</string>
+    <string name="voice_strip_paused_language">This language cannot be recognized right now — tap the microphone to try again</string>
+    <string name="voice_strip_paused_busy">Speech recognition is in use elsewhere — tap the microphone to try again</string>
+    <string name="voice_strip_paused_network">Network problem — tap the microphone to try again</string>
+    <string name="voice_strip_paused_other">Dictation did not work — tap the microphone to try again</string>
+    <string name="voice_strip_paused_insert">Could not put the text in — tap the microphone to try again</string>
+    <string name="voice_strip_permission">Microphone permission is needed</string>
+    <string name="voice_strip_mic_pause">Pause dictation</string>
+    <string name="voice_strip_mic_resume">Listen again</string>
+    <string name="voice_strip_erase">Erase what was just dictated</string>
+    <string name="voice_strip_done">Finish dictation</string>
     <string name="voice_record_stop">Stop recording</string>
     <string name="voice_recording">Recording %1$d sec</string>
     <string name="voice_transcribing_segment">Recording stopped · creating an accurate Korean transcript…</string>
@@ -1032,6 +1065,7 @@
     <string name="enrichment_pause_reason_low_memory" tools:ignore="MissingTranslation">Low on memory</string>
     <string name="enrichment_pause_reason_keyboard_active" tools:ignore="MissingTranslation">The keyboard is in use</string>
     <string name="enrichment_pause_reason_screen_on" tools:ignore="MissingTranslation">The screen is on</string>
+    <string name="enrichment_pause_reason_not_charging" tools:ignore="MissingTranslation">Not charging</string>
     <string name="enrichment_pause_reason_user_stopped" tools:ignore="MissingTranslation">You stopped it</string>
     <string name="enrichment_pause_reason_lease_wait_timeout" tools:ignore="MissingTranslation">Waited too long for a turn</string>
     <string name="enrichment_pause_reason_app_terminated" tools:ignore="MissingTranslation">Paused because the app restarted. Tap [Apply now] to continue.</string>

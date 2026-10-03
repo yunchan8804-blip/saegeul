@@ -15,12 +15,19 @@ package org.fcitx.fcitx5.android.input.ai.rag
  * because the automatic thresholds have not been met yet. The caller still separately checks
  * whether there is anything to enrich at all (`no_data`).
  *
- * No I/O; the caller reads [PersonalGraphStore.stats] and [PersonalSentenceVault.stats] and passes
- * the derived numbers in.
+ * No disk I/O; the caller passes in the derived numbers ([newSentenceCount] reads the in-memory
+ * vault for the count).
  */
 object PersonalGraphEnrichmentCycle {
     const val MIN_NEW_SENTENCES = 10
     const val MIN_INTERVAL_MS = 60L * 60 * 1000
+
+    /**
+     * Sentences that still need enriching: every stored sentence while no graph exists yet,
+     * otherwise those last seen after the graph was built ([graphBuiltMs]).
+     */
+    fun newSentenceCount(hasExistingGraph: Boolean, vault: PersonalSentenceVault, graphBuiltMs: Long): Int =
+        if (hasExistingGraph) vault.countSince(graphBuiltMs) else vault.stats().sentences
 
     fun shouldStart(
         hasExistingGraph: Boolean,

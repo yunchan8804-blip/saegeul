@@ -48,14 +48,14 @@ class BufferedHangulModeTest {
             CapabilityFlag.SurroundingText
         )
 
-        val result = BufferedHangulMode.effectiveCapabilities(input, enabled = true, hangul)
+        val result = BufferedHangulMode.effectiveCapabilities(input, enabled = true, hangul, packageName = null)
 
         assertFalse(result.has(CapabilityFlag.Preedit))
         assertTrue(result.has(CapabilityFlag.ClientUnfocusCommit))
         assertTrue(result.has(CapabilityFlag.SurroundingText))
         assertEquals(
             input,
-            BufferedHangulMode.effectiveCapabilities(input, enabled = false, hangul)
+            BufferedHangulMode.effectiveCapabilities(input, enabled = false, hangul, packageName = null)
         )
     }
 

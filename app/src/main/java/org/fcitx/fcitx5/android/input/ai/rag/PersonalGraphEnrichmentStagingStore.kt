@@ -56,7 +56,9 @@ class PersonalGraphEnrichmentStagingStore(
         /** True when this cycle only processed sentences new since the graph already stored was last built (an existing graph to add to), false for a first-ever full export. */
         val isIncremental: Boolean = false,
         /** How many sentences this cycle's [chunks] were built from in total, for the incremental progress line. */
-        val processedSentenceCount: Int = 0
+        val processedSentenceCount: Int = 0,
+        /** Sentences skipped because the engine rejected even that one sentence alone as too long; counted across the cycle. */
+        val skippedSentenceCount: Int = 0
     ) {
         val completedChunkCount: Int get() = successCount + failCount
     }
@@ -91,7 +93,8 @@ class PersonalGraphEnrichmentStagingStore(
                     ?: GraphEnrichmentPauseReason.NONE,
                 manual = root.optBoolean("manual", false),
                 isIncremental = root.optBoolean("isIncremental", false),
-                processedSentenceCount = root.optInt("processedSentenceCount", 0)
+                processedSentenceCount = root.optInt("processedSentenceCount", 0),
+                skippedSentenceCount = root.optInt("skippedSentenceCount", 0)
             )
         }.getOrNull()
     }
@@ -115,6 +118,7 @@ class PersonalGraphEnrichmentStagingStore(
         root.put("manual", state.manual)
         root.put("isIncremental", state.isIncremental)
         root.put("processedSentenceCount", state.processedSentenceCount)
+        root.put("skippedSentenceCount", state.skippedSentenceCount)
         vf.writeText(root.toString())
     }
 

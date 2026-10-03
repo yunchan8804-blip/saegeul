@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.voice.VoiceStartMode
 import org.fcitx.fcitx5.android.input.wm.EssentialWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -119,6 +120,13 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private val keyActionListener = KeyActionListener { action, source ->
         when {
             action is KeyAction.LayoutSwitchAction -> switchLayout(action.act)
+            action is KeyAction.VoiceInputAction -> when (action.phase) {
+                KeyAction.VoiceInputAction.Phase.Tap ->
+                    bar.openVoiceFromKeyboard(VoiceStartMode.Tap)
+                KeyAction.VoiceInputAction.Phase.HoldStart ->
+                    bar.openVoiceFromKeyboard(VoiceStartMode.PushToTalk)
+                KeyAction.VoiceInputAction.Phase.HoldEnd -> bar.finishVoiceHold()
+            }
             action is KeyAction.SpaceLongPressAction &&
                 MobileHangulSurfaceSwitcher.isAvailable(activeHangulLayout) ->
                 showMobileHangulLayoutPicker()

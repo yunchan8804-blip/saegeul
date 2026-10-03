@@ -13,7 +13,7 @@ import org.junit.Test
 class MobileHangulKeyboardLayoutTest {
     @Test
     fun `chunjiin rows and multitap groups match Samsung phonepad`() {
-        val rows = MobileHangulKeyboard.layoutFor(MobileHangulLayout.Chunjiin)
+        val rows = layoutWithoutMicKey(MobileHangulLayout.Chunjiin)
 
         assertRows(
             rows,
@@ -35,7 +35,7 @@ class MobileHangulKeyboardLayoutTest {
 
     @Test
     fun `chunjiin plus separates consonants and puts tense forms on paired keys`() {
-        val rows = MobileHangulKeyboard.layoutFor(MobileHangulLayout.ChunjiinPlus)
+        val rows = layoutWithoutMicKey(MobileHangulLayout.ChunjiinPlus)
 
         assertRows(
             rows,
@@ -56,7 +56,7 @@ class MobileHangulKeyboardLayoutTest {
 
     @Test
     fun `single vowel rows and 300ms pairs match Samsung`() {
-        val rows = MobileHangulKeyboard.layoutFor(MobileHangulLayout.Danmoum)
+        val rows = layoutWithoutMicKey(MobileHangulLayout.Danmoum)
 
         assertRows(
             rows,
@@ -79,8 +79,8 @@ class MobileHangulKeyboardLayoutTest {
 
     @Test
     fun `vega full and center rows keep Samsung side controls`() {
-        val full = MobileHangulKeyboard.layoutFor(MobileHangulLayout.Vega)
-        val center = MobileHangulKeyboard.layoutFor(MobileHangulLayout.VegaCenter)
+        val full = layoutWithoutMicKey(MobileHangulLayout.Vega)
+        val center = layoutWithoutMicKey(MobileHangulLayout.VegaCenter)
 
         assertRows(
             full,
@@ -106,8 +106,8 @@ class MobileHangulKeyboardLayoutTest {
 
     @Test
     fun `naratgul full and center rows use the two correct vowel pairs`() {
-        val full = MobileHangulKeyboard.layoutFor(MobileHangulLayout.Naratgul)
-        val center = MobileHangulKeyboard.layoutFor(MobileHangulLayout.NaratgulCenter)
+        val full = layoutWithoutMicKey(MobileHangulLayout.Naratgul)
+        val center = layoutWithoutMicKey(MobileHangulLayout.NaratgulCenter)
 
         assertRows(
             full,
@@ -137,8 +137,8 @@ class MobileHangulKeyboardLayoutTest {
 
     @Test
     fun `Moakey keeps Samsung rows and exactly one backspace`() {
-        val oneHand = MobileHangulKeyboard.layoutFor(MobileHangulLayout.MoakeyOneHand)
-        val twoHand = MobileHangulKeyboard.layoutFor(MobileHangulLayout.MoakeyTwoHand)
+        val oneHand = layoutWithoutMicKey(MobileHangulLayout.MoakeyOneHand)
+        val twoHand = layoutWithoutMicKey(MobileHangulLayout.MoakeyTwoHand)
 
         assertEquals(listOf("~", "ㅃ", "ㅉ", "ㄸ", "ㄲ", "ㅆ", "!"), signatures(oneHand[0]))
         assertEquals(listOf("^", "ㅂ", "ㅈ", "ㄷ", "ㄱ", "ㅅ", "?"), signatures(oneHand[1]))
@@ -156,7 +156,7 @@ class MobileHangulKeyboardLayoutTest {
     @Test
     fun `every mobile row fills the surface and exposes one editing control set`() {
         MobileHangulLayout.entries.filterNot { it == MobileHangulLayout.Physical }.forEach { layout ->
-            val rows = MobileHangulKeyboard.layoutFor(layout)
+            val rows = layoutWithoutMicKey(layout)
             val keys = rows.flatten()
             assertTrue("$layout has a non-full row", rows.all { row ->
                 val widths = row.map { it.appearance.percentWidth.toDouble() }
@@ -176,7 +176,7 @@ class MobileHangulKeyboardLayoutTest {
 
     @Test
     fun `Moakey consonant swipe emits consonant before vowel`() {
-        val ieung = MobileHangulKeyboard.layoutFor(MobileHangulLayout.MoakeyOneHand)[2][3]
+        val ieung = layoutWithoutMicKey(MobileHangulLayout.MoakeyOneHand)[2][3]
         val gesture = ieung.behaviors.filterIsInstance<KeyDef.Behavior.Gesture>().single()
         gesture.handler(event(CustomGestureView.GestureType.Down, 0f, 0f))
         gesture.handler(event(CustomGestureView.GestureType.Move, 100f, 0f))
@@ -191,8 +191,8 @@ class MobileHangulKeyboardLayoutTest {
 
     @Test
     fun `K16 moakey gesture threshold scales with device density instead of a fixed px value`() {
-        val default = MobileHangulKeyboard.layoutFor(MobileHangulLayout.MoakeyTwoHand, density = 1f)
-        val scaled = MobileHangulKeyboard.layoutFor(MobileHangulLayout.MoakeyTwoHand, density = 3f)
+        val default = layoutWithoutMicKey(MobileHangulLayout.MoakeyTwoHand, density = 1f)
+        val scaled = layoutWithoutMicKey(MobileHangulLayout.MoakeyTwoHand, density = 3f)
 
         assertTrue(
             "a 40px swipe clears the default (1x density) 28px threshold",
@@ -213,8 +213,8 @@ class MobileHangulKeyboardLayoutTest {
         )
         val fiveRow = listOf(MobileHangulLayout.MoakeyOneHand, MobileHangulLayout.MoakeyTwoHand)
 
-        fourRow.forEach { assertEquals("$it", 4, MobileHangulKeyboard.layoutFor(it).size) }
-        fiveRow.forEach { assertEquals("$it", 5, MobileHangulKeyboard.layoutFor(it).size) }
+        fourRow.forEach { assertEquals("$it", 4, layoutWithoutMicKey(it).size) }
+        fiveRow.forEach { assertEquals("$it", 5, layoutWithoutMicKey(it).size) }
     }
 
     @Test
@@ -235,6 +235,13 @@ class MobileHangulKeyboardLayoutTest {
             assertEquals(MobileHangulKeyboard.name(it), MobileHangulSurfaceSwitcher.target(it))
         }
     }
+
+    /**
+     * Every contract in this class describes the surfaces as they were before the mic key: the
+     * layouts built with the mic setting off.
+     */
+    private fun layoutWithoutMicKey(layout: MobileHangulLayout, density: Float = 1f) =
+        MobileHangulKeyboard.layoutFor(layout, density, showMicKey = false)
 
     private fun assertRows(actual: List<List<KeyDef>>, expected: List<List<String>>) =
         assertEquals(expected, actual.map(::signatures))

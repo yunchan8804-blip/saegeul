@@ -12,6 +12,16 @@ object DirectBootInputPolicy {
     fun allowsCredentialProtectedFeatures(isDirectBootMode: Boolean): Boolean =
         !isDirectBootMode
 
+    /**
+     * Fails fast for a caller that reached credential-encrypted storage (filesDir, noBackupFilesDir,
+     * default SharedPreferences) before the first unlock, naming the feature that did.
+     */
+    fun requireCredentialProtectedStorage(isDirectBootMode: Boolean, name: String) {
+        check(allowsCredentialProtectedFeatures(isDirectBootMode)) {
+            "$name requires credential-encrypted storage; not available in Direct Boot"
+        }
+    }
+
     fun allowsTextInspection(
         isDirectBootMode: Boolean,
         editorAllowsTextInspection: Boolean

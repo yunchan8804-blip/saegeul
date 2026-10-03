@@ -256,4 +256,25 @@ class MobileHangulActionRouterTest {
             composer.pendingDotCount()
         )
     }
+
+    @Test
+    fun `the mic key only forwards, so the syllable being composed is left for dictation to confirm`() {
+        KeyAction.VoiceInputAction.Phase.entries.forEach { phase ->
+            val composer = MobileHangulComposer()
+            val router = MobileHangulActionRouter(composer)
+            router.route(KeyAction.MobileHangulAction(MobileHangulComposer.Token.Jamo('ㄱ')))
+            router.route(KeyAction.MobileHangulAction(MobileHangulComposer.Token.VowelDot))
+            assertEquals(1, composer.pendingDotCount())
+            val mic = KeyAction.VoiceInputAction(phase)
+
+            val routed = router.route(mic)
+
+            assertEquals(
+                "no composer output, so nothing is erased or rewritten in the editor",
+                listOf(MobileHangulActionRouter.RoutedAction.Forward(mic)),
+                routed
+            )
+            assertEquals("only the composer's own unsent ㆍ bookkeeping is cleared", 0, composer.pendingDotCount())
+        }
+    }
 }

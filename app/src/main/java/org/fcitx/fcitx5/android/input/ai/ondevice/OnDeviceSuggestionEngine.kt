@@ -338,7 +338,14 @@ class OnDeviceSuggestionEngine(
             if (!conversationClosed && failure == null) {
                 failure = OnDeviceSuggestionException("NATIVE_CLOSE_FAILED")
             }
-            if (failure != null || request.cancelled.get() || closeRequested) {
+            // A runaway reply cut at MAX_RESPONSE_CHARS only spoils its Conversation. When that
+            // Conversation was cancelled and closed cleanly the Engine stays warm; dropping it would
+            // leave a GPU device without suggestions until the keyboard is hidden again.
+            val outputLimitOnly = (failure as? OnDeviceSuggestionException)?.code == "OUTPUT_TOO_LONG" &&
+                request.cancellationFailure == null && conversationClosed && !closeRequested
+            if (outputLimitOnly) {
+                scheduleIdleClose()
+            } else if (failure != null || request.cancelled.get() || closeRequested) {
                 try {
                     closeWarmLocked(
                         discardSharedEngine = request.cancellationFailure != null ||

@@ -29,7 +29,17 @@ class HangulPositionKey(
 
 /** Full physical-key surface required by three-set and Ahnmatae layouts. */
 @SuppressLint("ViewConstructor")
-class HangulKeyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, Layout) {
+class HangulKeyboard private constructor(
+    context: Context,
+    theme: Theme,
+    private val rows: List<List<KeyDef>>
+) : BaseKeyboard(context, theme, rows) {
+
+    constructor(context: Context, theme: Theme) : this(
+        context,
+        theme,
+        layoutFor(AppPrefs.getInstance().keyboard.showVoiceInputButton.getValue())
+    )
 
     enum class ShiftState { None, Once, Lock }
 
@@ -39,26 +49,44 @@ class HangulKeyboard(context: Context, theme: Theme) : BaseKeyboard(context, the
         private fun row(keys: String, width: Float) =
             keys.map { HangulPositionKey(it, width) }
 
-        val Layout: List<List<KeyDef>> = listOf(
+        // The position keys are shared by every layout: their views are matched to them by
+        // appearance when the legends are refreshed.
+        private val PositionRows: List<List<KeyDef>> = listOf(
             row("`1234567890-=", 1f / 13f),
             row("qwertyuiop[]", 1f / 12f),
             row("asdfghjkl;'\\", 0.07f) + BackspaceKey(percentWidth = 0.16f),
-            listOf(CapsKey()) + row("zxcvbnm,./", 0.085f),
-            listOf(
-                LayoutSwitchKey("?123", "", percentWidth = 0.15f),
-                LanguageKey(),
-                SpaceKey(),
-                ReturnKey()
-            )
+            listOf(CapsKey()) + row("zxcvbnm,./", 0.085f)
         )
 
-        private val positionByAppearance = Layout.flatten()
+        private fun bottomRow(showMicKey: Boolean): List<KeyDef> = buildList {
+            if (showMicKey) add(MicKey())
+            add(LayoutSwitchKey("?123", "", percentWidth = 0.15f))
+            add(LanguageKey())
+            add(SpaceKey())
+            add(ReturnKey())
+        }
+
+        fun layoutFor(showMicKey: Boolean): List<List<KeyDef>> =
+            PositionRows + listOf(bottomRow(showMicKey))
+
+        /** With the microphone key the bottom row splits before the space: mic, `?123` and language on the left. */
+        internal fun bottomRowSplitBoundary(bottomRow: List<KeyDef>): Int? =
+            bottomRow.takeIf { row -> row.any { it is MicKey } }?.indexOfFirst { it is SpaceKey }
+
+        private val positionByAppearance = PositionRows.flatten()
             .filterIsInstance<HangulPositionKey>()
             .associateBy { it.appearance }
     }
 
     // Full physical-key surface, never pinned; its layout is already five rows on its own.
-    override val baseRowCount: Int = Layout.size
+    override val baseRowCount: Int = rows.size
+
+    override fun thumbSplitBoundaryIndex(rowIndex: Int, keyCount: Int): Int? =
+        if (rowIndex == rows.lastIndex) {
+            bottomRowSplitBoundary(rows.last())?.takeIf { it in 1 until keyCount }
+        } else {
+            null
+        }
 
     private val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
     private val space: TextKeyView by lazy { findViewById(R.id.button_space) }

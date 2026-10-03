@@ -34,6 +34,9 @@
         <intent>
             <action android:name="android.view.InputMethod" />
         </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
     </queries>
 
     <permission
@@ -250,6 +253,12 @@
             <!-- do not inject splitties AppCompat -->
             <meta-data
                 android:name="splitties.views.dsl.appcompat.experimental.AppCompatViewInstantiatorInjecter"
+                android:value="androidx.startup"
+                tools:node="remove" />
+            <!-- WorkManager is initialized on demand by FcitxApplication (Configuration.Provider):
+                 the default initializer would open its credential-encrypted database in Direct Boot -->
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>

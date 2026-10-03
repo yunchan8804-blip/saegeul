@@ -111,6 +111,19 @@ class PersonalGraphEnrichmentStagingStoreTest {
     }
 
     @Test
+    fun skippedSentenceCountRoundTripsAndDefaultsToZero() {
+        val store = PersonalGraphEnrichmentStagingStore(tempFolder.newFile("staging_skipped.json"))
+        val state = stateOf()
+        assertEquals(0, state.skippedSentenceCount)
+
+        store.save(state)
+        assertEquals(0, requireNotNull(store.load()).skippedSentenceCount)
+
+        store.save(state.copy(skippedSentenceCount = 3))
+        assertEquals(3, requireNotNull(store.load()).skippedSentenceCount)
+    }
+
+    @Test
     fun clearRemovesTheSavedCycle() {
         val store = PersonalGraphEnrichmentStagingStore(tempFolder.newFile("staging_clear.json"))
         store.save(stateOf())

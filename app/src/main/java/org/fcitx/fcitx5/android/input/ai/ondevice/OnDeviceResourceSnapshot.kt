@@ -37,9 +37,10 @@ data class OnDeviceResourceSnapshot(
             batteryPercent == null || (batteryPercent < minimumBatteryPercent && !charging) -> "RESOURCE_BATTERY"
             powerSaveMode && !charging -> "RESOURCE_POWER_SAVE"
             lowMemory -> "RESOURCE_LOW_MEMORY"
-            // Light and moderate throttling are normal while a GPU model runs; only severe or
-            // worse stops on-device generation. Devices without a thermal API are not blocked.
-            thermalStatus != null && thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE -> "RESOURCE_THERMAL"
+            // Light, moderate and severe throttling are normal while a GPU model runs (Samsung reports
+            // severe under ordinary charge-plus-load warmth); only critical or worse stops on-device
+            // generation. Devices without a thermal API are not blocked.
+            thermalStatus != null && thermalStatus >= PowerManager.THERMAL_STATUS_CRITICAL -> "RESOURCE_THERMAL"
             else -> null
         }
     }

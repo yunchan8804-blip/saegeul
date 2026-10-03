@@ -69,8 +69,8 @@ class AiContextualPredictor(
     }
 
     private val keyboardTypoSource = KeyboardTypoCorrectionSource(typoCorrector, baseVocabulary, correctionStore, ngram)
-    private val sentenceTypoSource = SentenceTypoCorrectionSource(typoEngine)
-    private val wordTypoSource = WordTypoCorrectionSource(typoEngine)
+    private val sentenceTypoSource = SentenceTypoCorrectionSource(typoEngine, baseVocabulary)
+    private val wordTypoSource = WordTypoCorrectionSource(typoEngine, baseVocabulary)
 
     // Run after the typo corrections, in priority order: on a duplicate text the candidate from
     // the source listed first is kept.

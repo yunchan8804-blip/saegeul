@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
 import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.ai.typo.SingleEditTypoProbe
 
 /**
  * Keyboard-aware corrections for the typed fragment, plus [handledFragment]: the fragment these
@@ -18,9 +19,12 @@ import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
 internal class KeyboardTypoCorrections(val candidates: List<AiPrediction>, val handledFragment: String?)
 
 /**
- * Top-priority typo correction (`typo_personal`, `typo_keyboard`, `typo_keyboard_stem`): the user's
- * own correction patterns first, then key-distance corrections against the base vocabulary, then a
- * stem correction under a common bound ending.
+ * Top-priority typo correction (`typo_personal`, `typo_keyboard`, `typo_keyboard_stem`,
+ * `typo_keyboard_known`): the user's own correction patterns first, then key-distance corrections
+ * against the base vocabulary merged with single-edit probe hits over the whole vocabulary, then a
+ * stem correction under a common bound ending. A word the trie knows is only replaced when the
+ * probe finds a far more common word one Shift or compound-vowel edit away, and a rare word the
+ * trie lacks but the base vocabulary has only takes corrections far more common than itself.
  */
 internal class KeyboardTypoCorrectionSource(
     private val typoCorrector: KeyboardAwareTypoCorrector?,
@@ -29,12 +33,25 @@ internal class KeyboardTypoCorrectionSource(
     private val ngram: PersonalNgramModel
 ) {
 
+    private val probe = SingleEditTypoProbe(baseVocabulary, ngram)
+
     companion object {
+        private const val MAX_KEYBOARD_CORRECTIONS = 3
+
+        // Trie and probe hits gathered before the ranking filter and the final cut.
+        private const val CORRECTION_POOL = 10
+
+        // An input outside the trie but inside the base vocabulary is an ordinary rare word: a
+        // correction has to be this many times more frequent than it to be offered. A Shift
+        // undo (햇는데 -> 했는데) is a likelier slip, so it only has to clear
+        // SingleEditTypoProbe.UPGRADE_RANK_RATIO.
+        private const val RARE_WORD_RANK_RATIO = 1000
+
         // Leading/trailing punctuation stripped off the typed fragment before keyboard-aware
         // typo correction runs, so a trailing "???" or similar does not blow the key-distance
         // cost budget and suppress an otherwise-valid correction.
-        private val HEAD_PUNCTUATION = "([{«\"'".toSet()
-        private val TAIL_PUNCTUATION = ".,!?~…:;)]}»\"'".toSet()
+        internal val HEAD_PUNCTUATION = "([{«\"'".toSet()
+        internal val TAIL_PUNCTUATION = ".,!?~…:;)]}»\"'".toSet()
 
         // Common bound-ending suffixes (조사/어미) tried, longest-first, when the typed fragment
         // itself has no direct keyboard-aware correction: the stem before the ending is corrected
@@ -81,11 +98,15 @@ internal class KeyboardTypoCorrectionSource(
                 val ctxProb = ngram.predictNext(input.contextBeforeCursor, packageName, 20)
                     .associate { it.word to it.probability }
                 val contextBoost: (String) -> Float = { w -> 1.5f * (ctxProb[w] ?: 0f) }
-                val corrections = typoCorrector.correct(
-                    core,
-                    limit = if (isPersonalKnownOnly) 1 else 2,
-                    contextBoost = contextBoost
-                )
+                val limit = if (isPersonalKnownOnly) 1 else MAX_KEYBOARD_CORRECTIONS
+                val inputRank = baseVocabulary?.rankOf(core) ?: 0
+                val probeHits = probe.probe(core, limit = CORRECTION_POOL, contextBoost = contextBoost)
+                val shiftWords = probeHits.filter { it.isShiftEdit }.map { it.correction.word }.toSet()
+                val corrections = mergeCorrections(
+                    typoCorrector.correct(core, limit = CORRECTION_POOL, contextBoost = contextBoost),
+                    probeHits.map { it.correction },
+                    limit
+                ) { word -> inputRank == 0 || outranksRareWord(word, inputRank, word in shiftWords) }
                 if (corrections.isNotEmpty()) {
                     handledFragment = typed
                 }
@@ -112,7 +133,8 @@ internal class KeyboardTypoCorrectionSource(
                                 stem,
                                 limit = 1,
                                 contextBoost = contextBoost
-                            ).firstOrNull()
+                            ).firstOrNull()?.takeIf { it.cost <= 1.0f }
+                                ?: probe.correct(stem, limit = 1, contextBoost = contextBoost).firstOrNull()
                             if (stemCorrection != null && stemCorrection.cost <= 1.0f) {
                                 handledFragment = typed
                                 candidates += AiPrediction(
@@ -127,8 +149,42 @@ internal class KeyboardTypoCorrectionSource(
                         }
                     }
                 }
+            } else {
+                val upgrade = probe.upgradeKnownWord(core)
+                if (upgrade != null) {
+                    handledFragment = typed
+                    candidates += AiPrediction(
+                        text = "$head${upgrade.word}$tail",
+                        confidenceScore = 0.990f,
+                        isSentenceCompletion = false,
+                        source = "typo_keyboard_known",
+                        badge = "✏️",
+                        replaceLength = replaceLen
+                    )
+                }
             }
         }
         return KeyboardTypoCorrections(candidates, handledFragment)
     }
+
+    // A word only the user's own vocabulary knows has no rank and is kept.
+    private fun outranksRareWord(word: String, inputRank: Int, isShiftUndo: Boolean): Boolean {
+        val rank = baseVocabulary?.rankOf(word) ?: 0
+        val ratio = if (isShiftUndo) SingleEditTypoProbe.UPGRADE_RANK_RATIO else RARE_WORD_RANK_RATIO
+        return rank == 0 || rank.toLong() * ratio < inputRank
+    }
+
+    // Trie and probe hits merged: one entry per word (the cheaper edit), best score first.
+    private fun mergeCorrections(
+        trie: List<KeyboardAwareTypoCorrector.Correction>,
+        probed: List<KeyboardAwareTypoCorrector.Correction>,
+        limit: Int,
+        accepts: (String) -> Boolean
+    ): List<KeyboardAwareTypoCorrector.Correction> =
+        (trie + probed)
+            .filter { accepts(it.word) }
+            .groupBy { it.word }
+            .map { (_, sameWord) -> sameWord.minBy { it.cost } }
+            .sortedWith(compareByDescending<KeyboardAwareTypoCorrector.Correction> { it.score }.thenBy { it.cost })
+            .take(limit)
 }

@@ -47,6 +47,32 @@ class TextKeyboard(
             }
         }
 
+        /**
+         * With the mic key, left of `?123` so it is not pressed by mistake, the comma key is gone:
+         * the period key also types the comma, and the emoji, quick phrase and Unicode menu moves
+         * from the comma key to `?123`. Without the mic key the row is the original one.
+         */
+        internal fun bottomRow(showMicKey: Boolean): List<KeyDef> =
+            if (showMicKey) {
+                listOf(
+                    MicKey(),
+                    LayoutSwitchKey("?123", "", popup = arrayOf(editorToolsMenu())),
+                    LanguageKey(),
+                    SpaceKey(),
+                    PeriodCommaKey(0.1f, variant = KeyDef.Appearance.Variant.Alternative),
+                    ReturnKey()
+                )
+            } else {
+                listOf(
+                    LayoutSwitchKey("?123", ""),
+                    CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
+                    LanguageKey(),
+                    SpaceKey(),
+                    SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
+                    ReturnKey()
+                )
+            }
+
         private val LowerRows: List<List<KeyDef>> = listOf(
             listOf(
                 AlphabetKey("A", "@"),
@@ -69,20 +95,13 @@ class TextKeyboard(
                 AlphabetKey("N", "~"),
                 AlphabetKey("M", "\\"),
                 BackspaceKey()
-            ),
-            listOf(
-                LayoutSwitchKey("?123", ""),
-                CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
-                LanguageKey(),
-                SpaceKey(),
-                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
-                ReturnKey()
             )
         )
 
         private fun layout(): List<List<KeyDef>> {
             val pinned = PinnedNumberRow.isEnabled()
-            return PinnedNumberRow.prependTo(listOf(topRow(pinned)) + LowerRows, pinned)
+            val bottom = bottomRow(AppPrefs.getInstance().keyboard.showVoiceInputButton.getValue())
+            return PinnedNumberRow.prependTo(listOf(topRow(pinned)) + LowerRows + listOf(bottom), pinned)
         }
     }
 

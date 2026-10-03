@@ -111,7 +111,8 @@ class LayoutSwitchKey(
     displayText: String,
     val to: String = "",
     percentWidth: Float = 0.15f,
-    variant: Variant = Variant.Alternative
+    variant: Variant = Variant.Alternative,
+    popup: Array<Popup>? = null
 ) : KeyDef(
     Appearance.Text(
         displayText,
@@ -122,7 +123,8 @@ class LayoutSwitchKey(
     ),
     setOf(
         Behavior.Press(KeyAction.LayoutSwitchAction(to))
-    )
+    ),
+    popup
 )
 
 class BackspaceKey(
@@ -170,25 +172,55 @@ class CommaKey(
     ),
     arrayOf(
         Popup.Preview(","),
-        Popup.Menu(
-            arrayOf(
-                Popup.Menu.Item(
-                    "Emoji",
-                    R.drawable.ic_baseline_tag_faces_24,
-                    KeyAction.PickerSwitchAction()
-                ),
-                Popup.Menu.Item(
-                    "QuickPhrase",
-                    R.drawable.ic_baseline_format_quote_24,
-                    KeyAction.QuickPhraseAction
-                ),
-                Popup.Menu.Item(
-                    "Unicode",
-                    R.drawable.ic_logo_unicode,
-                    KeyAction.UnicodeAction
-                )
-            )
+        editorToolsMenu()
+    )
+)
+
+/** Emoji, quick phrase and Unicode entry: on the comma key, or on `?123` when the comma is gone. */
+fun editorToolsMenu() = KeyDef.Popup.Menu(
+    arrayOf(
+        KeyDef.Popup.Menu.Item(
+            "Emoji",
+            R.drawable.ic_baseline_tag_faces_24,
+            KeyAction.PickerSwitchAction()
+        ),
+        KeyDef.Popup.Menu.Item(
+            "QuickPhrase",
+            R.drawable.ic_baseline_format_quote_24,
+            KeyAction.QuickPhraseAction
+        ),
+        KeyDef.Popup.Menu.Item(
+            "Unicode",
+            R.drawable.ic_logo_unicode,
+            KeyAction.UnicodeAction
         )
+    )
+)
+
+/**
+ * Period and comma on one key: a tap types ".", a swipe up types ",", and a long press offers
+ * the other punctuation. It sends plain key actions, so a Hangul surface treats it like its
+ * ordinary punctuation keys.
+ */
+class PeriodCommaKey(
+    percentWidth: Float = 0.1f,
+    textSize: Float = 23f,
+    variant: Variant = Variant.Normal
+) : KeyDef(
+    Appearance.AltText(
+        displayText = ".",
+        altText = ",",
+        textSize = textSize,
+        percentWidth = percentWidth,
+        variant = variant
+    ),
+    setOf(
+        Behavior.Press(KeyAction.FcitxKeyAction(".")),
+        Behavior.Swipe(KeyAction.FcitxKeyAction(","))
+    ),
+    arrayOf(
+        Popup.AltPreview(".", ","),
+        Popup.Keyboard.Explicit(arrayOf(",", "?", "!", "~", "…"))
     )
 )
 
@@ -202,6 +234,26 @@ class LanguageKey(percentWidth: Float = 0.1f) : KeyDef(
     setOf(
         Behavior.Press(KeyAction.LangSwitchAction),
         Behavior.LongPress(KeyAction.ShowInputMethodPickerAction)
+    )
+)
+
+/**
+ * Dictation key next to [LanguageKey]: a tap opens dictation, a hold dictates only while the
+ * finger stays down. It has no popup, so a long press never opens a menu.
+ */
+class MicKey(percentWidth: Float = 0.1f) : KeyDef(
+    Appearance.Image(
+        src = R.drawable.ic_baseline_keyboard_voice_24,
+        percentWidth = percentWidth,
+        variant = Variant.AltForeground,
+        viewId = R.id.button_mic
+    ),
+    setOf(
+        Behavior.Press(KeyAction.VoiceInputAction(KeyAction.VoiceInputAction.Phase.Tap)),
+        Behavior.Hold(
+            start = KeyAction.VoiceInputAction(KeyAction.VoiceInputAction.Phase.HoldStart),
+            end = KeyAction.VoiceInputAction(KeyAction.VoiceInputAction.Phase.HoldEnd)
+        )
     )
 )
 

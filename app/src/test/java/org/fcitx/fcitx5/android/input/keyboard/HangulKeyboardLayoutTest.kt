@@ -13,13 +13,13 @@ class HangulKeyboardLayoutTest {
     @Test
     fun fullSurfaceContainsEveryPrintableUsKeyboardPosition() {
         val expected = "`1234567890-=qwertyuiop[]asdfghjkl;'\\zxcvbnm,./".toSet()
-        val actual = HangulKeyboard.Layout.flatten()
+        val actual = HangulKeyboard.layoutFor(showMicKey = true).flatten()
             .filterIsInstance<HangulPositionKey>()
             .map { it.character }
             .toSet()
 
         assertEquals(expected, actual)
-        assertEquals(expected.size, HangulKeyboard.Layout.flatten().count { it is HangulPositionKey })
+        assertEquals(expected.size, HangulKeyboard.layoutFor(showMicKey = true).flatten().count { it is HangulPositionKey })
     }
 
     @Test
@@ -36,7 +36,7 @@ class HangulKeyboardLayoutTest {
 
     @Test
     fun normalAndShiftActionsCoverEverySurfacePosition() {
-        val keys = HangulKeyboard.Layout.flatten().filterIsInstance<HangulPositionKey>()
+        val keys = HangulKeyboard.layoutFor(showMicKey = true).flatten().filterIsInstance<HangulPositionKey>()
         HangulKeyLegends.fullSurfaceLayouts.forEach { layout ->
             keys.forEach { key ->
                 val normal = HangulKeyLegends.actionCharacter(key.character, false)

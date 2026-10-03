@@ -110,12 +110,12 @@ class GemmaManualBackgroundDeviceTest {
             }
 
             latestEligibility = GemmaGenerationEligibility.snapshot(context)
-            // 수동 강화는 MODERATE 이상 열 상태에서 설계상 차단된다. 기기가 뜨거우면 행복 경로를
+            // 수동 강화는 CRITICAL 이상 열 상태에서 설계상 차단된다. 기기가 뜨거우면 행복 경로를
             // 검증할 수 없으므로 실패가 아니라 건너뛴다(모델 부재 preflight와 같은 규칙).
             assumeTrue(
-                "수동 강화는 MODERATE 이상 열 상태에서 실행하지 않습니다: ${latestEligibility.thermalStatus}",
+                "수동 강화는 CRITICAL 이상 열 상태에서 실행하지 않습니다: ${latestEligibility.thermalStatus}",
                 latestEligibility.thermalStatus?.let {
-                    it < PowerManager.THERMAL_STATUS_MODERATE
+                    it < PowerManager.THERMAL_STATUS_CRITICAL
                 } ?: true
             )
             assertTrue(

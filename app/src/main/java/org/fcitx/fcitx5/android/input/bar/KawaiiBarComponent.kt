@@ -9,14 +9,15 @@ import android.graphics.Color
 import android.os.Build
 import android.util.Size
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestion
 import android.view.inputmethod.InlineSuggestionsResponse
-import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import android.widget.ViewAnimator
 import android.widget.inline.InlineContentView
 import androidx.annotation.Keep
@@ -47,6 +48,7 @@ import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine.TransitionEvent.
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine.TransitionEvent.PreeditUpdated
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine.TransitionEvent.WindowDetached
 import org.fcitx.fcitx5.android.input.bar.ui.CandidateUi
+import org.fcitx.fcitx5.android.input.bar.ui.DictationStripUi
 import org.fcitx.fcitx5.android.input.bar.ui.IdleUi
 import org.fcitx.fcitx5.android.input.bar.ui.TitleUi
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
@@ -65,6 +67,7 @@ import org.fcitx.fcitx5.android.input.OneHandMode
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
+import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
@@ -82,13 +85,20 @@ import org.fcitx.fcitx5.android.input.search.KoreanSearchWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryWindow
+import org.fcitx.fcitx5.android.input.voice.DeviceSpeechLanguage
+import org.fcitx.fcitx5.android.input.voice.DictationMode
+import org.fcitx.fcitx5.android.input.voice.InlineDictationController
+import org.fcitx.fcitx5.android.input.voice.VoicePermissionResumeResult
+import org.fcitx.fcitx5.android.input.voice.VoiceProviderMode
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderModeStore
+import org.fcitx.fcitx5.android.input.voice.VoiceKeyGate
+import org.fcitx.fcitx5.android.input.voice.VoiceKeyGatePolicy
 import org.fcitx.fcitx5.android.input.voice.VoiceProviderPolicy
+import org.fcitx.fcitx5.android.input.voice.VoiceStartMode
 import org.fcitx.fcitx5.android.input.voice.VoiceTranscriptionWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
-import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.manager.must
 import splitties.bitflags.hasFlag
@@ -97,6 +107,7 @@ import splitties.views.backgroundColor
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import java.util.Locale
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.math.PI
@@ -111,6 +122,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val context by manager.context()
     private val theme by manager.theme()
     private val service by manager.inputMethodService()
+    private val fcitx by manager.fcitx()
     private val windowManager: InputWindowManager by manager.must()
     private val horizontalCandidate: HorizontalCandidateComponent by manager.must()
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
@@ -125,8 +137,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
     private val showNumberRow by prefs.keyboard.showNumberRow
-    private val showVoiceInputButton by prefs.keyboard.showVoiceInputButton
-    private val preferredVoiceInput by prefs.keyboard.preferredVoiceInput
     private val splitKeyboardExpandedPref = prefs.keyboard.splitKeyboardExpanded
     private val splitExpandedPromptDonePref = prefs.internal.splitExpandedPromptDone
 
@@ -375,11 +385,111 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         } else false
     }
 
-    private var voiceInputSubtype: Pair<String, InputMethodSubtype>? = null
+    private fun canOpenEditorTool() = !service.isInternalPromptInputOwned
 
-    private val switchToVoiceInputCallback = View.OnClickListener {
-        val (id, subtype) = voiceInputSubtype ?: return@OnClickListener
-        InputMethodUtil.switchInputMethod(service, id, subtype)
+    private var pushToTalkWindow: VoiceTranscriptionWindow? = null
+
+    private val dictationStrip by lazy { DictationStripUi(context, theme) }
+    private val dictationDelegate = lazy {
+        InlineDictationController(
+            context = context,
+            service = service,
+            strip = dictationStrip,
+            languageTag = {
+                DeviceSpeechLanguage.tagFor(
+                    fcitx.runImmediately { inputMethodEntryCached }.languageCode,
+                    Locale.getDefault()
+                )
+            },
+            onOpenChanged = ::onDictationOpenChanged
+        )
+    }
+    private val dictation by dictationDelegate
+    private var dictationShown = false
+
+    private fun onDictationOpenChanged(open: Boolean) {
+        dictationShown = open
+        if (open) {
+            view.displayedChild = DICTATION_CHILD_INDEX
+            updateBarHeight()
+        } else {
+            switchUiByState(barStateMachine.currentState)
+        }
+    }
+
+    fun closeInlineDictation() {
+        if (dictationDelegate.isInitialized()) dictation.close()
+    }
+
+    /** Continues dictation on the strip after the microphone permission screen; false means the panel must. */
+    fun resumeInlineDictation(result: VoicePermissionResumeResult): Boolean {
+        if (VoiceProviderModeStore(context).load() != VoiceProviderMode.DeviceDictation) return false
+        return dictation.resume(result)
+    }
+
+    /**
+     * Device dictation runs on the strip; a device that cannot, and the OpenAI modes, use the
+     * dictation panel. The returned window is the panel that was attached, if any.
+     */
+    private fun openVoice(startMode: VoiceStartMode): VoiceTranscriptionWindow? {
+        if (VoiceProviderModeStore(context).load() == VoiceProviderMode.DeviceDictation) {
+            val mode = if (startMode == VoiceStartMode.PushToTalk) {
+                DictationMode.PushToTalk
+            } else {
+                DictationMode.Continuous
+            }
+            if (dictation.open(mode)) return null
+        }
+        val window = VoiceTranscriptionWindow(startMode = startMode)
+        windowManager.attachWindow(window)
+        return window
+    }
+
+    /**
+     * The panel that answers a hold replaces the keyboard, which cancels the touch of the
+     * microphone key before the finger is lifted. The lift then reaches only the window
+     * container, so it is watched there until the hold ends.
+     */
+    private val holdReleaseWatcher = View.OnTouchListener { _, event ->
+        if (event.actionMasked == MotionEvent.ACTION_UP ||
+            event.actionMasked == MotionEvent.ACTION_CANCEL
+        ) {
+            finishVoiceHold()
+        }
+        false
+    }
+
+    /**
+     * The microphone key of the keyboard. A tap starts dictation, a hold ([VoiceStartMode.PushToTalk])
+     * dictates until [finishVoiceHold].
+     */
+    fun openVoiceFromKeyboard(startMode: VoiceStartMode) {
+        when (
+            VoiceKeyGatePolicy.decide(
+                internalPromptInputOwned = service.isInternalPromptInputOwned,
+                allowsTextInspection = service.allowsTextInspectionFeatures()
+            )
+        ) {
+            VoiceKeyGate.Ignore -> return
+            VoiceKeyGate.ShowBlockedNotice -> {
+                Toast.makeText(context, R.string.voice_key_blocked, Toast.LENGTH_SHORT).show()
+                return
+            }
+            VoiceKeyGate.Start -> Unit
+        }
+        val window = openVoice(startMode)
+        if (startMode == VoiceStartMode.PushToTalk) {
+            pushToTalkWindow = window
+            if (window != null) windowManager.view.setOnTouchListener(holdReleaseWatcher)
+        }
+    }
+
+    /** The finger of a hold left the microphone key, or the touch was cancelled. */
+    fun finishVoiceHold() {
+        windowManager.view.setOnTouchListener(null)
+        if (dictationDelegate.isInitialized()) dictation.finishPushToTalk()
+        pushToTalkWindow?.finishPushToTalk()
+        pushToTalkWindow = null
     }
 
     private val idleUi: IdleUi by lazy {
@@ -441,8 +551,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 service.showDialog(dialog.apply { setCanceledOnTouchOutside(true) })
             }
             buttonsUi.apply {
-                fun canOpenEditorTool() = !service.isInternalPromptInputOwned
-
                 onNeedsSecondRowChanged = {
                     toolbarNeedsSecondRow = it
                     toolbarHeightSession = toolbarHeightSession.onToolbarRowsChanged(
@@ -689,10 +797,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private fun switchUiByState(state: KawaiiBarStateMachine.State) {
         // Idle and Candidate both display normalRoot (tool row + candidate row, always visible
-        // together). Only Title swaps the whole bar out for the extended-window title row.
-        val index = if (state == KawaiiBarStateMachine.State.Title) TITLE_CHILD_INDEX else NORMAL_CHILD_INDEX
+        // together). Only Title swaps the whole bar out for the extended-window title row, and
+        // the dictation strip stays on top of whichever state comes until dictation closes.
+        val index = when {
+            dictationShown -> DICTATION_CHILD_INDEX
+            state == KawaiiBarStateMachine.State.Title -> TITLE_CHILD_INDEX
+            else -> NORMAL_CHILD_INDEX
+        }
         if (view.displayedChild != index) {
-            if (index != TITLE_CHILD_INDEX) {
+            if (index == NORMAL_CHILD_INDEX) {
                 titleUi.setReturnButtonOnClickListener { }
                 titleUi.setTitle("")
                 titleUi.removeExtension()
@@ -709,10 +822,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 else theme.barColor
             add(normalRoot, lParams(matchParent, matchParent))
             add(titleUi.root, lParams(matchParent, matchParent))
+            add(dictationStrip.root, lParams(matchParent, matchParent))
             addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
                 // 의도적으로 비움: 붙을 때는 할 일이 없고, 뗄 때만 정리하면 된다.
                 override fun onViewAttachedToWindow(v: View) {}
                 override fun onViewDetachedFromWindow(v: View) {
+                    closeInlineDictation()
                     cancelCandidateRowCollapse()
                 }
             })
@@ -746,6 +861,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         capFlags: CapabilityFlags,
         restarting: Boolean
     ) {
+        if (dictationDelegate.isInitialized()) dictation.onEditorStarted(info, restarting)
         updateBufferedHangulButtonVisual()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
@@ -820,13 +936,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             idleUi.inlineSuggestionsBar.clear()
         }
-        voiceInputSubtype = InputMethodUtil.findVoiceSubtype(preferredVoiceInput)
-        val shouldShowVoiceInput =
-            showVoiceInputButton && voiceInputSubtype != null && allowsTextInspection
-        idleUi.setHideKeyboardIsVoiceInput(
-            shouldShowVoiceInput,
-            if (shouldShowVoiceInput) switchToVoiceInputCallback else hideKeyboardCallback
-        )
         // Re-resolve for every editor session so a Fold posture or multi-window viewport change is
         // reflected without requiring the user to reopen the keyboard (mirrors
         // KeyboardWindow.updateThumbSplitProfile()).
@@ -876,6 +985,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onWindowAttached(window: InputWindow) {
+        if (window !is KeyboardWindow) closeInlineDictation()
         when (window) {
             is InputWindow.ExtendedInputWindow<*> -> {
                 titleUi.setTitle(window.title)
@@ -972,6 +1082,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         // ViewAnimator child indices for the top-level bar view.
         private const val NORMAL_CHILD_INDEX = 0
         private const val TITLE_CHILD_INDEX = 1
+        private const val DICTATION_CHILD_INDEX = 2
 
         // Height of the candidate row when HorizontalCandidateComponent renders both the
         // word-level and sentence-level rows (see HorizontalCandidateComponent.isCandidateTwoRow).
@@ -1081,11 +1192,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         // Normal mode stacks both rows, so the bar height is their sum. When the suggestion row
         // is collapsed (no candidates), it contributes zero height. Title mode keeps its
         // pre-existing height contract (unrelated to candidate row height).
-        val targetHeight = if (view.displayedChild == TITLE_CHILD_INDEX) {
-            context.dp(toolbarHeightSession.heightDp)
-        } else {
-            val visibleCandidateRowHeightDp = if (candidateRowVisible) candidateRowHeightDp else 0
-            context.dp(effectiveToolRowHeightDp + visibleCandidateRowHeightDp)
+        val targetHeight = when (view.displayedChild) {
+            TITLE_CHILD_INDEX -> context.dp(toolbarHeightSession.heightDp)
+            DICTATION_CHILD_INDEX -> context.dp(HEIGHT)
+            else -> {
+                val visibleCandidateRowHeightDp = if (candidateRowVisible) candidateRowHeightDp else 0
+                context.dp(effectiveToolRowHeightDp + visibleCandidateRowHeightDp)
+            }
         }
         val params = view.layoutParams ?: return
         if (params.height == targetHeight) return

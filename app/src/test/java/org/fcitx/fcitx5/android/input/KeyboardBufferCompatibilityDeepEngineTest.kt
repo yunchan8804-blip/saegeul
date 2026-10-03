@@ -85,13 +85,13 @@ class KeyboardBufferCompatibilityDeepEngineTest {
         )
 
         // When buffered mode is active, Preedit capability must be stripped so the engine keeps composing internal
-        val effective = BufferedHangulMode.effectiveCapabilities(normalFlags, enabled = true, hangulIme)
+        val effective = BufferedHangulMode.effectiveCapabilities(normalFlags, enabled = true, hangulIme, packageName = null)
         assertFalse(effective.has(CapabilityFlag.Preedit))
         assertTrue(effective.has(CapabilityFlag.ClientUnfocusCommit))
         assertTrue(effective.has(CapabilityFlag.SurroundingText))
 
         // When buffered mode is inactive, Preedit capability is preserved
-        val inactiveEffective = BufferedHangulMode.effectiveCapabilities(normalFlags, enabled = false, hangulIme)
+        val inactiveEffective = BufferedHangulMode.effectiveCapabilities(normalFlags, enabled = false, hangulIme, packageName = null)
         assertTrue(inactiveEffective.has(CapabilityFlag.Preedit))
     }
 

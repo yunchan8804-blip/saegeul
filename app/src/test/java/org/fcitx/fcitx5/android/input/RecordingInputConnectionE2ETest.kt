@@ -123,7 +123,8 @@ class RecordingInputConnectionE2ETest {
         val effectiveCaps = BufferedHangulMode.effectiveCapabilities(
             CapabilityFlags(CapabilityFlag.Preedit, CapabilityFlag.ClientUnfocusCommit),
             enabled = true,
-            ime = hangulIme
+            ime = hangulIme,
+            packageName = null
         )
         assertFalse(effectiveCaps.has(CapabilityFlag.Preedit))
 

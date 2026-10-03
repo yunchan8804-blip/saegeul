@@ -37,7 +37,7 @@ object OnDeviceSharedEngine {
 
     typealias Use = SharedWarmResource.Use<Engine, Flavor>
 
-    private const val MAX_NUM_TOKENS = 2048
+    internal const val MAX_NUM_TOKENS = 2048
 
     private val resource = SharedWarmResource<ModelKey, Engine, Flavor>(
         create = ::createEngine,

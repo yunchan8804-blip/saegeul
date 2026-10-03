@@ -43,6 +43,35 @@ class PersonalSentenceVaultTest {
     }
 
     @Test
+    fun countSinceCountsSentencesLastSeenAfterTheCutoffLikeExportSince() {
+        var now = 1000L
+        val vault = PersonalSentenceVault(clock = { now })
+        vault.record("오늘 날씨 좋다", "com.android.chrome")
+        vault.record("내일 판교에서 봐요", "com.android.chrome")
+        now = 2000L
+        vault.record("회의 자료 검토했습니다", "com.android.chrome")
+        // Seeing an older sentence again moves its last-seen time past the cutoff too.
+        vault.record("오늘 날씨 좋다", "com.android.chrome")
+
+        assertEquals(2, vault.countSince(1000L))
+        assertEquals(vault.exportSince(1000L, 100).size, vault.countSince(1000L))
+        assertEquals(3, vault.countSince(0L))
+        assertEquals(0, vault.countSince(2000L))
+    }
+
+    @Test
+    fun countSinceStillSeesNewSentencesWhenTheVaultIsAtCapacity() {
+        var now = 1000L
+        val vault = PersonalSentenceVault(clock = { now }, maxSentences = 5)
+        repeat(5) { assertTrue(vault.record("기록 ${('가' + it)}다 하루", "com.android.chrome")) }
+        now = 2000L
+        repeat(3) { assertTrue(vault.record("추가 ${('나' + it)}다 하루", "com.android.chrome")) }
+
+        assertEquals(5, vault.stats().sentences)
+        assertEquals(3, vault.countSince(1000L))
+    }
+
+    @Test
     fun retrieveRanksMatchingSentencesAboveAndExcludesNonMatching() {
         val vault = PersonalSentenceVault(clock = { 1000L })
         vault.record("오늘 회의 참석하겠습니다", "com.android.chrome")

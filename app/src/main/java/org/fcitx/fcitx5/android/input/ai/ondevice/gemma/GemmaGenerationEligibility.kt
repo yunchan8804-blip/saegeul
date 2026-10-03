@@ -19,7 +19,11 @@ data class GemmaGenerationSnapshot(
      * 입력 뷰가 지금 화면에 있는지. `isKeyboardActive`(숨김 유예 포함)가 아니라 이 신호가
      * 배경 재료 생성의 중지 경계다.
      */
-    val inputViewVisible: Boolean
+    val inputViewVisible: Boolean,
+    /**
+     * 화면이 켜져 있는지(`PowerManager.isInteractive`). 자동 생성만 이 값이 false(화면 꺼짐)일 때 돈다.
+     */
+    val screenInteractive: Boolean = false
 )
 
 enum class GemmaGenerationMode(
@@ -46,19 +50,28 @@ enum class GemmaGenerationWaitReason(val message: String) {
     POWER_SAVE_MODE("절전 모드에서는 생성을 미룹니다."),
     THERMAL_LIMITED("기기 온도가 높아 생성을 미룹니다."),
     LOW_MEMORY("메모리 부족 상태라 생성을 미룹니다."),
-    KEYBOARD_ACTIVE("키보드 사용 중에는 생성하지 않습니다.")
+    KEYBOARD_ACTIVE("키보드 사용 중에는 생성하지 않습니다."),
+    SCREEN_ON("충전 중이고 화면이 꺼져 있을 때 만들어요."),
+    NOT_CHARGING("충전 중이고 화면이 꺼져 있을 때 만들어요.")
 }
 
+/**
+ * 기기 조건으로 생성을 시작·계속해도 되는지 판단한다. 자동 생성([GemmaGenerationMode.AUTOMATIC])은
+ * 배터리·온도·메모리·입력 뷰 조건에 더해 충전 중이고 화면이 꺼져 있을 때만 허용한다. 수동 생성
+ * ([GemmaGenerationMode.MANUAL])은 충전·화면 상태를 보지 않는다.
+ */
 object GemmaGenerationEligibility {
     fun snapshot(context: Context): GemmaGenerationSnapshot {
         val resources = OnDeviceResourceSnapshot.read(context)
+        val powerManager = context.applicationContext.getSystemService(PowerManager::class.java)
         return GemmaGenerationSnapshot(
             batteryPercent = resources.batteryPercent,
-            isCharging = resources.batteryCharging,
+            isCharging = resources.batteryCharging || resources.powerPlugged,
             powerSaveMode = resources.powerSaveMode,
             thermalStatus = resources.thermalStatus,
             lowMemory = resources.lowMemory,
-            inputViewVisible = OnDeviceGenerationControl.isInputViewVisible
+            inputViewVisible = OnDeviceGenerationControl.isInputViewVisible,
+            screenInteractive = powerManager.isInteractive
         )
     }
 
@@ -73,11 +86,16 @@ object GemmaGenerationEligibility {
             GemmaGenerationMode.AUTOMATIC -> GemmaGenerationWaitReason.BATTERY_BELOW_MINIMUM
             GemmaGenerationMode.MANUAL -> GemmaGenerationWaitReason.MANUAL_BATTERY_BELOW_MINIMUM
         }
-        snapshot.thermalStatus != null && snapshot.thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE -> {
+        // Samsung reports SEVERE under ordinary charge-plus-load warmth; only CRITICAL or worse waits.
+        snapshot.thermalStatus != null && snapshot.thermalStatus >= PowerManager.THERMAL_STATUS_CRITICAL -> {
             GemmaGenerationWaitReason.THERMAL_LIMITED
         }
         snapshot.lowMemory -> GemmaGenerationWaitReason.LOW_MEMORY
         snapshot.inputViewVisible -> GemmaGenerationWaitReason.KEYBOARD_ACTIVE
+        mode == GemmaGenerationMode.AUTOMATIC && snapshot.screenInteractive -> {
+            GemmaGenerationWaitReason.SCREEN_ON
+        }
+        mode == GemmaGenerationMode.AUTOMATIC && !snapshot.isCharging -> GemmaGenerationWaitReason.NOT_CHARGING
         else -> null
     }
 
@@ -90,8 +108,8 @@ object GemmaGenerationEligibility {
         thermalStatus: Int?,
         mode: GemmaGenerationMode = GemmaGenerationMode.AUTOMATIC
     ): Int = when {
-        thermalStatus != null && thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE -> 0
-        thermalStatus != null && thermalStatus >= PowerManager.THERMAL_STATUS_MODERATE -> 1
+        thermalStatus != null && thermalStatus >= PowerManager.THERMAL_STATUS_CRITICAL -> 0
+        thermalStatus != null && thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE -> 1
         else -> mode.maxContexts
     }
 

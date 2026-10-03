@@ -58,7 +58,9 @@ class MobileHangulKeyboard(
 ) : BaseKeyboard(
     context,
     theme,
-    PinnedNumberRow.prependTo(layoutFor(mobileLayout, effectiveDensity(context)))
+    PinnedNumberRow.prependTo(
+        layoutFor(mobileLayout, effectiveDensity(context), micKeyEnabled())
+    )
 ) {
 
     companion object {
@@ -74,6 +76,17 @@ class MobileHangulKeyboard(
 
         private fun effectiveDensity(context: Context): Float =
             context.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
+
+        private fun micKeyEnabled(): Boolean =
+            AppPrefs.getInstance().keyboard.showVoiceInputButton.getValue()
+
+        /** Period and comma share one key wherever the mic key takes the comma's place. */
+        private fun periodComma(width: Float) =
+            PeriodCommaKey(width, textSize = 19f)
+
+        private fun micBackspace(showMicKey: Boolean): List<KeyDef> =
+            if (showMicKey) listOf(MicKey(EIGHTH), BackspaceKey(EIGHTH))
+            else listOf(BackspaceKey(QUARTER))
 
         private fun jamo(label: String, value: Char, width: Float) =
             MobileHangulKey(label, MobileHangulComposer.Token.Jamo(value), width)
@@ -154,16 +167,28 @@ class MobileHangulKeyboard(
                 includePressTokenOnGesture = true
             )
 
-        private fun qwertyBottom() = listOf(
-            LayoutSwitchKey("?123", "", percentWidth = 0.13f),
-            LanguageKey(),
-            symbol(",", width = 0.1f),
-            mobileSpace(),
-            symbol(".", width = 0.1f),
-            ReturnKey(percentWidth = 0.15f)
-        )
+        private fun qwertyBottom(showMicKey: Boolean) =
+            if (showMicKey) {
+                listOf(
+                    MicKey(),
+                    LayoutSwitchKey("?123", "", percentWidth = 0.13f),
+                    LanguageKey(),
+                    mobileSpace(),
+                    periodComma(0.1f),
+                    ReturnKey(percentWidth = 0.15f)
+                )
+            } else {
+                listOf(
+                    LayoutSwitchKey("?123", "", percentWidth = 0.13f),
+                    LanguageKey(),
+                    symbol(",", width = 0.1f),
+                    mobileSpace(),
+                    symbol(".", width = 0.1f),
+                    ReturnKey(percentWidth = 0.15f)
+                )
+            }
 
-        private fun chunjiin() = listOf(
+        private fun chunjiin(showMicKey: Boolean) = listOf(
             listOf(
                 token("ㅣ", MobileHangulComposer.Token.VowelI, QUARTER),
                 token("ㆍ", MobileHangulComposer.Token.VowelDot, QUARTER, R.id.button_chunjiin_dot),
@@ -188,11 +213,11 @@ class MobileHangulKeyboard(
                 LanguageKey(percentWidth = EIGHTH),
                 cycle("cj_ng", "ㅇㅁ", QUARTER, 'ㅇ', 'ㅁ'),
                 mobileSpace(QUARTER),
-                symbol(",", width = QUARTER)
+                if (showMicKey) MicKey(QUARTER) else symbol(",", width = QUARTER)
             )
         )
 
-        private fun chunjiinPlus() = listOf(
+        private fun chunjiinPlus(showMicKey: Boolean) = listOf(
             listOf(
                 token("ㅣ", MobileHangulComposer.Token.VowelI, QUARTER),
                 token("ㆍ", MobileHangulComposer.Token.VowelDot, QUARTER, R.id.button_chunjiin_dot),
@@ -224,11 +249,11 @@ class MobileHangulKeyboard(
                 jamo("ㅇ", 'ㅇ', EIGHTH),
                 jamo("ㅁ", 'ㅁ', EIGHTH),
                 mobileSpace(QUARTER),
-                symbol(",", width = QUARTER)
+                if (showMicKey) MicKey(QUARTER) else symbol(",", width = QUARTER)
             )
         )
 
-        private fun danmoum() = listOf(
+        private fun danmoum(showMicKey: Boolean) = listOf(
             listOf(
                 singleVowelCycle("dm_b", "ㅂ", EIGHTH, 'ㅂ', 'ㅃ'),
                 singleVowelCycle("dm_j", "ㅈ", EIGHTH, 'ㅈ', 'ㅉ'),
@@ -254,13 +279,24 @@ class MobileHangulKeyboard(
                 jamo("ㅡ", 'ㅡ', 1f / 7f),
                 BackspaceKey(percentWidth = 1f / 7f)
             ),
-            qwertyBottom()
+            qwertyBottom(showMicKey)
         )
 
-        private fun moakeyBottom(oneHand: Boolean, gestureThresholdPx: Float) = buildList {
+        private fun moakeyBottom(
+            oneHand: Boolean,
+            gestureThresholdPx: Float,
+            showMicKey: Boolean
+        ) = buildList {
+            if (showMicKey) add(MicKey())
             add(LayoutSwitchKey("?123", "", percentWidth = 0.13f))
             add(LanguageKey())
-            add(symbol(",", width = 0.08f))
+            // The one-hand surface has no period key of its own, so its comma key becomes the
+            // period and comma key; the two-hand surface merges its comma and "?.!" keys.
+            if (!showMicKey) {
+                add(symbol(",", width = 0.08f))
+            } else if (oneHand) {
+                add(periodComma(0.1f))
+            }
             add(mobileSpace())
             if (oneHand) {
                 add(
@@ -274,13 +310,19 @@ class MobileHangulKeyboard(
                         )
                     )
                 )
+            } else if (showMicKey) {
+                add(periodComma(0.1f))
             } else {
                 add(symbolCycle("mk_punct", "?.!", 0.10f, '.', '?', '!'))
             }
             add(ReturnKey(percentWidth = 0.15f))
         }
 
-        private fun moakey(oneHand: Boolean, gestureThresholdPx: Float): List<List<KeyDef>> {
+        private fun moakey(
+            oneHand: Boolean,
+            gestureThresholdPx: Float,
+            showMicKey: Boolean
+        ): List<List<KeyDef>> {
             val seven = 1f / 7f
             val six = 1f / 6f
             return buildList {
@@ -315,7 +357,7 @@ class MobileHangulKeyboard(
                             )
                         }
                 )
-                add(moakeyBottom(oneHand, gestureThresholdPx))
+                add(moakeyBottom(oneHand, gestureThresholdPx, showMicKey))
             }
         }
 
@@ -342,21 +384,27 @@ class MobileHangulKeyboard(
             )
         )
 
-        private fun vega(centered: Boolean): List<List<KeyDef>> {
+        private fun vega(centered: Boolean, showMicKey: Boolean): List<List<KeyDef>> {
             val width = if (centered) CENTER_KEY else QUARTER
             val core = vegaCore(width)
             return if (centered) {
                 listOf(
                     listOf(symbolCycle("vg_qm", "?!", CENTER_SIDE, '?', '!')) + core[0] +
                         BackspaceKey(CENTER_SIDE),
-                    listOf(symbol(",", width = CENTER_SIDE)) + core[1] + mobileSpace(CENTER_SIDE),
+                    listOf(
+                        if (showMicKey) MicKey(CENTER_SIDE) else symbol(",", width = CENTER_SIDE)
+                    ) + core[1] + mobileSpace(CENTER_SIDE),
                     listOf(LanguageKey(CENTER_SIDE)) + core[2] + ReturnKey(CENTER_SIDE),
                     listOf(LayoutSwitchKey("?123", "", CENTER_SIDE)) + core[3] +
-                        symbol(".", width = CENTER_SIDE)
+                        if (showMicKey) {
+                            periodComma(CENTER_SIDE)
+                        } else {
+                            symbol(".", width = CENTER_SIDE)
+                        }
                 )
             } else {
                 listOf(
-                    core[0] + BackspaceKey(QUARTER),
+                    core[0] + micBackspace(showMicKey),
                     core[1] + mobileSpace(QUARTER),
                     core[2] + listOf(
                         symbolCycle("vg_punct", ".,?!", EIGHTH, '.', ',', '?', '!'),
@@ -390,21 +438,27 @@ class MobileHangulKeyboard(
             )
         )
 
-        private fun naratgul(centered: Boolean): List<List<KeyDef>> {
+        private fun naratgul(centered: Boolean, showMicKey: Boolean): List<List<KeyDef>> {
             val width = if (centered) CENTER_KEY else QUARTER
             val core = naratgulCore(width)
             return if (centered) {
                 listOf(
                     listOf(symbolCycle("nr_qm", "?!", CENTER_SIDE, '?', '!')) + core[0] +
                         BackspaceKey(CENTER_SIDE),
-                    listOf(symbol(",", width = CENTER_SIDE)) + core[1] + mobileSpace(CENTER_SIDE),
+                    listOf(
+                        if (showMicKey) MicKey(CENTER_SIDE) else symbol(",", width = CENTER_SIDE)
+                    ) + core[1] + mobileSpace(CENTER_SIDE),
                     listOf(LanguageKey(CENTER_SIDE)) + core[2] + ReturnKey(CENTER_SIDE),
                     listOf(LayoutSwitchKey("?123", "", CENTER_SIDE)) + core[3] +
-                        symbol(".", width = CENTER_SIDE)
+                        if (showMicKey) {
+                            periodComma(CENTER_SIDE)
+                        } else {
+                            symbol(".", width = CENTER_SIDE)
+                        }
                 )
             } else {
                 listOf(
-                    core[0] + BackspaceKey(QUARTER),
+                    core[0] + micBackspace(showMicKey),
                     core[1] + mobileSpace(QUARTER),
                     core[2] + listOf(
                         symbolCycle("nr_punct", ".,?!", EIGHTH, '.', ',', '?', '!'),
@@ -415,19 +469,28 @@ class MobileHangulKeyboard(
             }
         }
 
-        fun layoutFor(layout: MobileHangulLayout, density: Float = 1f): List<List<KeyDef>> =
+        /**
+         * With [showMicKey] the bottom rows make room for the mic key and, where the comma key
+         * has to give way, merge it into a period and comma key. Without it every surface is
+         * built exactly as it was before the mic key existed.
+         */
+        fun layoutFor(
+            layout: MobileHangulLayout,
+            density: Float = 1f,
+            showMicKey: Boolean = true
+        ): List<List<KeyDef>> =
             when (layout) {
-                MobileHangulLayout.Chunjiin -> chunjiin()
-                MobileHangulLayout.ChunjiinPlus -> chunjiinPlus()
-                MobileHangulLayout.Danmoum -> danmoum()
+                MobileHangulLayout.Chunjiin -> chunjiin(showMicKey)
+                MobileHangulLayout.ChunjiinPlus -> chunjiinPlus(showMicKey)
+                MobileHangulLayout.Danmoum -> danmoum(showMicKey)
                 MobileHangulLayout.MoakeyOneHand ->
-                    moakey(true, MOAKEY_GESTURE_THRESHOLD_DP * density)
+                    moakey(true, MOAKEY_GESTURE_THRESHOLD_DP * density, showMicKey)
                 MobileHangulLayout.MoakeyTwoHand ->
-                    moakey(false, MOAKEY_GESTURE_THRESHOLD_DP * density)
-                MobileHangulLayout.Vega -> vega(false)
-                MobileHangulLayout.VegaCenter -> vega(true)
-                MobileHangulLayout.Naratgul -> naratgul(false)
-                MobileHangulLayout.NaratgulCenter -> naratgul(true)
+                    moakey(false, MOAKEY_GESTURE_THRESHOLD_DP * density, showMicKey)
+                MobileHangulLayout.Vega -> vega(false, showMicKey)
+                MobileHangulLayout.VegaCenter -> vega(true, showMicKey)
+                MobileHangulLayout.Naratgul -> naratgul(false, showMicKey)
+                MobileHangulLayout.NaratgulCenter -> naratgul(true, showMicKey)
                 MobileHangulLayout.Physical -> error("Physical layout does not use MobileHangulKeyboard")
             }
     }
