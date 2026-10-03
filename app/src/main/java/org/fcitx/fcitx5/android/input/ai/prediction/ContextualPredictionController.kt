@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.input.ai.KoreanSemanticSentencePredictor
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore
 import org.fcitx.fcitx5.android.input.ai.ReinforcementTracker
+import org.fcitx.fcitx5.android.input.ai.learning.PersonalLearningInstrumentationGate
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
@@ -536,6 +537,7 @@ class ContextualPredictionController(private val host: Host) {
 
     fun recordContextualCandidateShown(candidate: PredictionMetricsSession.Candidate?) {
         if (candidate == null) return
+        if (PersonalLearningInstrumentationGate.isPaused) return
         if (!host.allowsTextInspection()) {
             predictionMetricsSession.reset()
             return
@@ -562,6 +564,7 @@ class ContextualPredictionController(private val host: Host) {
         replacedText: String
     ) {
         if (candidate == null) return
+        if (PersonalLearningInstrumentationGate.isPaused) return
         if (!host.allowsTextInspection()) {
             predictionMetricsSession.reset()
             return

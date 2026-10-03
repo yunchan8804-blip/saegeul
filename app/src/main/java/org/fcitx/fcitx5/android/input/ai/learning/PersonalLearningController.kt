@@ -72,6 +72,19 @@ internal fun launchSerializedLearning(
     task()
 }
 
+/**
+ * [launchSerializedLearning] unless [PersonalLearningInstrumentationGate] is paused, in which case
+ * nothing is queued and null is returned.
+ */
+internal fun launchSerializedLearningUnlessPaused(
+    scope: CoroutineScope,
+    previous: Job?,
+    task: suspend CoroutineScope.() -> Unit
+): Job? {
+    if (PersonalLearningInstrumentationGate.isPaused) return null
+    return launchSerializedLearning(scope, previous, task)
+}
+
 /** A transient collection-progress hint for the keyboard's status row (see [PersonalLearningController.collectionFeedback]). */
 data class CollectionFeedbackEvent(
     val category: String,
@@ -303,6 +316,7 @@ class PersonalLearningController(private val host: Host) {
     }
 
     fun observeCommittedEditorText(text: String) {
+        if (PersonalLearningInstrumentationGate.isPaused) return
         if (!host.allowsTextInspection()) {
             if (!collectionPrivacyDropLogged) {
                 collectionPrivacyDropLogged = true
@@ -322,6 +336,7 @@ class PersonalLearningController(private val host: Host) {
      * 문장 종결로 취급해 관찰한다.
      */
     fun observeForwardedKeyIfPrintable(keyCode: Int, unicodeChar: Int, metaState: Int) {
+        if (PersonalLearningInstrumentationGate.isPaused) return
         if (!host.allowsTextInspection()) return
         val printable = ForwardedKeyObserver.printableText(keyCode, unicodeChar, metaState) ?: return
         if (printable == "\n" &&
@@ -354,6 +369,7 @@ class PersonalLearningController(private val host: Host) {
     }
 
     private fun recordCorrectionPairIfPresent(pair: Pair<String, String>?) {
+        if (PersonalLearningInstrumentationGate.isPaused) return
         val (typed, corrected) = pair ?: return
         if (correctionPatternStore.recordCorrection(typed, corrected)) {
             typoCorrector.addWord(
@@ -392,7 +408,7 @@ class PersonalLearningController(private val host: Host) {
         action: () -> Unit
     ) {
         val previous = personalLearningTail
-        personalLearningTail = launchSerializedLearning(FcitxApplication.getInstance().applicationScope, previous) {
+        val launched = launchSerializedLearningUnlessPaused(FcitxApplication.getInstance().applicationScope, previous) {
             action()
             val persistAfterDestroyed = withContext(Dispatchers.Main) {
                 host.advancePredictionEpoch()
@@ -412,6 +428,7 @@ class PersonalLearningController(private val host: Host) {
                 FcitxApplication.getInstance().predictionMetricsStore.save()
             }
         }
+        if (launched != null) personalLearningTail = launched
     }
 
     fun enqueueContextualSelectionFeedback(
@@ -420,6 +437,7 @@ class PersonalLearningController(private val host: Host) {
         reinforcedSentence: String,
         packageName: String
     ) {
+        if (PersonalLearningInstrumentationGate.isPaused) return
         enqueuePersonalLearning {
             reinforcementTracker.onCandidateSelected(selectedSentence, packageName)
             personalNgramModel.reinforce(contextBeforeReinforce, reinforcedSentence, packageName)

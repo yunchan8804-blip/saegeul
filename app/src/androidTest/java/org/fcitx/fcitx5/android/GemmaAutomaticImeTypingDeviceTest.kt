@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
 import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.ai.learning.PersonalLearningInstrumentationGate
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionWarmupState
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator
@@ -58,11 +59,13 @@ class GemmaAutomaticImeTypingDeviceTest {
     fun pauseAccumulationForInstrumentation() {
         // 이전 실기기 세션에서 남은 축적 주기 작업이 측정 도중 깨어나 생성 lease를 잡는 것을 막는다.
         GemmaAccumulationScheduler.pauseForInstrumentation()
+        PersonalLearningInstrumentationGate.pauseForInstrumentation()
     }
 
     @After
     fun resumeAccumulationAfterInstrumentation() {
         GemmaAccumulationScheduler.resumeAfterInstrumentation()
+        PersonalLearningInstrumentationGate.resumeAfterInstrumentation()
     }
 
     @Test

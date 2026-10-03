@@ -237,6 +237,10 @@ class PersonalSentenceVault(
             .map { it.text }
     }
 
+    /** Every stored sentence text (already PII-scrubbed), in no particular order. Read-only. */
+    @Synchronized
+    fun allSentences(): List<String> = docs.values.map { it.text }
+
     /**
      * How many stored sentences were last seen strictly after [sinceMs] - the same criterion
      * [exportSince] filters by, without materializing them. A size difference against an earlier

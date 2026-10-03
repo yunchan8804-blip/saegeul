@@ -25,6 +25,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.debug.AiEditorTestActivity
+import org.fcitx.fcitx5.android.input.ai.learning.PersonalLearningInstrumentationGate
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationScheduler
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationStore
 import org.fcitx.fcitx5.android.input.EditorIdentity
@@ -61,11 +62,13 @@ class GemmaAutomaticImeDeviceTest {
         // 이전 실기기 세션에서 남은 축적 주기 작업이 이 E2E 도중 깨어나 두 번째 native 엔진을
         // 만드는 것을 막는다. 진행 중인 생성은 그대로 끝나고, 새 생성만 막힌다.
         GemmaAccumulationScheduler.pauseForInstrumentation()
+        PersonalLearningInstrumentationGate.pauseForInstrumentation()
     }
 
     @After
     fun resumeAccumulationAfterInstrumentation() {
         GemmaAccumulationScheduler.resumeAfterInstrumentation()
+        PersonalLearningInstrumentationGate.resumeAfterInstrumentation()
     }
 
     @Test
