@@ -121,6 +121,48 @@ class OnDeviceSuggestionPolicyTest {
     }
 
     @Test
+    fun `current sentence without any space stays under the prompt budget and keeps its tail`() {
+        val text = "가".repeat(299) + "끝"
+        val prompt = OnDeviceSuggestionPolicy.promptFor(input(text = text))
+
+        assertTrue("length=${prompt.length}", prompt.length <= 190)
+        val current = prompt.lines().last()
+        assertTrue(current.startsWith("쓰는 중인 문장: "))
+        assertTrue(current.endsWith("가가끝"))
+        assertTrue(current.length > "쓰는 중인 문장: ".length + 70)
+    }
+
+    @Test
+    fun `long current sentence with spaces only early on is cut at a word boundary within the budget`() {
+        val spaced = (1..10).joinToString(" ") { "어절%02d".format(it) }
+        val text = spaced + " " + "나".repeat(90) + "끝"
+        val prompt = OnDeviceSuggestionPolicy.promptFor(input(text = text))
+
+        assertTrue("length=${prompt.length}", prompt.length <= 190)
+        assertTrue(prompt.lines().last().endsWith("나끝"))
+    }
+
+    @Test
+    fun `truncating a long current sentence does not split a surrogate pair`() {
+        val pair = "😀"
+        val prompt = OnDeviceSuggestionPolicy.promptFor(input(text = pair.repeat(150)))
+
+        assertTrue("length=${prompt.length}", prompt.length <= 190)
+        val current = prompt.lines().last().removePrefix("쓰는 중인 문장: ")
+        assertFalse(current.first().isLowSurrogate())
+        assertTrue(current.endsWith(pair))
+    }
+
+    @Test
+    fun `reply that echoes the shown part of a truncated current sentence is reduced to its continuation`() {
+        val text = "가".repeat(300)
+        val shown = OnDeviceSuggestionPolicy.promptFor(input(text = text)).lines().last()
+            .removePrefix("쓰는 중인 문장: ")
+
+        assertEquals(" 이어서 씁니다.", OnDeviceSuggestionPolicy.parseSuffix(input(text = text), "$shown 이어서 씁니다."))
+    }
+
+    @Test
     fun `tone is polite when completed sentences end politely`() {
         val prompt = OnDeviceSuggestionPolicy.promptFor(input(text = "안녕하세요. 내일 일정 ", appCategory = "messenger"))
 

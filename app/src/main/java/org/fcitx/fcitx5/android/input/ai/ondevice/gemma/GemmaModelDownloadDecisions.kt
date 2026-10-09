@@ -27,6 +27,36 @@ internal fun decideResumeOutcome(requestedRange: Boolean, responseCode: Int): Ge
         GemmaResumeOutcome.DISCARD_EXISTING_BYTES
     }
 
+/** What [GemmaModelDownloadWorker] does with the `.part` file it finds on disk before it opens any connection. */
+internal enum class GemmaPartDisposition {
+    /** Empty, absent or shorter than the model: request the missing bytes (a `Range` request when there are some). */
+    TRANSFER,
+
+    /** Exactly the model size: nothing is left to download, and a `Range` request past the end would be answered with `416`. Go straight to verification. */
+    VERIFY_COMPLETE,
+
+    /** Longer than the model can ever be, so it cannot be a prefix of it: delete it and download from byte 0. */
+    DISCARD_OVERSIZED
+}
+
+internal fun decidePartDisposition(partBytes: Long, modelBytes: Long): GemmaPartDisposition = when {
+    partBytes > modelBytes -> GemmaPartDisposition.DISCARD_OVERSIZED
+    partBytes == modelBytes -> GemmaPartDisposition.VERIFY_COMPLETE
+    else -> GemmaPartDisposition.TRANSFER
+}
+
+/** What a `416 Range Not Satisfiable` answer to a resume request means for the `.part` file. */
+internal enum class GemmaRangeRejection {
+    /** The `.part` file already holds the whole model, which is why the server has nothing left to send: verify it. */
+    VERIFY_PART,
+
+    /** The `.part` file does not match what the server can serve: delete it and retry from byte 0. */
+    DISCARD_PART_AND_RETRY
+}
+
+internal fun decideRangeRejection(partBytes: Long, modelBytes: Long): GemmaRangeRejection =
+    if (partBytes == modelBytes) GemmaRangeRejection.VERIFY_PART else GemmaRangeRejection.DISCARD_PART_AND_RETRY
+
 /** Whether [availableBytes] of free space is enough to hold the fixed-size model (plus headroom), independent of how [StatFs] measures it. */
 internal fun hasEnoughFreeSpace(availableBytes: Long, requiredBytes: Long): Boolean =
     availableBytes >= requiredBytes

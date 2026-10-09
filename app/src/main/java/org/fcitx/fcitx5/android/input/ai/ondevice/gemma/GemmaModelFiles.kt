@@ -28,6 +28,9 @@ object GemmaModelFiles {
 
     private val transferMutex = Mutex()
 
+    /** 모델 파일을 바꾸는 경로([verifyAndInstallPart], [deleteModel])는 모두 [transferMutex] 아래에서 [GemmaVerifiedFileCache.invalidate]를 부른다. */
+    private val verifiedModelCache = GemmaVerifiedFileCache()
+
     const val MODEL_ID = "litert-community/gemma-4-E2B-it-litert-lm"
     const val MODEL_SHA256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c"
     const val MODEL_BYTES = 2_588_147_712L
@@ -77,7 +80,7 @@ object GemmaModelFiles {
             requireSupportedAbi()
             val model = modelFile(context)
             if (!model.isFile) throw IOException("검증된 Gemma 모델이 없습니다. 다운로드하거나 가져오세요.")
-            verify(model, isCancelled)
+            verifiedModelCache.verifyOnce(model) { verify(model, isCancelled) }
             model
         }
     }
@@ -86,6 +89,7 @@ object GemmaModelFiles {
         withContext(Dispatchers.IO) {
             val model = modelFile(context)
             val part = partFile(context)
+            verifiedModelCache.invalidate()
             if (model.exists() && !model.delete()) throw IOException("Gemma 모델을 삭제할 수 없습니다.")
             if (part.exists() && !part.delete()) throw IOException("Gemma 부분 모델 파일을 삭제할 수 없습니다.")
         }
@@ -159,13 +163,15 @@ object GemmaModelFiles {
         isCancelled: () -> Boolean = { false }
     ) {
         verify(part, isCancelled)
+        verifiedModelCache.invalidate()
         Os.rename(part.absolutePath, model.absolutePath)
+        verifiedModelCache.invalidate()
     }
 
     private suspend fun existingVerifiedModel(context: Context): File? {
         val model = modelFile(context)
         if (!model.isFile) return null
-        verify(model)
+        verifiedModelCache.verifyOnce(model) { verify(model) }
         return model
     }
 

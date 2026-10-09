@@ -131,12 +131,25 @@ object OnDeviceSuggestionPolicy {
         val completed = text.substring(0, completedEnd).trim()
         val current = text.substring(currentStart).trimStart()
         if (current.length <= MAX_CURRENT_CHARS) return SentenceSplit(completed, completed, current)
-        val cut = (current.length - MAX_CURRENT_CHARS until current.length).firstOrNull { index ->
-            index > 0 && current[index - 1].isWhitespace() && !current[index].isWhitespace()
-        } ?: return SentenceSplit(completed, completed, current)
+        val cut = wordBoundaryCut(current, MAX_CURRENT_CHARS) ?: when {
+            current.length <= MAX_SHOWN_CURRENT_CHARS -> return SentenceSplit(completed, completed, current)
+            else -> wordBoundaryCut(current, MAX_SHOWN_CURRENT_CHARS) ?: characterCut(current, MAX_SHOWN_CURRENT_CHARS)
+        }
         val head = current.substring(0, cut).trimEnd()
         val prev = if (completed.isEmpty()) head else "$completed $head"
         return SentenceSplit(completed, prev, current.substring(cut))
+    }
+
+    /** The first word start within the last [keepChars] characters of [current], so the kept tail begins on a word. */
+    private fun wordBoundaryCut(current: String, keepChars: Int): Int? =
+        (current.length - keepChars until current.length).firstOrNull { index ->
+            index > 0 && current[index - 1].isWhitespace() && !current[index].isWhitespace()
+        }
+
+    /** Keeps exactly the last [keepChars] characters (one more if that would split a surrogate pair), for text with no word boundary to cut at. */
+    private fun characterCut(current: String, keepChars: Int): Int {
+        val cut = current.length - keepChars
+        return if (current[cut].isLowSurrogate()) cut + 1 else cut
     }
 
     private enum class Tone(val label: String) {
@@ -499,4 +512,12 @@ object OnDeviceSuggestionPolicy {
         "쓰는 중인 문장을 앞 내용에 이어 짧게 끝맺어 그 문장 하나만 쓰세요. 쓴 부분은 그대로 두고 앞 내용은 되풀이하지 마세요."
     private const val NEXT_SENTENCE_INSTRUCTION =
         "앞 내용에 자연스럽게 이어질 짧은 다음 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
+
+    /**
+     * Longest part of the sentence being typed that can be shown without the prompt passing
+     * [PROMPT_CHAR_BUDGET]: the current line is always sent with [COMPLETE_SENTENCE_INSTRUCTION] and the
+     * newline joining them, and everything else optional is squeezed into what is left.
+     */
+    private const val MAX_SHOWN_CURRENT_CHARS =
+        PROMPT_CHAR_BUDGET - COMPLETE_SENTENCE_INSTRUCTION.length - 1 - CURRENT_LINE_PREFIX.length
 }

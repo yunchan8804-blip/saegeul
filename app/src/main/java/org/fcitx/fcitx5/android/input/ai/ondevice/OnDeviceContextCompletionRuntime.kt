@@ -206,20 +206,15 @@ class OnDeviceContextCompletionRuntime(context: Context) {
     private suspend fun drainGenerator(
         run: Run,
         generation: Deferred<GemmaMaterialGenerator.GenerationResult>
-    ): Boolean = try {
+    ): Boolean {
         run.generator.cancel()
         generation.cancel()
-        withContext(NonCancellable) {
-            withTimeout(NATIVE_STOP_BUDGET_MS) {
-                generation.join()
-                while (run.generator.isRunning || OnDeviceGenerationControl.isGenerating) {
-                    delay(NATIVE_STOP_POLL_INTERVAL_MS)
-                }
-            }
-        }
-        true
-    } catch (_: TimeoutCancellationException) {
-        false
+        return awaitOwnGenerationStopped(
+            generation = generation,
+            isOwnGenerationRunning = { run.generator.isRunning },
+            budgetMs = NATIVE_STOP_BUDGET_MS,
+            pollIntervalMs = NATIVE_STOP_POLL_INTERVAL_MS
+        )
     }
 
     private fun waitForLateNativeStop(
@@ -228,7 +223,7 @@ class OnDeviceContextCompletionRuntime(context: Context) {
     ) {
         scope.launch {
             generation?.join()
-            while (run.generator.isRunning || OnDeviceGenerationControl.isGenerating) {
+            while (run.generator.isRunning) {
                 delay(NATIVE_STOP_POLL_INTERVAL_MS)
             }
             run.nativeStopped.set(true)
@@ -296,4 +291,31 @@ class OnDeviceContextCompletionRuntime(context: Context) {
         const val NATIVE_STOP_BUDGET_MS = 30_000L
         const val NATIVE_STOP_POLL_INTERVAL_MS = 50L
     }
+}
+
+/**
+ * 이 run 자신의 생성이 끝나기를 [budgetMs]까지 기다린다. 끝나면 true, 못 끝내면 false.
+ *
+ * 프로세스 전역 lease([OnDeviceGenerationControl.isGenerating])는 기다리지 않는다. 웜 AUTO_CONTEXT 엔진은
+ * 유휴 중에도 lease를 쥐고 있어서, 이어쓰기가 lease를 못 받은 run까지 그 lease를 기다리면 멈춘 적이 없는
+ * 네이티브를 멈추지 않았다고 판단해 이후 이어쓰기가 영구히 실패한다. run이 lease를 얻었다면
+ * [GemmaMaterialGenerator.isRunning]은 그 lease를 반납한 뒤에야 거짓이 되므로 이것만 보면 된다.
+ */
+internal suspend fun awaitOwnGenerationStopped(
+    generation: Job,
+    isOwnGenerationRunning: () -> Boolean,
+    budgetMs: Long,
+    pollIntervalMs: Long
+): Boolean = try {
+    withContext(NonCancellable) {
+        withTimeout(budgetMs) {
+            generation.join()
+            while (isOwnGenerationRunning()) {
+                delay(pollIntervalMs)
+            }
+        }
+    }
+    true
+} catch (_: TimeoutCancellationException) {
+    false
 }

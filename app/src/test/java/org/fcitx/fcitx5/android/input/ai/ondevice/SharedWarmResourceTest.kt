@@ -86,6 +86,29 @@ class SharedWarmResourceTest {
     }
 
     @Test
+    fun idleEngineClosesImmediatelyOnRequestWithADirectExecutor() {
+        val shared = resource(Executor { it.run() })
+        shared.acquire("model", "gpu", clock).release()
+        shared.requestClose("MODEL_DELETED")
+
+        assertTrue(created.single().closed)
+        assertFalse(shared.isWarm)
+    }
+
+    @Test
+    fun engineInUseWhenTheModelIsDeletedClosesOnlyAtTheLastRelease() {
+        val shared = resource(Executor { it.run() })
+        val use = shared.acquire("model", "gpu", clock)
+        shared.requestClose("MODEL_DELETED")
+        assertFalse(created.single().closed)
+        assertTrue(shared.isWarm)
+
+        use.release()
+        assertTrue(created.single().closed)
+        assertFalse(shared.isWarm)
+    }
+
+    @Test
     fun acquireAfterAPendingCloseBuildsAFreshEngine() {
         val shared = resource()
         shared.acquire("model", "gpu", clock).release()

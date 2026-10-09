@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSharedEngine
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -110,16 +111,22 @@ object GemmaModelInstaller {
     /**
      * Deletes an installed model. Cancels any in-flight on-device generation first (material
      * accumulation and personal-graph enrichment each hold their own lease on the Gemma engine; both
-     * would otherwise fail mid-generation against a model file that just disappeared).
+     * would otherwise fail mid-generation against a model file that just disappeared) and asks the
+     * shared engine to close, so an idle engine does not keep the deleted 2.5GB file and its memory.
      */
     fun deleteModel(context: Context) {
         val applicationContext = context.applicationContext
         installerScope.launch {
-            GemmaAccumulationRuntime.cancelActiveGenerator()
-            GemmaGraphEnrichmentRuntime.cancelActiveGenerator()
+            releaseModelUsers()
             GemmaModelFiles.deleteModel(applicationContext)
             refreshStateNow(applicationContext)
         }
+    }
+
+    internal fun releaseModelUsers(requestEngineClose: (reason: String) -> Unit = OnDeviceSharedEngine::requestClose) {
+        GemmaAccumulationRuntime.cancelActiveGenerator()
+        GemmaGraphEnrichmentRuntime.cancelActiveGenerator()
+        requestEngineClose(ENGINE_CLOSE_REASON_MODEL_DELETED)
     }
 
     suspend fun importFrom(context: Context, uri: Uri): Result<Unit> {
@@ -149,12 +156,21 @@ object GemmaModelInstaller {
      * accumulation + personal-graph enrichment) on by default, unless the user had explicitly turned
      * it off before - see [GemmaAutomaticLearningPolicy.shouldAutoEnableAfterInstall].
      */
-    internal suspend fun onInstallSucceeded(context: Context) {
-        val store = GemmaAccumulationStore.get(context)
-        val state = store.load()
+    internal suspend fun onInstallSucceeded(context: Context) = applyInstallDefaults(
+        loadAccumulationState = { GemmaAccumulationStore.get(context).load() },
+        enableAccumulation = { GemmaAccumulationScheduler.setEnabled(context, enabled = true, byUser = false) },
+        enableGraphEnrichment = { GemmaGraphEnrichmentScheduler.setEnabled(context, enabled = true) }
+    )
+
+    internal suspend fun applyInstallDefaults(
+        loadAccumulationState: suspend () -> GemmaAccumulationState,
+        enableAccumulation: suspend () -> Unit,
+        enableGraphEnrichment: suspend () -> Unit
+    ) {
+        val state = loadAccumulationState()
         if (GemmaAutomaticLearningPolicy.shouldAutoEnableAfterInstall(state.enabled, state.automaticLearningUserOptOut)) {
-            GemmaAccumulationScheduler.setEnabled(context, enabled = true, byUser = false)
-            GemmaGraphEnrichmentScheduler.setEnabled(context, enabled = true)
+            enableAccumulation()
+            enableGraphEnrichment()
         }
     }
 
@@ -253,6 +269,7 @@ object GemmaModelInstaller {
         WorkInfo.State.SUCCEEDED to 3
     )
 
+    internal const val ENGINE_CLOSE_REASON_MODEL_DELETED = "MODEL_DELETED"
     private const val WORK_INFO_TIMEOUT_SECONDS = 10L
     private const val BACKOFF_DELAY_SECONDS = 30L
 }

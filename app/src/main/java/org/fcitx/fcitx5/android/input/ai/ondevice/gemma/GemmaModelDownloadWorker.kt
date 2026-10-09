@@ -62,24 +62,34 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
             return Result.failure(failureData(GemmaInstallFailure.UNKNOWN))
         }
         val part = GemmaModelFiles.partFile(applicationContext)
-        val existingBytes = if (part.isFile) part.length() else 0L
-        val available = StatFs(directory.absolutePath).availableBytes
-        val stillNeeded = (GemmaModelFiles.REQUIRED_FREE_BYTES - existingBytes).coerceAtLeast(0L)
-        if (!hasEnoughFreeSpace(available, stillNeeded)) {
-            return Result.failure(failureData(GemmaInstallFailure.STORAGE_FULL))
+        var existingBytes = if (part.isFile) part.length() else 0L
+        val disposition = decidePartDisposition(existingBytes, GemmaModelFiles.MODEL_BYTES)
+        if (disposition == GemmaPartDisposition.DISCARD_OVERSIZED) {
+            if (!part.delete()) return Result.retry()
+            existingBytes = 0L
+        }
+        if (disposition != GemmaPartDisposition.VERIFY_COMPLETE) {
+            val available = StatFs(directory.absolutePath).availableBytes
+            val stillNeeded = (GemmaModelFiles.REQUIRED_FREE_BYTES - existingBytes).coerceAtLeast(0L)
+            if (!hasEnoughFreeSpace(available, stillNeeded)) {
+                return Result.failure(failureData(GemmaInstallFailure.STORAGE_FULL))
+            }
         }
 
         val installStore = GemmaModelInstallStore.get(applicationContext)
         trySetForeground(existingBytes, 0L)
 
         return try {
-            transferOneAttempt(part, existingBytes, installStore)
+            if (disposition != GemmaPartDisposition.VERIFY_COMPLETE) {
+                transferOneAttempt(part, existingBytes, installStore)
+            }
             if (part.length() != GemmaModelFiles.MODEL_BYTES) {
                 throw IOException("모델 다운로드가 완료되지 않았습니다: ${part.length()}/${GemmaModelFiles.MODEL_BYTES}")
             }
             setProgress(progressData(part.length(), 0L, verifying = true))
             GemmaModelFiles.verifyAndInstallPart(part, model) { isStopped }
             installStore.clear()
+            applyInstallDefaults()
             BackgroundProgressNotifier.done(
                 applicationContext,
                 BackgroundProgressNotifier.ID_GEMMA_INSTALL,
@@ -117,6 +127,15 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
             if (requestRange) installStore.lastEtag else null
         )
         try {
+            if (requestRange && response.responseCode == HTTP_RANGE_NOT_SATISFIABLE) {
+                when (decideRangeRejection(part.length(), GemmaModelFiles.MODEL_BYTES)) {
+                    GemmaRangeRejection.VERIFY_PART -> return
+                    GemmaRangeRejection.DISCARD_PART_AND_RETRY -> {
+                        if (part.isFile && !part.delete()) throw IOException("이전 모델 부분 파일을 지울 수 없습니다.")
+                        throw IOException("모델 다운로드 HTTP $HTTP_RANGE_NOT_SATISFIABLE: 부분 파일을 버리고 처음부터 다시 받습니다.")
+                    }
+                }
+            }
             if (response.responseCode != HttpURLConnection.HTTP_OK &&
                 response.responseCode != HttpURLConnection.HTTP_PARTIAL
             ) {
@@ -159,6 +178,17 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
             }
         } finally {
             response.disconnect()
+        }
+    }
+
+    /** 모델이 설치된 뒤의 기본 후처리(자동으로 배우기 켜기). 설치 자체는 이미 끝났으므로 여기서 실패해도 다운로드를 실패로 되돌리지 않는다. */
+    private suspend fun applyInstallDefaults() {
+        try {
+            GemmaModelInstaller.onInstallSucceeded(applicationContext)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Timber.w(error, "Gemma install defaults failed after a successful model install")
         }
     }
 
@@ -236,5 +266,6 @@ internal class GemmaModelDownloadWorker @JvmOverloads constructor(
         const val KEY_FAILURE_REASON = "failure_reason"
         private const val TRANSFER_BUFFER_BYTES = 256 * 1024
         private const val PROGRESS_INTERVAL_MS = 900L
+        private const val HTTP_RANGE_NOT_SATISFIABLE = 416
     }
 }

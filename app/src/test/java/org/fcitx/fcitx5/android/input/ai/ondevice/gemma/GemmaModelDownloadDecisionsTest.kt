@@ -321,4 +321,36 @@ class GemmaModelDownloadDecisionsTest {
         // Once the window is full, only the trailing 5s of samples count.
         assertEquals(200_000L, tracker.sample(7_000L, 2_000_000L))
     }
+
+    @Test
+    fun `a part file shorter than the model is transferred`() {
+        assertEquals(GemmaPartDisposition.TRANSFER, decidePartDisposition(0L, MODEL_BYTES))
+        assertEquals(GemmaPartDisposition.TRANSFER, decidePartDisposition(MODEL_BYTES - 1L, MODEL_BYTES))
+    }
+
+    @Test
+    fun `a part file with exactly the model size goes straight to verification`() {
+        assertEquals(GemmaPartDisposition.VERIFY_COMPLETE, decidePartDisposition(MODEL_BYTES, MODEL_BYTES))
+    }
+
+    @Test
+    fun `a part file longer than the model is discarded`() {
+        assertEquals(GemmaPartDisposition.DISCARD_OVERSIZED, decidePartDisposition(MODEL_BYTES + 1L, MODEL_BYTES))
+    }
+
+    @Test
+    fun `a range rejection on a complete part file verifies it`() {
+        assertEquals(GemmaRangeRejection.VERIFY_PART, decideRangeRejection(MODEL_BYTES, MODEL_BYTES))
+    }
+
+    @Test
+    fun `a range rejection on any other part file discards it and retries`() {
+        assertEquals(GemmaRangeRejection.DISCARD_PART_AND_RETRY, decideRangeRejection(MODEL_BYTES - 1L, MODEL_BYTES))
+        assertEquals(GemmaRangeRejection.DISCARD_PART_AND_RETRY, decideRangeRejection(MODEL_BYTES + 1L, MODEL_BYTES))
+        assertEquals(GemmaRangeRejection.DISCARD_PART_AND_RETRY, decideRangeRejection(1L, MODEL_BYTES))
+    }
+
+    private companion object {
+        const val MODEL_BYTES = GemmaModelFiles.MODEL_BYTES
+    }
 }
