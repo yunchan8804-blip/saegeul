@@ -140,6 +140,47 @@ class KoreanTypoCorrectionEngineTest {
     }
 
     @Test
+    fun `calculateReplacementOverlap replaces a syllable-ending token by jamo prefix`() {
+        assertEquals(2, typoEngine.calculateReplacementOverlap("했스", "했습니다"))
+        assertEquals(2, typoEngine.calculateReplacementOverlap("오늘 했스", "했습니다"))
+        assertEquals(1, typoEngine.calculateReplacementOverlap("가", "갈게"))
+        assertEquals(0, typoEngine.calculateReplacementOverlap("했스 ", "했습니다"))
+        assertEquals(0, typoEngine.calculateReplacementOverlap("했스", "하세요"))
+    }
+
+    @Test
+    fun `calculateReplacementOverlap replaces earlier words when the sentence candidate starts at the context`() {
+        assertEquals(4, typoEngine.calculateReplacementOverlap("나는 나", "나는 나중에 갈게"))
+        assertEquals(4, typoEngine.calculateReplacementOverlap("오늘은 나는 나", "나는 나중에 갈게"))
+        assertEquals(4, typoEngine.calculateReplacementOverlap("앞 문장. 나는 나", "나는 나중에 갈게"))
+        assertEquals(7, typoEngine.calculateReplacementOverlap("나는 오늘 ㅅ", "나는 오늘 선생님"))
+    }
+
+    @Test
+    fun `calculateReplacementOverlap keeps the space before a next-word candidate sharing the previous last syllable`() {
+        assertEquals(0, typoEngine.calculateReplacementOverlap("제가 ", "가서"))
+        assertEquals(0, typoEngine.calculateReplacementOverlap("나도 ", "도와줘"))
+        assertEquals(0, typoEngine.calculateReplacementOverlap("오늘은 ", "은행에"))
+    }
+
+    @Test
+    fun `calculateReplacementOverlap treats compound final and compound vowel as an intermediate typing state`() {
+        assertEquals(1, typoEngine.calculateReplacementOverlap("닭", "달걀"))
+        assertEquals(1, typoEngine.calculateReplacementOverlap("없", "업소"))
+        assertEquals(1, typoEngine.calculateReplacementOverlap("오", "왜요"))
+        assertEquals(1, typoEngine.calculateReplacementOverlap("도", "돼요"))
+    }
+
+    @Test
+    fun `calculateReplacementOverlap keeps an opening bracket or quote before the composing token`() {
+        assertEquals(2, typoEngine.calculateReplacementOverlap("(했스", "했습니다"))
+        assertEquals(2, typoEngine.calculateReplacementOverlap("\"했스", "했습니다"))
+        assertEquals(2, typoEngine.calculateReplacementOverlap("「했스", "했습니다"))
+        assertEquals(2, typoEngine.calculateReplacementOverlap("오늘 “했스", "했습니다"))
+        assertEquals(1, typoEngine.calculateReplacementOverlap("(ㅅ", "선생님"))
+    }
+
+    @Test
     fun `calculateReplacementOverlap rejects nonmatching or separated incomplete jamo tokens`() {
         assertEquals(0, typoEngine.calculateReplacementOverlap("ㅅ", "가세요"))
         assertEquals(0, typoEngine.calculateReplacementOverlap("ㅅ ", "선생님"))

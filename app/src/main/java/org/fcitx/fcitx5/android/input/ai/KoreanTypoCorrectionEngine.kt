@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
 import kotlin.math.min
 
 /**
@@ -450,21 +451,11 @@ class KoreanTypoCorrectionEngine(
             .ifEmpty { trimmedBefore }
         val isCandidateSingleWord = !normalizedCandidate.contains(" ")
 
-        if (trailingSpaces == 0 &&
-            lastWord.any(morphology::isChoseong) &&
-            lastWord.all { morphology.isHangulSyllable(it) || morphology.isChoseong(it) }
-        ) {
-            val candidateFirstWord = normalizedCandidate.takeWhile { !it.isWhitespace() }
-            val queryChoseong = morphology.extractChoseongSequence(lastWord)
-            val candidateChoseong = morphology.extractChoseongSequence(candidateFirstWord)
-            val queryJamo = morphology.decomposeHangul(lastWord)
-            val candidateJamo = morphology.decomposeHangul(candidateFirstWord)
-            val isChoseongOnly = lastWord.all(morphology::isChoseong)
-            if ((isChoseongOnly && candidateChoseong.startsWith(queryChoseong)) ||
-                candidateJamo.startsWith(queryJamo)
-            ) {
-                return lastWord.length
-            }
+        // 조합 중인 어절은 낱자 초성("가ㅅ")뿐 아니라 완성 음절("했스" → "했습니다")로 끝나도
+        // 후보와 자모 접두가 맞으면 그 어절을 대체한다. 표면 접두 비교로는 잡히지 않는다.
+        if (trailingSpaces == 0) {
+            val composingOverlap = calculateComposingTokenOverlap(trimmedBefore, lastClause, normalizedCandidate)
+            if (composingOverlap > 0) return composingOverlap
         }
 
         // 1. Check if lastWord is a typo of candidate (or candidate is a typo correction for lastWord)
@@ -494,9 +485,12 @@ class KoreanTypoCorrectionEngine(
         }
 
         // 2. Standard longest suffix/prefix overlap match
+        // 겹친 부분은 어절 시작에서 시작할 때만 인정한다. 앞 어절의 끝 글자와 겹치면 공백이 먹힌다.
         for (i in normalizedCandidate.length downTo 1) {
             val prefix = normalizedCandidate.substring(0, i).trimEnd()
-            if (prefix.isNotEmpty() && trimmedBefore.endsWith(prefix)) {
+            if (prefix.isEmpty() || !trimmedBefore.endsWith(prefix)) continue
+            val start = trimmedBefore.length - prefix.length
+            if (start == 0 || !trimmedBefore[start - 1].isLetterOrDigit()) {
                 return prefix.length + trailingSpaces
             }
         }
@@ -504,7 +498,45 @@ class KoreanTypoCorrectionEngine(
         return 0
     }
 
+    /**
+     * 커서 앞 마지막 절에서, 어절 경계에서 시작하는 접미 S(가장 이른 것부터)를 후보로 대체할 글자 수를 구한다.
+     * S에서 마지막 어절(조합 중인 토큰)을 뺀 앞부분 P가 후보의 접두와 같고, 후보의 P 이후 첫 어절이
+     * 마지막 어절과 두벌식 키 순서 접두(초성만이면 초성 접두)로 맞으면 S의 길이를 반환한다.
+     * 마지막 어절 맨 앞의 여는 괄호·따옴표는 대체 대상에서 빼며, 이때는 P가 빈 경우만 본다.
+     */
+    private fun calculateComposingTokenOverlap(
+        trimmedBefore: String,
+        lastClause: String,
+        candidate: String
+    ): Int {
+        if (lastClause.isEmpty()) return 0
+        val rawWord = trimmedBefore.takeLastWhile { !it.isWhitespace() }
+        val bracketLength = rawWord.takeWhile { it in OPENING_BRACKETS }.length
+        val word = rawWord.substring(bracketLength)
+        if (word.isEmpty() || !word.all { morphology.isHangulSyllable(it) || morphology.isChoseong(it) }) return 0
+
+        val isChoseongOnly = word.all(morphology::isChoseong)
+        val queryChoseong = morphology.extractChoseongSequence(word)
+        val queryKeys = DubeolsikKeyMap.keySequence(word)
+        val wordStart = trimmedBefore.length - rawWord.length
+        val clauseStart = trimmedBefore.length - lastClause.length
+
+        for (start in clauseStart..wordStart) {
+            if (start != clauseStart && !trimmedBefore[start - 1].isWhitespace()) continue
+            val leading = trimmedBefore.substring(start, wordStart)
+            if (leading.isNotEmpty() && (bracketLength > 0 || !candidate.startsWith(leading))) continue
+            val candidateWord = candidate.substring(leading.length).takeWhile { !it.isWhitespace() }
+            val matches = (isChoseongOnly &&
+                morphology.extractChoseongSequence(candidateWord).startsWith(queryChoseong)) ||
+                DubeolsikKeyMap.keySequence(candidateWord).startsWith(queryKeys)
+            if (matches) return trimmedBefore.length - start - bracketLength
+        }
+        return 0
+    }
+
     companion object {
+        private const val OPENING_BRACKETS = "([{\"'“‘「『〈《"
+
         private const val HANGUL_BASE = 0xAC00
         private const val HANGUL_END = 0xD7A3
 

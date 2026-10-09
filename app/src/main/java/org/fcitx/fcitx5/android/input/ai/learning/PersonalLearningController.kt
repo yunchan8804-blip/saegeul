@@ -110,6 +110,7 @@ class PersonalLearningController(private val host: Host) {
         val editorInfo: () -> EditorInfo?,
         val inputConnection: () -> InputConnection?,
         val activePreedit: () -> String,
+        val editorComposingText: () -> String,
         val appPersona: () -> String?,
         val isDestroyed: () -> Boolean,
         val lifecycleScope: () -> CoroutineScope,
@@ -351,7 +352,10 @@ class PersonalLearningController(private val host: Host) {
      */
     fun currentWordBeforeCursor(): String {
         val ic = host.inputConnection() ?: return ""
-        val beforeCursor = ic.getTextBeforeCursor(64, 0)?.toString().orEmpty()
+        val beforeCursor = ContextualPredictionInput.committedTextBeforeCursor(
+            ic.getTextBeforeCursor(64, 0)?.toString().orEmpty(),
+            host.editorComposingText()
+        )
         val activePreedit = host.activePreedit()
         return ContextualPredictionInput.resolve(beforeCursor, activePreedit).stroke
     }

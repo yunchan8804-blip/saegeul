@@ -228,4 +228,165 @@ class UserTypingContextCollectorTest {
 
         assertTrue(collector.hasPending("com.kakao.talk"))
     }
+
+    @Test
+    fun multiSentenceChunkEmitsEachSentenceInOrder() {
+        collector.recordCommittedText("com.kakao.talk", "회의 끝났어요. 내일 연락드릴게요.")
+
+        assertEquals(
+            listOf("회의 끝났어요.", "내일 연락드릴게요."),
+            committedSentences.map { it.second }
+        )
+        assertFalse(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun multiSentenceChunkWithoutFinalPunctuationEmitsTrailingKoreanEnding() {
+        collector.recordCommittedText("com.kakao.talk", "회의 끝났어요. 내일 연락드릴게요")
+
+        assertEquals(
+            listOf("회의 끝났어요.", "내일 연락드릴게요"),
+            committedSentences.map { it.second }
+        )
+        assertFalse(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun multiSentenceChunkKeepsTrailingFragmentPending() {
+        collector.recordCommittedText("com.kakao.talk", "첫째. 둘째? 셋째! 넷째")
+
+        assertEquals(
+            listOf("첫째.", "둘째?", "셋째!"),
+            committedSentences.map { it.second }
+        )
+        assertTrue(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun terminatorGluedToNextCharacterDoesNotSplit() {
+        collector.recordCommittedText("com.kakao.talk", "naver.com 들어가 보세요")
+
+        assertEquals(listOf("naver.com 들어가 보세요"), committedSentences.map { it.second })
+        assertFalse(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun consecutiveTerminatorsStayInOneSentence() {
+        collector.recordCommittedText("com.kakao.talk", "정말요?! 그렇군요...")
+
+        assertEquals(
+            listOf("정말요?!", "그렇군요..."),
+            committedSentences.map { it.second }
+        )
+    }
+
+    @Test
+    fun newlineAfterTerminatorSplitsLines() {
+        collector.recordCommittedText("com.kakao.talk", "첫 줄입니다.\n둘째 줄입니다.")
+
+        assertEquals(
+            listOf("첫 줄입니다.", "둘째 줄입니다."),
+            committedSentences.map { it.second }
+        )
+    }
+
+    @Test
+    fun perCharacterTypingWithPeriodAndSpaceStaysOneSentence() {
+        listOf("안", "녕", ".", " ").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+
+        assertEquals(listOf("안녕."), committedSentences.map { it.second })
+        assertFalse(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun perCharacterRepeatedPeriodsStayInOneSentence() {
+        listOf("그", "렇", "군", "요", ".", ".", ".", " ").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+
+        assertEquals(listOf("그렇군요..."), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterTerminatorWaitsForFollowingWhitespace() {
+        listOf("그", "렇", "군", "요", ".", ".", ".").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+
+        assertTrue(committedSentences.isEmpty())
+        assertTrue(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun perCharacterDomainPeriodIsNotABoundary() {
+        "naver.com 들어가".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertTrue(committedSentences.isEmpty())
+        collector.flushPending("com.kakao.talk")
+        assertEquals(listOf("naver.com 들어가"), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterDecimalPointIsNotABoundary() {
+        "3.5km 걸었다. ".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertEquals(listOf("3.5km 걸었다."), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterPeriodGluedToNextSyllableIsNotABoundary() {
+        "고마워요.그렇군요 ".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertTrue(committedSentences.none { it.second == "고마워요." })
+    }
+
+    @Test
+    fun waitingPunctuationBoundaryIsConfirmedByFlush() {
+        listOf("오", "늘", " ", "끝", "났", "다", ".").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+        assertTrue(committedSentences.isEmpty())
+
+        collector.flushPending("com.kakao.talk")
+
+        assertEquals(listOf("오늘 끝났다."), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun waitingPunctuationBoundaryIsConfirmedOnEditorSwitch() {
+        collector.onEditorSessionStarted("com.kakao.talk", fieldId = 1, restarting = false)
+        listOf("오", "늘", " ", "끝", "났", "다", ".").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+
+        collector.onEditorSessionStarted("com.kakao.talk", fieldId = 2, restarting = false)
+
+        assertEquals(listOf("오늘 끝났다."), committedSentences.map { it.second })
+        assertFalse(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun punctuationOnlySentenceIsNotStored() {
+        collector.recordCommittedText("com.kakao.talk", ".")
+        collector.recordCommittedText("com.kakao.talk", " ")
+        collector.recordCommittedText("com.kakao.talk", "...")
+
+        assertTrue(committedSentences.isEmpty())
+        assertTrue(collector.getSentences("com.kakao.talk").isEmpty())
+    }
+
+    @Test
+    fun committedCompositionSyllableKeepsPendingSuffixMatchable() {
+        listOf("회의 ", "참", "석", "하").forEach {
+            collector.recordCommittedText("com.kakao.talk", it)
+        }
+
+        collector.removePendingSuffix("com.kakao.talk", "참석하")
+
+        assertTrue(collector.hasPending("com.kakao.talk"))
+        collector.recordCommittedText("com.kakao.talk", "기로 했어요.")
+        assertEquals(listOf("회의 기로 했어요."), committedSentences.map { it.second })
+    }
 }

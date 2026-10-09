@@ -51,27 +51,44 @@ class UserTypingContextCollector(
         // (b) Append the new chunk regardless of whether it just closed a pending boundary.
         buffer.append(text)
 
-        // (c) Latin/CJK punctuation still splits immediately, same as before.
-        val currentText = buffer.toString()
-        val punctBoundary = findPunctuationBoundary(currentText)
-        if (punctBoundary != null) {
-            val completedSentence = currentText.substring(0, punctBoundary).trim()
-            val remaining = currentText.substring(punctBoundary)
+        // (c) Latin/CJK punctuation splits immediately. A long chunk (dictation, paste) can hold
+        // several sentences, so every boundary is emitted in order; whatever follows the last
+        // boundary stays buffered and still goes through the Korean-ending check below.
+        // The one exception is a '.' run that a single-character commit just left at the very end
+        // of the buffer: the next keystroke may extend it ("...") or glue to it ("naver.com"), so
+        // that boundary only waits, like a Korean ending, and step (a) confirms it on whitespace.
+        val boundaries = findPunctuationBoundaries(buffer.toString())
+        if (boundaries.isNotEmpty()) {
+            val currentText = buffer.toString()
+            val deferLast = text.length == 1 &&
+                boundaries.last() == currentText.length &&
+                currentText.last() == '.'
+            val emitBoundaries = if (deferLast) boundaries.dropLast(1) else boundaries
+            var start = 0
+            val completedSentences = emitBoundaries.map { boundary ->
+                currentText.substring(start, boundary).trim().also { start = boundary }
+            }
+            val remaining = currentText.substring(start)
             buffer.clear()
             if (remaining.isNotBlank()) {
                 buffer.append(remaining)
             }
-            pendingEndingBoundaryMap.remove(packageName)
-            emitSentence(packageName, completedSentence)
-            return
+            if (deferLast) {
+                pendingEndingBoundaryMap[packageName] = remaining.length
+            } else {
+                pendingEndingBoundaryMap.remove(packageName)
+            }
+            completedSentences.filter { it.isNotBlank() }.forEach { emitSentence(packageName, it) }
+            if (deferLast) return
         }
 
-        // (d) No punctuation boundary. A single-syllable chunk (per-syllable engine commit)
-        // only *arms* a Korean-ending boundary for next time, so a leading syllable like "요"
-        // cannot be split off. A multi-character chunk (paste, buffered-Hangul segment,
-        // candidate selection) already delivered a whole unit of text, so it emits immediately,
-        // same as a punctuation boundary.
-        val trimmed = buffer.toString().trimEnd()
+        // (d) Text left after the last punctuation boundary. A single-syllable chunk
+        // (per-syllable engine commit) only *arms* a Korean-ending boundary for next time, so a
+        // leading syllable like "요" cannot be split off. A multi-character chunk (paste,
+        // buffered-Hangul segment, candidate selection) already delivered a whole unit of text,
+        // so it emits immediately, same as a punctuation boundary.
+        val currentText = buffer.toString()
+        val trimmed = currentText.trimEnd()
         if (KOREAN_ENDINGS.any { trimmed.endsWith(it) }) {
             if (text.length >= 2) {
                 val completedSentence = trimmed.trim()
@@ -102,6 +119,7 @@ class UserTypingContextCollector(
      */
     @Synchronized
     fun flushPending(packageName: String): Boolean {
+        confirmWaitingPunctuationBoundary(packageName)
         val buffer = pendingBufferMap[packageName] ?: return false
         val pending = buffer.toString().trim()
         pendingBufferMap.remove(packageName)
@@ -132,13 +150,19 @@ class UserTypingContextCollector(
         return historyMap[packageName]?.toList() ?: emptyList()
     }
 
-    /** Drops only text that has not crossed a sentence boundary in the current editor session. */
+    /**
+     * Drops only text that has not crossed a sentence boundary in the current editor session.
+     * A punctuation boundary still waiting for its confirming whitespace has already crossed one,
+     * so that sentence is kept.
+     */
     @Synchronized
     fun discardPending(packageName: String? = null) {
         if (packageName != null) {
+            confirmWaitingPunctuationBoundary(packageName)
             pendingBufferMap.remove(packageName)
             pendingEndingBoundaryMap.remove(packageName)
         } else {
+            pendingBufferMap.keys.toList().forEach { confirmWaitingPunctuationBoundary(it) }
             pendingBufferMap.clear()
             pendingEndingBoundaryMap.clear()
         }
@@ -240,8 +264,18 @@ class UserTypingContextCollector(
         }
     }
 
+    private fun confirmWaitingPunctuationBoundary(packageName: String) {
+        val boundary = pendingEndingBoundaryMap[packageName] ?: return
+        val buffer = pendingBufferMap[packageName] ?: return
+        if (boundary <= 0 || boundary > buffer.length || buffer[boundary - 1] !in SENTENCE_TERMINATORS) return
+        val sentence = buffer.substring(0, boundary).trim()
+        buffer.delete(0, boundary)
+        pendingEndingBoundaryMap.remove(packageName)
+        emitSentence(packageName, sentence)
+    }
+
     private fun emitSentence(packageName: String, sentence: String) {
-        if (sentence.isBlank()) {
+        if (sentence.all { it.isWhitespace() || it in SENTENCE_TERMINATORS }) {
             diagnostics?.dropped("blank")
             return
         }
@@ -253,10 +287,27 @@ class UserTypingContextCollector(
         }
     }
 
-    private fun findPunctuationBoundary(text: String): Int? {
-        val punctIdx = text.indexOfLast { it in SENTENCE_TERMINATORS }
-        if (punctIdx >= 0) return punctIdx + 1
-        return null
+    /**
+     * Returns the end offset of every sentence boundary: a run of terminators (`...`, `?!`, `.\n`)
+     * followed by whitespace or the end of [text]. A run ending in a newline is always a boundary.
+     * A terminator glued to the next character (`naver.com`, `3.5km`) is not.
+     */
+    private fun findPunctuationBoundaries(text: String): List<Int> {
+        val boundaries = mutableListOf<Int>()
+        var i = 0
+        while (i < text.length) {
+            if (text[i] !in SENTENCE_TERMINATORS) {
+                i++
+                continue
+            }
+            var end = i + 1
+            while (end < text.length && text[end] in SENTENCE_TERMINATORS) end++
+            if (end == text.length || text[end].isWhitespace() || text[end - 1] == '\n') {
+                boundaries.add(end)
+            }
+            i = end
+        }
+        return boundaries
     }
 
     /** Drops the last whitespace-separated token; an empty result means the buffer had only one. */

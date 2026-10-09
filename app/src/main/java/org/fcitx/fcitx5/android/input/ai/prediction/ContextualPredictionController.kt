@@ -85,6 +85,7 @@ class ContextualPredictionController(private val host: Host) {
         val selection: () -> CursorRange,
         val inputSessionEpoch: () -> Long,
         val activePreedit: () -> String,
+        val editorComposingText: () -> String,
         val finishCompositionForDirectAction: () -> Boolean,
         val commitTextToEditor: (text: String, cursor: Int) -> Boolean,
         val replaceAiRange: (
@@ -136,14 +137,21 @@ class ContextualPredictionController(private val host: Host) {
         val packageName: String,
         val epoch: Long,
         val sentencePackRevision: Long,
-        val generatedSentenceRevision: Long
+        val generatedSentenceRevision: Long,
+        val isContextKnown: Boolean
     )
 
     private data class CachedContextualPredictions(
         val key: ContextualPredictionMemoKey,
         val generation: Long,
         val predictions: List<AiPrediction>
-    )
+    ) {
+        /** The erase the prediction with this [text] needs, against the text it was computed for. */
+        fun replaceTargetFor(text: String): ReplaceTarget? {
+            val replaceLength = predictions.firstOrNull { it.text == text }?.replaceLength ?: return null
+            return ReplaceTarget.of(ContextualPredictionInput.rawFullContext(key.stroke, key.context), replaceLength)
+        }
+    }
 
     private data class ResolvedContextualPredictions(
         val predictions: List<AiPrediction>,
@@ -341,7 +349,12 @@ class ContextualPredictionController(private val host: Host) {
             predictionMetricsSession.reset()
             return ResolvedContextualPredictions(emptyList(), null)
         }
-        val beforeCursor = ic.getTextBeforeCursor(128, 0)?.toString().orEmpty()
+        val readBeforeCursor = ic.getTextBeforeCursor(128, 0)?.toString()
+        val isContextKnown = readBeforeCursor != null
+        val beforeCursor = ContextualPredictionInput.committedTextBeforeCursor(
+            readBeforeCursor.orEmpty(),
+            host.editorComposingText()
+        )
 
         val activePreedit = host.activePreedit()
 
@@ -381,7 +394,8 @@ class ContextualPredictionController(private val host: Host) {
             pkgName,
             predictionEpoch,
             application.sentencePacks.revision,
-            if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank.revision else 0L
+            if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank.revision else 0L,
+            isContextKnown
         )
         val inputSessionEpoch = host.inputSessionEpoch()
         contextualResultCache?.let { cached ->
@@ -421,7 +435,8 @@ class ContextualPredictionController(private val host: Host) {
                     contextBeforeCursor = resolved.context,
                     packageName = pkgName,
                     limit = limit,
-                    inputSessionEpoch = inputSessionEpoch
+                    inputSessionEpoch = inputSessionEpoch,
+                    isContextKnown = isContextKnown
                 )
                 withContext(Dispatchers.Main) {
                     val currentFieldIsConversational =
@@ -603,14 +618,19 @@ class ContextualPredictionController(private val host: Host) {
         }
     }
 
-    /** 마지막으로 만든 예측 결과 메모에서 텍스트가 같은 후보의 replaceLength를 찾는다. */
-    private fun replaceLengthForCandidate(sentence: String): Int =
-        contextualResultCache?.predictions?.firstOrNull { it.text == sentence }?.replaceLength ?: 0
+    /** 마지막으로 만든 예측 결과 메모에서 텍스트가 같은 후보가 지워야 할 입력 조각을 찾는다. */
+    private fun replaceTargetForCandidate(sentence: String): ReplaceTarget? =
+        contextualResultCache?.replaceTargetFor(sentence)
 
+    /**
+     * [replaceTarget]이 있으면 지우기 직전에 읽은 글이 그 후보를 만든 입력 조각과 정확히 같을
+     * 때만 바꾼다. 다르면 아무것도 지우지도 덧붙이지도 않고 false를 돌려준다.
+     */
     private fun commitContextualCandidateText(
         connection: InputConnection,
         replaceLength: Int,
-        textToCommit: String
+        textToCommit: String,
+        replaceTarget: ReplaceTarget? = null
     ): Boolean {
         if (replaceLength <= 0) {
             return host.commitTextToEditor(textToCommit, textToCommit.length)
@@ -622,6 +642,7 @@ class ContextualPredictionController(private val host: Host) {
         if (removedText.length != replaceLength || !host.selection().rangeEquals(start, end)) {
             return false
         }
+        if (replaceTarget != null && !replaceTarget.accepts(removedText)) return false
         host.captureCorrectionBoundarySnapshot()
         val replacementStart = start - replaceLength
         if (!replaceAiRange(
@@ -765,14 +786,16 @@ class ContextualPredictionController(private val host: Host) {
         if (!host.finishCompositionForDirectAction()) return false
         val ic = host.inputConnection() ?: return false
         val beforeCursor = ic.getTextBeforeCursor(512, 0)?.toString().orEmpty()
+        val afterCursor = ic.getTextAfterCursor(1, 0)?.toString()
         val capturedMetricsCandidate = metricsCandidate?.takeIf { it.text == sentence }
 
-        val replaceLength = replaceLengthForCandidate(sentence)
+        val replaceTarget = replaceTargetForCandidate(sentence)
+        val replaceLength = replaceTarget?.length ?: 0
         if (replaceLength > 0) {
             val contextBeforeReinforce = beforeCursor.dropLast(replaceLength).takeLast(64)
-            val shouldAppendSpace = !sentence.endsWith(" ") && !sentence.endsWith("\n")
+            val shouldAppendSpace = ContextualPredictionInput.shouldAppendSpace(sentence, afterCursor)
             val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
-            val committed = commitContextualCandidateText(ic, replaceLength, textToCommit)
+            val committed = commitContextualCandidateText(ic, replaceLength, textToCommit, replaceTarget)
             if (committed) {
                 enqueueContextualSelectionFeedback(
                     contextBeforeReinforce = contextBeforeReinforce,
@@ -807,7 +830,11 @@ class ContextualPredictionController(private val host: Host) {
                         val trailingSpaces = beforeCursor.length - beforeCursor.trimEnd().length
                         val replacementLength = lastSentence.length + trailingSpaces
                         val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
-                        val textToCommit = if (correctedSentence.endsWith(" ") || correctedSentence.endsWith("\n")) correctedSentence else "$correctedSentence "
+                        val textToCommit = if (ContextualPredictionInput.shouldAppendSpace(correctedSentence, afterCursor)) {
+                            "$correctedSentence "
+                        } else {
+                            correctedSentence
+                        }
                         val committed = commitContextualCandidateText(ic, replacementLength, textToCommit)
                         if (committed) {
                             enqueueContextualSelectionFeedback(
@@ -876,7 +903,8 @@ class ContextualPredictionController(private val host: Host) {
             urlReplaceLength
         }
         val contextBeforeReinforce = beforeCursor.dropLast(replacementLength).takeLast(64)
-        val shouldAppendSpace = !isEmailField && !isUrlField && !isEmailDomain && !isUrlTld && !sentence.endsWith(" ") && !sentence.endsWith("\n")
+        val shouldAppendSpace = !isEmailField && !isUrlField && !isEmailDomain && !isUrlTld &&
+            ContextualPredictionInput.shouldAppendSpace(sentence, afterCursor)
         val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
         val committed = commitContextualCandidateText(ic, replacementLength, textToCommit)
         if (committed) {
