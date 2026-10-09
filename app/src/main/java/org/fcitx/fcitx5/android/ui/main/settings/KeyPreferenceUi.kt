@@ -111,6 +111,7 @@ class KeyPreferenceUi(override val ctx: Context) : Ui {
 
     private val clearButton = imageButton {
         background = styledDrawable(android.R.attr.actionBarItemBackground)
+        contentDescription = ctx.getString(R.string.a11y_key_clear)
         imageDrawable = drawable(R.drawable.ic_baseline_delete_24)!!.apply {
             setTint(styledColor(android.R.attr.colorControlNormal))
         }

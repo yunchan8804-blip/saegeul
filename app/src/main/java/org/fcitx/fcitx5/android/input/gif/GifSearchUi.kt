@@ -100,7 +100,6 @@ class GifSearchUi(private val context: Context, private val theme: Theme) {
         // Settings entry keeps the genericActive emphasis tokens; not a committing action.
         setTextColor(theme.genericActiveForegroundColor)
         background = context.pressableChipSurface(theme, theme.genericActiveBackgroundColor)
-        contentDescription = text
         visibility = View.GONE
         setOnClickListener { onMoreGifSettings?.invoke() }
     }

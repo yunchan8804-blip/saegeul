@@ -64,8 +64,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
     }
 
     val editButton = imageView {
-        contentDescription = ctx.getString(R.string.edit_theme)
-        setPaddingDp(16, 4, 4, 16)
+        setPaddingDp(20, 4, 4, 20)
         scaleType = ImageView.ScaleType.FIT_CENTER
         imageResource = R.drawable.ic_baseline_edit_24
     }
@@ -93,7 +92,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         add(checkMark, lParams(dp(60), dp(60)) {
             centerInParent()
         })
-        add(editButton, lParams(dp(44), dp(44)) {
+        add(editButton, lParams(dp(48), dp(48)) {
             topOfParent()
             endOfParent()
         })
@@ -120,7 +119,8 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
 
     fun setTheme(theme: Theme) {
         root.foreground = rippleDrawable(theme.keyPressHighlightColor)
-        nameLabel.text = ThemeDisplayNames.displayName(ctx, theme)
+        val displayName = ThemeDisplayNames.displayName(ctx, theme)
+        nameLabel.text = displayName
         bkg.imageDrawable = theme.backgroundDrawable()
         bar.backgroundColor = theme.barColor
         spaceBar.background = GradientDrawable().apply {
@@ -136,6 +136,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
             visibility = if (theme is Theme.Custom) View.VISIBLE else View.GONE
             background = rippleDrawable(theme.keyPressHighlightColor)
             imageTintList = foregroundTint
+            contentDescription = ctx.getString(R.string.a11y_edit_theme_named, displayName)
         }
         dynamicIcon.apply {
             visibility =

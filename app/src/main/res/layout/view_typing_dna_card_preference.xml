@@ -12,7 +12,6 @@
     android:layout_marginVertical="8dp"
     android:clickable="true"
     android:focusable="true"
-    android:contentDescription="AI 언어 지문 학습 현황 카드"
     android:foreground="?android:attr/selectableItemBackground"
     app:cardBackgroundColor="@color/saegeul_surface"
     app:cardCornerRadius="20dp"

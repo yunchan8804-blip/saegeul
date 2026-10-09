@@ -509,7 +509,6 @@ class HorizontalCandidateComponent :
             isClickable = false
             isFocusable = false
             setText(R.string.candidate_placeholder_no_words)
-            contentDescription = context.getString(R.string.candidate_placeholder_no_words)
             visibility = View.GONE
         }
     }
@@ -790,7 +789,7 @@ class HorizontalCandidateComponent :
         val status = service.automaticSuggestionStatus
         val previousCoordinatorState = lastObservedCoordinatorState
         lastObservedCoordinatorState = status.state
-        if (hasAutomaticSentence) {
+        if (hasAutomaticSentence || !service.allowsTextInspectionFeatures()) {
             cancelStatusRowNoCandidateHide()
             statusRowLogicalState = null
             statusRowNoCandidateHidden = false
@@ -1057,7 +1056,8 @@ class HorizontalCandidateComponent :
         // otherwise show nothing while a fresh suggestion is being generated. This spinner
         // covers that gap; it stays hidden whenever the status row itself is already showing
         // a spinner (StatusRowDecision.forcesBar), so the two never double up.
-        val generating = StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
+        val generating = service.allowsTextInspectionFeatures() &&
+            StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
         generatingSpinner.visibility = if (generating && !statusRow.forcesBar) View.VISIBLE else View.GONE
         showHairlineDivider()
 
@@ -1199,7 +1199,8 @@ class HorizontalCandidateComponent :
         wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
         showSingleRowContent(sentenceCandidate, hasWords = topCandidates.isNotEmpty())
 
-        val generating = StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
+        val generating = service.allowsTextInspectionFeatures() &&
+            StatusRowPolicy.isGenerating(service.automaticSuggestionStatus.state)
         singleRowGeneratingSpinner.visibility = if (generating) View.VISIBLE else View.GONE
 
         bar.isCandidateTwoRow = false

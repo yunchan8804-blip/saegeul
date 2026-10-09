@@ -17,9 +17,9 @@
         <item name="colorOnSurface">@color/saegeul_ink</item>
         <item name="colorControlNormal">@color/saegeul_ink</item>
         <item name="colorLogFatal">@color/red_A700</item>
-        <item name="colorLogError">@color/red_400</item>
-        <item name="colorLogWarning">@color/yellow_800</item>
-        <item name="colorLogInfo">@color/blue_500</item>
+        <item name="colorLogError">@color/log_error_on_light</item>
+        <item name="colorLogWarning">@color/log_warning_on_light</item>
+        <item name="colorLogInfo">@color/log_info_on_light</item>
         <item name="colorLogDebug">@color/grey_700</item>
         <item name="colorLogVerbose">@color/grey_700</item>
     </style>

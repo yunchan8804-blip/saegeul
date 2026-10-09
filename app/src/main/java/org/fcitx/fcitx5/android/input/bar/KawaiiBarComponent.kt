@@ -179,7 +179,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.OnClipboardUpdateListener {
             if (!clipboardSuggestion.getValue()) return@OnClipboardUpdateListener
             service.lifecycleScope.launch {
-                if (it.text.isEmpty()) {
+                if (it.text.isEmpty() || !service.allowsTextInspectionFeatures()) {
                     isClipboardFresh = false
                 } else {
                     idleUi.clipboardUi.text.text = if (it.sensitive && clipboardMaskSensitive) {
@@ -287,7 +287,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private fun evalIdleUiState(fromUser: Boolean = false) {
         val newState = when {
             numberRowState == NumberRowState.ForceShow -> IdleUi.State.NumberRow
-            isClipboardFresh -> IdleUi.State.Clipboard
+            isClipboardFresh && service.allowsTextInspectionFeatures() -> IdleUi.State.Clipboard
             isInlineSuggestionPresent -> IdleUi.State.InlineSuggestion
             isCapabilityFlagsPassword && !isKeyboardLayoutNumber && numberRowState != NumberRowState.ForceHide -> IdleUi.State.NumberRow
             /**
@@ -1076,8 +1076,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     companion object {
         const val HEIGHT = ToolbarLayoutPolicy.TOUCH_TARGET_DP
-        const val EXPANDED_HEIGHT =
-            ToolbarLayoutPolicy.TOUCH_TARGET_DP * ToolbarLayoutPolicy.EXPANDED_ROWS
 
         // ViewAnimator child indices for the top-level bar view.
         private const val NORMAL_CHILD_INDEX = 0

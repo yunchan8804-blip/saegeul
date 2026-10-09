@@ -101,7 +101,7 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
     private val responsiveRoot = ResponsiveToolbarLayout(ctx)
 
     val rowExpansionButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
-        contentDescription = ctx.getString(R.string.expand_toolbar)
+        contentDescription = ctx.getString(R.string.a11y_toolbar_more_tools)
         setOnClickListener { toggleExpandedRows() }
     }
 
@@ -126,7 +126,7 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
     fun collapse() {
         responsiveRoot.setExpanded(false)
         rowExpansionButton.setIcon(R.drawable.ic_baseline_expand_more_24)
-        rowExpansionButton.contentDescription = ctx.getString(R.string.expand_toolbar)
+        rowExpansionButton.contentDescription = ctx.getString(R.string.a11y_toolbar_more_tools)
     }
 
     private fun toggleExpandedRows() {
@@ -137,7 +137,7 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
             else R.drawable.ic_baseline_expand_more_24
         )
         rowExpansionButton.contentDescription = ctx.getString(
-            if (expanded) R.string.hide_toolbar else R.string.expand_toolbar
+            if (expanded) R.string.a11y_toolbar_fewer_tools else R.string.a11y_toolbar_more_tools
         )
     }
 

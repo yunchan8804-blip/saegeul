@@ -42,6 +42,7 @@ class DynamicListEntryUi(override val ctx: Context) : Ui {
             setTint(styledColor(android.R.attr.colorAccent))
         }
         setPaddingDp(3, 0, 3, 0)
+        contentDescription = ctx.getString(R.string.a11y_list_reorder)
     }
 
     val multiselectCheckBox = checkBox()
@@ -55,6 +56,7 @@ class DynamicListEntryUi(override val ctx: Context) : Ui {
 
     val editButton = imageButton {
         background = styledDrawable(android.R.attr.selectableItemBackground)
+        contentDescription = ctx.getString(R.string.a11y_list_edit)
         imageDrawable = drawable(R.drawable.ic_baseline_edit_24)!!.apply {
             setTint(styledColor(android.R.attr.colorControlNormal))
         }
@@ -62,6 +64,7 @@ class DynamicListEntryUi(override val ctx: Context) : Ui {
 
     val settingsButton = imageButton {
         background = styledDrawable(android.R.attr.selectableItemBackground)
+        contentDescription = ctx.getString(R.string.a11y_list_settings)
         imageDrawable = drawable(R.drawable.ic_baseline_settings_24)!!.apply {
             setTint(styledColor(android.R.attr.colorControlNormal))
         }

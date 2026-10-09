@@ -7,7 +7,9 @@ package org.fcitx.fcitx5.android.input.picker
 import android.content.Context
 import android.graphics.Typeface
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.core.view.isVisible
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
@@ -74,6 +76,7 @@ class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
         }
 
         fun setIcon(@DrawableRes src: Int) {
+            categoryNameRes(src)?.let { root.contentDescription = ctx.getString(it) }
             icon.imageDrawable = ctx.drawable(src)!!.apply {
                 setTint(theme.keyTextColor.alpha(0.5f))
             }
@@ -82,10 +85,32 @@ class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
         }
 
         fun setActive(active: Boolean) {
+            root.isSelected = active
             val color = theme.keyTextColor.alpha(if (active) 1f else 0.5f)
             label.setTextColor(color)
             icon.imageDrawable?.setTint(color)
         }
+    }
+
+    @StringRes
+    private fun categoryNameRes(@DrawableRes icon: Int): Int? = when (icon) {
+        R.drawable.ic_baseline_access_time_24 -> R.string.a11y_picker_recent
+        R.drawable.symbol_number_punctuation -> R.string.a11y_picker_number_punctuation
+        R.drawable.symbol_bracket -> R.string.a11y_picker_bracket
+        R.drawable.symbol_arrow -> R.string.a11y_picker_arrow
+        R.drawable.symbol_math -> R.string.a11y_picker_math
+        R.drawable.symbol_ordinal -> R.string.a11y_picker_ordinal
+        R.drawable.symbol_other -> R.string.a11y_picker_other_symbol
+        R.drawable.ic_baseline_tag_faces_24 -> R.string.a11y_picker_smileys
+        R.drawable.ic_baseline_emoji_people_24 -> R.string.a11y_picker_people
+        R.drawable.ic_baseline_flower_24 -> R.string.a11y_picker_nature
+        R.drawable.ic_baseline_cake_24 -> R.string.a11y_picker_food
+        R.drawable.ic_baseline_directions_car_24 -> R.string.a11y_picker_travel
+        R.drawable.ic_baseline_sports_basketball_24 -> R.string.a11y_picker_activity
+        R.drawable.ic_baseline_emoji_objects_24 -> R.string.a11y_picker_objects
+        R.drawable.ic_baseline_emoji_symbols_24 -> R.string.a11y_picker_emoji_symbols
+        R.drawable.ic_baseline_flag_24 -> R.string.a11y_picker_flags
+        else -> null
     }
 
     private var tabs: Array<TabUi> = arrayOf()

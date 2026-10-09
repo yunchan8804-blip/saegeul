@@ -157,7 +157,6 @@ class KoreanSearchUi(private val context: Context, private val theme: Theme) {
                 setTextColor(theme.altKeyTextColor)
                 textSize = PanelStyle.TEXT_BODY
                 background = context.pressableChipSurface(theme, theme.altKeyBackgroundColor)
-                contentDescription = query
                 setPadding(context.dp(PanelStyle.CARD_PADDING_H_DP), 0, context.dp(PanelStyle.CARD_PADDING_H_DP), 0)
                 setOnClickListener { onEmotionQuery?.invoke(query) }
             }, LinearLayout.LayoutParams(

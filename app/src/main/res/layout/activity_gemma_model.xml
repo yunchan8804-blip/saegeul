@@ -21,7 +21,6 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="@color/saegeul_canvas"
-            android:contentDescription="@string/gemma_model_activity_title"
             app:title="@string/gemma_model_activity_title"
             app:titleTextColor="@color/saegeul_ink"
             app:navigationIcon="@drawable/ic_baseline_arrow_back_24"
@@ -170,7 +169,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:background="?attr/selectableItemBackground"
-                        android:minHeight="40dp"
+                        android:minHeight="48dp"
                         android:gravity="center_vertical"
                         android:text="@string/gemma_model_terms_link"
                         android:textColor="?attr/colorPrimary"
@@ -181,7 +180,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackground"
-                        android:minHeight="40dp"
+                        android:minHeight="48dp"
                         android:gravity="center_vertical"
                         android:text="@string/gemma_model_license_row"
                         android:textColor="?attr/colorPrimary"
@@ -210,7 +209,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
-                android:minHeight="40dp"
+                android:minHeight="48dp"
                 android:orientation="horizontal">
 
                 <TextView

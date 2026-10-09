@@ -13,7 +13,19 @@ import kotlin.math.min
  */
 object ThemeContrast {
 
-    enum class Role { Key, AltKey, AccentKey, Candidate, KeyOverride }
+    enum class Role {
+        Key,
+        AltKey,
+        AccentKey,
+        Candidate,
+        KeyOverride,
+        CandidateComment,
+        CandidateLabel,
+        SpaceBar,
+        GenericActive,
+        Popup,
+        AltKeyHint
+    }
 
     data class ContrastIssue(
         val role: Role,
@@ -42,7 +54,8 @@ object ThemeContrast {
 
     /**
      * Finds every glyph/background pair in [theme] whose contrast ratio is below
-     * [minRatio]: the four fixed roles (key, alt key, accent key, candidate/bar),
+     * [minRatio]: the fixed roles (key, alt key, accent key, candidate text, comment and
+     * label on the bar, space bar legend, active chip, popup, alt key hint on a key),
      * plus every key override (and the global key style) that customizes at least
      * one of text or background color, filling the unset side with the theme default.
      */
@@ -60,6 +73,12 @@ object ThemeContrast {
         check(Role.AltKey, theme.altKeyTextColor, theme.altKeyBackgroundColor)
         check(Role.AccentKey, theme.accentKeyTextColor, theme.accentKeyBackgroundColor)
         check(Role.Candidate, theme.candidateTextColor, theme.barColor)
+        check(Role.CandidateComment, theme.candidateCommentColor, theme.barColor)
+        check(Role.CandidateLabel, theme.candidateLabelColor, theme.barColor)
+        check(Role.SpaceBar, theme.keyTextColor, theme.spaceBarColor)
+        check(Role.GenericActive, theme.genericActiveForegroundColor, theme.genericActiveBackgroundColor)
+        check(Role.Popup, theme.popupTextColor, theme.popupBackgroundColor)
+        check(Role.AltKeyHint, theme.altKeyTextColor, theme.keyBackgroundColor)
 
         theme.globalKeyStyle?.let { style ->
             if (style.keyTextColor != null || style.keyBackgroundColor != null) {
@@ -95,13 +114,22 @@ object ThemeContrast {
             val issues = findIssues(result, minRatio)
             if (issues.isEmpty()) return result
             for (issue in issues) {
-                val newFg = bestTextColor(issue.bg)
                 result = when (issue.role) {
-                    Role.Key -> result.copy(keyTextColor = newFg)
-                    Role.AltKey -> result.copy(altKeyTextColor = newFg)
-                    Role.AccentKey -> result.copy(accentKeyTextColor = newFg)
-                    Role.Candidate -> result.copy(candidateTextColor = newFg)
-                    Role.KeyOverride -> applyKeyOverrideFix(result, issue.keyOverrideKey, newFg)
+                    // The key text also draws the space bar legend, and the alt key text also
+                    // draws the hint on a plain key, so each is fixed against both backgrounds.
+                    Role.Key, Role.SpaceBar -> result.copy(
+                        keyTextColor = bestTextColor(result.keyBackgroundColor, result.spaceBarColor)
+                    )
+                    Role.AltKey, Role.AltKeyHint -> result.copy(
+                        altKeyTextColor = bestTextColor(result.altKeyBackgroundColor, result.keyBackgroundColor)
+                    )
+                    Role.AccentKey -> result.copy(accentKeyTextColor = bestTextColor(issue.bg))
+                    Role.Candidate -> result.copy(candidateTextColor = bestTextColor(issue.bg))
+                    Role.CandidateComment -> result.copy(candidateCommentColor = bestTextColor(issue.bg))
+                    Role.CandidateLabel -> result.copy(candidateLabelColor = bestTextColor(issue.bg))
+                    Role.GenericActive -> result.copy(genericActiveForegroundColor = bestTextColor(issue.bg))
+                    Role.Popup -> result.copy(popupTextColor = bestTextColor(issue.bg))
+                    Role.KeyOverride -> applyKeyOverrideFix(result, issue.keyOverrideKey, bestTextColor(issue.bg))
                 }
             }
         }
@@ -126,9 +154,9 @@ object ThemeContrast {
         }
     }
 
-    private fun bestTextColor(bg: Int): Int {
-        val inkRatio = ratio(INK, bg)
-        val ivoryRatio = ratio(IVORY, bg)
+    private fun bestTextColor(vararg backgrounds: Int): Int {
+        val inkRatio = backgrounds.minOf { ratio(INK, it) }
+        val ivoryRatio = backgrounds.minOf { ratio(IVORY, it) }
         return if (inkRatio >= ivoryRatio) INK else IVORY
     }
 

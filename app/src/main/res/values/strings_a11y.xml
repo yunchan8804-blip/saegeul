@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-2.1-or-later
+  SPDX-FileCopyrightText: Copyright 2026 YunChan
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="a11y_level_loading" tools:ignore="MissingTranslation">Loading level</string>
+    <string name="a11y_level_load_failed" tools:ignore="MissingTranslation">Level unavailable</string>
+    <string name="a11y_edit_theme_named" tools:ignore="MissingTranslation">Edit %1$s theme</string>
+    <string name="a11y_toolbar_more_tools" tools:ignore="MissingTranslation">Show more tools</string>
+    <string name="a11y_toolbar_fewer_tools" tools:ignore="MissingTranslation">Show fewer tools</string>
+    <string name="a11y_list_edit" tools:ignore="MissingTranslation">Edit</string>
+    <string name="a11y_list_settings" tools:ignore="MissingTranslation">Settings</string>
+    <string name="a11y_list_reorder" tools:ignore="MissingTranslation">Change order</string>
+    <string name="a11y_key_clear" tools:ignore="MissingTranslation">Clear key</string>
+    <string name="a11y_picker_recent" tools:ignore="MissingTranslation">Recently used</string>
+    <string name="a11y_picker_number_punctuation" tools:ignore="MissingTranslation">Numbers and punctuation</string>
+    <string name="a11y_picker_bracket" tools:ignore="MissingTranslation">Brackets</string>
+    <string name="a11y_picker_arrow" tools:ignore="MissingTranslation">Arrows</string>
+    <string name="a11y_picker_math" tools:ignore="MissingTranslation">Math symbols</string>
+    <string name="a11y_picker_ordinal" tools:ignore="MissingTranslation">Numbered symbols</string>
+    <string name="a11y_picker_other_symbol" tools:ignore="MissingTranslation">Other symbols</string>
+    <string name="a11y_picker_smileys" tools:ignore="MissingTranslation">Faces</string>
+    <string name="a11y_picker_people" tools:ignore="MissingTranslation">People</string>
+    <string name="a11y_picker_nature" tools:ignore="MissingTranslation">Nature</string>
+    <string name="a11y_picker_food" tools:ignore="MissingTranslation">Food</string>
+    <string name="a11y_picker_travel" tools:ignore="MissingTranslation">Travel</string>
+    <string name="a11y_picker_activity" tools:ignore="MissingTranslation">Activities</string>
+    <string name="a11y_picker_objects" tools:ignore="MissingTranslation">Objects</string>
+    <string name="a11y_picker_emoji_symbols" tools:ignore="MissingTranslation">Emoji symbols</string>
+    <string name="a11y_picker_flags" tools:ignore="MissingTranslation">Flags</string>
+    <string name="theme_contrast_role_candidate_comment" tools:ignore="MissingTranslation">Candidate hint</string>
+    <string name="theme_contrast_role_candidate_label" tools:ignore="MissingTranslation">Candidate number</string>
+    <string name="theme_contrast_role_space_bar" tools:ignore="MissingTranslation">Space bar</string>
+    <string name="theme_contrast_role_generic_active" tools:ignore="MissingTranslation">Selected chip</string>
+    <string name="theme_contrast_role_popup" tools:ignore="MissingTranslation">Popup</string>
+    <string name="theme_contrast_role_alt_key_hint" tools:ignore="MissingTranslation">Small key legend</string>
+</resources>

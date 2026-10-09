@@ -21,7 +21,6 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="@color/saegeul_canvas"
-            android:contentDescription="@string/style_report_title"
             app:title="@string/style_report_title"
             app:titleTextColor="@color/saegeul_ink"
             app:navigationIcon="@drawable/ic_baseline_arrow_back_24"

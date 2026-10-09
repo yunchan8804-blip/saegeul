@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-2.1-or-later
+  SPDX-FileCopyrightText: Copyright 2026 YunChan
+-->
+<resources>
+    <string name="a11y_level_loading">레벨 불러오는 중</string>
+    <string name="a11y_level_load_failed">레벨을 불러오지 못했어요</string>
+    <string name="a11y_edit_theme_named">%1$s 테마 편집</string>
+    <string name="a11y_toolbar_more_tools">도구 더 보기</string>
+    <string name="a11y_toolbar_fewer_tools">도구 접기</string>
+    <string name="a11y_list_edit">편집</string>
+    <string name="a11y_list_settings">설정</string>
+    <string name="a11y_list_reorder">순서 바꾸기</string>
+    <string name="a11y_key_clear">키 지우기</string>
+    <string name="a11y_picker_recent">최근 사용</string>
+    <string name="a11y_picker_number_punctuation">숫자와 문장 부호</string>
+    <string name="a11y_picker_bracket">괄호</string>
+    <string name="a11y_picker_arrow">화살표</string>
+    <string name="a11y_picker_math">수학 기호</string>
+    <string name="a11y_picker_ordinal">번호 기호</string>
+    <string name="a11y_picker_other_symbol">기타 기호</string>
+    <string name="a11y_picker_smileys">표정</string>
+    <string name="a11y_picker_people">사람</string>
+    <string name="a11y_picker_nature">자연</string>
+    <string name="a11y_picker_food">음식</string>
+    <string name="a11y_picker_travel">이동과 장소</string>
+    <string name="a11y_picker_activity">활동</string>
+    <string name="a11y_picker_objects">사물</string>
+    <string name="a11y_picker_emoji_symbols">이모지 기호</string>
+    <string name="a11y_picker_flags">깃발</string>
+    <string name="theme_contrast_role_candidate_comment">후보 설명</string>
+    <string name="theme_contrast_role_candidate_label">후보 번호</string>
+    <string name="theme_contrast_role_space_bar">스페이스 키</string>
+    <string name="theme_contrast_role_generic_active">선택된 칩</string>
+    <string name="theme_contrast_role_popup">팝업</string>
+    <string name="theme_contrast_role_alt_key_hint">키 작은 글자</string>
+</resources>

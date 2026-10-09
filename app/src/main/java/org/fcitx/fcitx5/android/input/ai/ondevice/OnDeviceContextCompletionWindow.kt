@@ -489,18 +489,15 @@ private class OnDeviceContextCompletionUi(
     }
     private val completeButton = context.panelButton(theme, PanelButtonKind.Primary).apply {
         text = context.getString(R.string.gemma_context_complete)
-        contentDescription = text
         setOnClickListener { onComplete?.invoke() }
     }
     private val cancelButton = context.panelButton(theme, PanelButtonKind.Secondary).apply {
         text = context.getString(R.string.gemma_context_cancel)
-        contentDescription = text
         visibility = View.GONE
         setOnClickListener { onCancel?.invoke() }
     }
     private val applyButton = context.panelButton(theme, PanelButtonKind.Primary).apply {
         text = context.getString(R.string.gemma_context_apply)
-        contentDescription = text
         visibility = View.GONE
         setOnClickListener { onApply?.invoke() }
     }

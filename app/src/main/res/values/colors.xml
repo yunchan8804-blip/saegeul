@@ -8,4 +8,8 @@
     <color name="grey_400">#BDBDBD</color>
     <color name="grey_700">#616161</color>
     <color name="card_stroke_color">#1F000000</color>
+    <color name="log_error_on_light">#D33839</color>
+    <color name="log_warning_on_light">#AB5F00</color>
+    <color name="log_info_on_light">#0074CF</color>
+    <color name="log_fatal_on_dark">#F33729</color>
 </resources>

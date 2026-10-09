@@ -82,7 +82,7 @@
                     android:layout_marginTop="2dp"
                     android:textColor="?android:attr/textColorPrimary"
                     android:textSize="14sp"
-                    tools:text="실패 · AI 공급자에 다시 로그인해야 해요" />
+                    tools:text="실패 · 다음 충전 때 다시 시도해요" />
 
             </LinearLayout>
 
@@ -91,8 +91,8 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
                 android:paddingHorizontal="8dp"
                 android:text="@string/enrichment_setup_action"
                 android:textSize="13sp"
@@ -142,8 +142,8 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
                 android:paddingHorizontal="8dp"
                 android:text="@string/dashboard_status_notification_action"
                 android:textSize="13sp" />
@@ -194,6 +194,9 @@
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
+                android:gravity="center_vertical"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
                 android:padding="4dp"
                 android:text="@string/dashboard_status_collection_recent_show"
                 android:textColor="?attr/colorPrimary"

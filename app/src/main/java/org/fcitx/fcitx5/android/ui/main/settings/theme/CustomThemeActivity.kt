@@ -290,7 +290,11 @@ class CustomThemeActivity : AppCompatActivity() {
         }
         val container = FrameLayout(this).apply {
             contentDescription = description
-            addView(ring, FrameLayout.LayoutParams(containerSizePx, containerSizePx))
+            minimumWidth = dp(48)
+            minimumHeight = dp(48)
+            addView(ring, FrameLayout.LayoutParams(containerSizePx, containerSizePx).apply {
+                gravity = Gravity.CENTER
+            })
             addView(swatch, FrameLayout.LayoutParams(swatchSizePx, swatchSizePx).apply {
                 gravity = Gravity.CENTER
             })
@@ -648,7 +652,7 @@ class CustomThemeActivity : AppCompatActivity() {
             add(changeImageLabel, lParams(matchParent, dp(48)))
             add(cropLabel, lParams(matchParent, dp(48)))
             add(removeImageLabel, lParams(matchParent, dp(48)))
-            addSeekBarControl(brightnessLabel, brightnessValue, brightnessSeekBar, rowHeight = dp(40))
+            addSeekBarControl(brightnessLabel, brightnessValue, brightnessSeekBar, rowHeight = dp(48))
             add(keyToneSectionContainer, lParams(matchParent, wrapContent) { bottomMargin = dp(8) })
 
             // d. Contrast warning (only rendered when there is an issue)
@@ -665,7 +669,7 @@ class CustomThemeActivity : AppCompatActivity() {
         label: TextView,
         value: TextView,
         seekBar: SeekBar,
-        rowHeight: Int = dp(36)
+        rowHeight: Int = dp(48)
     ) {
         val row = horizontalLayout {
             gravity = Gravity.CENTER_VERTICAL
@@ -975,6 +979,12 @@ class CustomThemeActivity : AppCompatActivity() {
         ThemeContrast.Role.AccentKey -> R.string.theme_contrast_role_accent_key
         ThemeContrast.Role.Candidate -> R.string.theme_contrast_role_candidate
         ThemeContrast.Role.KeyOverride -> R.string.theme_contrast_role_key_override
+        ThemeContrast.Role.CandidateComment -> R.string.theme_contrast_role_candidate_comment
+        ThemeContrast.Role.CandidateLabel -> R.string.theme_contrast_role_candidate_label
+        ThemeContrast.Role.SpaceBar -> R.string.theme_contrast_role_space_bar
+        ThemeContrast.Role.GenericActive -> R.string.theme_contrast_role_generic_active
+        ThemeContrast.Role.Popup -> R.string.theme_contrast_role_popup
+        ThemeContrast.Role.AltKeyHint -> R.string.theme_contrast_role_alt_key_hint
     }
 
     private fun refreshContrastRow() {
@@ -1011,7 +1021,7 @@ class CustomThemeActivity : AppCompatActivity() {
                 theme = ThemeContrast.autoFix(theme)
                 updatePreview()
             },
-            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36))
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(48))
         )
         contrastWarningContainer.addView(row)
     }

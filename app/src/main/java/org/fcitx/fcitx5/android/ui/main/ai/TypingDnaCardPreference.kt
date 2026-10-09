@@ -206,7 +206,9 @@ class TypingDnaCardPreference @JvmOverloads constructor(
     ) {
         val failed = latestLoadFailed
         levelBadge?.text = context.getString(R.string.typing_dna_card_value_unknown)
-        levelBadge?.contentDescription = context.getString(R.string.typing_dna_card_value_unknown)
+        levelBadge?.contentDescription = context.getString(
+            if (failed) R.string.a11y_level_load_failed else R.string.a11y_level_loading
+        )
         title?.setText(if (failed) R.string.typing_dna_card_load_failed_title else R.string.typing_dna_card_loading_title)
         summary?.setText(if (failed) R.string.typing_dna_card_load_failed_summary else R.string.typing_dna_card_loading_summary)
         progressBar?.apply {
