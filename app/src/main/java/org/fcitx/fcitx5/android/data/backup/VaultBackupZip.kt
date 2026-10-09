@@ -14,6 +14,7 @@ import java.util.zip.ZipOutputStream
 internal object VaultBackupZip {
     const val MANIFEST_PATH = "manifest.json"
     private const val ENTRIES_DIR = "entries"
+    private const val CHUNK_BYTES = 64 * 1024
 
     fun build(manifestJson: String, entries: Map<String, ByteArray>): ByteArray {
         val buffer = ByteArrayOutputStream()
@@ -32,14 +33,28 @@ internal object VaultBackupZip {
 
     data class Unpacked(val manifestJson: String, val entries: Map<String, ByteArray>)
 
-    /** Returns null when the ZIP has no `manifest.json` entry (malformed/foreign ZIP). */
-    fun read(bytes: ByteArray): Unpacked? {
+    /**
+     * Returns null when the ZIP has no `manifest.json` entry (malformed/foreign ZIP), or when the
+     * entries decompress to more than [maxTotalBytes] in total. Sizes recorded in the ZIP headers
+     * are never trusted; the limit is enforced on the bytes actually inflated.
+     */
+    fun read(bytes: ByteArray, maxTotalBytes: Long = VaultBackup.MAX_PLAINTEXT_BYTES): Unpacked? {
         val entries = mutableMapOf<String, ByteArray>()
         var manifestJson: String? = null
+        var totalBytes = 0L
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
-                val content = zip.readBytes()
+                val buffer = ByteArrayOutputStream()
+                val chunk = ByteArray(CHUNK_BYTES)
+                while (true) {
+                    val read = zip.read(chunk)
+                    if (read < 0) break
+                    totalBytes += read
+                    if (totalBytes > maxTotalBytes) return null
+                    buffer.write(chunk, 0, read)
+                }
+                val content = buffer.toByteArray()
                 when {
                     entry.name == MANIFEST_PATH -> manifestJson = String(content, Charsets.UTF_8)
                     entry.name.startsWith("$ENTRIES_DIR/") ->

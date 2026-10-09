@@ -47,16 +47,23 @@ internal data class BackupTarget(
  *   artifact, owned by the on-device generation feature rather than this task, and deleted (not
  *   restored) on every import commit so a stale in-progress batch never mixes with a freshly
  *   imported corpus (see [VaultBackup]'s import commit step).
+ * - `typing_dna_pending.json` — the raw-sentence buffer awaiting analysis. The privacy declaration
+ *   only allows keeping original text until it is analyzed, and restoring it would let a
+ *   hand-made backup feed sentences into the point-earning analysis. Backups written by older
+ *   versions may still carry this entry; import ignores it ([LEGACY_IGNORED_ENTRY_NAMES]) and
+ *   never touches the device's own pending file.
  * - `vault_habit` prefs (streak/freezes) — gamification state, not corpus or derived language
  *   data, and adjacent to the same anti-exploit concern as level rewards.
  */
 internal object VaultBackupTargets {
+    /** Entry names older backups may contain that are no longer targets; skipped without validation on import. */
+    val LEGACY_IGNORED_ENTRY_NAMES: Set<String> = setOf("typing_dna_pending.json")
+
     val ALL: List<BackupTarget> = listOf(
         // Corpus: raw text the user actually wrote/collected. Restoring these lets everything
         // derived below be rebuilt from scratch even if it doesn't come across.
         BackupTarget("personal_rag.json", BackupEntryKind.CORPUS, BackupTargetLocation.FILES_DIR),
         BackupTarget("personalized_sentences.json", BackupEntryKind.CORPUS, BackupTargetLocation.FILES_DIR),
-        BackupTarget("typing_dna_pending.json", BackupEntryKind.CORPUS, BackupTargetLocation.FILES_DIR),
         BackupTarget(
             name = "personal_dictionary_words.txt",
             kind = BackupEntryKind.CORPUS,

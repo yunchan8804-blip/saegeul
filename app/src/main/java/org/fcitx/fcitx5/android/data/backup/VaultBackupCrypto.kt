@@ -32,14 +32,22 @@ internal object VaultBackupCrypto {
     const val CURRENT_FORMAT_VERSION = 1
     const val DEFAULT_PBKDF2_ITERATIONS = 600_000
 
+    /** Upper bound on the header's iteration count; a larger value is treated as a hostile/corrupt header. */
+    const val MAX_PBKDF2_ITERATIONS = DEFAULT_PBKDF2_ITERATIONS * 10
+
     private val MAGIC = byteArrayOf('S'.code.toByte(), 'G'.code.toByte(), 'B'.code.toByte(), 'K'.code.toByte())
     private const val SALT_LENGTH = 16
     private const val NONCE_LENGTH = 12
     private const val PASSWORD_CHECK_LENGTH = 32
     private const val KEY_BITS = 256
     private const val GCM_TAG_BITS = 128
+    private const val GCM_TAG_BYTES = GCM_TAG_BITS / 8
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private const val PASSWORD_CHECK_CONTEXT = "saegeul-vault-backup-password-check-v1"
+
+    /** Largest valid encrypted blob for a plaintext of [maxPlaintextBytes]: header + ciphertext + GCM tag. */
+    fun maxEncryptedBytes(maxPlaintextBytes: Long): Long =
+        maxPlaintextBytes + (MAGIC.size + 4 + 4 + SALT_LENGTH + PASSWORD_CHECK_LENGTH + NONCE_LENGTH) + GCM_TAG_BYTES
 
     sealed interface DecryptResult {
         data class Ok(val plaintext: ByteArray) : DecryptResult
@@ -79,7 +87,7 @@ internal object VaultBackupCrypto {
         if (blob.size < offset + 4) return DecryptResult.Corrupted
         val iterations = readInt(blob, offset)
         offset += 4
-        if (iterations <= 0) return DecryptResult.Corrupted
+        if (iterations <= 0 || iterations > MAX_PBKDF2_ITERATIONS) return DecryptResult.Corrupted
         if (blob.size < offset + SALT_LENGTH + PASSWORD_CHECK_LENGTH + NONCE_LENGTH) return DecryptResult.Corrupted
         val salt = blob.copyOfRange(offset, offset + SALT_LENGTH)
         offset += SALT_LENGTH

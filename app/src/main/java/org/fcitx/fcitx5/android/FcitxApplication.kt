@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.ExternalAiCredentialPurge
+import org.fcitx.fcitx5.android.data.backup.VaultBackup
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -294,6 +295,10 @@ class FcitxApplication : Application(), WorkConfiguration.Provider {
         Timber.setupForest(verbose = sharedPrefs.getBoolean("verbose_log", false))
 
         Timber.d("isDirectBootMode=$isDirectBootMode")
+
+        if (!isDirectBootMode) {
+            VaultBackup.recoverInterruptedImport(this)
+        }
 
         AppPrefs.init(sharedPrefs)
         // record last pid for crash logs

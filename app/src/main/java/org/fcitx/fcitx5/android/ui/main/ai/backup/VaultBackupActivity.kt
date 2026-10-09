@@ -12,6 +12,7 @@ import android.content.SharedPreferences
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
@@ -27,7 +28,9 @@ import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.backup.BackupSummary
@@ -251,6 +254,7 @@ class VaultBackupActivity : AppCompatActivity() {
                 Timber.w(e, "Vault backup export failed")
                 ExportResult.Failure("UNEXPECTED")
             }
+            if (result !is ExportResult.Success) deleteCreatedDocument(uri)
             hideProgress()
             when (result) {
                 is ExportResult.Success -> {
@@ -266,6 +270,17 @@ class VaultBackupActivity : AppCompatActivity() {
                     }
                 )
             }
+        }
+    }
+
+    /** Removes the empty document the system file picker created when the export did not complete. */
+    private suspend fun deleteCreatedDocument(uri: Uri) = withContext(Dispatchers.IO) {
+        try {
+            if (!DocumentsContract.deleteDocument(contentResolver, uri)) {
+                Timber.w("Vault backup: could not delete the incomplete export document")
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Vault backup: could not delete the incomplete export document")
         }
     }
 

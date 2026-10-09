@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.backup
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Fast PBKDF2 iteration count for tests; production always uses [VaultBackupCrypto.DEFAULT_PBKDF2_ITERATIONS]. */
@@ -83,6 +84,44 @@ class VaultBackupCryptoTest {
         val result = VaultBackupCrypto.decrypt(byteArrayOf('S'.code.toByte(), 'G'.code.toByte()), "x".toCharArray())
 
         assertEquals(VaultBackupCrypto.DecryptResult.NotABackup, result)
+    }
+
+    @Test
+    fun hostileIterationCountIsCorruptedWithoutRunningTheKeyDerivation() {
+        val encrypted = VaultBackupCrypto.encrypt("payload".toByteArray(), "pw123456".toCharArray(), TEST_ITERATIONS)
+        val hostile = encrypted.copyOf()
+        // iterations is the Int32 right after magic(4) + formatVersion(4).
+        hostile[8] = 0x7F
+        hostile[9] = 0xFF.toByte()
+        hostile[10] = 0xFF.toByte()
+        hostile[11] = 0xFF.toByte()
+
+        val startedAt = System.nanoTime()
+        val result = VaultBackupCrypto.decrypt(hostile, "pw123456".toCharArray())
+        val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+
+        assertEquals(VaultBackupCrypto.DecryptResult.Corrupted, result)
+        assertTrue("decrypt must reject before deriving the key, took ${elapsedMs}ms", elapsedMs < 1_000)
+    }
+
+    @Test
+    fun iterationCountJustOverTheCapIsCorrupted() {
+        val encrypted = VaultBackupCrypto.encrypt("payload".toByteArray(), "pw123456".toCharArray(), TEST_ITERATIONS)
+        val tooMany = VaultBackupCrypto.MAX_PBKDF2_ITERATIONS + 1
+        val hostile = encrypted.copyOf()
+        hostile[8] = (tooMany ushr 24).toByte()
+        hostile[9] = (tooMany ushr 16).toByte()
+        hostile[10] = (tooMany ushr 8).toByte()
+        hostile[11] = tooMany.toByte()
+
+        assertEquals(VaultBackupCrypto.DecryptResult.Corrupted, VaultBackupCrypto.decrypt(hostile, "pw123456".toCharArray()))
+    }
+
+    @Test
+    fun maxEncryptedBytesCoversHeaderAndGcmTag() {
+        val encrypted = VaultBackupCrypto.encrypt(ByteArray(100), "pw123456".toCharArray(), TEST_ITERATIONS)
+
+        assertEquals(encrypted.size.toLong(), VaultBackupCrypto.maxEncryptedBytes(100))
     }
 
     @Test
