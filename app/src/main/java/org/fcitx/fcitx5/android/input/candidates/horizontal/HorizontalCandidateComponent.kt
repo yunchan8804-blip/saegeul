@@ -135,15 +135,38 @@ class HorizontalCandidateComponent :
 
     val expandedCandidateOffset = _expandedCandidateOffset.asSharedFlow()
 
-    private fun refreshExpanded(childCount: Int) {
-        _expandedCandidateOffset.tryEmit(childCount)
+    /**
+     * [visibleChips] are the chips the word row currently shows. The expanded window lists fcitx's
+     * own candidate list from the returned offset on, so only the native chips among them count.
+     */
+    private fun refreshExpanded(visibleChips: List<CandidateWord>) {
+        val nativeOffset = nativeExpandedOffset(visibleChips, ::nativeIndexOf)
+        nativeExpandedStart = nativeOffset
+        _expandedCandidateOffset.tryEmit(nativeOffset)
         bar.expandButtonStateMachine.push(
             ExpandedCandidatesUpdated,
-            ExpandedCandidatesEmpty to (wordAdapter.total == childCount)
+            ExpandedCandidatesEmpty to !hasHiddenNativeCandidates(nativeTotal, nativeOffset)
         )
     }
 
+    /**
+     * Index of [chip] in fcitx's candidate list, or -1 when it is no native chip. Native chips are
+     * the very instances fcitx delivered; automatic and contextual chips are separate objects.
+     */
+    private fun nativeIndexOf(chip: CandidateWord): Int = nativeCandidates.indexOfFirst { it === chip }
+
     private var nativeCandidateCount = 0
+
+    /**
+     * fcitx's own candidate list size, unlike `adapter.total` which counts the merged chips.
+     * -1 when fcitx did not report it.
+     */
+    var nativeTotal = 0
+        private set
+
+    /** Index in fcitx's candidate list the expanded window starts at. */
+    var nativeExpandedStart = 0
+        private set
     private var nativeCandidates: List<CandidateWord> = emptyList()
     private var currentCapFlags: CapabilityFlags = CapabilityFlags.DefaultFlags
     private var preeditEmpty: Boolean = true
@@ -370,7 +393,7 @@ class HorizontalCandidateComponent :
                         secondLayoutPassNeeded = false
                     }
                 }
-                refreshExpanded(cnt)
+                refreshExpanded(wordAdapter.candidates.take(cnt))
             }
         }
     }
@@ -679,7 +702,9 @@ class HorizontalCandidateComponent :
         if (collectionFeedbackJob?.isActive == true) return
         collectionFeedbackJob = service.lifecycleScope.launch {
             service.collectionFeedback.collect { event ->
-                if (event == null) return@collect
+                if (event == null || !isCollectionFeedbackFresh(event.atMs, System.currentTimeMillis())) {
+                    return@collect
+                }
                 activeCollectionFeedbackEvent = event
                 refreshContextualCandidatesIfNeeded()
                 collectionFeedbackHideRunnable?.let { view.removeCallbacks(it) }
@@ -740,9 +765,10 @@ class HorizontalCandidateComponent :
         val visible = resource != null
         connectionHintView.showRow(visible, context.dp(KawaiiBarComponent.HEIGHT))
         if (visible) connectionHintView.setText(resource)
+        // setOnClickListener turns isClickable back on, so it has to come before the flags.
+        connectionHintView.setOnClickListener(null)
         connectionHintView.isClickable = clickable
         connectionHintView.isFocusable = clickable
-        connectionHintView.setOnClickListener(null)
         connectionHintView.setTextColor(if (clickable) theme.candidateTextColor else theme.candidateCommentColor)
         bar.candidateConnectionHintVisible = visible
     }
@@ -909,6 +935,7 @@ class HorizontalCandidateComponent :
         if (data != null) {
             nativeCandidates = data.candidates.toList()
             nativeCandidateCount = nativeCandidates.size
+            nativeTotal = data.total
         }
         val sources = collectCandidateSources()
         val addressField = isAddressField()
@@ -1147,7 +1174,7 @@ class HorizontalCandidateComponent :
         bar.isCandidateTwoRow = false
         setHasVisibleCandidates(false)
         pushCandidateEmpty(true)
-        refreshExpanded(0)
+        refreshExpanded(emptyList())
     }
 
     /**
@@ -1204,7 +1231,7 @@ class HorizontalCandidateComponent :
                 wordRecyclerView.visibility = View.GONE
                 wordRow.showRow(false, rowHeight)
                 wordPlaceholder.showRow(true, rowHeight)
-                refreshExpanded(0)
+                refreshExpanded(emptyList())
             }
         }
     }
@@ -1272,6 +1299,7 @@ class HorizontalCandidateComponent :
     }
 
     private fun applyFillStyle(candidateCount: Int) {
+        secondLayoutPassDone = false
         val maxSpanCount = maxSpanCountPref.getValue()
         when (fillStyle) {
             NeverFillWidth -> {
@@ -1345,6 +1373,8 @@ class HorizontalCandidateComponent :
         currentCapFlags = capFlags
         nativeCandidateCount = 0
         nativeCandidates = emptyList()
+        nativeTotal = 0
+        nativeExpandedStart = 0
         contextualMetricsCandidates.clear()
         contextualAppendSnapshots.clear()
         contextualReplacementSnapshots.clear()
@@ -1376,6 +1406,33 @@ class HorizontalCandidateComponent :
          */
         internal fun shouldShowStatusSpinner(spinner: Boolean, disableAnimation: Boolean): Boolean =
             spinner && !disableAnimation
+
+        /**
+         * The offset the expanded candidate window starts at: one past the last fcitx list index
+         * among the native [visibleChips]. Automatic, contextual and typo-correction chips occupy
+         * no index in fcitx's own candidate list, and a native candidate an automatic chip hides
+         * is not a visible chip, so it shows up in the expanded window when it lies beyond the
+         * last visible native chip. [nativeIndexOf] gives a chip's fcitx list index, -1 for
+         * non-native chips.
+         */
+        internal fun nativeExpandedOffset(
+            visibleChips: List<CandidateWord>,
+            nativeIndexOf: (CandidateWord) -> Int
+        ): Int = (visibleChips.maxOfOrNull(nativeIndexOf) ?: -1) + 1
+
+        /**
+         * Whether native candidates remain beyond the [nativeOffset] shown ones. A [nativeTotal]
+         * of -1 means fcitx did not report its list size, so that cannot be ruled out.
+         */
+        internal fun hasHiddenNativeCandidates(nativeTotal: Int, nativeOffset: Int): Boolean =
+            nativeTotal < 0 || nativeTotal > nativeOffset
+
+        /**
+         * The collection-feedback flow keeps its last event after it was shown, so a re-subscribing
+         * view receives it again; [atMs] and [nowMs] are both [System.currentTimeMillis] readings.
+         */
+        internal fun isCollectionFeedbackFresh(atMs: Long, nowMs: Long): Boolean =
+            nowMs - atMs < COLLECTION_FEEDBACK_DISPLAY_MS
 
         fun automaticFailureText(context: Context, code: String?): String =
             OnDeviceFailureText.of(code ?: "UNKNOWN", context.resources)
