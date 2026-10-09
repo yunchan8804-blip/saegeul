@@ -4,11 +4,16 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 internal object KoreanDiscourseContinuation {
     private val connectiveSuffixes = listOf("는데", "은데")
     private val connectiveWords = listOf("아직", "생각보다", "그래도")
     private val contrastWords = listOf("그래도", "아직")
     private val nextSentenceWords = listOf("그리고", "그런데", "이제")
+    private val whitespace = Regex("\\s+")
+    private val sentenceBoundary = Regex("[.!?\\n\\r]")
+    private val sentenceTerminals = setOf('.', '!', '?')
 
     fun suggest(rawContext: String): List<String> {
         if (!isSafeContext(rawContext)) return emptyList()
@@ -18,7 +23,7 @@ internal object KoreanDiscourseContinuation {
 
     private fun connectiveSuggestion(rawContext: String): List<String>? {
         if (rawContext.lastOrNull() != ' ') return null
-        val lastWord = rawContext.trimEnd(' ').split(Regex("\\s+")).lastOrNull().orEmpty()
+        val lastWord = rawContext.trimEnd(' ').split(whitespace).lastOrNull().orEmpty()
         if (lastWord.any { it in '\u1100'..'\u11FF' || it in '\u3130'..'\u318F' }) return null
         return when {
             lastWord.endsWith("지만") -> contrastWords
@@ -29,11 +34,11 @@ internal object KoreanDiscourseContinuation {
 
     private fun nextSentenceSuggestion(rawContext: String): List<String> {
         val terminalContext = rawContext.trimEnd(' ')
-        if (terminalContext.lastOrNull() !in setOf('.', '!', '?')) return emptyList()
+        if (terminalContext.lastOrNull() !in sentenceTerminals) return emptyList()
         if (terminalContext.dropLast(1).lastOrNull()?.isDigit() == true) return emptyList()
-        val lastSentence = terminalContext.dropLast(1).split(Regex("[.!?\\n\\r]")).lastOrNull().orEmpty()
+        val lastSentence = terminalContext.dropLast(1).split(sentenceBoundary).lastOrNull().orEmpty()
         if (lastSentence.any { it in '\u1100'..'\u11FF' || it in '\u3130'..'\u318F' }) return emptyList()
-        return if (lastSentence.any { it in '가'..'힣' }) nextSentenceWords else emptyList()
+        return if (lastSentence.any(HangulSyllable::isSyllable)) nextSentenceWords else emptyList()
     }
 
     private fun isSafeContext(rawContext: String): Boolean {

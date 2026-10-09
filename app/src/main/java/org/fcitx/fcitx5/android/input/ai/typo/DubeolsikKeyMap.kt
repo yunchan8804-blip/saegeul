@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.typo
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 import kotlin.math.sqrt
 
 /**
@@ -12,25 +13,6 @@ import kotlin.math.sqrt
  * 유클리드 거리를 기준으로 오타 치환 비용을 계산한다.
  */
 object DubeolsikKeyMap {
-
-    private const val HANGUL_BASE = 0xAC00
-    private const val HANGUL_END = 0xD7A3
-
-    internal val CHOSEONG = charArrayOf(
-        'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ',
-        'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-    )
-
-    internal val JUNGSEONG = charArrayOf(
-        'ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ',
-        'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'
-    )
-
-    internal val JONGSEONG = charArrayOf(
-        ' ', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ',
-        'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ',
-        'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-    )
 
     // 두벌식 33키 매핑 (자음·모음 27 + 시프트 6)
     private val JAMO_TO_KEY: Map<Char, Char> = mapOf(
@@ -87,16 +69,12 @@ object DubeolsikKeyMap {
     }
 
     private fun appendKeysForChar(sb: StringBuilder, c: Char) {
-        val code = c.code
-        if (code in HANGUL_BASE..HANGUL_END) {
-            val offset = code - HANGUL_BASE
-            val choIdx = offset / (21 * 28)
-            val jungIdx = (offset % (21 * 28)) / 28
-            val jongIdx = offset % 28
-            appendJamoKeys(sb, CHOSEONG[choIdx])
-            appendJamoKeys(sb, JUNGSEONG[jungIdx])
-            if (jongIdx > 0) {
-                appendJamoKeys(sb, JONGSEONG[jongIdx])
+        if (HangulSyllable.isSyllable(c)) {
+            appendJamoKeys(sb, HangulSyllable.CHOSEONG[HangulSyllable.choseongIndex(c)])
+            appendJamoKeys(sb, HangulSyllable.JUNGSEONG[HangulSyllable.jungseongIndex(c)])
+            val jongIdx = HangulSyllable.jongseongIndex(c)
+            if (jongIdx > HangulSyllable.NO_JONGSEONG) {
+                appendJamoKeys(sb, HangulSyllable.jongseongJamo(jongIdx))
             }
             return
         }

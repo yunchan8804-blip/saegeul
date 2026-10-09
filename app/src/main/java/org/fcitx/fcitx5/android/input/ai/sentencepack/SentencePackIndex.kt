@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.sentencepack
 
 import org.fcitx.fcitx5.android.input.ai.ContextualAppend
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 
 enum class MatchEvidence {
     PREFIX,
@@ -95,7 +96,7 @@ internal class SentencePackIndex private constructor(
     }
 
     private fun isEligibleLastWord(token: String): Boolean = token.length >= 2 &&
-        token !in excludedLastWords && token.all { it in '가'..'힣' }
+        token !in excludedLastWords && token.all(HangulSyllable::isSyllable)
 
     private fun lastSentenceStart(context: String): Int {
         val index = context.indexOfLast { isSentenceTerminal(it) || it == '\n' || it == '\r' }

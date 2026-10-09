@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai.morphology
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 /**
  * Korean Morphological Ending Analyzer (EAI-03 / B22).
  *
@@ -19,11 +21,6 @@ package org.fcitx.fcitx5.android.input.ai.morphology
  * 5. Pre-final endings (선어말어미 결합): -았/었/였-, -겠-, -시/으시-, -더-
  */
 object KoreanMorphologicalEndingAnalyzer {
-
-    // --- Hangul Syllable Constants ---
-    private const val HANGUL_BASE = 0xAC00
-    private const val HANGUL_END = 0xD7A3
-    private const val FINAL_COUNT = 28
 
     // Final consonants (받침 종성 인덱스)
     // 0: 없음, 4: ㄴ, 8: ㄹ, 16: ㅁ, 17: ㅂ, 20: ㅆ
@@ -479,16 +476,7 @@ object KoreanMorphologicalEndingAnalyzer {
     }
 
 
-    private fun isHangulSyllable(c: Char): Boolean {
-        return c.code in HANGUL_BASE..HANGUL_END
-    }
-
-    private fun getFinalIndex(c: Char): Int {
-        if (!isHangulSyllable(c)) return -1
-        return (c.code - HANGUL_BASE) % FINAL_COUNT
-    }
-
     private fun hasBatchim(c: Char, batchimIndex: Int): Boolean {
-        return getFinalIndex(c) == batchimIndex
+        return HangulSyllable.jongseongIndex(c) == batchimIndex
     }
 }

@@ -44,7 +44,7 @@ class BundledKoreanNgram private constructor(
         val probabilityByWord: Map<String, Float>
     )
 
-    private val morphology = ChoseongMorphologyEngine()
+    private val morphology = ChoseongMorphologyEngine.Default
 
     private val sentenceStart: SentenceStartTable by lazy { buildSentenceStartTable() }
 

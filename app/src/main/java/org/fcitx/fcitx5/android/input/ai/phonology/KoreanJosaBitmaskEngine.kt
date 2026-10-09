@@ -4,13 +4,15 @@
  */
 package org.fcitx.fcitx5.android.input.ai.phonology
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 /**
  * Phonological Korean Josa (Particle) Bitmask Engine.
  *
  * Implements deterministic O(1) phonological selection and logit/token filtering based on
  * the Hangul Unicode syllable decomposition formula:
  *
- *   S = C - 0xAC00
+ *   S = C - HangulSyllable.BASE
  *   T = S % 28 (Jongseong / Batchim index in [0, 27])
  *
  * Phonological Rules:
@@ -27,8 +29,8 @@ object KoreanJosaBitmaskEngine {
     const val FLAG_RIEUL_BATCHIM = 1 shl 2        // T == 8 ('ㄹ' 받침)
     const val FLAG_NON_RIEUL_BATCHIM = 1 shl 3    // T != 0 && T != 8 ('ㄹ' 제외 자음 받침)
 
-    const val HANGUL_SYLLABLE_START = 0xAC00
-    const val HANGUL_SYLLABLE_END = 0xD7A3
+    const val HANGUL_SYLLABLE_START = HangulSyllable.BASE
+    const val HANGUL_SYLLABLE_END = HangulSyllable.END
 
     enum class JosaKind(
         val withBatchim: String,
@@ -139,9 +141,7 @@ object KoreanJosaBitmaskEngine {
      * 1..27 for jongseong (8 is 'ㄹ').
      */
     fun getBatchimCode(c: Char): Int {
-        val code = c.code
-        if (code !in HANGUL_SYLLABLE_START..HANGUL_SYLLABLE_END) return -1
-        return (code - HANGUL_SYLLABLE_START) % 28
+        return HangulSyllable.jongseongIndex(c)
     }
 
     fun hasBatchim(c: Char): Boolean {
@@ -156,7 +156,7 @@ object KoreanJosaBitmaskEngine {
 
     fun isRieulBatchim(c: Char): Boolean {
         val batchim = getBatchimCode(c)
-        if (batchim >= 0) return batchim == 8
+        if (batchim >= 0) return batchim == HangulSyllable.RIEUL_JONGSEONG
         return c == '1' || c == '7' || c == '8'
     }
 
@@ -242,9 +242,9 @@ object KoreanJosaBitmaskEngine {
     fun getPhonologicalFlags(c: Char): Int {
         val batchim = getBatchimCode(c)
         if (batchim >= 0) {
-            return if (batchim == 0) {
+            return if (batchim == HangulSyllable.NO_JONGSEONG) {
                 FLAG_NO_BATCHIM
-            } else if (batchim == 8) {
+            } else if (batchim == HangulSyllable.RIEUL_JONGSEONG) {
                 FLAG_HAS_BATCHIM or FLAG_RIEUL_BATCHIM
             } else {
                 FLAG_HAS_BATCHIM or FLAG_NON_RIEUL_BATCHIM
@@ -252,7 +252,7 @@ object KoreanJosaBitmaskEngine {
         }
         // Korean Jamo (호환 자모 영역 U+3131..U+318E)
         val code = c.code
-        if (code in 0x3131..0x318E) {
+        if (HangulSyllable.isCompatJamo(c)) {
             return when (c) {
                 'ㄹ' -> FLAG_HAS_BATCHIM or FLAG_RIEUL_BATCHIM
                 'ㅋ', 'ㅎ', in 'ㅏ'..'ㅣ' -> FLAG_NO_BATCHIM
@@ -330,7 +330,7 @@ object KoreanJosaBitmaskEngine {
         if (batchim >= 0) {
             return getPhonologicalFlags(targetChar)
         }
-        if (targetChar.code in 0x3131..0x318E || targetChar.code in 0x1100..0x11FF) {
+        if (HangulSyllable.isCompatJamo(targetChar) || targetChar.code in 0x1100..0x11FF) {
             return getPhonologicalFlags(targetChar)
         }
         if (targetChar.isDigit()) {

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.context
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 enum class KoreanParticleKind {
     Topic,
     Subject,
@@ -65,17 +67,11 @@ internal class KoreanParticleCommitGate {
  * context, or inserts text, and therefore remains independently testable.
  */
 object KoreanParticleSuggester {
-    private const val HANGUL_BASE = 0xAC00
-    private const val HANGUL_END = 0xD7A3
-    private const val JONGSEONG_COUNT = 28
-    private const val RIEUL_JONGSEONG_INDEX = 8
-
     fun suggest(beforeCursor: CharSequence?, limit: Int = 6): List<KoreanParticleSuggestion> {
         if (limit <= 0) return emptyList()
         val syllable = lastHangulSyllable(beforeCursor) ?: return emptyList()
-        val jongseong = (syllable.code - HANGUL_BASE) % JONGSEONG_COUNT
-        val hasBatchim = jongseong != 0
-        val hasRieulBatchim = jongseong == RIEUL_JONGSEONG_INDEX
+        val hasBatchim = HangulSyllable.hasBatchim(syllable)
+        val hasRieulBatchim = HangulSyllable.hasRieulBatchim(syllable)
         return listOf(
             KoreanParticleSuggestion(KoreanParticleKind.Topic, if (hasBatchim) "은" else "는"),
             KoreanParticleSuggestion(KoreanParticleKind.Subject, if (hasBatchim) "이" else "가"),
@@ -93,6 +89,6 @@ object KoreanParticleSuggester {
         val text = value?.toString()?.trimEnd().orEmpty()
         if (text.isEmpty()) return null
         val last = text.last()
-        return last.takeIf { it.code in HANGUL_BASE..HANGUL_END }
+        return last.takeIf(HangulSyllable::isSyllable)
     }
 }

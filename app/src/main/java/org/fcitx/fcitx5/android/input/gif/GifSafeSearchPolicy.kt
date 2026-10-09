@@ -28,7 +28,7 @@ object GifSafeSearchPolicy {
         val normalized = value.lowercase(Locale.ROOT)
             .replace('_', ' ')
             .replace('-', ' ')
-            .replace(Regex("\\s+"), " ")
+            .replace(WHITESPACE_RUN, " ")
             .trim()
         if (normalized.isEmpty()) return false
         return blockedTerms.any { term ->
@@ -41,4 +41,5 @@ object GifSafeSearchPolicy {
     }
 
     private val TOKEN_PATTERN = Regex("[\\p{L}\\p{N}]+")
+    private val WHITESPACE_RUN = Regex("\\s+")
 }

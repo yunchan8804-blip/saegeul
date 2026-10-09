@@ -133,7 +133,7 @@ class PersonalLearningController(private val host: Host) {
         mutableCollectionFeedback.value = event
     }
 
-    val morphologyEngine by lazy { ChoseongMorphologyEngine() }
+    val morphologyEngine = ChoseongMorphologyEngine.Default
 
     val personalizedStore by lazy {
         val file = File(host.filesDir(), "personalized_sentences.json")

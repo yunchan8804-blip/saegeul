@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.typo
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 enum class TypoRecoveryDirection {
     EnglishToHangul,
     HangulToEnglish
@@ -88,10 +90,7 @@ object KoreanTypoRecovery {
                     val vowelIndex = VOWELS.indexOf(vowel)
                     val trailingIndex = FINALS.indexOf(trailing)
                     if (leadingIndex >= 0 && vowelIndex >= 0 && trailingIndex >= 0) {
-                        output.append(
-                            (HANGUL_BASE + (leadingIndex * VOWELS.size + vowelIndex) * FINALS.size +
-                                trailingIndex).toChar()
-                        )
+                        output.append(HangulSyllable.compose(leadingIndex, vowelIndex, trailingIndex))
                     } else {
                         leading?.let(output::append)
                         vowel?.let(output::append)
@@ -178,11 +177,10 @@ object KoreanTypoRecovery {
     fun hangulToEnglish(input: String): String = buildString {
         input.forEach { character ->
             when {
-                character.code in HANGUL_BASE..HANGUL_END -> {
-                    val offset = character.code - HANGUL_BASE
-                    val leading = INITIALS[offset / (VOWELS.size * FINALS.size)]
-                    val vowel = VOWELS[(offset % (VOWELS.size * FINALS.size)) / FINALS.size]
-                    val trailing = FINALS[offset % FINALS.size]
+                HangulSyllable.isSyllable(character) -> {
+                    val leading = INITIALS[HangulSyllable.choseongIndex(character)]
+                    val vowel = VOWELS[HangulSyllable.jungseongIndex(character)]
+                    val trailing = FINALS[HangulSyllable.jongseongIndex(character)]
                     append(JAMO_TO_KEYS.getValue(leading))
                     append(JAMO_TO_KEYS.getValue(vowel))
                     trailing?.let { append(JAMO_TO_KEYS.getValue(it)) }
@@ -207,25 +205,13 @@ object KoreanTypoRecovery {
     private fun Char.isAsciiLetter() = this in 'a'..'z' || this in 'A'..'Z'
 
     private fun Char.isHangulForRecovery() =
-        code in HANGUL_BASE..HANGUL_END || this in JAMO_TO_KEYS
+        HangulSyllable.isSyllable(this) || this in JAMO_TO_KEYS
 
-    private const val HANGUL_BASE = 0xAC00
-    private const val HANGUL_END = 0xD7A3
     private const val TRAILING_PUNCTUATION = ".,!?…;:)]}'\""
 
-    private val INITIALS = listOf(
-        'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ',
-        'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-    )
-    private val VOWELS = listOf(
-        'ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ',
-        'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'
-    )
-    private val FINALS: List<Char?> = listOf(
-        null, 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ',
-        'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ',
-        'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-    )
+    private val INITIALS = HangulSyllable.CHOSEONG.toList()
+    private val VOWELS = HangulSyllable.JUNGSEONG.toList()
+    private val FINALS: List<Char?> = listOf<Char?>(null) + HangulSyllable.JONGSEONG_TAIL.toList()
 
     private val ENGLISH_TO_JAMO = mapOf(
         'q' to 'ㅂ', 'w' to 'ㅈ', 'e' to 'ㄷ', 'r' to 'ㄱ', 't' to 'ㅅ',

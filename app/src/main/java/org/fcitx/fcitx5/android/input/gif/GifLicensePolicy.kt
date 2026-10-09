@@ -12,6 +12,9 @@ object GifLicensePolicy {
         Regex("^cc by(?:[- ]sa)?(?: .*)?$", RegexOption.IGNORE_CASE)
     )
 
+    private val htmlTag = Regex("<[^>]+>")
+    private val whitespaceRun = Regex("\\s+")
+
     private val rejectedTextPatterns = listOf(
         "all rights reserved",
         "copyright violation",
@@ -40,13 +43,13 @@ object GifLicensePolicy {
     }
 
     fun cleanText(value: String): String = value
-        .replace(Regex("<[^>]+>"), " ")
+        .replace(htmlTag, " ")
         .replace("&nbsp;", " ", ignoreCase = true)
         .replace("&amp;", "&", ignoreCase = true)
         .replace("&quot;", "\"", ignoreCase = true)
         .replace("&#39;", "'", ignoreCase = true)
         .replace("&lt;", "<", ignoreCase = true)
         .replace("&gt;", ">", ignoreCase = true)
-        .replace(Regex("\\s+"), " ")
+        .replace(whitespaceRun, " ")
         .trim()
 }

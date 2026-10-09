@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.typo
 
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 
 /**
  * 흔한 오타 한 번을 되돌린 변형을 만들어 어휘에서 정확 일치로 찾는 탐색기.
@@ -89,11 +90,11 @@ class SingleEditTypoProbe(
         val out = HashMap<String, Edit>()
         val chars = typed.toCharArray()
         for (i in chars.indices) {
-            val offset = chars[i].code - SYLLABLE_BASE
-            if (offset !in 0 until SYLLABLE_COUNT) continue
-            val cho = offset / JUNG_JONG_COUNT
-            val jung = (offset % JUNG_JONG_COUNT) / JONG_COUNT
-            val jong = offset % JONG_COUNT
+            val syllable = chars[i]
+            if (!HangulSyllable.isSyllable(syllable)) continue
+            val cho = HangulSyllable.choseongIndex(syllable)
+            val jung = HangulSyllable.jungseongIndex(syllable)
+            val jong = HangulSyllable.jongseongIndex(syllable)
 
             for (alt in CHO_ALTS[cho]) {
                 if (upgradeOnly && !alt.isShift) continue
@@ -119,7 +120,7 @@ class SingleEditTypoProbe(
         for (i in 0 until chars.size - 1) {
             val a = chars[i]
             val b = chars[i + 1]
-            if (!isSyllable(a) || !isSyllable(b)) continue
+            if (!HangulSyllable.isSyllable(a) || !HangulSyllable.isSyllable(b)) continue
             if (a == b) {
                 merge(out, typed.removeRange(i, i + 1), DUPLICATE_SYLLABLE_COST, false)
             } else {
@@ -157,18 +158,9 @@ class SingleEditTypoProbe(
         if (isShift) existing.isShift = true
     }
 
-    private fun compose(cho: Int, jung: Int, jong: Int): Char =
-        (SYLLABLE_BASE + (cho * JUNG_COUNT + jung) * JONG_COUNT + jong).toChar()
-
-    private fun isSyllable(c: Char): Boolean = c.code - SYLLABLE_BASE in 0 until SYLLABLE_COUNT
+    private fun compose(cho: Int, jung: Int, jong: Int): Char = HangulSyllable.compose(cho, jung, jong)
 
     companion object {
-        private const val SYLLABLE_BASE = 0xAC00
-        private const val JUNG_COUNT = 21
-        private const val JONG_COUNT = 28
-        private const val JUNG_JONG_COUNT = JUNG_COUNT * JONG_COUNT
-        private const val SYLLABLE_COUNT = 19 * JUNG_JONG_COUNT
-
         /** 후보가 입력보다 이만큼 이상 흔해야 한다: 아는 단어의 업그레이드와 희귀어의 Shift 되돌림 후보. */
         const val UPGRADE_RANK_RATIO = 100
 
@@ -190,9 +182,12 @@ class SingleEditTypoProbe(
 
         private val EMPTY_ALTS = emptyArray<Alt>()
 
-        private val CHO_ALTS: Array<Array<Alt>> = alternatives(DubeolsikKeyMap.CHOSEONG)
-        private val JUNG_ALTS: Array<Array<Alt>> = alternatives(DubeolsikKeyMap.JUNGSEONG)
-        private val JONG_ALTS: Array<Array<Alt>> = alternatives(DubeolsikKeyMap.JONGSEONG)
+        // 받침 없음 칸은 키 하나로 만드는 자모가 아니므로 어떤 키와도 겹치지 않는 공백으로 채운다.
+        private const val NO_JONGSEONG_SLOT = ' '
+
+        private val CHO_ALTS: Array<Array<Alt>> = alternatives(HangulSyllable.CHOSEONG)
+        private val JUNG_ALTS: Array<Array<Alt>> = alternatives(HangulSyllable.JUNGSEONG)
+        private val JONG_ALTS: Array<Array<Alt>> = alternatives(HangulSyllable.jongseongTable(NO_JONGSEONG_SLOT))
 
         // 입력 중성 -> 복원할 복합 모음. 머해->뭐해, 가제->과제, 쉬어요->쉬워요.
         private val JUNG_RESTORE: Array<IntArray> = jungTable(
@@ -206,7 +201,7 @@ class SingleEditTypoProbe(
         )
 
         private fun jungTable(vararg rows: Pair<Char, String>): Array<IntArray> {
-            val jungseong = DubeolsikKeyMap.JUNGSEONG
+            val jungseong = HangulSyllable.JUNGSEONG
             val table = Array(jungseong.size) { IntArray(0) }
             for ((from, targets) in rows) {
                 table[jungseong.indexOf(from)] = IntArray(targets.length) { jungseong.indexOf(targets[it]) }

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 import kotlin.text.CharCategory.CONTROL
 import kotlin.text.CharCategory.FORMAT
 
@@ -339,7 +340,7 @@ object OnDeviceSuggestionPolicy {
             end -= Character.charCount(codePoint)
         }
         val last = suffix.substring(0, end).lastOrNull() ?: return false
-        return last in terminalPunctuation || last in hangulSyllables
+        return last in terminalPunctuation || HangulSyllable.isSyllable(last)
     }
 
     /**
@@ -476,7 +477,6 @@ object OnDeviceSuggestionPolicy {
         Character.COMBINING_SPACING_MARK.toInt(),
         Character.ENCLOSING_MARK.toInt()
     )
-    private val hangulSyllables = '가'..'힣'
 
     private const val MAX_CONTEXT_CHARS = 2048
     private const val MAX_PACKAGE_CHARS = 255

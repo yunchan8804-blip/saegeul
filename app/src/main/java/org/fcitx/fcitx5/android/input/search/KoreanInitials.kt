@@ -4,16 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.search
 
-object KoreanInitials {
-    private const val HANGUL_BASE = 0xAC00
-    private const val HANGUL_END = 0xD7A3
-    private const val SYLLABLES_PER_INITIAL = 21 * 28
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 
-    private val initials = charArrayOf(
-        'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ',
-        'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-    )
-    private val initialSet = initials.toSet()
+object KoreanInitials {
+    private val initialSet = HangulSyllable.CHOSEONG.toSet()
 
     fun isInitialQuery(query: String): Boolean {
         val compact = compact(query)
@@ -22,10 +16,9 @@ object KoreanInitials {
 
     fun extract(text: String): String = buildString {
         text.forEach { character ->
-            val code = character.code
             when {
-                code in HANGUL_BASE..HANGUL_END -> {
-                    append(initials[(code - HANGUL_BASE) / SYLLABLES_PER_INITIAL])
+                HangulSyllable.isSyllable(character) -> {
+                    append(HangulSyllable.CHOSEONG[HangulSyllable.choseongIndex(character)])
                 }
                 character in initialSet -> append(character)
             }

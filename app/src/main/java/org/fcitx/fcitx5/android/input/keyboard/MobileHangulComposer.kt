@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 /** Which vowel-combination table a mobile Hangul surface's directional/dot primitives use. */
 enum class MobileHangulFamily {
     /** Builds ㅠ from ㆍ, so a following ㅣ combines into ㅝ (Chunjiin, ChunjiinPlus). */
@@ -369,7 +371,7 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
     private fun attachesAsBatchim(syllable: Char, consonant: Char): Boolean {
         val (_, _, batchim) = decomposeSyllable(syllable) ?: return false
         return if (batchim == null) {
-            consonant in jongseongTable
+            HangulSyllable.jongseongIndexOf(consonant) > HangulSyllable.NO_JONGSEONG
         } else {
             doubleBatchim.containsKey(batchim to consonant)
         }
@@ -389,12 +391,11 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
     }
 
     private fun decomposeSyllable(ch: Char): Triple<Char, Char, Char?>? {
-        val index = ch.code - HANGUL_SYLLABLE_BASE
-        if (index !in 0 until HANGUL_SYLLABLE_COUNT) return null
-        val cho = choseongTable[index / (VOWEL_COUNT * BATCHIM_SLOT_COUNT)]
-        val jung = jungseongTable[(index / BATCHIM_SLOT_COUNT) % VOWEL_COUNT]
-        val jongIndex = index % BATCHIM_SLOT_COUNT
-        val jong = if (jongIndex == 0) null else jongseongTable[jongIndex - 1]
+        if (!HangulSyllable.isSyllable(ch)) return null
+        val cho = HangulSyllable.CHOSEONG[HangulSyllable.choseongIndex(ch)]
+        val jung = HangulSyllable.JUNGSEONG[HangulSyllable.jungseongIndex(ch)]
+        val jongIndex = HangulSyllable.jongseongIndex(ch)
+        val jong = if (jongIndex == HangulSyllable.NO_JONGSEONG) null else HangulSyllable.jongseongJamo(jongIndex)
         return Triple(cho, jung, jong)
     }
 
@@ -424,17 +425,6 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
     companion object {
         const val PHONEPAD_MULTITAP_TIMEOUT_MS = 1_500L
         const val SINGLE_VOWEL_MULTITAP_TIMEOUT_MS = 300L
-
-        private const val HANGUL_SYLLABLE_BASE = 0xAC00
-        private const val VOWEL_COUNT = 21
-        private const val BATCHIM_SLOT_COUNT = 28 // index 0 = no batchim
-        private const val HANGUL_SYLLABLE_COUNT = 19 * VOWEL_COUNT * BATCHIM_SLOT_COUNT
-
-        private const val choseongTable = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
-        private const val jungseongTable = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
-
-        /** The 27 possible jongseong (종성), index 0 (no batchim) handled separately. */
-        private const val jongseongTable = "ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
 
         /** The 11 standard Dubeolsik compound batchim (K21), base consonants -> the compound. */
         private val doubleBatchim = mapOf(

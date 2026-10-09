@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 /**
  * Tokenizes committed Korean sentences into learnable words for [PersonalNgramModel],
  * stripping punctuation, PII placeholders, and noise tokens that should never be learned.
@@ -13,7 +15,7 @@ object PersonalNgramTokenizer {
     private val WHITESPACE = Regex("\\s+")
     private val DIGIT_RUN = Regex("\\d{4,}")
     private val PUNCTUATION = ".,!?~…\"'()[]{}<>:;。？！、".toSet()
-    private val morphology = ChoseongMorphologyEngine()
+    private val morphology = ChoseongMorphologyEngine.Default
 
     // Ordered longest-first so the first matching suffix is always the longest applicable one.
     private val PARTICLES = listOf(
@@ -47,7 +49,7 @@ object PersonalNgramTokenizer {
                 val stemCandidate = word.substring(0, remainder)
                 val lastChar = stemCandidate.last()
                 if (morphology.isHangulSyllable(lastChar)) {
-                    val hasBatchim = ((lastChar.code - 0xAC00) % 28) > 0
+                    val hasBatchim = HangulSyllable.hasBatchim(lastChar)
                     if (particle in PARTICLES_REQUIRING_BATCHIM && !hasBatchim) continue
                     if (particle in PARTICLES_FORBIDDING_BATCHIM && hasBatchim) continue
                 }

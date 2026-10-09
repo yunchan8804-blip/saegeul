@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 /**
  * High-speed On-Device Korean Collocation & Next-Word Transition Model.
  * Provides rich built-in Bigram transitions for conversational and business contexts,
@@ -141,7 +143,7 @@ class KoreanCollocationModel {
         "은" to listOf("어때?", "확인했어?", "괜찮아?", "어려워")
     )
 
-    private val morphology = ChoseongMorphologyEngine()
+    private val morphology = ChoseongMorphologyEngine.Default
     private val PARTICLES_REQUIRING_BATCHIM = setOf("이", "을", "과", "은")
     private val PARTICLES_FORBIDDING_BATCHIM = setOf("가", "를", "와", "는")
 
@@ -201,7 +203,7 @@ class KoreanCollocationModel {
             if (clean.endsWith(particle) && clean.length > particle.length) {
                 val stemChar = clean[clean.length - particle.length - 1]
                 if (morphology.isHangulSyllable(stemChar)) {
-                    val hasBatchim = ((stemChar.code - 0xAC00) % 28) > 0
+                    val hasBatchim = HangulSyllable.hasBatchim(stemChar)
                     if (particle in PARTICLES_REQUIRING_BATCHIM && !hasBatchim) continue
                     if (particle in PARTICLES_FORBIDDING_BATCHIM && hasBatchim) continue
                 }

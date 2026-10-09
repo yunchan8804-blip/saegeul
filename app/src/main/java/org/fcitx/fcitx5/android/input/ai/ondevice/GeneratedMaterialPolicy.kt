@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 import org.json.JSONArray
 
 object GeneratedMaterialPolicy {
@@ -38,7 +39,7 @@ object GeneratedMaterialPolicy {
         require(excludedStarts.size <= MAX_EXCLUDED_STARTS) { "excludedStarts must contain at most 12 starts" }
         excludedStarts.forEach { start ->
             require(start.length <= MAX_EXCLUDED_START_LENGTH) { "excluded start is too long" }
-            require(start.any { it in '가'..'힣' }) { "excluded start must contain Korean" }
+            require(start.any(HangulSyllable::isSyllable)) { "excluded start must contain Korean" }
             require(start.none(Character::isISOControl)) { "excluded start contains a control character" }
             require(!KoreanPiiScrubber.containsPii(start)) { "excluded start contains PII" }
         }

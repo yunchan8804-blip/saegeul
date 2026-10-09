@@ -57,9 +57,11 @@ internal object KoreanGifQueryPlanner {
         return terms.map { (value, weight) -> WeightedGifSearchTerm(value, weight) }
     }
 
+    private val SEPARATOR_RUN = Regex("[\\s_-]+")
+
     private fun normalize(value: String): String = value
         .lowercase(Locale.ROOT)
-        .replace(Regex("[\\s_-]+"), " ")
+        .replace(SEPARATOR_RUN, " ")
         .trim()
 
     private val INTENTS = listOf(

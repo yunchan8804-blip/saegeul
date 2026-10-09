@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 /**
  * 존댓말/반말/업무체 톤 판정의 정본(single source of truth).
  *
@@ -181,8 +183,6 @@ object KoreanToneClassifier {
     /** 문장 끝에서 두 번째 글자가 한글 음절이고 종성이 ㄹ인지("할"/"갈"/"될"/"을" 등). */
     private fun precedingCharHasRieulBatchim(text: String): Boolean {
         if (text.length < 2) return false
-        val c = text[text.length - 2]
-        if (c !in '가'..'힣') return false
-        return (c.code - 0xAC00) % 28 == 8
+        return HangulSyllable.hasRieulBatchim(text[text.length - 2])
     }
 }

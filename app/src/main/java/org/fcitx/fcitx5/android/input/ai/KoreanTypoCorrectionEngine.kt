@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
 import kotlin.math.min
 
@@ -16,7 +17,7 @@ class KoreanTypoCorrectionEngine(
     private val extraLexicon: List<String> = emptyList()
 ) {
 
-    private val morphology = ChoseongMorphologyEngine()
+    private val morphology = ChoseongMorphologyEngine.Default
 
     private val commonTypoDictionary = mapOf(
         "오눌" to "오늘",
@@ -315,12 +316,12 @@ class KoreanTypoCorrectionEngine(
         // 2. 종성 ㄹ + 께 / 께요 -> 게 / 게요 (한글 맞춤법 제53항: -(으)ㄹ게)
         if (word.endsWith("께요") && word.length >= 3) {
             val prevChar = word[word.length - 3]
-            if (prevChar in '\uAC00'..'\uD7A3' && (prevChar.code - 0xAC00) % 28 == 8) {
+            if (HangulSyllable.hasRieulBatchim(prevChar)) {
                 return word.dropLast(2) + "게요"
             }
         } else if (word.endsWith("께") && word.length >= 2) {
             val prevChar = word[word.length - 2]
-            if (prevChar in '\uAC00'..'\uD7A3' && (prevChar.code - 0xAC00) % 28 == 8) {
+            if (HangulSyllable.hasRieulBatchim(prevChar)) {
                 return word.dropLast(1) + "게"
             }
         }
@@ -365,7 +366,7 @@ class KoreanTypoCorrectionEngine(
         val trimmed = rawSentence.trim()
         if (trimmed.isEmpty()) return emptyList()
 
-        val tokens = trimmed.split(Regex("\\s+"))
+        val tokens = trimmed.split(WHITESPACE)
         val pairs = mutableListOf<Pair<String, String>>()
 
         tokens.forEach { token ->
@@ -390,7 +391,7 @@ class KoreanTypoCorrectionEngine(
         val trimmed = rawSentence.trim()
         if (trimmed.isEmpty()) return null
 
-        val tokens = trimmed.split(Regex("\\s+"))
+        val tokens = trimmed.split(WHITESPACE)
         var replacedAny = false
 
         val correctedTokens = tokens.map { token ->
@@ -537,22 +538,7 @@ class KoreanTypoCorrectionEngine(
     companion object {
         private const val OPENING_BRACKETS = "([{\"'“‘「『〈《"
 
-        private const val HANGUL_BASE = 0xAC00
-        private const val HANGUL_END = 0xD7A3
-
-        private val CHOSEONG = charArrayOf(
-            'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ',
-            'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-        )
-        private val JUNGSEONG = charArrayOf(
-            'ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ',
-            'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'
-        )
-        private val JONGSEONG = charArrayOf(
-            '\u0000', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ',
-            'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ',
-            'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-        )
+        private val WHITESPACE = Regex("\\s+")
 
         private val qwertyToJamoMap = mapOf(
             'r' to 'ㄱ', 'R' to 'ㄲ', 's' to 'ㄴ', 'e' to 'ㄷ', 'E' to 'ㄸ',
@@ -592,11 +578,11 @@ class KoreanTypoCorrectionEngine(
 
             fun flush() {
                 if (cho != null && jung != null) {
-                    val cIdx = CHOSEONG.indexOf(cho!!)
-                    val uIdx = JUNGSEONG.indexOf(jung!!)
-                    val jIdx = if (jong != null) JONGSEONG.indexOf(jong!!) else 0
+                    val cIdx = HangulSyllable.CHOSEONG.indexOf(cho!!)
+                    val uIdx = HangulSyllable.JUNGSEONG.indexOf(jung!!)
+                    val jIdx = if (jong != null) HangulSyllable.jongseongIndexOf(jong!!) else HangulSyllable.NO_JONGSEONG
                     if (cIdx >= 0 && uIdx >= 0 && jIdx >= 0) {
-                        sb.append((HANGUL_BASE + (cIdx * 21 + uIdx) * 28 + jIdx).toChar())
+                        sb.append(HangulSyllable.compose(cIdx, uIdx, jIdx))
                     } else {
                         sb.append(cho).append(jung)
                         if (jong != null) sb.append(jong)
@@ -630,7 +616,7 @@ class KoreanTypoCorrectionEngine(
                         }
                     } else {
                         if (jong == null) {
-                            if (JONGSEONG.contains(jamo)) {
+                            if (HangulSyllable.jongseongIndexOf(jamo) > HangulSyllable.NO_JONGSEONG) {
                                 jong = jamo
                             } else {
                                 flush()
@@ -691,26 +677,6 @@ class KoreanTypoCorrectionEngine(
             return sb.toString()
         }
 
-        fun decomposeToJaso(text: String): String {
-            val sb = StringBuilder()
-            for (ch in text) {
-                val code = ch.code
-                if (code in HANGUL_BASE..HANGUL_END) {
-                    val syllableIndex = code - HANGUL_BASE
-                    val cho = syllableIndex / (21 * 28)
-                    val jung = (syllableIndex % (21 * 28)) / 28
-                    val jong = syllableIndex % 28
-
-                    sb.append(CHOSEONG[cho])
-                    sb.append(JUNGSEONG[jung])
-                    if (jong > 0) {
-                        sb.append(JONGSEONG[jong])
-                    }
-                } else {
-                    sb.append(ch)
-                }
-            }
-            return sb.toString()
-        }
+        fun decomposeToJaso(text: String): String = HangulSyllable.decomposeToJamo(text)
     }
 }

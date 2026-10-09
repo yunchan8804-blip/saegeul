@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.rule
 
 import org.fcitx.fcitx5.android.input.ai.KoreanTypoCorrectionEngine
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 
 /**
  * 정본 최종 추천 품질 게이트: [org.fcitx.fcitx5.android.input.ai.AiContextualPredictor]와
@@ -68,9 +69,9 @@ object SuggestionQualityGate {
         evaluate(candidate, context, isSentenceCompletion) == null
 
     private fun hasHangulSyllableMixedWithJamo(word: String): Boolean {
-        val hasHangulSyllable = word.any { it in '가'..'힣' }
+        val hasHangulSyllable = word.any(HangulSyllable::isSyllable)
         if (!hasHangulSyllable) return false // "ㅋㅋ", "ㅠㅠ", "ㅇㅋ"처럼 자모만인 어절은 허용
-        return word.any { it.code in 0x3131..0x318E }
+        return word.any(HangulSyllable::isCompatJamo)
     }
 
     private fun hasKnownTypo(word: String): Boolean = typoEngine.findTypoCorrectionsInSentence(word).isNotEmpty()

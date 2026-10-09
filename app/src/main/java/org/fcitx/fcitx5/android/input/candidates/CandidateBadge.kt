@@ -14,6 +14,8 @@ object CandidateBadge {
     private const val VARIATION_SELECTOR_16 = 0xFE0F
     private const val SYMBOL_ONLY_MAX_LENGTH = 4
 
+    private val WHITESPACE_CHAR = Regex("\\s")
+
     fun iconFor(comment: String?): String? {
         if (comment.isNullOrBlank()) return null
         val clean = comment.trim()
@@ -32,7 +34,7 @@ object CandidateBadge {
             clean.contains("맞춤") || clean.contains("AI") || clean.contains("스타일") || clean.contains("기록") || clean.contains("✨") -> "✨"
             clean.contains("웹") || clean.contains("🌐") -> "🌐"
             else -> {
-                val noSpace = clean.replace(Regex("\\s"), "")
+                val noSpace = clean.replace(WHITESPACE_CHAR, "")
                 if (noSpace.isNotEmpty() && noSpace.length <= SYMBOL_ONLY_MAX_LENGTH && isSymbolOnly(noSpace)) {
                     noSpace
                 } else {

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.personaldictionary
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.text.Normalizer
@@ -93,7 +94,7 @@ internal fun normalizePersonalWord(value: String): String =
 
 internal fun isValidPersonalWord(value: String): Boolean =
     value.length in MIN_PERSONAL_WORD_LENGTH..MAX_PERSONAL_WORD_LENGTH &&
-        value.all { it in '\uAC00'..'\uD7A3' }
+        value.all(HangulSyllable::isSyllable)
 
 internal const val PERSONAL_DICTIONARY_HEADER = "# fcitx5-android-personal-dictionary-v1"
 internal const val MAX_PERSONAL_WORDS = 500

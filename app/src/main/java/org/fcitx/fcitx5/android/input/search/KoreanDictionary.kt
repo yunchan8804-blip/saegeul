@@ -23,10 +23,11 @@ object KoreanDictionaryQuery {
     const val MAX_LENGTH = 40
     private val headword = Regex("^[가-힣]+(?:[- ][가-힣]+)*$")
     private val cursorWord = Regex("[가-힣]+(?:-[가-힣]+)*$")
+    private val whitespaceRun = Regex("\\s+")
     private const val TRAILING_PUNCTUATION = ".,!?…:;'\"()[]{}<>"
 
     fun normalize(value: String?): String? {
-        val normalized = value.orEmpty().trim().replace(Regex("\\s+"), " ")
+        val normalized = value.orEmpty().trim().replace(whitespaceRun, " ")
         return normalized.takeIf {
             it.length in 1..MAX_LENGTH && headword.matches(it)
         }

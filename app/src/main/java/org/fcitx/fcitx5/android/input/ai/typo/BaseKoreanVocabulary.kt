@@ -85,7 +85,7 @@ class BaseKoreanVocabulary(private val source: () -> Reader) {
 
     private class RawEntry(val word: String, val jamo: String, val choseong: String, val count: Int)
 
-    private val morphology = ChoseongMorphologyEngine()
+    private val morphology = ChoseongMorphologyEngine.Default
 
     @Volatile
     private var snapshot: Snapshot? = null

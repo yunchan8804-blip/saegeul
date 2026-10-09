@@ -34,12 +34,13 @@ data class ContextualAppend(
         }
     }
 
-    private fun normalize(value: String): String = value.trim().replace(Regex("\\s+"), " ")
+    private fun normalize(value: String): String = value.trim().replace(WHITESPACE, " ")
 
     private fun isInvalidSuffixCharacter(character: Char): Boolean =
         Character.isISOControl(character) || character == '\uFFFD' || character == '\u200B' || character == '\uFEFF'
 
     private companion object {
         const val MAX_EXPECTED_CONTEXT_LENGTH = 1024
+        val WHITESPACE = Regex("\\s+")
     }
 }

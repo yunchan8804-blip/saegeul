@@ -11,6 +11,7 @@ object PersonalSentenceCompletionGate {
 
     private val ALLOWED_SUFFIX_CHARS = "요죠네다까며서고도만의는이가을를에로와과자게지어아?!.~…".toSet()
     private val VERBAL_PREFIXES = listOf("하", "했", "합", "할", "해", "되", "됐", "됩", "될", "돼", "시", "셨")
+    private val WHITESPACE = Regex("\\s+")
 
     fun isContinuation(fullContext: String, candidate: String): Boolean {
         val currentSentence = normalize(lastSentence(fullContext))
@@ -32,7 +33,7 @@ object PersonalSentenceCompletionGate {
         return text.substring(boundary + 1).trim()
     }
 
-    private fun normalize(text: String): String = text.trim().split(Regex("\\s+"))
+    private fun normalize(text: String): String = text.trim().split(WHITESPACE)
         .filter { it.isNotEmpty() }
         .joinToString(" ")
 }

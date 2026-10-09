@@ -21,7 +21,7 @@ import kotlin.math.max
  */
 class PersonalizedSentenceStore(
     private val storageFile: File? = null,
-    private val morphology: ChoseongMorphologyEngine = ChoseongMorphologyEngine(),
+    private val morphology: ChoseongMorphologyEngine = ChoseongMorphologyEngine.Default,
     private val maxCapacity: Int = 500,
     private val cipher: VaultCipher = PlainVaultCipher
 ) {

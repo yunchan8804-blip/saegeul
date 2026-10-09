@@ -23,6 +23,8 @@ class TypingDnaProfiler {
          * occurrence is not evidence of habit and must never be surfaced as "내 스타일".
          */
         const val MIN_CANNED_PHRASE_FREQUENCY = 2
+
+        private val WHITESPACE = Regex("\\s+")
     }
 
     /**
@@ -71,7 +73,7 @@ class TypingDnaProfiler {
             }
 
             // Bigram extraction
-            val words = trimmed.split(Regex("\\s+")).filter { it.isNotBlank() }
+            val words = trimmed.split(WHITESPACE).filter { it.isNotBlank() }
             for (i in 0 until words.size - 1) {
                 val pair = Pair(words[i], words[i + 1])
                 bigramCounts[pair] = (bigramCounts[pair] ?: 0) + 1

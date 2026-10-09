@@ -71,7 +71,7 @@ class PersonalNgramModel(
         }
     }
 
-    private val morphology = ChoseongMorphologyEngine()
+    private val morphology = ChoseongMorphologyEngine.Default
     private val tables = HashMap<String, Table>()
     private val vaultFile: VaultFile? = storeFile?.let { VaultFile(it, cipher, VaultFile.aadFor(it.name)) }
     private val persistenceLock = Any()

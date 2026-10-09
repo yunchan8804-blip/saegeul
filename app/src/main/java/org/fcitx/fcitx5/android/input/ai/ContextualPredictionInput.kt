@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+
 /**
  * Resolves the raw text before the cursor and any in-progress composing text into the
  * (stroke, context) pair the contextual predictor expects. Buffered Hangul compatibility mode
@@ -85,5 +87,5 @@ internal object ContextualPredictionInput {
         }
     }
 
-    private fun isHangul(c: Char): Boolean = c in '가'..'힣' || c in 'ㄱ'..'ㆎ'
+    private fun isHangul(c: Char): Boolean = HangulSyllable.isSyllable(c) || HangulSyllable.isCompatJamo(c)
 }

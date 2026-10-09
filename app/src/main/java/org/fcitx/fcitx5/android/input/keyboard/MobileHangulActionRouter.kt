@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeySym
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 
 /**
  * Decides, for a mobile Hangul keyboard, what a [KeyAction] should do to the composer and what
@@ -75,7 +76,7 @@ class MobileHangulActionRouter(private val composer: MobileHangulComposer) {
      * bare open jamo or punctuation carries nothing usable and clears it instead.
      */
     fun onClientPreeditUpdate(text: String) {
-        composer.setComposingSyllable(text.lastOrNull()?.takeIf { it in '가'..'힣' })
+        composer.setComposingSyllable(text.lastOrNull()?.takeIf(HangulSyllable::isSyllable))
     }
 
     /**
