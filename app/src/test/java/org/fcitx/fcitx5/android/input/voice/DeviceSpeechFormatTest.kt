@@ -77,4 +77,21 @@ class DeviceSpeechFormatTest {
         assertEquals(1f, DeviceSpeechLevel.fraction(40f), 0f)
         assertEquals(0.5f, DeviceSpeechLevel.fraction(4f), 0.0001f)
     }
+
+    @Test
+    fun candidatesAddTheDeviceLanguageAfterThePinnedOne() {
+        assertEquals(
+            listOf("en-US", "ko-KR"),
+            DeviceSpeechLanguage.candidates("en-US", Locale.KOREA)
+        )
+        assertEquals(
+            listOf("en-US", "ko-KR"),
+            DeviceSpeechLanguage.candidates("en-US", Locale.forLanguageTag("ko"))
+        )
+    }
+
+    @Test
+    fun candidatesDoNotRepeatTheSameLanguage() {
+        assertEquals(listOf("ko-KR"), DeviceSpeechLanguage.candidates("ko-KR", Locale.KOREA))
+    }
 }

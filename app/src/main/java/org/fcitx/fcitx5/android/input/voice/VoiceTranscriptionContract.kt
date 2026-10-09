@@ -91,8 +91,8 @@ enum class VoiceUnavailableAction {
 }
 
 object VoiceFallbackPolicy {
-    fun action(hasDeviceVoiceInput: Boolean): VoiceUnavailableAction =
-        if (hasDeviceVoiceInput) {
+    fun action(hasDeviceVoiceInput: Boolean, allowsNetworkInput: Boolean): VoiceUnavailableAction =
+        if (hasDeviceVoiceInput && allowsNetworkInput) {
             VoiceUnavailableAction.DeviceDictation
         } else {
             VoiceUnavailableAction.ProviderSetup

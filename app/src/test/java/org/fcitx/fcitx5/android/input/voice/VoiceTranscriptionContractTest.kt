@@ -45,11 +45,23 @@ class VoiceTranscriptionContractTest {
     fun `device dictation offers the installed voice input or a setup action`() {
         assertEquals(
             VoiceUnavailableAction.DeviceDictation,
-            VoiceFallbackPolicy.action(hasDeviceVoiceInput = true)
+            VoiceFallbackPolicy.action(hasDeviceVoiceInput = true, allowsNetworkInput = true)
         )
         assertEquals(
             VoiceUnavailableAction.ProviderSetup,
-            VoiceFallbackPolicy.action(hasDeviceVoiceInput = false)
+            VoiceFallbackPolicy.action(hasDeviceVoiceInput = false, allowsNetworkInput = true)
+        )
+    }
+
+    @Test
+    fun `fully offline never hands voice input to another keyboard`() {
+        assertEquals(
+            VoiceUnavailableAction.ProviderSetup,
+            VoiceFallbackPolicy.action(hasDeviceVoiceInput = true, allowsNetworkInput = false)
+        )
+        assertEquals(
+            VoiceUnavailableAction.ProviderSetup,
+            VoiceFallbackPolicy.action(hasDeviceVoiceInput = false, allowsNetworkInput = false)
         )
     }
 

@@ -45,6 +45,10 @@ object DeviceSpeechLanguage {
             "en" -> ENGLISH
             else -> deviceLocale.toLanguageTag()
         }
+
+    /** The pinned language first, then the device language, for when the device lacks the first. */
+    fun candidates(primaryTag: String, deviceLocale: Locale): List<String> =
+        listOf(primaryTag, tagFor(deviceLocale.language, deviceLocale)).distinct()
 }
 
 object DeviceSpeechLevel {

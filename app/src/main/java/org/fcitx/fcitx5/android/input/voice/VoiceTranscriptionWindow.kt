@@ -60,6 +60,7 @@ class VoiceTranscriptionWindow(
     private var realtimePartial = ""
     private var realtimeElapsedSeconds = 0
     private var realtimeStopping = false
+    private var segmentSending = false
     private var sessionJob: Job? = null
     private var systemVoiceInput: Pair<String, InputMethodSubtype>? = null
     private var attached = false
@@ -92,7 +93,7 @@ class VoiceTranscriptionWindow(
         }
         return VoiceWindowRoot(context, ui.root).apply {
             onTouchBoundary = ::finishPushToTalk
-            onHidden = ::releaseHiddenDeviceListening
+            onHidden = ::releaseHiddenMicrophone
         }
     }
 
@@ -260,13 +261,17 @@ class VoiceTranscriptionWindow(
                 }
             ),
             canSwitchKeyboard =
-                VoiceFallbackPolicy.action(systemVoiceInput != null) ==
+                VoiceFallbackPolicy.action(
+                    hasDeviceVoiceInput = systemVoiceInput != null,
+                    allowsNetworkInput = allowsNetwork
+                ) ==
                     VoiceUnavailableAction.DeviceDictation
         )
     }
 
     private fun switchToDeviceDictation() {
         if (!validatePolicy()) return
+        if (!service.allowsNetworkInputFeatures()) return
         val voiceInput = systemVoiceInput ?: findDeviceVoiceInput() ?: return
         val (id, subtype) = voiceInput
         InputMethodUtil.switchInputMethod(service, id, subtype)
@@ -393,10 +398,33 @@ class VoiceTranscriptionWindow(
         devicePartial = ""
     }
 
-    /** The keyboard went away while listening: give the microphone back and show the ready state. */
-    private fun releaseHiddenDeviceListening() {
-        if (deviceSession == null) return
-        cancelWork(clearUi = attached)
+    /**
+     * The keyboard went away: give every microphone capture back and show the ready state. Device
+     * listening and a cloud recording that was not yet sent are discarded; a request the user
+     * already started by stopping is left to finish.
+     */
+    private fun releaseHiddenMicrophone() {
+        val engine = when {
+            deviceSession != null -> VoiceHiddenEngine.Device
+            segmentRuntime != null -> VoiceHiddenEngine.Segment
+            realtimeRuntime != null -> VoiceHiddenEngine.Realtime
+            else -> null
+        }
+        val sending = when (engine) {
+            VoiceHiddenEngine.Segment -> segmentSending
+            VoiceHiddenEngine.Realtime -> realtimeStopping
+            else -> false
+        }
+        val phase = when {
+            engine == null -> VoiceHiddenPhase.Idle
+            sending -> VoiceHiddenPhase.Sending
+            else -> VoiceHiddenPhase.Recording
+        }
+        when (VoiceHiddenPolicy.decide(engine, phase)) {
+            VoiceHiddenAction.CancelRecording,
+            VoiceHiddenAction.ReleaseDevice -> cancelWork(clearUi = attached)
+            VoiceHiddenAction.Keep -> Unit
+        }
     }
 
     private fun startSegmentRecordingWithPermission(resumedTarget: VoiceEditorTarget? = null) {
@@ -412,6 +440,7 @@ class VoiceTranscriptionWindow(
         reviewSession.begin(boundTarget)
         val activeRuntime = runtimeFactory.createSegment(configuredProfile)
         segmentRuntime = activeRuntime
+        segmentSending = false
         ui.showRecording(0)
         sessionJob = service.lifecycleScope.launch {
             try {
@@ -425,6 +454,7 @@ class VoiceTranscriptionWindow(
                         }
                     },
                     onTranscribing = {
+                        if (segmentRuntime === activeRuntime) segmentSending = true
                         if (attached && segmentRuntime === activeRuntime) ui.showTranscribing()
                     }
                 ) ?: return@launch
@@ -530,6 +560,7 @@ class VoiceTranscriptionWindow(
             return
         }
         segmentRuntime?.let { activeRuntime ->
+            segmentSending = true
             ui.showTranscribing()
             activeRuntime.stopRecording()
             return
@@ -557,6 +588,7 @@ class VoiceTranscriptionWindow(
         realtimePartial = ""
         realtimeElapsedSeconds = 0
         realtimeStopping = false
+        segmentSending = false
         if (clearUi && attached) {
             renderReadyState()
         }
