@@ -27,6 +27,7 @@ import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeBitmaps
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
@@ -159,7 +160,7 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         val slicedDrawable = if (slicedImageDef != null) {
             val file = java.io.File(slicedImageDef.imagePath)
             if (file.exists()) {
-                val bmp = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                val bmp = ThemeBitmaps.decodeFile(file)
                 if (bmp != null) {
                     SlicedKeyDrawable(
                         bmp,

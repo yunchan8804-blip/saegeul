@@ -6,4 +6,15 @@
 <resources>
     <string name="theme_swatch_selected">선택됨</string>
     <string name="theme_swatch_color_index">색 %1$d</string>
+    <string name="theme_thumbnail_selected">선택됨</string>
+    <string name="theme_thumbnail_light_mode">라이트 모드에서 사용 중</string>
+    <string name="theme_thumbnail_dark_mode">다크 모드에서 사용 중</string>
+    <string name="theme_discard_changes_message">변경한 내용을 버릴까요?</string>
+    <string name="theme_discard">버리기</string>
+    <string name="theme_keep_editing">계속 편집</string>
+    <string name="theme_shop_need_points">포인트가 부족해요. 필요한 포인트: %1$d점</string>
+    <string name="app_profile_theme_missing">없는 테마</string>
+    <string name="exception_theme_name_invalid">테마 이름이 올바르지 않습니다</string>
+    <string name="exception_theme_image_path">테마 배경 이미지 경로가 올바르지 않습니다</string>
+    <string name="exception_theme_image_decode">테마 배경 이미지를 읽을 수 없거나 너무 큽니다</string>
 </resources>

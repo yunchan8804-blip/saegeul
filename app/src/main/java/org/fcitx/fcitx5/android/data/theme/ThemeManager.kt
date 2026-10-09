@@ -10,6 +10,7 @@ import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
@@ -54,6 +55,18 @@ object ThemeManager {
             ?: ThemeShopCatalog.find(name)?.theme
 
     fun getAllThemes() = customThemes + monetThemes + BuiltinThemes + ThemeShopCatalog.allThemes()
+
+    /** Credential-encrypted storage, where purchases are recorded, does not exist in Direct Boot. */
+    private fun isShopThemeOwned(name: String): Boolean =
+        FcitxApplication.getInstance().isDirectBootMode ||
+            ThemeOwnershipStore(appContext).isOwned(name)
+
+    /** Themes a picker may offer: shop themes only once bought. */
+    fun getSelectableThemes() = selectableThemes(getAllThemes(), ::isShopThemeOwned)
+
+    /** The theme saved under [name] if it may be used: not a shop theme that has not been bought. */
+    fun findSelectableTheme(name: String) =
+        resolveSelectableTheme(name, getAllThemes(), ::isShopThemeOwned)
 
     fun refreshThemes() {
         customThemes.clear()

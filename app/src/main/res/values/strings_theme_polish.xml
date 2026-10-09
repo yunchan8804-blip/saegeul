@@ -3,9 +3,21 @@
   SPDX-License-Identifier: LGPL-2.1-or-later
   SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
 -->
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Accessibility state for a color swatch that is currently the selected choice -->
     <string name="theme_swatch_selected">Selected</string>
     <!-- Accessibility label for a color swatch with no specific name, e.g. "Color 3" -->
     <string name="theme_swatch_color_index">Color %1$d</string>
+    <!-- Accessibility state of the check icon on a theme thumbnail -->
+    <string name="theme_thumbnail_selected" tools:ignore="MissingTranslation">Selected</string>
+    <string name="theme_thumbnail_light_mode" tools:ignore="MissingTranslation">Used in light mode</string>
+    <string name="theme_thumbnail_dark_mode" tools:ignore="MissingTranslation">Used in dark mode</string>
+    <string name="theme_discard_changes_message" tools:ignore="MissingTranslation">Discard your changes?</string>
+    <string name="theme_discard" tools:ignore="MissingTranslation">Discard</string>
+    <string name="theme_keep_editing" tools:ignore="MissingTranslation">Keep editing</string>
+    <string name="theme_shop_need_points" tools:ignore="MissingTranslation">Not enough points. Points needed: %1$d</string>
+    <string name="app_profile_theme_missing" tools:ignore="MissingTranslation">Theme not found</string>
+    <string name="exception_theme_name_invalid" tools:ignore="MissingTranslation">Theme name is not valid</string>
+    <string name="exception_theme_image_path" tools:ignore="MissingTranslation">Path of the theme background image is not valid</string>
+    <string name="exception_theme_image_decode" tools:ignore="MissingTranslation">Theme background image cannot be read or is too large</string>
 </resources>

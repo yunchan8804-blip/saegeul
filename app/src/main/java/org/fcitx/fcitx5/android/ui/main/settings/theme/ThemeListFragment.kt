@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ads.ThemePointRewardedController
 import org.fcitx.fcitx5.android.data.points.PointLedger
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeFileRules
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemeOwnershipStore
@@ -210,6 +211,14 @@ class ThemeListFragment : Fragment() {
             showShopPurchaseDialog(shopTheme)
             return
         }
+        applyChosenTheme(theme)
+    }
+
+    /**
+     * Makes [theme] the one in use. While the keyboard follows the system day/night mode a
+     * single choice does not stick, so the user is asked first.
+     */
+    private fun applyChosenTheme(theme: Theme) {
         if (followSystemDayNightTheme) {
             val ctx = requireContext()
             AlertDialog.Builder(ctx)
@@ -240,7 +249,10 @@ class ThemeListFragment : Fragment() {
         }
         var dialog: AlertDialog? = null
         fun tryPurchase() {
-            if (ledger.balance() < shop.price) return
+            if (ledger.balance() < shop.price) {
+                ctx.toast(ctx.getString(R.string.theme_shop_need_points, shop.price))
+                return
+            }
             lifecycleScope.launch(Dispatchers.IO) {
                 val spent = ledger.spend(
                     shop.price, System.currentTimeMillis(), "theme:${shop.theme.name}"
@@ -249,7 +261,7 @@ class ThemeListFragment : Fragment() {
                     if (spent) {
                         ownership.markOwned(shop.theme.name)
                         dialog?.dismiss()
-                        ThemeManager.setNormalModeTheme(shop.theme)
+                        applyChosenTheme(shop.theme)
                         updateSelectedThemes()
                         ctx.toast(ctx.getString(R.string.theme_shop_purchased, shop.displayName))
                     } else {
@@ -286,7 +298,8 @@ class ThemeListFragment : Fragment() {
 
     private fun exportTheme(theme: Theme.Custom) {
         beingExported = theme
-        exportLauncher.launch(theme.name + ".zip")
+        val displayName = ThemeDisplayNames.displayName(requireContext(), theme)
+        exportLauncher.launch(ThemeFileRules.exportFileName(displayName) + ".zip")
     }
 
     override fun onDestroy() {

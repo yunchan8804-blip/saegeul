@@ -64,7 +64,16 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
             .show()
     }
 
-    private fun showItemEditor(vault: SensitivePhraseVault, existing: SensitivePhrase?) {
+    /**
+     * [draft] is what the user had typed when a previous attempt to save did not go through,
+     * so the form opens again with it instead of the stored item.
+     */
+    private fun showItemEditor(
+        vault: SensitivePhraseVault,
+        existing: SensitivePhrase?,
+        draft: SensitivePhrase? = null
+    ) {
+        val shown = draft ?: existing
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             val horizontal = context.dp(20)
@@ -82,7 +91,7 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
                 android.R.layout.simple_spinner_dropdown_item,
                 kinds.map(::kindLabel)
             )
-            setSelection(kinds.indexOf(existing?.kind ?: SensitivePhraseKind.Account))
+            setSelection(kinds.indexOf(shown?.kind ?: SensitivePhraseKind.Account))
         }
         content.addView(kindSpinner, matchWrapParams())
 
@@ -91,14 +100,14 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
         label(R.string.secret_vault_label_hint)
         val labelField = EditText(context).apply {
             setHint(R.string.secret_vault_label_hint)
-            setText(existing?.label.orEmpty())
+            setText(shown?.label.orEmpty())
             maxLines = 1
         }
         content.addView(labelField, matchWrapParams())
         label(R.string.secret_vault_value_hint)
         val valueField = EditText(context).apply {
             setHint(R.string.secret_vault_value_hint)
-            setText(existing?.value.orEmpty())
+            setText(shown?.value.orEmpty())
             inputType = InputType.TYPE_CLASS_TEXT or
                 InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
                 InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
@@ -110,7 +119,7 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
         label(R.string.secret_vault_packages_hint)
         val packagesField = EditText(context).apply {
             setHint(R.string.secret_vault_packages_hint)
-            setText(existing?.allowedPackages?.joinToString("\n").orEmpty())
+            setText(shown?.allowedPackages?.joinToString("\n").orEmpty())
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             minLines = 2
             maxLines = 5
@@ -158,7 +167,7 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
                 runCatching { vault.upsert(item) }
                     .onSuccess { updated ->
                         dialog.dismiss()
-                        authenticateWrite(updated)
+                        authenticateWrite(updated) { showItemEditor(vault, existing, item) }
                     }
                     .onFailure {
                         packagesField.error = context.getString(R.string.secret_vault_invalid_item)
@@ -167,16 +176,18 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
             existing?.let { item ->
                 dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
                     dialog.dismiss()
-                    authenticateWrite(vault.remove(item.id))
+                    authenticateWrite(vault.remove(item.id)) { showItemEditor(vault, item) }
                 }
             }
         }
         dialog.show()
     }
 
-    private fun authenticateWrite(vault: SensitivePhraseVault) {
+    /** [onNotSaved] runs when the change was not saved, so the form can open again. */
+    private fun authenticateWrite(vault: SensitivePhraseVault, onNotSaved: () -> Unit) {
         val request = runCatching(store::beginVaultWrite).getOrElse {
             showToast(R.string.secret_vault_auth_unavailable)
+            onNotSaved()
             return
         }
         SensitivePhraseAuthenticator.authenticate(
@@ -192,9 +203,15 @@ class SensitivePhraseVaultSettings(private val fragment: Fragment) {
                         showToast(R.string.secret_vault_saved)
                         showList(vault)
                     }
-                    .onFailure { showToast(R.string.secret_vault_save_failed) }
+                    .onFailure {
+                        showToast(R.string.secret_vault_save_failed)
+                        onNotSaved()
+                    }
             },
-            onError = { showToast(R.string.secret_vault_auth_failed) }
+            onError = {
+                showToast(R.string.secret_vault_auth_failed)
+                onNotSaved()
+            }
         )
     }
 

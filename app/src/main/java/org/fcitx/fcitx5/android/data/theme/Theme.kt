@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
-import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
@@ -179,7 +178,7 @@ sealed class Theme : Parcelable {
             fun toDrawable(): Drawable? {
                 val cropped = File(croppedFilePath)
                 if (!cropped.exists()) return null
-                val bitmap = BitmapFactory.decodeStream(cropped.inputStream()) ?: return null
+                val bitmap = ThemeBitmaps.decodeFile(cropped) ?: return null
                 return BitmapDrawable(appContext.resources, bitmap).apply {
                     colorFilter = DarkenColorFilter(100 - brightness)
                 }
@@ -376,7 +375,7 @@ sealed class Theme : Parcelable {
             secondaryContainer: Int,
             onSurfaceVariant: Int,
         ) : this(
-            name = "Monet" + if (isDark) "Dark" else "Light",
+            name = nameOf(isDark),
             isDark = isDark,
             backgroundColor = surfaceContainer,
             barColor = surfaceContainerHigh,
@@ -400,6 +399,10 @@ sealed class Theme : Parcelable {
             genericActiveBackgroundColor = primary,
             genericActiveForegroundColor = onPrimary
         )
+
+        companion object {
+            fun nameOf(isDark: Boolean) = "Monet" + if (isDark) "Dark" else "Light"
+        }
 
         @OptIn(ExperimentalStdlibApi::class)
         fun toCustom() = Custom(

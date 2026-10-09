@@ -64,6 +64,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
     }
 
     val editButton = imageView {
+        contentDescription = ctx.getString(R.string.edit_theme)
         setPaddingDp(16, 4, 4, 16)
         scaleType = ImageView.ScaleType.FIT_CENTER
         imageResource = R.drawable.ic_baseline_edit_24
@@ -147,6 +148,8 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
     fun setChecked(checked: Boolean) {
         checkMark.isVisible = checked
         checkMark.imageResource = R.drawable.ic_baseline_check_24
+        checkMark.contentDescription =
+            if (checked) ctx.getString(R.string.theme_thumbnail_selected) else null
     }
 
     fun setChecked(state: State) {
@@ -156,6 +159,12 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
             State.Selected -> R.drawable.ic_baseline_check_24
             State.LightMode -> R.drawable.ic_baseline_light_mode_24
             State.DarkMode -> R.drawable.ic_baseline_dark_mode_24
+        }
+        checkMark.contentDescription = when (state) {
+            State.Normal -> null
+            State.Selected -> ctx.getString(R.string.theme_thumbnail_selected)
+            State.LightMode -> ctx.getString(R.string.theme_thumbnail_light_mode)
+            State.DarkMode -> ctx.getString(R.string.theme_thumbnail_dark_mode)
         }
     }
 }

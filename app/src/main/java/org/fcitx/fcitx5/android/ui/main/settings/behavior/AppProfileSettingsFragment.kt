@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileStore
 import org.fcitx.fcitx5.android.input.profile.AppToolbarVisibility
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
+import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeDisplayNames
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
 import splitties.dimensions.dp
@@ -76,11 +77,16 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
         "${requireContext().packageManager.getApplicationLabel(info)} · $packageName"
     }.getOrDefault(packageName)
 
+    private fun themeLabel(themeName: String): String =
+        ThemeManager.getAllThemes().find { it.name == themeName }
+            ?.let { ThemeDisplayNames.displayName(requireContext(), it) }
+            ?: getString(R.string.app_profile_theme_missing)
+
     private fun profileSummary(profile: AppKeyboardProfile): String = buildList {
         profile.mobileHangulLayout?.let {
             add(getString(R.string.app_profile_summary_layout, getString(it.stringRes)))
         }
-        profile.themeName?.let { add(getString(R.string.app_profile_summary_theme, it)) }
+        profile.themeName?.let { add(getString(R.string.app_profile_summary_theme, themeLabel(it))) }
         if (profile.toolbarVisibility != AppToolbarVisibility.Inherit) {
             add(getString(R.string.app_profile_summary_toolbar, toolbarLabel(profile.toolbarVisibility)))
         }
@@ -142,11 +148,13 @@ class AppProfileSettingsFragment : PaddingPreferenceFragment() {
                 MobileHangulLayout.entries.map { getString(it.stringRes) },
             existing?.mobileHangulLayout
         )
-        val themes = listOf<String?>(null) + ThemeManager.getAllThemes().map { it.name }.distinct()
+        val selectableThemes = ThemeManager.getSelectableThemes().distinctBy { it.name }
+        val themes = listOf<String?>(null) + selectableThemes.map { it.name }
         val (themeSpinner, themeValues) = choice(
             R.string.app_profile_theme,
             themes,
-            listOf(getString(R.string.app_profile_inherit)) + themes.drop(1).map { it.orEmpty() },
+            listOf(getString(R.string.app_profile_inherit)) +
+                selectableThemes.map { ThemeDisplayNames.displayName(ctx, it) },
             existing?.themeName
         )
         val toolbarValues = AppToolbarVisibility.entries

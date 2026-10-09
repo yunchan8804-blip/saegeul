@@ -10,7 +10,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
@@ -46,11 +45,15 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlinx.parcelize.Parcelize
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.theme.CustomThemeSerializer
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeBitmaps
 import org.fcitx.fcitx5.android.data.theme.ThemeColorGenerator
 import org.fcitx.fcitx5.android.data.theme.ThemeContrast
+import org.fcitx.fcitx5.android.data.theme.ThemeFileRules
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -92,6 +95,7 @@ import splitties.views.horizontalPadding
 import splitties.views.imageResource
 import splitties.views.textAppearance
 import splitties.views.topPadding
+import timber.log.Timber
 import java.io.File
 
 class CustomThemeActivity : AppCompatActivity() {
@@ -774,6 +778,12 @@ class CustomThemeActivity : AppCompatActivity() {
 
     private lateinit var theme: Theme.Custom
 
+    /** The theme as it was when editing began; unsaved changes are measured against it. */
+    private lateinit var baselineTheme: Theme.Custom
+
+    /** Whether the picked images are already copied to the staging folder for recreation. */
+    private var pendingImagesStaged = false
+
     private class BackgroundStates {
         lateinit var launcher: ActivityResultLauncher<CropOption>
         var srcImageExtension: String? = null
@@ -1382,7 +1392,7 @@ class CustomThemeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        loadStartingTheme()
+        loadStartingTheme(savedInstanceState)
         seedGenIsDark = theme.isDark
         keyToneIsDark = !theme.isDark
         previewUi = KeyboardPreviewUi(this, theme)
@@ -1395,13 +1405,115 @@ class CustomThemeActivity : AppCompatActivity() {
         refreshContrastRow()
         updateMoreVisibility()
 
+        if (!::baselineTheme.isInitialized) {
+            baselineTheme = snapshotTheme()
+        }
+
         onBackPressedDispatcher.addCallback {
-            cancel()
+            requestCancel()
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_THEME, Json.encodeToString(CustomThemeSerializer, snapshotTheme()))
+        outState.putBoolean(STATE_NEW_CREATED, newCreated)
+        outState.putString(STATE_CROPPED_FILE, backgroundStates.croppedImageFile?.absolutePath)
+        outState.putString(STATE_SRC_FILE, backgroundStates.srcImageFile?.absolutePath)
+        outState.putString(STATE_SRC_EXTENSION, backgroundStates.srcImageExtension)
+        outState.putBoolean(STATE_HAS_PENDING_IMAGES, stagePendingImages())
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+            stagingDir.deleteRecursively()
+        }
+    }
+
+    private val stagingDir get() = File(cacheDir, STAGING_DIR)
+
+    /**
+     * Images picked in this session exist only in memory until the theme is saved, so they are
+     * copied aside to survive the activity being recreated. Returns whether they are staged.
+     */
+    private fun stagePendingImages(): Boolean {
+        val srcBuffer = backgroundStates.srcImageBuffer ?: return false
+        val croppedBitmap = backgroundStates.croppedBitmap ?: return false
+        if (pendingImagesStaged) return true
+        return runCatching {
+            stagingDir.mkdirs()
+            File(stagingDir, STAGED_SRC).writeBytes(srcBuffer)
+            File(stagingDir, STAGED_CROPPED).outputStream().use {
+                croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        }.onSuccess {
+            pendingImagesStaged = true
+        }.onFailure {
+            Timber.w(it, "Cannot keep the picked background image across recreation")
+        }.isSuccess
+    }
+
+    private fun restorePendingImages() {
+        val srcFile = File(stagingDir, STAGED_SRC)
+        val croppedFile = File(stagingDir, STAGED_CROPPED)
+        if (!srcFile.exists() || !croppedFile.exists()) {
+            Timber.w("Staged background images are gone, the picked image is lost")
+            return
+        }
+        backgroundStates.apply {
+            srcImageBuffer = srcFile.readBytes()
+            croppedBitmap = ThemeBitmaps.decodeFile(croppedFile)
+            filteredDrawable = croppedBitmap?.let { BitmapDrawable(resources, it) }
+        }
+        pendingImagesStaged = true
+    }
+
+    private fun decodeSavedTheme(state: Bundle): Theme.Custom? {
+        val json = state.getString(STATE_THEME) ?: return null
+        return runCatching { Json.decodeFromString(CustomThemeSerializer, json) }
+            .onFailure { Timber.w(it, "Cannot restore the theme being edited") }
+            .getOrNull()
+    }
+
+    /**
+     * The theme as it would be saved right now: the background image settings that live in the
+     * controls and in [backgroundStates] are folded into [theme].
+     */
+    private fun snapshotTheme(): Theme.Custom {
+        val background = theme.backgroundImage ?: return theme
+        return theme.copy(
+            backgroundImage = background.copy(
+                brightness = brightnessSeekBar.progress,
+                cropRect = backgroundStates.cropRect,
+                cropRotation = backgroundStates.cropRotation
+            )
+        )
+    }
+
+    private fun hasUnsavedChanges() =
+        snapshotTheme() != baselineTheme ||
+            (theme.backgroundImage != null && backgroundStates.srcImageBuffer != null)
+
+    private fun requestCancel() {
+        if (!hasUnsavedChanges()) {
+            cancel()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setMessage(R.string.theme_discard_changes_message)
+            .setPositiveButton(R.string.theme_discard) { _, _ -> cancel() }
+            .setNegativeButton(R.string.theme_keep_editing, null)
+            .show()
+    }
+
     /** Edits the theme passed in, or starts a new one from the SaegeulIvory template. */
-    private fun loadStartingTheme() {
+    private fun loadStartingTheme(savedInstanceState: Bundle?) {
+        val savedTheme = savedInstanceState?.let(::decodeSavedTheme)
+        if (savedInstanceState != null && savedTheme != null) {
+            restoreEditedTheme(savedInstanceState, savedTheme)
+            return
+        }
         // recover from bundle
         val originTheme = intent?.parcelable<Theme.Custom>(ORIGIN_THEME)?.also { t ->
             theme = t
@@ -1410,10 +1522,7 @@ class CustomThemeActivity : AppCompatActivity() {
                 srcImageFile = File(it.srcFilePath)
                 cropRect = it.cropRect
                 cropRotation = it.cropRotation
-                if (croppedImageFile?.exists() == true) {
-                    croppedBitmap = BitmapFactory.decodeFile(it.croppedFilePath)
-                    filteredDrawable = BitmapDrawable(resources, croppedBitmap)
-                }
+                loadCroppedBitmap(it)
             }
             newCreated = false
         }
@@ -1426,6 +1535,35 @@ class CustomThemeActivity : AppCompatActivity() {
             }
             // Use SaegeulIvory as the starting template for a brand-new custom theme
             theme = ThemePreset.SaegeulIvory.deriveCustomNoBackground(n)
+        }
+    }
+
+    private fun BackgroundStates.loadCroppedBitmap(background: Theme.Custom.CustomBackground) {
+        val croppedFile = File(background.croppedFilePath)
+        if (croppedFile.exists()) {
+            croppedBitmap = ThemeBitmaps.decodeFile(croppedFile)
+            filteredDrawable = croppedBitmap?.let { BitmapDrawable(resources, it) }
+        }
+    }
+
+    /** Continues the edit that was interrupted by the activity being recreated. */
+    private fun restoreEditedTheme(state: Bundle, savedTheme: Theme.Custom) {
+        val originTheme = intent?.parcelable<Theme.Custom>(ORIGIN_THEME)
+        theme = savedTheme
+        newCreated = state.getBoolean(STATE_NEW_CREATED, originTheme == null)
+        baselineTheme = originTheme
+            ?: ThemePreset.SaegeulIvory.deriveCustomNoBackground(savedTheme.name)
+        backgroundStates.apply {
+            croppedImageFile = state.getString(STATE_CROPPED_FILE)?.let(::File)
+            srcImageFile = state.getString(STATE_SRC_FILE)?.let(::File)
+            srcImageExtension = state.getString(STATE_SRC_EXTENSION)
+            cropRect = savedTheme.backgroundImage?.cropRect
+            cropRotation = savedTheme.backgroundImage?.cropRotation ?: 0
+        }
+        if (state.getBoolean(STATE_HAS_PENDING_IMAGES)) {
+            restorePendingImages()
+        } else {
+            whenHasBackground { loadCroppedBitmap(it) }
         }
     }
 
@@ -1488,6 +1626,7 @@ class CustomThemeActivity : AppCompatActivity() {
                         .getExtensionFromMimeType(contentResolver.getType(it.srcUri))
                     backgroundStates.srcImageBuffer =
                         contentResolver.openInputStream(it.srcUri)!!.use { x -> x.readBytes() }
+                    pendingImagesStaged = false
                     backgroundStates.cropRect = it.rect
                     backgroundStates.cropRotation = it.rotation
                     backgroundStates.croppedBitmap = it.bitmap
@@ -1597,31 +1736,22 @@ class CustomThemeActivity : AppCompatActivity() {
                     val srcFile = srcImageFile
                     val srcBuf = srcImageBuffer
                     if (srcFile != null && srcBuf != null) {
-                        if (srcImageExtension != null) {
-                            backgroundStates.srcImageFile = File("${srcFile.absolutePath}.$srcImageExtension")
+                        val target = ThemeFileRules.srcFileWithExtension(srcFile, srcImageExtension)
+                        target.writeBytes(srcBuf)
+                        if (target != srcFile) {
+                            ThemeFilesManager.deleteBackgroundImage(srcFile.absolutePath)
+                            backgroundStates.srcImageFile = target
                             theme = theme.copy(
-                                backgroundImage = it.copy(
-                                    srcFilePath = backgroundStates.srcImageFile!!.absolutePath
-                                )
+                                backgroundImage = it.copy(srcFilePath = target.absolutePath)
                             )
                         }
-                        backgroundStates.srcImageFile!!.writeBytes(srcBuf)
                     }
                 }
             }
             setResult(
                 RESULT_OK,
                 Intent().apply {
-                    var newTheme = theme
-                    whenHasBackground {
-                        newTheme = theme.copy(
-                            backgroundImage = it.copy(
-                                brightness = brightnessSeekBar.progress,
-                                cropRect = cropRect,
-                                cropRotation = cropRotation
-                            )
-                        )
-                    }
+                    val newTheme = snapshotTheme()
                     putExtra(
                         RESULT,
                         if (newCreated)
@@ -1658,7 +1788,7 @@ class CustomThemeActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         if (!newCreated) {
             val iconTint = color(R.color.red_400)
-            menu.item(R.string.save, R.drawable.ic_baseline_delete_24, iconTint, true) {
+            menu.item(R.string.delete, R.drawable.ic_baseline_delete_24, iconTint, true) {
                 promptDelete()
             }
         }
@@ -1671,7 +1801,7 @@ class CustomThemeActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
         android.R.id.home -> {
-            cancel()
+            requestCancel()
             true
         }
         else -> super.onOptionsItemSelected(item)
@@ -1680,5 +1810,16 @@ class CustomThemeActivity : AppCompatActivity() {
     companion object {
         const val RESULT = "result"
         const val ORIGIN_THEME = "origin_theme"
+
+        private const val STATE_THEME = "state_theme"
+        private const val STATE_NEW_CREATED = "state_new_created"
+        private const val STATE_CROPPED_FILE = "state_cropped_file"
+        private const val STATE_SRC_FILE = "state_src_file"
+        private const val STATE_SRC_EXTENSION = "state_src_extension"
+        private const val STATE_HAS_PENDING_IMAGES = "state_has_pending_images"
+
+        private const val STAGING_DIR = "theme-edit"
+        private const val STAGED_SRC = "src"
+        private const val STAGED_CROPPED = "cropped.png"
     }
 }
