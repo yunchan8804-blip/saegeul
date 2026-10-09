@@ -20,6 +20,23 @@ to a word appearing as a bigram/trigram prefix (prev, or trigram a/b).
 Run with --verify to re-read the written .bin from disk, check header/offset
 consistency, cross-check entry counts against the source TSVs, and print a
 handful of bigram/trigram lookups.
+
+A run that would overwrite an assets ko-ngram.bin holding `<s>` rows with a bin
+that has none is refused before any asset is written, unless
+--allow-drop-sentence-start is given (the `<s>` rows are then restored by the
+--add-sentence-start step below).
+
+Run with --add-sentence-start <dir> (a lam_<값> directory from
+scripts/build-ko-sentence-start.py holding bos_unigram.tsv / bos_bigram.tsv)
+to experiment with sentence-start data: every bigram/trigram row of the
+existing assets ko-ngram.bin is kept, the reserved token `<s>` is added as a
+bigram prefix (bos_unigram rows) and as the first word of trigram pairs
+((<s>, w1) -> w2 from bos_bigram rows), and the result is written only to
+--sentence-start-out (default build/ko-sentence-start/ko-ngram.bin). The app
+assets are never touched in this mode. The format, header and NEXT_EXCLUDE
+rule are unchanged. With --sentence-start-no-trigram the bos_bigram.tsv rows
+are left out, so only the `<s>` bigram row is added. An assets file that
+already holds `<s>` is refused as the base, since the rows would be added twice.
 """
 
 from __future__ import annotations
@@ -39,6 +56,12 @@ MAX_BIN_BYTES = 32 * 1024 * 1024
 UNIGRAM_ROWS = 150_000
 
 BIGRAM_LOOKUP_SAMPLES = ["퇴근하고", "그럼", "밥", "주말에", "오늘", "감사합니다"]
+SENTENCE_START_TOKEN = "<s>"
+DEFAULT_SENTENCE_START_OUT = Path("build/ko-sentence-start/ko-ngram.bin")
+SENTENCE_START_DROPPED_WARNING = (
+    f"{SENTENCE_START_TOKEN} 행이 빠졌으니 docs/korean-input/korean-smart-input-ssot.md의 "
+    "--add-sentence-start 단계가 필요함"
+)
 
 
 def sha256_of(path: Path) -> str:
@@ -287,6 +310,135 @@ class NgramBinReader:
         return [(self.word(self.bi_next[i]), self.bi_count[i]) for i in range(start, end)]
 
 
+def sentence_start_row_count(reader: NgramBinReader) -> int:
+    wid = reader.word_id(SENTENCE_START_TOKEN)
+    if wid is None:
+        return 0
+    return reader.bi_start[wid + 1] - reader.bi_start[wid]
+
+
+def trigram_next(reader: NgramBinReader, a: str, b: str) -> list[tuple[str, int]]:
+    aid, bid = reader.word_id(a), reader.word_id(b)
+    if aid is None or bid is None:
+        return []
+    idx = bisect.bisect_left(list(zip(reader.tri_a, reader.tri_b)), (aid, bid))
+    if idx >= reader.p_total or (reader.tri_a[idx], reader.tri_b[idx]) != (aid, bid):
+        return []
+    start, end = reader.tri_start[idx], reader.tri_start[idx + 1]
+    return [(reader.word(reader.tri_next[i]), reader.tri_count[i]) for i in range(start, end)]
+
+
+def read_bin_rows(reader: NgramBinReader):
+    """Every bigram/trigram row of a KONGRAM1 file, in stored order."""
+    bigrams: list[tuple[str, str, int]] = []
+    for wid in range(reader.v):
+        prev = reader.word(wid)
+        for i in range(reader.bi_start[wid], reader.bi_start[wid + 1]):
+            bigrams.append((prev, reader.word(reader.bi_next[i]), reader.bi_count[i]))
+    trigrams: list[tuple[str, str, str, int]] = []
+    for pair in range(reader.p_total):
+        a, b = reader.word(reader.tri_a[pair]), reader.word(reader.tri_b[pair])
+        for i in range(reader.tri_start[pair], reader.tri_start[pair + 1]):
+            trigrams.append((a, b, reader.word(reader.tri_next[i]), reader.tri_count[i]))
+    return bigrams, trigrams
+
+
+def read_sentence_start_rows(start_dir: Path):
+    bos_bigram: list[tuple[str, str, int]] = []
+    with (start_dir / "bos_unigram.tsv").open("r", encoding="utf-8") as f:
+        for lineno, line in enumerate(f, start=1):
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            parts = line.split("\t")
+            if len(parts) != 3:
+                raise ValueError(f"bos_unigram.tsv:{lineno} 형식 오류: {line!r}")
+            bos_bigram.append((SENTENCE_START_TOKEN, parts[0], int(parts[1])))
+    bos_trigram: list[tuple[str, str, str, int]] = []
+    with (start_dir / "bos_bigram.tsv").open("r", encoding="utf-8") as f:
+        for lineno, line in enumerate(f, start=1):
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            parts = line.split("\t")
+            if len(parts) != 3:
+                raise ValueError(f"bos_bigram.tsv:{lineno} 형식 오류: {line!r}")
+            bos_trigram.append((SENTENCE_START_TOKEN, parts[0], parts[1], int(parts[2])))
+    return bos_bigram, bos_trigram
+
+
+def _group_bigrams(rows):
+    grouped: dict[str, list[tuple[str, int]]] = {}
+    for p, n, c in rows:
+        grouped.setdefault(p, []).append((n, c))
+    return grouped
+
+
+def _group_trigrams(rows):
+    grouped: dict[tuple[str, str], list[tuple[str, int]]] = {}
+    for a, b, n, c in rows:
+        grouped.setdefault((a, b), []).append((n, c))
+    return grouped
+
+
+def add_sentence_start(base_bin: Path, start_dir: Path, out_path: Path, include_trigram: bool = True) -> None:
+    if out_path.resolve() == base_bin.resolve():
+        raise ValueError(f"앱 자산 {base_bin}에는 쓰지 않는다. --sentence-start-out을 다른 경로로 지정할 것")
+    base_data = base_bin.read_bytes()
+    base = NgramBinReader(base_data)
+    if base.word_id(SENTENCE_START_TOKEN) is not None:
+        raise ValueError(f"{base_bin}에 이미 {SENTENCE_START_TOKEN} 행이 있다. 문장 시작 행이 없는 기준 파일에서 다시 만들 것")
+    old_bigrams, old_trigrams = read_bin_rows(base)
+    bos_bigram, bos_trigram = read_sentence_start_rows(start_dir)
+    if not include_trigram:
+        bos_trigram = []
+
+    data, _vocab, _stats = build_ngram_bin(old_bigrams + bos_bigram, old_trigrams + bos_trigram)
+    if len(data) > MAX_BIN_BYTES:
+        raise ValueError(f"ko-ngram.bin 크기 {len(data)} bytes가 32MB 한도를 초과함")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(data)
+
+    new = NgramBinReader(out_path.read_bytes())
+    new_bigrams, new_trigrams = read_bin_rows(new)
+    new_bigram_by_prev = _group_bigrams(new_bigrams)
+    new_trigram_by_pair = _group_trigrams(new_trigrams)
+    for prev, entries in _group_bigrams(old_bigrams).items():
+        if new_bigram_by_prev.get(prev) != entries:
+            raise AssertionError(f"기존 bigram 행이 왕복 일치하지 않음: {prev}")
+    for pair, entries in _group_trigrams(old_trigrams).items():
+        if new_trigram_by_pair.get(pair) != entries:
+            raise AssertionError(f"기존 trigram 행이 왕복 일치하지 않음: {pair}")
+    print(
+        f"[sentence-start] 기존 bigram {len(old_bigrams)}행·trigram {len(old_trigrams)}행이 "
+        f"(prev→next,count) 순서까지 모두 일치"
+    )
+
+    bos_expected = sum(1 for r in bos_bigram if r[1] not in NEXT_EXCLUDE)
+    bos_tri_expected = sum(1 for r in bos_trigram if r[2] not in NEXT_EXCLUDE)
+    added_b = new.b_total - base.b_total
+    added_t = new.t_total - base.t_total
+    if added_b != bos_expected or added_t != bos_tri_expected:
+        raise AssertionError(f"추가 행 수 불일치: bigram {added_b}/{bos_expected}, trigram {added_t}/{bos_tri_expected}")
+    print(
+        f"[sentence-start] 추가 bigram {added_b}행(소스 {len(bos_bigram)}행 중 NEXT_EXCLUDE 제외 {len(bos_bigram) - bos_expected}행), "
+        f"추가 trigram {added_t}행(소스 {len(bos_trigram)}행 중 제외 {len(bos_trigram) - bos_tri_expected}행)"
+    )
+    print(
+        f"[sentence-start] V {base.v} -> {new.v}, B {base.b_total} -> {new.b_total}, "
+        f"P {base.p_total} -> {new.p_total}, T {base.t_total} -> {new.t_total}"
+    )
+    print(f"[sentence-start] 크기 {len(base_data)} -> {len(data)} bytes (+{len(data) - len(base_data)})")
+    print(f"[sentence-start] 작성: {out_path} sha256={sha256_of(out_path)}")
+    print(
+        f"[sentence-start] {SENTENCE_START_TOKEN} bigram 조회: "
+        + ", ".join(f"{w}:{c}" for w, c in new.bigram_next(SENTENCE_START_TOKEN)[:15])
+    )
+    for w1 in [row[1] for row in bos_bigram[:3]] if include_trigram else []:
+        entries = trigram_next(new, SENTENCE_START_TOKEN, w1)
+        print(f"[sentence-start] ({SENTENCE_START_TOKEN}, {w1}) trigram 조회: " + ", ".join(f"{w}:{c}" for w, c in entries))
+
+
 def verify(bin_path: Path, pack_dir: Path) -> None:
     data = bin_path.read_bytes()
     reader = NgramBinReader(data)
@@ -322,6 +474,11 @@ def verify(bin_path: Path, pack_dir: Path) -> None:
     if pairs != sorted(pairs):
         raise AssertionError("trigram (a,b) 쌍이 오름차순으로 정렬돼 있지 않음")
     print("[verify] 오프셋·정렬 일관성 OK")
+
+    start_rows = sentence_start_row_count(reader)
+    print(f"[verify] {SENTENCE_START_TOKEN} bigram 행 {start_rows}개")
+    if start_rows == 0:
+        print(f"[verify] 경고: {SENTENCE_START_DROPPED_WARNING}")
 
     # (2) 원본 TSV 대비 엔트리 수
     bigram_rows = read_bigram(pack_dir / "bigram.tsv")
@@ -361,10 +518,25 @@ def verify(bin_path: Path, pack_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pack-dir", type=Path, required=True)
+    parser.add_argument("--pack-dir", type=Path)
     parser.add_argument("--assets-dir", type=Path, default=Path("app/src/main/assets"))
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--allow-drop-sentence-start", action="store_true")
+    parser.add_argument("--add-sentence-start", type=Path, metavar="DIR")
+    parser.add_argument("--sentence-start-out", type=Path, default=DEFAULT_SENTENCE_START_OUT)
+    parser.add_argument("--sentence-start-no-trigram", action="store_true")
     args = parser.parse_args()
+
+    if args.add_sentence_start is not None:
+        add_sentence_start(
+            args.assets_dir / "korean" / "ko-ngram.bin",
+            args.add_sentence_start,
+            args.sentence_start_out,
+            include_trigram=not args.sentence_start_no_trigram,
+        )
+        return
+    if args.pack_dir is None:
+        parser.error("--pack-dir is required unless --add-sentence-start is given")
 
     unigram_path = args.pack_dir / "unigram.tsv"
     bigram_path = args.pack_dir / "bigram.tsv"
@@ -378,10 +550,6 @@ def main() -> None:
     bigram_rows = read_bigram(bigram_path)
     trigram_rows = read_trigram(trigram_path)
 
-    vocab_out = args.assets_dir / "ko_base_vocab.tsv"
-    vocab_bytes = write_vocab_tsv(unigram_rows, vocab_out)
-    print(f"작성: {vocab_out} ({vocab_bytes} bytes, {UNIGRAM_ROWS}행 + 헤더 1행)")
-
     ngram_data, vocab, stats = build_ngram_bin(bigram_rows, trigram_rows)
     if len(ngram_data) > MAX_BIN_BYTES:
         print(
@@ -389,8 +557,26 @@ def main() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
-
     ngram_out = args.assets_dir / "korean" / "ko-ngram.bin"
+    if sentence_start_row_count(NgramBinReader(ngram_data)) == 0:
+        existing_start_rows = (
+            sentence_start_row_count(NgramBinReader(ngram_out.read_bytes())) if ngram_out.exists() else 0
+        )
+        if existing_start_rows > 0:
+            if not args.allow_drop_sentence_start:
+                print(
+                    f"오류: 기존 자산 {ngram_out}의 {SENTENCE_START_TOKEN} 행 {existing_start_rows}개가 사라진다. "
+                    "의도했다면 --allow-drop-sentence-start로 다시 돌린 뒤 "
+                    "docs/korean-input/korean-smart-input-ssot.md의 --add-sentence-start 단계를 이어서 실행하라",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            print(f"경고: {SENTENCE_START_DROPPED_WARNING}", file=sys.stderr)
+
+    vocab_out = args.assets_dir / "ko_base_vocab.tsv"
+    vocab_bytes = write_vocab_tsv(unigram_rows, vocab_out)
+    print(f"작성: {vocab_out} ({vocab_bytes} bytes, {UNIGRAM_ROWS}행 + 헤더 1행)")
+
     ngram_out.parent.mkdir(parents=True, exist_ok=True)
     ngram_out.write_bytes(ngram_data)
     print(f"작성: {ngram_out} ({len(ngram_data)} bytes)")

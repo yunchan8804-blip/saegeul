@@ -464,6 +464,12 @@ A35에서 `ㄱㅅ` 검색 후 빠른 문구 또는 emoji 1회 삽입, 일반 문
   - `ko_base_vocab.tsv`는 어절 15만 개다. 어절 완성에는 전체를 쓰고, 오타 교정의 트라이 등록과 '아는 단어' 판정에는 빈도 상위 `BaseKoreanVocabulary.TYPO_VOCAB_LIMIT`(3만)만 쓴다. 드문 어절까지 아는 단어로 치면 인접 키 오타가 교정되지 않는다.
   - `korean/ko-ngram.bin`은 KONGRAM1 포맷이고, bigram은 앞 어절당 8개, trigram은 쌍당 5개이며 전체 20만 개다. 다음 어절이 단독 조사나 단위(`은 는 을 를 의 에 년 월`)인 항목은 제외한다. `BundledKoreanNgram`이 IO 스레드에서 읽는다.
     - 후보 점수(`corpus_ngram`, 배지 없음): 다음 어절 모드는 trigram 0.93, bigram 0.90이다. 입력 중 모드는 자모·초성 앞부분이 일치하는 후보만 0.957이다. 두 모드 모두 개인 n-gram보다 아래이고 문맥 없는 사전 완성보다는 위다.
+    - **문장 시작 분포**: 문장의 첫 어절 분포를 예약 토큰 `<s>`의 bigram 행으로 같은 파일에 담는다(2000개 중 제외 대상 7개를 뺀 1993개). 원천은 위와 같은 FineWeb-2 샤드와 ChatbotData 학습 분할이다. 문장의 첫 토큰이 유효 어절일 때만 센다. 웹은 문서 3개 이상·가중 빈도 5 이상만 남기고, 구어는 2회 이상만 남긴다. 두 분포는 `p = (1−λ)·p_web + λ·p_casual`, λ = 0.3으로 섞는다. 확률은 `BundledKoreanNgram.sentenceStartProbability`가 목록 안 상대 빈도로 돌려준다.
+      - 쓰는 곳: 커서 앞이 문장 시작(비었거나 공백뿐이거나 `.?!…` 줄바꿈 뒤)이고 입력 중인 글자가 있을 때만 `corpus_ngram` 후보로 낸다. 점수와 매칭 규칙은 입력 중 모드와 같다. 오타 교정은 고칠 어절이 문장 첫 어절이면 `1.5 × 문장 시작 확률`을 문맥 가중에 더한다. 앞 어절이 한글이 아닌 경우(`2023년 `, `Apple `)는 문장 시작으로 보지 않는다.
+      - 글자를 아직 하나도 치지 않은 상태에서는 보여주지 않는다. 이 상태의 hit@4가 0.9~4.6%로 낮았다.
+      - 평가(접두에 맞는 문장 시작 후보를 먼저 두고 나머지는 전역 빈도순, 초성 1개 top4, 기존 → 적용): 웹 6.2% → 13.5%, 구어 12.0% → 14.3%, 216문장 3.7% → 11.1%. 첫 음절은 웹 28.2% → 33.8%, 구어 44.1% → 46.2%, 216문장 39.8% → 42.1%로 세 세트 모두 좋아졌다.
+      - `(<s>, w1) → w2` trigram은 넣지 않았다. 이득이 작고 216문장 hit@1이 떨어졌다. 그래서 `--sentence-start-no-trigram`으로 `<s>` bigram 행만 더한다.
+      - 재현: `python scripts/build-ko-sentence-start.py --shard <FineWeb-2 샤드> --chatbot-csv <ChatbotData.csv> --out-dir build/ko-sentence-start/out --raw-dir <캐시 디렉터리>`(λ 기본값 0.3)로 `lam_0.3/`을 만들고, `<s>` 행이 없는 기존 `ko-ngram.bin`을 기준으로 `python scripts/pack-ko-base-assets.py --add-sentence-start build/ko-sentence-start/out/lam_0.3 --sentence-start-no-trigram`을 돌린다. 결과는 `build/ko-sentence-start/ko-ngram.bin`이고, 이 파일을 자산으로 복사한다. 이미 `<s>`가 들어 있는 자산을 기준으로 하면 스크립트가 거부한다. 평가는 `scripts/eval-ko-sentence-start.py`로 한다.
   - 두 자산은 AssetManager로 직접 읽으므로 `descriptor.json`의 dataDir 복사 대상에서 뺀다(`app/build.gradle.kts`).
   - **구어 층** (`scripts/merge-ko-casual-layer.py`): 웹 팩만으로는 채팅 문맥이 약해 구어 분포를 섞는다. 앞 어절별로 `p = (1−λ')·p_web + λ'·p_casual`로 보간하고, `λ' = 0.7·n/(n+10)`이다(n은 그 문맥에서 구어 원천이 관측한 횟수). 한두 번 나온 쌍이 맨 앞을 차지하지 않게 하려는 것이다. 유니그램은 `web + 1000·casual`로 가중한다.
     - 구어 원천은 두 가지다.

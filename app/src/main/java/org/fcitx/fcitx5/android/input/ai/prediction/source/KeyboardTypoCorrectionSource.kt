@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.prediction.source
 
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
+import org.fcitx.fcitx5.android.input.ai.BundledKoreanNgram
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
@@ -30,7 +31,8 @@ internal class KeyboardTypoCorrectionSource(
     private val typoCorrector: KeyboardAwareTypoCorrector?,
     private val baseVocabulary: BaseKoreanVocabulary?,
     private val correctionStore: CorrectionPatternStore?,
-    private val ngram: PersonalNgramModel
+    private val ngram: PersonalNgramModel,
+    private val bundledNgram: () -> BundledKoreanNgram?
 ) {
 
     private val probe = SingleEditTypoProbe(baseVocabulary, ngram)
@@ -50,7 +52,7 @@ internal class KeyboardTypoCorrectionSource(
         // Leading/trailing punctuation stripped off the typed fragment before keyboard-aware
         // typo correction runs, so a trailing "???" or similar does not blow the key-distance
         // cost budget and suppress an otherwise-valid correction.
-        internal val HEAD_PUNCTUATION = "([{«\"'".toSet()
+        internal val HEAD_PUNCTUATION = "([{«\"'“‘「『〈《".toSet()
         internal val TAIL_PUNCTUATION = ".,!?~…:;)]}»\"'".toSet()
 
         // Common bound-ending suffixes (조사/어미) tried, longest-first, when the typed fragment
@@ -97,7 +99,13 @@ internal class KeyboardTypoCorrectionSource(
                 val isPersonalKnownOnly = ngram.unigramCount(core) >= 2f
                 val ctxProb = ngram.predictNext(input.contextBeforeCursor, packageName, 20)
                     .associate { it.word to it.probability }
-                val contextBoost: (String) -> Float = { w -> 1.5f * (ctxProb[w] ?: 0f) }
+                // 오타 어절이 문장 첫 어절이면 문장 시작 분포(`<s>`)도 문맥 가중에 더한다.
+                val sentenceStart = bundledNgram()?.takeIf {
+                    input.isContextKnown && BundledKoreanNgram.isSentenceStart(contextBeforeTarget(input))
+                }
+                val contextBoost: (String) -> Float = { w ->
+                    1.5f * (ctxProb[w] ?: 0f) + 1.5f * (sentenceStart?.sentenceStartProbability(w) ?: 0f)
+                }
                 val limit = if (isPersonalKnownOnly) 1 else MAX_KEYBOARD_CORRECTIONS
                 val inputRank = baseVocabulary?.rankOf(core) ?: 0
                 val probeHits = probe.probe(core, limit = CORRECTION_POOL, contextBoost = contextBoost)
@@ -166,6 +174,15 @@ internal class KeyboardTypoCorrectionSource(
         }
         return KeyboardTypoCorrections(candidates, handledFragment)
     }
+
+    // The text before the typo target's first character: the context minus the stroke being typed,
+    // or minus the committed last word when the target is that word.
+    private fun contextBeforeTarget(input: PredictionInput): String =
+        if (input.cleanStroke.isNotBlank()) {
+            input.contextBeforeCursor.removeSuffix(input.cleanStroke)
+        } else {
+            input.cleanContext.removeSuffix(input.lastWordInContext)
+        }
 
     // A word only the user's own vocabulary knows has no rank and is kept.
     private fun outranksRareWord(word: String, inputRank: Int, isShiftUndo: Boolean): Boolean {

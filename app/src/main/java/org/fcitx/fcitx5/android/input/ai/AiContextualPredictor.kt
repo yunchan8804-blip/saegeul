@@ -68,7 +68,7 @@ class AiContextualPredictor(
         private val SENTENCE_LINE_SOURCE_BLOCKLIST = setOf("collocation_next_word", "base_lexicon")
     }
 
-    private val keyboardTypoSource = KeyboardTypoCorrectionSource(typoCorrector, baseVocabulary, correctionStore, ngram)
+    private val keyboardTypoSource = KeyboardTypoCorrectionSource(typoCorrector, baseVocabulary, correctionStore, ngram, bundledNgram)
     private val sentenceTypoSource = SentenceTypoCorrectionSource(typoEngine, baseVocabulary)
     private val wordTypoSource = WordTypoCorrectionSource(typoEngine, baseVocabulary)
 
@@ -96,9 +96,10 @@ class AiContextualPredictor(
         contextBeforeCursor: String,
         packageName: String,
         limit: Int = 5,
-        inputSessionEpoch: Long = 0L
+        inputSessionEpoch: Long = 0L,
+        isContextKnown: Boolean = true
     ): List<AiPrediction> {
-        val input = PredictionInput(currentStroke, contextBeforeCursor)
+        val input = PredictionInput(currentStroke, contextBeforeCursor, isContextKnown)
         val collected = collectCandidates(input, packageName, limit, inputSessionEpoch)
         val merged = mergeCandidates(collected)
         val gated = applyQualityGate(merged, input)

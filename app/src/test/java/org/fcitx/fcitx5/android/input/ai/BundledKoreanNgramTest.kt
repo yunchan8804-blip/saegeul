@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
@@ -99,6 +100,102 @@ class BundledKoreanNgramTest {
         assertNull(BundledKoreanNgram.contextWords("Hello "))
         assertNull(BundledKoreanNgram.contextWords("2023년 "))
         assertNull(BundledKoreanNgram.contextWords(""))
+    }
+
+    @Test
+    fun isSentenceStartMatchesTextBoundaries() {
+        assertTrue(BundledKoreanNgram.isSentenceStart(""))
+        assertTrue(BundledKoreanNgram.isSentenceStart("  "))
+        assertTrue(BundledKoreanNgram.isSentenceStart("\t "))
+        assertTrue(BundledKoreanNgram.isSentenceStart("안녕. "))
+        assertTrue(BundledKoreanNgram.isSentenceStart("안녕?"))
+        assertTrue(BundledKoreanNgram.isSentenceStart("안녕! "))
+        assertTrue(BundledKoreanNgram.isSentenceStart("안녕… "))
+        assertTrue(BundledKoreanNgram.isSentenceStart("줄\n"))
+        assertFalse(BundledKoreanNgram.isSentenceStart("안녕 "))
+        assertFalse(BundledKoreanNgram.isSentenceStart("안녕"))
+        assertFalse(BundledKoreanNgram.isSentenceStart("2023년 "))
+        assertFalse(BundledKoreanNgram.isSentenceStart("Apple "))
+    }
+
+    @Test
+    fun contextWordsStripEmojiAndOtherSupplementarySymbols() {
+        assertEquals(null to "고마워", BundledKoreanNgram.contextWords("고마워😊 "))
+        assertEquals(null to "고마워", BundledKoreanNgram.contextWords("고마워😊"))
+        assertEquals("오늘" to "고마워", BundledKoreanNgram.contextWords("오늘 고마워😊😊 "))
+        assertEquals(null to "고마워", BundledKoreanNgram.contextWords("😊고마워 "))
+        assertEquals("고마워" to "오늘", BundledKoreanNgram.contextWords("고마워😊 오늘 "))
+        assertEquals(null to "고마워", BundledKoreanNgram.contextWords("😊고마워😊 "))
+    }
+
+    @Test
+    fun emojiOnlyTokenBreaksTheContextChainLikeTheCorpusBuild() {
+        assertNull(BundledKoreanNgram.contextWords("😊 "))
+        assertNull(BundledKoreanNgram.contextWords("고마워 😊 "))
+        assertNull(BundledKoreanNgram.contextWords("끝났다.😊 "))
+        assertFalse(BundledKoreanNgram.isSentenceStart("😊 "))
+        assertFalse(BundledKoreanNgram.isSentenceStart("고마워😊 "))
+        assertFalse(BundledKoreanNgram.isSentenceStart("끝났다.😊 "))
+        assertTrue(BundledKoreanNgram.isSentenceStart("고마워. 😊\n"))
+    }
+
+    @Test
+    fun noBreakAndIdeographicSpacesSeparateContextWords() {
+        assertEquals("오늘" to "회의", BundledKoreanNgram.contextWords("오늘 회의 "))
+        assertEquals("오늘" to "회의", BundledKoreanNgram.contextWords("오늘　회의　"))
+        assertTrue(BundledKoreanNgram.isSentenceStart("안녕. "))
+        assertTrue(BundledKoreanNgram.isSentenceStart(" 　"))
+        assertFalse(BundledKoreanNgram.isSentenceStart("안녕 "))
+    }
+
+    private fun sentenceStartNgram() = SyntheticKoreanNgram.parse(
+        mapOf(
+            BundledKoreanNgram.SENTENCE_START to listOf("그" to 50, "그리고" to 30, "하지만" to 15, "고마워" to 5),
+            "퇴근하고" to listOf("집에" to 10)
+        )
+    )
+
+    @Test
+    fun sentenceStartCompletionsFollowStoredOrderAndMatchRules() {
+        val synthetic = sentenceStartNgram()
+        assertEquals(listOf("그", "그리고", "고마워"), synthetic.sentenceStartCompletions("ㄱ", 5).map { it.word })
+        assertEquals(listOf("그", "그리고"), synthetic.sentenceStartCompletions("ㄱ", 2).map { it.word })
+        assertEquals(listOf("그", "그리고"), synthetic.sentenceStartCompletions("그", 5).map { it.word })
+        assertEquals(listOf("그리고"), synthetic.sentenceStartCompletions("그리", 5).map { it.word })
+        assertEquals(listOf("그리고"), synthetic.sentenceStartCompletions("ㄱㄹ", 5).map { it.word })
+        assertEquals(listOf("하지만"), synthetic.sentenceStartCompletions("ㅎㅈㅁ", 5).map { it.word })
+        assertTrue(synthetic.sentenceStartCompletions("ㅋ", 5).isEmpty())
+        assertTrue(synthetic.sentenceStartCompletions("ㄱ", 0).isEmpty())
+        val first = synthetic.sentenceStartCompletions("ㄱ", 5).first()
+        assertEquals(0.5f, first.probability, 1e-6f)
+        assertEquals(2, first.order)
+    }
+
+    @Test
+    fun sentenceStartProbabilityIsRelativeFrequencyWithinTheStartList() {
+        val synthetic = sentenceStartNgram()
+        assertEquals(0.5f, synthetic.sentenceStartProbability("그"), 1e-6f)
+        assertEquals(0.05f, synthetic.sentenceStartProbability("고마워"), 1e-6f)
+        assertEquals(0f, synthetic.sentenceStartProbability("집에"), 0f)
+        assertEquals(0f, synthetic.sentenceStartProbability("없는어절"), 0f)
+    }
+
+    @Test
+    fun binWithoutSentenceStartRowGivesNoStartCandidates() {
+        val synthetic = SyntheticKoreanNgram.parse(mapOf("퇴근하고" to listOf("집에" to 10)))
+        assertTrue(synthetic.sentenceStartCompletions("ㄱ", 5).isEmpty())
+        assertTrue(synthetic.sentenceStartCompletions("집", 5).isEmpty())
+        assertEquals(0f, synthetic.sentenceStartProbability("집에"), 0f)
+    }
+
+    @Test
+    fun realAssetHasSentenceStartDistribution() {
+        val top = ngram.sentenceStartCompletions("ㄱ", 5).map { it.word }
+        assertTrue(top.toString(), "그" in top && "그리고" in top)
+        assertTrue(ngram.sentenceStartProbability("그") > ngram.sentenceStartProbability("그러나"))
+        assertTrue(ngram.sentenceStartProbability("그리고") > 0f)
+        val total = ngram.sentenceStartCompletions("", Int.MAX_VALUE).sumOf { it.probability.toDouble() }
+        assertEquals(1.0, total, 1e-3)
     }
 
     private fun assertThrowsIo(block: () -> Unit) {

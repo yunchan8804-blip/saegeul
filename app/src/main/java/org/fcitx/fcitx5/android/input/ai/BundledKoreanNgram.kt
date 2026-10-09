@@ -36,6 +36,18 @@ class BundledKoreanNgram private constructor(
     val vocabularySize: Int
 ) {
 
+    // 문장 시작 후보 한 목록: 저장 순서(빈도순)를 유지하고, 자모 분해형·초성열은 매칭용으로 미리 계산한다.
+    private class SentenceStartEntry(val candidate: BundledNgramCandidate, val jamo: String, val choseong: String)
+
+    private class SentenceStartTable(
+        val entries: List<SentenceStartEntry>,
+        val probabilityByWord: Map<String, Float>
+    )
+
+    private val morphology = ChoseongMorphologyEngine()
+
+    private val sentenceStart: SentenceStartTable by lazy { buildSentenceStartTable() }
+
     /**
      * [prev1] 다음에 올 어절을 빈도순으로 최대 [limit]개 돌려준다. [prev2]가 있고 (prev2, prev1)
      * trigram이 있으면 그 후보를 먼저 채우고, 남은 자리를 bigram으로 중복 없이 채운다.
@@ -60,6 +72,44 @@ class BundledKoreanNgram private constructor(
             collect(biStart.get(id1), biStart.get(id1 + 1), biNext, biCount, 2, limit, taken, result)
         }
         return result
+    }
+
+    /**
+     * 문장 시작(`<s>` bigram 행) 후보 중 [stroke]로 시작하는 어절을 저장 순서대로 최대 [limit]개 돌려준다.
+     * 매칭은 입력 중 모드와 같다: 표면 startsWith, 자모 분해 startsWith, stroke가 전부 초성이면
+     * 초성열 startsWith. probability는 문장 시작 목록 안에서의 상대 빈도다. `<s>` 행이 없으면 빈 목록.
+     */
+    fun sentenceStartCompletions(stroke: String, limit: Int): List<BundledNgramCandidate> {
+        if (limit <= 0) return emptyList()
+        val entries = sentenceStart.entries
+        if (entries.isEmpty()) return emptyList()
+        val strokeJamo = morphology.decomposeHangul(stroke)
+        val choseongOnly = stroke.all { morphology.isChoseong(it) }
+        val result = ArrayList<BundledNgramCandidate>()
+        for (entry in entries) {
+            if (entry.candidate.word.startsWith(stroke) ||
+                entry.jamo.startsWith(strokeJamo) ||
+                (choseongOnly && entry.choseong.startsWith(stroke))
+            ) {
+                result.add(entry.candidate)
+                if (result.size >= limit) break
+            }
+        }
+        return result
+    }
+
+    /** [word]가 문장 첫 어절로 나올 상대 빈도. 문장 시작 목록에 없으면 0. */
+    fun sentenceStartProbability(word: String): Float = sentenceStart.probabilityByWord[word] ?: 0f
+
+    private fun buildSentenceStartTable(): SentenceStartTable {
+        val id = indexOf(SENTENCE_START)
+        if (id < 0) return SentenceStartTable(emptyList(), emptyMap())
+        val candidates = ArrayList<BundledNgramCandidate>()
+        collect(biStart.get(id), biStart.get(id + 1), biNext, biCount, 2, Int.MAX_VALUE, HashSet(), candidates)
+        val entries = candidates.map {
+            SentenceStartEntry(it, morphology.decomposeHangul(it.word), morphology.extractChoseongSequence(it.word))
+        }
+        return SentenceStartTable(entries, candidates.associate { it.word to it.probability })
     }
 
     private fun collect(
@@ -140,6 +190,9 @@ class BundledKoreanNgram private constructor(
     companion object {
         const val ASSET_PATH = "korean/ko-ngram.bin"
 
+        /** 문장 시작을 뜻하는 예약 토큰. bin에서 이 어절의 bigram 행이 문장 첫 어절 분포다. */
+        const val SENTENCE_START = "<s>"
+
         private const val MAGIC = "KONGRAM1"
         private const val VERSION = 1
         private const val HEADER_BYTES = 28
@@ -147,6 +200,7 @@ class BundledKoreanNgram private constructor(
 
         private val HANGUL_WORD = Regex("^[가-힣]{1,12}$")
         private val SENTENCE_END = charArrayOf('.', '?', '!', '…', '\n', '\r')
+        private val INLINE_WHITESPACE_RUN = Regex("[\\s\\p{Z}]+")
 
         fun read(input: InputStream): BundledKoreanNgram {
             val bytes = input.readBytes()
@@ -204,26 +258,47 @@ class BundledKoreanNgram private constructor(
          */
         fun contextWords(textBeforeCursor: String): Pair<String?, String>? {
             if (textBeforeCursor.isBlank()) return null
-            val trimmed = textBeforeCursor.trimEnd(' ', '\t')
+            val trimmed = textBeforeCursor.trimEnd(::isInlineWhitespace)
             if (trimmed.isEmpty() || trimmed.last() in SENTENCE_END) return null
             val sentence = trimmed.substring(trimmed.lastIndexOfAny(SENTENCE_END) + 1)
-            val raw = sentence.split(' ', '\t').filter { it.isNotEmpty() }
+            val raw = sentence.split(INLINE_WHITESPACE_RUN).filter { it.isNotEmpty() }
             if (raw.isEmpty()) return null
             val prev1 = cleanWord(raw.last()) ?: return null
             val before = raw.getOrNull(raw.size - 2) ?: return null to prev1
             return cleanWord(before) to prev1
         }
 
+        /**
+         * 커서 앞 텍스트 끝이 문장 시작인지 본다. 비었거나 공백·탭뿐이면, 또는 공백·탭을 걷어낸 끝이
+         * 문장 끝 부호면 true. 한글이 아닌 어절 뒤("2023년 ", "Apple ")는 문장 중간이라 false.
+         */
+        fun isSentenceStart(textBeforeCursor: String): Boolean {
+            val trimmed = textBeforeCursor.trimEnd(::isInlineWhitespace)
+            return trimmed.isEmpty() || trimmed.last() in SENTENCE_END
+        }
+
+        // 줄바꿈은 문장 경계라 걷어내지 않는다.
+        private fun isInlineWhitespace(c: Char): Boolean = c.isWhitespace() && c != '\n' && c != '\r'
+
+        // 이모지처럼 서로게이트 쌍인 기호도 한 글자로 봐야 하므로 코드포인트 단위로 벗긴다.
         private fun cleanWord(token: String): String? {
             var start = 0
             var end = token.length
-            while (start < end && isPunctOrSymbol(token[start])) start++
-            while (end > start && isPunctOrSymbol(token[end - 1])) end--
+            while (start < end) {
+                val cp = token.codePointAt(start)
+                if (!isPunctOrSymbol(cp)) break
+                start += Character.charCount(cp)
+            }
+            while (end > start) {
+                val cp = token.codePointBefore(end)
+                if (!isPunctOrSymbol(cp)) break
+                end -= Character.charCount(cp)
+            }
             val word = token.substring(start, end)
             return if (HANGUL_WORD.matches(word)) word else null
         }
 
-        private fun isPunctOrSymbol(c: Char): Boolean = when (Character.getType(c).toByte()) {
+        private fun isPunctOrSymbol(codePoint: Int): Boolean = when (Character.getType(codePoint).toByte()) {
             Character.CONNECTOR_PUNCTUATION, Character.DASH_PUNCTUATION,
             Character.START_PUNCTUATION, Character.END_PUNCTUATION,
             Character.INITIAL_QUOTE_PUNCTUATION, Character.FINAL_QUOTE_PUNCTUATION,

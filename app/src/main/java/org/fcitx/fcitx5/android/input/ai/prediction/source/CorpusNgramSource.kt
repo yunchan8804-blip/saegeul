@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
 
 /**
  * Bundled corpus n-gram (`corpus_ngram`, FineWeb-2 어절 bigram/trigram): 개인 n-gram 아래, 문맥 없는
- * 사전 위.
+ * 사전 위. 문장 시작(첫 어절)에서는 stroke가 있을 때만 문장 시작 분포(`<s>` bigram)로 후보를 낸다.
  */
 internal class CorpusNgramSource(
     private val morphology: ChoseongMorphologyEngine,
@@ -19,9 +19,23 @@ internal class CorpusNgramSource(
 
     override fun collect(request: CandidateRequest): List<AiPrediction> {
         val corpusNgram = bundledNgram() ?: return emptyList()
-        val (prev2, prev1) = BundledKoreanNgram.contextWords(request.input.contextBeforeCursor) ?: return emptyList()
+        val typedStroke = request.input.cleanStroke
+        // 첫 어절 앞에 붙은 여는 따옴표·괄호는 어절의 일부가 아니므로 매칭에서 뗀다.
+        val cleanStroke = typedStroke.trimStart { it in KeyboardTypoCorrectionSource.HEAD_PUNCTUATION }
+        if (typedStroke.isNotEmpty() && cleanStroke.isEmpty()) return emptyList()
+        val contextWords = BundledKoreanNgram.contextWords(request.input.contextBeforeCursor)
+        if (contextWords == null) {
+            if (!request.input.isContextKnown || cleanStroke.isBlank() ||
+                !BundledKoreanNgram.isSentenceStart(request.input.contextBeforeCursor)
+            ) {
+                return emptyList()
+            }
+            return corpusNgram.sentenceStartCompletions(cleanStroke, 3).mapIndexed { idx, candidate ->
+                strokeCandidate(candidate.word, idx)
+            }
+        }
+        val (prev2, prev1) = contextWords
         val corpusCandidates = corpusNgram.nextWords(prev2, prev1, 8)
-        val cleanStroke = request.input.cleanStroke
         if (cleanStroke.isBlank()) {
             return corpusCandidates.take(4).mapIndexed { idx, candidate ->
                 val base = if (candidate.order == 3) 0.93f else 0.90f
@@ -43,14 +57,14 @@ internal class CorpusNgramSource(
                     (choseongOnly && morphology.extractChoseongSequence(candidate.word).startsWith(cleanStroke))
             }
             .take(3)
-            .mapIndexed { idx, candidate ->
-                AiPrediction(
-                    text = candidate.word,
-                    confidenceScore = 0.957f - idx * 0.005f,
-                    isSentenceCompletion = false,
-                    source = "corpus_ngram",
-                    badge = ""
-                )
-            }
+            .mapIndexed { idx, candidate -> strokeCandidate(candidate.word, idx) }
     }
+
+    private fun strokeCandidate(word: String, idx: Int) = AiPrediction(
+        text = word,
+        confidenceScore = 0.957f - idx * 0.005f,
+        isSentenceCompletion = false,
+        source = "corpus_ngram",
+        badge = ""
+    )
 }

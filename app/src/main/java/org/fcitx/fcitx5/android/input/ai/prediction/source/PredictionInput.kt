@@ -16,7 +16,16 @@ internal class TypoTarget(val typed: String, val replaceLength: Int)
  * The composing stroke and the text before the cursor, split into the pieces the candidate
  * sources read. Computed once per [org.fcitx.fcitx5.android.input.ai.AiContextualPredictor.predict] call.
  */
-internal class PredictionInput(val currentStroke: String, val contextBeforeCursor: String) {
+internal class PredictionInput(
+    val currentStroke: String,
+    val contextBeforeCursor: String,
+    /**
+     * False when the editor refused to hand over the text before the cursor: an empty
+     * [contextBeforeCursor] then means "unknown", not "start of the document", so nothing may
+     * assume the stroke starts a sentence.
+     */
+    val isContextKnown: Boolean = true
+) {
 
     companion object {
         // Characters that end a sentence; the text after the last one is the sentence being typed.
@@ -27,14 +36,9 @@ internal class PredictionInput(val currentStroke: String, val contextBeforeCurso
 
     val cleanContext: String = contextBeforeCursor.trim()
 
-    val hasTrailingSpace: Boolean = contextBeforeCursor.endsWith(" ") || contextBeforeCursor.endsWith("\n")
+    val hasTrailingSpace: Boolean = contextBeforeCursor.isNotEmpty() && contextBeforeCursor.last().isWhitespace()
 
-    val lastWordInContext: String = cleanContext
-        .substringAfterLast(' ')
-        .substringAfterLast('\n')
-        .substringAfterLast('\t')
-        .substringAfterLast('\r')
-        .trim()
+    val lastWordInContext: String = lastWordOf(cleanContext)
 
     private val lastTerminatorIndex = contextBeforeCursor.lastIndexOfAny(SENTENCE_TERMINATORS)
 
@@ -61,7 +65,7 @@ internal class PredictionInput(val currentStroke: String, val contextBeforeCurso
             if (baseSentence.isNotBlank()) {
                 if (baseSentence.endsWith(cleanStroke)) {
                     baseSentence
-                } else if (hasTrailingSpace || cleanContext.endsWith(" ")) {
+                } else if (hasTrailingSpace) {
                     "$baseSentence $cleanStroke"
                 } else {
                     "$baseSentence$cleanStroke"
@@ -86,7 +90,8 @@ internal class PredictionInput(val currentStroke: String, val contextBeforeCurso
     val effectiveLastWord: String = if (cleanStroke.isBlank() || hasTrailingSpace) {
         lastWordInContext
     } else {
-        val precedingBeforeStroke = cleanContext.removeSuffix(cleanStroke).trim()
-        precedingBeforeStroke.substringAfterLast(' ').substringAfterLast('\n').trim()
+        lastWordOf(cleanContext.removeSuffix(cleanStroke))
     }
+
+    private fun lastWordOf(text: String): String = text.trim().takeLastWhile { !it.isWhitespace() }
 }

@@ -175,7 +175,7 @@ class TypoRecallRegressionTest {
             baseVocabulary = vocabulary,
             correctionStore = correctionStore
         )
-        keyboardSource = KeyboardTypoCorrectionSource(typoCorrector, vocabulary, correctionStore, ngram)
+        keyboardSource = KeyboardTypoCorrectionSource(typoCorrector, vocabulary, correctionStore, ngram) { null }
     }
 
     private fun stroke(variant: Variant, typed: String): String =
