@@ -120,8 +120,6 @@
     <string name="exception_quickphrase_parse">无法解析快速输入条目： %1$s</string>
     <string name="exception_quickphrase_filename">文件 %1$s 的拓展名不是快速输入</string>
     <string name="exception_theme_filename">文件 %1$s 的拓展名不是主题</string>
-    <string name="exception_libime_dict_filename">文件 %1$s 的拓展名不是 libime 词库</string>
-    <string name="exception_text_dict_filename">文件 %1$s 的拓展名不是纯文本词库</string>
     <string name="exception_theme_json">找不到主题 JSON</string>
     <string name="exception_theme_name_clash">主题名称与内置主题冲突</string>
     <string name="exception_theme_src_image">无法保存主题背景原图片</string>
@@ -159,7 +157,6 @@
     <string name="saving">保存中</string>
     <string name="delete_all_pinned_items">要删除所有置顶条目吗？</string>
     <string name="vivo_keypress_workaround">解决 vivo Origin OS 按键检测问题</string>
-    <string name="invalid_im">无效的输入法配置文件：\n%1$s</string>
     <string name="notification_permission_message">没有发送通知的权限，我们无法在一些耗时操作完成时通知您。</string>
     <string name="notification_permission_title">没有通知权限</string>
     <string name="toolbar_num_row_on_password">输入密码时在工具栏上显示数字行</string>
@@ -251,7 +248,6 @@
     <string name="status_area">状态区域</string>
     <string name="expand_candidates_list">展开候选词列表</string>
     <string name="hide_candidates_list">隐藏</string>
-    <string name="switch_to_voice_input">切换到语音输入</string>
     <string name="hide_keyboard">隐藏键盘</string>
     <string name="private_mode">隐私模式（点击以切换工具栏）</string>
     <string name="hide_toolbar">隐藏工具栏</string>

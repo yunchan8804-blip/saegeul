@@ -59,7 +59,7 @@ class OpenAiDiarizationClient(
                     authorization = authorization,
                     request = DiarizationRequest(source, validated.diarizationModel)
                 )
-            } catch (exception: AiHttpStatusException) {
+            } catch (exception: VoiceHttpStatusException) {
                 // exception.message를 도메인 예외 메시지로 그대로 옮긴다; 상태 코드별 분류가 목적이라 원본은 버린다.
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
                     throw VoiceAuthenticationException("OpenAI rejected the STT API key")
@@ -203,7 +203,7 @@ class UrlConnectionDiarizationTransport : DiarizationHttpTransport {
             }
             val status = connection.responseCode
             if (status !in 200..299) {
-                throw AiHttpStatusException(status, "Diarization provider HTTP $status")
+                throw VoiceHttpStatusException(status, "Diarization provider HTTP $status")
             }
             return readBounded(connection.inputStream)
         } finally {

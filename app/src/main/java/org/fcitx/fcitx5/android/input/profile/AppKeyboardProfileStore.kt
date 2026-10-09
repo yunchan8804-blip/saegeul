@@ -35,12 +35,6 @@ class AppKeyboardProfileStore(context: Context) {
         decodeAppKeyboardProfiles(bytes)
     }
 
-    fun profileFor(packageName: String?): AppKeyboardProfile? = synchronized(IO_LOCK) {
-        val normalized = packageName?.let(AppKeyboardProfile::normalizePackageName).orEmpty()
-        if (normalized.isEmpty()) return null
-        profiles().firstOrNull { it.packageName.equals(normalized, ignoreCase = true) }
-    }
-
     fun upsert(profile: AppKeyboardProfile) {
         synchronized(IO_LOCK) {
             val validated = profile.validate()

@@ -6,8 +6,6 @@ package org.fcitx.fcitx5.android.perf
 
 import org.fcitx.fcitx5.android.media.MediaFavoritesManager
 import org.fcitx.fcitx5.android.media.MediaItem
-import org.fcitx.fcitx5.android.media.MediaRetryQueue
-import org.fcitx.fcitx5.android.media.MediaSearchRequest
 import org.fcitx.fcitx5.android.media.MediaType
 import org.fcitx.fcitx5.android.tab.TabId
 import org.fcitx.fcitx5.android.tab.TabManager
@@ -39,20 +37,6 @@ class PerformanceAndMemoryLeakGuardTest {
     }
 
     @Test
-    fun testMediaRetryQueueBoundedMemoryUsage() {
-        val maxCap = 100
-        val queue = MediaRetryQueue(maxQueueSize = maxCap, maxRetryAttempts = 3)
-
-        // Enqueue 5,000 items into capped queue
-        for (i in 0 until 5_000) {
-            queue.enqueue(MediaSearchRequest("req_$i", "Query $i", MediaType.GIF, i * 10L))
-        }
-
-        // Memory must remain strictly bounded to maxCap
-        assertEquals(maxCap, queue.size())
-    }
-
-    @Test
     fun testMediaFavoritesBoundedMemoryUsage() {
         val maxCap = 200
         val favorites = MediaFavoritesManager(maxCapacity = maxCap)
@@ -71,15 +55,13 @@ class PerformanceAndMemoryLeakGuardTest {
     fun testRepeatedTabManagerResetMemoryReclamation() {
         val tabManager = TabManager()
         for (cycle in 0 until 500) {
-            tabManager.reorderTabs(listOf(TabId.SYNC, TabId.FAVORITES, TabId.MEDIA))
-            tabManager.setTabVisibility(TabId.CLIPBOARD, false)
-            tabManager.pinTab(TabId.MEDIA)
+            tabManager.selectTab(TabId.MEDIA)
             tabManager.setTabBadgeCount(TabId.FAVORITES, 99)
 
             tabManager.resetToDefaults()
 
             assertEquals(TabId.CLIPBOARD, tabManager.activeTab.id)
-            assertEquals(0, tabManager.getTabBadgeCount(TabId.FAVORITES))
+            assertEquals(0, tabManager.getVisibleTabs().first { it.id == TabId.FAVORITES }.badgeCount)
         }
     }
 }

@@ -9,15 +9,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
 import org.fcitx.fcitx5.android.media.MediaFavoritesManager
 import org.fcitx.fcitx5.android.media.MediaItem
-import org.fcitx.fcitx5.android.media.MediaRetryQueue
-import org.fcitx.fcitx5.android.media.MediaSearchRequest
 import org.fcitx.fcitx5.android.media.MediaType
-import org.fcitx.fcitx5.android.tab.TabConfigItem
-import org.fcitx.fcitx5.android.tab.TabConfiguration
 import org.fcitx.fcitx5.android.tab.TabId
 import org.fcitx.fcitx5.android.tab.TabManager
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -31,7 +26,6 @@ class E2EDeviceComprehensiveTddTest {
 
     private lateinit var appContext: Context
     private lateinit var tabManager: TabManager
-    private lateinit var mediaQueue: MediaRetryQueue
     private lateinit var mediaFavorites: MediaFavoritesManager
     private lateinit var bufferController: BufferedInputController
 
@@ -39,7 +33,6 @@ class E2EDeviceComprehensiveTddTest {
     fun setUp() {
         appContext = InstrumentationRegistry.getInstrumentation().targetContext
         tabManager = TabManager()
-        mediaQueue = MediaRetryQueue(maxQueueSize = 100, maxRetryAttempts = 5)
         mediaFavorites = MediaFavoritesManager(maxCapacity = 200)
         bufferController = BufferedInputController()
     }
@@ -60,29 +53,10 @@ class E2EDeviceComprehensiveTddTest {
             assertEquals(tabId, tabManager.activeTab.id)
 
             tabManager.setTabBadgeCount(tabId, i)
-            assertEquals(i, tabManager.getTabBadgeCount(tabId))
+            assertEquals(i, tabManager.getVisibleTabs().first { it.id == tabId }.badgeCount)
         }
 
-        assertEquals(7, tabManager.getRegisteredTabs().size)
-    }
-
-    @Test
-    fun testMediaRetryQueueAndDeduplication1000ItemsOnDevice() {
-        // Enqueue 1,000 requests into capped queue of 100
-        for (i in 0 until 1000) {
-            val req = MediaSearchRequest(
-                id = "req_device_$i",
-                query = "실기기 테스트 $i",
-                mediaType = if (i % 2 == 0) MediaType.GIF else MediaType.VIDEO,
-                timestamp = System.currentTimeMillis() + i
-            )
-            mediaQueue.enqueue(req)
-        }
-
-        // Bounded capacity assertion
-        assertEquals(100, mediaQueue.size())
-        assertFalse(mediaQueue.contains("req_device_0")) // Oldest evicted
-        assertTrue(mediaQueue.contains("req_device_999")) // Latest kept
+        assertEquals(7, tabManager.getVisibleTabs().size)
     }
 
     @Test

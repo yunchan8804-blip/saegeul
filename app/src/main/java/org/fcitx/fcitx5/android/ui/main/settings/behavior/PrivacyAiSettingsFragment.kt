@@ -25,7 +25,7 @@ import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import splitties.resources.styledColor
 
-/** User-visible controls for network input, BYOK credentials, and local traces. */
+/** User-visible controls for network input, the user-provided voice and GIF keys, and local traces. */
 class PrivacyAiSettingsFragment : PaddingPreferenceFragment() {
     private lateinit var languageVault: LanguageVaultSection
     private lateinit var networkControls: NetworkControlsSection

@@ -80,7 +80,7 @@ enum class VoiceRealtimeTranscriptionModel(val id: String) {
     }
 }
 
-/** Dedicated STT credential. It is deliberately separate from the writing-LLM profile. */
+/** Dedicated STT credential. */
 data class VoiceProviderProfile(
     val apiKey: String,
     val transcriptionModel: String = VoiceTranscriptionModel.Accurate.id,
@@ -101,7 +101,7 @@ data class VoiceProviderProfile(
         require(profile.baseUrl == OPENAI_BASE_URL) {
             "Voice transcription must use the official OpenAI API"
         }
-        AiEndpointPolicy.requireHttps(profile.baseUrl, "Voice provider URL")
+        VoiceEndpointPolicy.requireHttps(profile.baseUrl, "Voice provider URL")
         require(profile.apiKey.isNotEmpty()) { "STT API key is empty" }
         require(profile.apiKey.length <= MAX_API_KEY_CHARACTERS) { "STT API key is too long" }
         require(profile.apiKey.none(Char::isISOControl)) { "STT API key contains control characters" }

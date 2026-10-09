@@ -21,13 +21,3 @@ data class MediaItem(
     val tags: List<String> = emptyList(),
     val timestamp: Long = System.currentTimeMillis()
 )
-
-data class MediaSearchRequest(
-    val id: String,
-    val query: String,
-    val mediaType: MediaType = MediaType.GIF,
-    val timestamp: Long = System.currentTimeMillis(),
-    var retryCount: Int = 0,
-    var lastFailureMessage: String? = null,
-    var nextRetryTime: Long = timestamp
-)

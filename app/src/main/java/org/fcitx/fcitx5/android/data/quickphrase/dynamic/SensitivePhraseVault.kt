@@ -151,11 +151,6 @@ class SensitivePhraseUnlockState(
     }
 
     @Synchronized
-    fun onEditorPackageChanged(packageName: String) {
-        if (this.packageName != null && this.packageName != packageName) lock()
-    }
-
-    @Synchronized
     fun lock() {
         packageName = null
         unlockedUntil = 0L

@@ -116,8 +116,6 @@
     <string name="exception_quickphrase_parse">クイックフレーズの行の解析に失敗しました: %1$s</string>
     <string name="exception_quickphrase_filename">%1$s のファイル拡張子はクイックフレーズを示していません</string>
     <string name="exception_theme_filename">%1$s のファイル拡張子はテーマを示していません</string>
-    <string name="exception_libime_dict_filename">%1$s のファイル拡張子はlibime辞書を示していません</string>
-    <string name="exception_text_dict_filename">%1$s のファイル拡張子はテキスト辞書を示していません</string>
     <string name="exception_theme_json">テーマのJSONが見つかりません</string>
     <string name="exception_theme_name_clash">テーマ名がビルトインテーマと衝突します</string>
     <string name="exception_theme_src_image">選択した画像をテーマの背景として保存できません</string>
@@ -154,7 +152,6 @@
     <string name="saving">保存する</string>
     <string name="delete_all_pinned_items">固定されたすべてのアイテムを削除しますか？</string>
     <string name="vivo_keypress_workaround">vivo OriginOSにおけるキー押下時の回避策</string>
-    <string name="invalid_im">無効なインプットメゾッド設定ファイル:\n%1$s</string>
     <string name="notification_permission_message">通知の許可がない場合、時間のかかる操作が行われたときに通知することができません。</string>
     <string name="notification_permission_title">通知の権限がありません</string>
     <string name="toolbar_num_row_on_password">パスワード入力時に数字をツールバーに横並びで表示する</string>

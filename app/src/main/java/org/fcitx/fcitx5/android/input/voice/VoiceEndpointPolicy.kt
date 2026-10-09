@@ -6,13 +6,13 @@ package org.fcitx.fcitx5.android.input.voice
 
 import java.net.URI
 
-class AiHttpStatusException(
+class VoiceHttpStatusException(
     val status: Int,
     message: String
 ) : Exception(message)
 
 /** HTTPS is mandatory even on RFC1918, loopback, and Tailscale/MagicDNS addresses. */
-object AiEndpointPolicy {
+object VoiceEndpointPolicy {
     fun requireHttps(value: String, label: String) {
         val uri = runCatching { URI(value) }
             .getOrElse { throw IllegalArgumentException("$label is invalid") }

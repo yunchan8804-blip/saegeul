@@ -51,7 +51,7 @@ class SensitivePhraseVaultTest {
     }
 
     @Test
-    fun `unlock expires at ttl and locks on app transition`() {
+    fun `unlock expires at ttl`() {
         var now = 1_000L
         val state = SensitivePhraseUnlockState(ttlMillis = 60_000L) { now }
         state.unlockFor("com.kakao.talk")
@@ -59,13 +59,26 @@ class SensitivePhraseVaultTest {
         now += 1_234L
         assertEquals(58_766L, state.remainingMillisFor("com.kakao.talk"))
 
-        state.onEditorPackageChanged("com.slack")
-        assertFalse(state.isUnlockedFor("com.kakao.talk"))
-
         state.unlockFor("com.kakao.talk")
         now += 60_000L
         assertFalse(state.isUnlockedFor("com.kakao.talk"))
         assertEquals(null, state.remainingMillisFor("com.kakao.talk"))
+    }
+
+    @Test
+    fun `unlock locks on other package and stays locked until reauthenticated`() {
+        var now = 1_000L
+        val state = SensitivePhraseUnlockState(ttlMillis = 60_000L) { now }
+        state.unlockFor("com.kakao.talk")
+        assertTrue(state.isUnlockedFor("com.kakao.talk"))
+
+        assertFalse(state.isUnlockedFor("com.slack"))
+        assertFalse(state.isUnlockedFor("com.kakao.talk"))
+        assertEquals(null, state.remainingMillisFor("com.kakao.talk"))
+
+        state.unlockFor("com.kakao.talk")
+        now += 1_000L
+        assertTrue(state.isUnlockedFor("com.kakao.talk"))
     }
 
     @Test

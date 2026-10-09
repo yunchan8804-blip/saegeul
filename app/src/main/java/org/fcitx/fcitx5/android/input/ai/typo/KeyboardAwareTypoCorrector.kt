@@ -52,19 +52,6 @@ class KeyboardAwareTypoCorrector(
     }
 
     @Synchronized
-    fun removeWord(word: String) {
-        if (word.isEmpty()) return
-        val keySeq = DubeolsikKeyMap.keySequence(word)
-        var node = root
-        for (c in keySeq) {
-            node = node.children[c] ?: return
-        }
-        if (node.words.removeAll { it.first == word }) {
-            wordCount--
-        }
-    }
-
-    @Synchronized
     fun size(): Int = wordCount
 
     @Synchronized

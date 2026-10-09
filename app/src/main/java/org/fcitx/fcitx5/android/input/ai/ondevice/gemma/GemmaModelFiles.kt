@@ -48,8 +48,7 @@ object GemmaModelFiles {
             "gemma-4-E2B-it.litertlm"
 
     data class ModelTransferResult(
-        val modelFile: File,
-        val reusedVerifiedModel: Boolean
+        val modelFile: File
     )
 
     /** Runs [block] under the transfer lock also held by [importFrom]/[deleteModel]/[requireVerifiedModel], so the resumable download worker never races a manual import or delete. */
@@ -62,7 +61,7 @@ object GemmaModelFiles {
     ): ModelTransferResult = transferMutex.withLock {
         withContext(Dispatchers.IO) {
         requireSupportedAbi()
-        existingVerifiedModel(context)?.let { return@withContext ModelTransferResult(it, true) }
+        existingVerifiedModel(context)?.let { return@withContext ModelTransferResult(it) }
         requireFreeSpace(context)
         val input = context.contentResolver.openInputStream(uri)
             ?: throw IOException("선택한 모델 파일을 열 수 없습니다.")
@@ -144,7 +143,7 @@ object GemmaModelFiles {
             }
             verifyAndInstallPart(part, model)
             completed = true
-            return ModelTransferResult(model, false)
+            return ModelTransferResult(model)
         } finally {
             if (!completed && part.exists()) part.delete()
         }

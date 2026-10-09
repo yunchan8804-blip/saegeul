@@ -36,8 +36,8 @@ class OpenAiDiarizationClientTest {
             )
         }.exceptionOrNull()
 
-        assertTrue(failure is AiHttpStatusException)
-        assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, (failure as AiHttpStatusException).status)
+        assertTrue(failure is VoiceHttpStatusException)
+        assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, (failure as VoiceHttpStatusException).status)
     }
 
     @Test
@@ -106,7 +106,7 @@ class OpenAiDiarizationClientTest {
                 url: String,
                 authorization: String,
                 request: DiarizationRequest
-            ): String = throw AiHttpStatusException(
+            ): String = throw VoiceHttpStatusException(
                 HttpURLConnection.HTTP_UNAUTHORIZED,
                 "provider detail"
             )

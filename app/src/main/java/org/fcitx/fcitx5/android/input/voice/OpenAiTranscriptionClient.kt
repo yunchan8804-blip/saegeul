@@ -53,7 +53,7 @@ class OpenAiTranscriptionClient(
                     authorization = authorization,
                     request = request
                 )
-            } catch (exception: AiHttpStatusException) {
+            } catch (exception: VoiceHttpStatusException) {
                 // exception.message를 도메인 예외 메시지로 그대로 옮긴다; 상태 코드별 분류가 목적이라 원본은 버린다.
                 if (exception.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
                     throw VoiceAuthenticationException("OpenAI rejected the STT API key")
@@ -161,7 +161,7 @@ class UrlConnectionVoiceTransport : VoiceHttpTransport {
             }
             val status = connection.responseCode
             if (status !in 200..299) {
-                throw AiHttpStatusException(status, "Transcription provider HTTP $status")
+                throw VoiceHttpStatusException(status, "Transcription provider HTTP $status")
             }
             val bytes = connection.inputStream.use { input ->
                 val output = ByteArrayOutputStream()
@@ -211,7 +211,7 @@ internal fun throwHttpStatusOrOriginal(
 ): Nothing {
     val status = runCatching(responseCode).getOrNull()
     if (status != null && status !in 200..299) {
-        throw AiHttpStatusException(status, "$providerLabel HTTP $status")
+        throw VoiceHttpStatusException(status, "$providerLabel HTTP $status")
     }
     throw exception
 }

@@ -78,8 +78,6 @@ object VaultHabitTracker {
             todaySentences = 0
         )
     }
-
-    fun dayIndexOf(epochMs: Long): Long = epochMs / DAY_MS
 }
 
 class VaultHabitStore(context: Context) {

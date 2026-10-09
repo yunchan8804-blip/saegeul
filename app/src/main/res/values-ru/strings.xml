@@ -120,8 +120,6 @@
     <string name="exception_quickphrase_parse">Не удалось разобрать строку быстрой фразы: %1$s</string>
     <string name="exception_quickphrase_filename">Расширение имени файла %1$s не указывает на быструю фразу</string>
     <string name="exception_theme_filename">Расширение имени файла %1$s не указывает на тему</string>
-    <string name="exception_libime_dict_filename">Расширение имени файла %1$s не указывает на словарь libime</string>
-    <string name="exception_text_dict_filename">Расширение имени файла %1$s не указывает на текстовый словарь</string>
     <string name="exception_theme_json">Не удалось найти тему json</string>
     <string name="exception_theme_name_clash">Название темы конфликтует со встроенными темами</string>
     <string name="exception_theme_src_image">Не удалось сохранить исходное изображение фона темы</string>
@@ -159,7 +157,6 @@
     <string name="saving">Сохранение</string>
     <string name="delete_all_pinned_items">Удалить все закрепленные элементы?</string>
     <string name="vivo_keypress_workaround">Обходной путь для нажатия клавиши в vivo Origin OS</string>
-    <string name="invalid_im">Неверный файл конфигурации метода ввода:\n%1$s</string>
     <string name="notification_permission_message">Без разрешения на публикацию уведомлений мы не сможем уведомить вас о выполнении некоторых сложных операций.</string>
     <string name="notification_permission_title">Нет разрешения на уведомление</string>
     <string name="toolbar_num_row_on_password">Показывать строку с цифрами на панели инструментов при вводе пароля</string>
@@ -251,7 +248,6 @@
     <string name="status_area">Область состояния</string>
     <string name="expand_candidates_list">Развернуть список кандидатов</string>
     <string name="hide_candidates_list">Скрыть список кандидатов</string>
-    <string name="switch_to_voice_input">Переключиться на голосовой ввод</string>
     <string name="hide_keyboard">Скрыть клавиатуру</string>
     <string name="private_mode">Приватный режим (нажмите, чтобы переключить панель инструментов)</string>
     <string name="hide_toolbar">Скрыть панель инструментов</string>

@@ -152,25 +152,6 @@ class GemmaAccumulationStore private constructor(context: Context) {
         }
     }
 
-    suspend fun nextPlan(): GemmaAccumulationPlan? = onIo {
-        mutex.withLock {
-            loadLocked()
-            val current = mutableState.value
-            if (!current.enabled) return@withLock null
-            val counts = prefixCountsLocked()
-            val plan = GemmaAccumulationPlanner.select(counts, current.attempts, current.cursor)
-            if (plan == null) {
-                val status = if (GemmaAccumulationPlanner.hasCoverageDeficit(counts)) {
-                    GemmaAccumulationState.STATUS_ATTEMPTS_EXHAUSTED
-                } else {
-                    GemmaAccumulationState.STATUS_TARGET_REACHED
-                }
-                persistAndPublishLocked(current.copy(status = status, error = null))
-            }
-            plan
-        }
-    }
-
     /**
      * Returns the next open-context plan, or null when the current run should stop. Null covers
      * two cases that the worker ends the same way, as a successful run:
@@ -217,25 +198,6 @@ class GemmaAccumulationStore private constructor(context: Context) {
         }
     }
 
-    suspend fun markAttemptStarted(plan: GemmaAccumulationPlan): Boolean = onIo {
-        mutex.withLock {
-            loadLocked()
-            val current = mutableState.value
-            if (!current.enabled) return@withLock false
-            val attempts = current.attempts.toMutableMap()
-            attempts[plan.prefix] = (attempts[plan.prefix] ?: 0) + 1
-            persistAndPublishLocked(
-                current.copy(
-                    status = GemmaAccumulationState.STATUS_RUNNING,
-                    attempts = attempts,
-                    cursor = plan.nextCursor,
-                    error = null
-                )
-            )
-            true
-        }
-    }
-
     suspend fun markOpenAttemptStarted(plan: GemmaOpenMaterialPlan): Boolean = onIo {
         mutex.withLock {
             loadLocked()
@@ -248,53 +210,6 @@ class GemmaAccumulationStore private constructor(context: Context) {
                 )
             )
             true
-        }
-    }
-
-    suspend fun rollbackAttempt(prefix: String): Unit = onIo {
-        mutex.withLock {
-            loadLocked()
-            val current = mutableState.value
-            val attempts = current.attempts.toMutableMap()
-            val remaining = (attempts[prefix] ?: 0) - 1
-            if (remaining > 0) attempts[prefix] = remaining else attempts.remove(prefix)
-            persistAndPublishLocked(
-                current.copy(
-                    attempts = attempts,
-                    status = if (current.enabled) GemmaAccumulationState.STATUS_IDLE else current.status
-                )
-            )
-        }
-    }
-
-    suspend fun commitIfEnabled(
-        prefix: String,
-        operation: (GeneratedSentenceBank) -> IngestionReport
-    ): IngestionReport? = onIo {
-        mutex.withLock {
-            require(prefix in GeneratedMaterialPolicy.PREFIXES) { "Unknown generated-material prefix" }
-            loadLocked()
-            val current = mutableState.value
-            if (!current.enabled) return@withLock null
-            val report = operation(bank())
-            val counts = prefixCountsLocked()
-            val next = current.copy(
-                status = GemmaAccumulationState.STATUS_RUNNING,
-                stored = bank().sentenceCount,
-                covered = counts.values.count { it >= GeneratedMaterialPolicy.TARGET_PER_PREFIX },
-                added = current.added + report.added,
-                rejected = current.rejected + report.rejected,
-                duplicates = current.duplicates + report.duplicate,
-                lastRunEpochMs = System.currentTimeMillis(),
-                error = null
-            )
-            try {
-                persistAndPublishLocked(next)
-            } catch (error: Exception) {
-                publishLocked(next.copy(error = "은행 저장 뒤 상태 저장 실패: ${errorMessage(error)}"))
-                throw IllegalStateException("은행 저장 뒤 상태 저장 실패", error)
-            }
-            report
         }
     }
 
@@ -365,31 +280,6 @@ class GemmaAccumulationStore private constructor(context: Context) {
                 )
                 throw failure
             }
-        }
-    }
-
-    suspend fun finishRun(): Unit = onIo {
-        mutex.withLock {
-            loadLocked()
-            val current = mutableState.value
-            if (!current.enabled) return@withLock
-            val counts = prefixCountsLocked()
-            val status = when {
-                !GemmaAccumulationPlanner.hasCoverageDeficit(counts) ->
-                    GemmaAccumulationState.STATUS_TARGET_REACHED
-                GemmaAccumulationPlanner.select(counts, current.attempts, current.cursor) == null ->
-                    GemmaAccumulationState.STATUS_ATTEMPTS_EXHAUSTED
-                else -> GemmaAccumulationState.STATUS_IDLE
-            }
-            persistAndPublishLocked(
-                current.copy(
-                    status = status,
-                    stored = bank().sentenceCount,
-                    covered = counts.values.count { it >= GeneratedMaterialPolicy.TARGET_PER_PREFIX },
-                    lastRunEpochMs = System.currentTimeMillis(),
-                    error = null
-                )
-            )
         }
     }
 

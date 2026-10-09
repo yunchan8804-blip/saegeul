@@ -26,16 +26,3 @@ data class TabItem(
     var isPinned: Boolean = false,
     var badgeCount: Int = 0
 )
-
-data class TabConfigItem(
-    val id: TabId,
-    val visible: Boolean = true,
-    val pinned: Boolean = false
-)
-
-data class TabConfiguration(
-    val version: Int = 1,
-    val timestamp: Long = System.currentTimeMillis(),
-    val tabs: List<TabConfigItem>,
-    val checksum: String = ""
-)

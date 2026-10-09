@@ -164,11 +164,6 @@ class KoreanCollocationModel {
         }
     }
 
-    fun clearDynamicBigrams() {
-        dynamicHonorificBigrams.clear()
-        dynamicInformalBigrams.clear()
-    }
-
     /** 사용자 입력에서 학습해 주입한 bigram만 돌려준다. 코드에 박아 둔 정적 연어는 포함하지 않는다. */
     fun predictLearnedNextWords(lastWord: String, isInformal: Boolean, limit: Int = 4): List<String> {
         val clean = lastWord.trim()

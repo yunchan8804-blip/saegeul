@@ -116,7 +116,6 @@
     <string name="system_default">Systemstandard</string>
     <string name="default_">Standard</string>
     <string name="saving">Wird gespeichert</string>
-    <string name="invalid_im">Ungültige Eingabemethode in Datei:\n%1$s</string>
     <string name="notification_permission_title">Keine Erlaubnis für Benachrichtigungen</string>
     <string name="space_long_press_behavior">Verhalten bei langem Tastendruck auf die Space-Taste</string>
     <string name="space_behavior_none">Nichts</string>
