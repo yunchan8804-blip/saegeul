@@ -89,7 +89,7 @@ git config --global core.symlinks true
 git clone --recurse-submodules https://github.com/yunchan8804-blip/saegeul.git D:\workspace\Saegul
 ```
 
-That command recovers the current independent-fork baseline (`origin` = `yunchan8804-blip/saegeul`; the original `fcitx5-android/fcitx5-android` project is tracked separately as `upstream` — see [`docs/independent-fork/README.md`](../independent-fork/README.md) §2). The original `feat/hangul-buffered-input` work from the old local `D:\workspace\fcitx5-android` checkout has been moved into this repository: implementation commit `5338d80a` is an ancestor of `main`, so no local branch needs to be preserved any more.
+That command recovers the current independent-fork baseline (`origin` = `yunchan8804-blip/saegeul`; the original `fcitx5-android/fcitx5-android` project is tracked separately as `upstream` — see [`docs/independent-fork/README.md`](../independent-fork/README.md) §2). The original `feat/hangul-buffered-input` work from the old local checkout has been moved into this repository: implementation commit `5338d80a` is an ancestor of `main`, so no local branch needs to be preserved any more.
 
 Install MSYS2 plus the native configuration tools:
 

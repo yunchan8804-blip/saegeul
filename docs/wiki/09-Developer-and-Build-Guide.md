@@ -7,10 +7,10 @@
 ## 1. 개발 환경 요구사항
 
 - **OS:** Windows 10/11, macOS, Linux (Ubuntu 22.04+)
-- **JDK:** OpenJDK 17 이상 (Eclipse Temurin 또는 Azul Zulu 권장)
-- **Android SDK:** API Level 34 (Compile), API 26+ (Min)
-- **Android NDK:** `26.1.10909125`
-- **CMake:** `3.22.1` 이상
+- **JDK:** OpenJDK 17 (CI는 Eclipse Temurin 17). 소스·바이트코드 호환 수준은 Java 11(`Versions.java = JavaVersion.VERSION_11`)
+- **Android SDK:** compileSdk 36, targetSdk 36, minSdk 23 (`build-logic/convention/src/main/kotlin/Versions.kt`), Build Tools `36.1.0`
+- **Android NDK:** `28.0.13004108`
+- **CMake:** `3.31.6` (CI도 `cmake;3.31.6`을 설치)
 - **Git:** Git 2.30+ (서브모듈 재귀 지원)
 
 ---
@@ -59,7 +59,15 @@ git submodule update --init --recursive
 .\scripts\verify-release-licenses.ps1 -ApkPath .\app\build\outputs\apk\release\net.chanpaca.saegeul.apk
 
 # 2. 공개 식별자 및 개인정보 일치성 검사
-.\scripts\verify-release-identity.ps1 -ApkPath .\app\build\outputs\apk\release\net.chanpaca.saegeul.apk
+.\scripts\verify-release-identity.ps1 `
+  -MainApkPath .\artifacts\release\net.chanpaca.saegeul.apk `
+  -HangulApkPath .\artifacts\release\net.chanpaca.saegeul.plugin.hangul.apk `
+  -ExpectedApplicationId "net.chanpaca.saegeul" `
+  -ExpectedProductName "Saegeul" `
+  -ExpectedRepositoryUrl "https://github.com/yunchan8804-blip/saegeul" `
+  -ExpectedPrivacyPolicyUrl "https://saegul.chanpaca.net/privacy/" `
+  -ExpectedSourceArchiveUrl "https://github.com/yunchan8804-blip/saegeul/releases/download/saegeul-v0.1.0/saegeul-v0.1.0-source.tar.gz" `
+  -ExpectedSigningCertificateSha256 "3B:08:8B:5C:6A:69:E3:6C:62:80:2E:F5:D4:33:BD:9D:84:5B:8E:98:09:27:8E:13:13:36:A5:03:DA:90:1A:66"
 
 # 3. 전체 릴리스 번들 및 CycloneDX SBOM 검증
 .\scripts\verify-release-bundle.ps1 `
@@ -70,8 +78,8 @@ git submodule update --init --recursive
   -BuildMetadataPath .\artifacts\release\build-metadata.json `
   -SourceArchivePath .\artifacts\release\saegeul-v0.1.0-source.tar.gz `
   -SourceTag saegeul-v0.1.0 `
-  -SbomOutputPath .\artifacts\release\saegeul-v0.1.0.cdx.json `
-  -ProductName "새글 (Saegeul)" `
+  -SbomOutputPath .\artifacts\release\saegeul-v0.1.0-sbom.cdx.json `
+  -ProductName "Saegeul" `
   -ApplicationId "net.chanpaca.saegeul" `
   -SourceRepositoryUrl "https://github.com/yunchan8804-blip/saegeul" `
   -PrivacyPolicyUrl "https://saegul.chanpaca.net/privacy/" `

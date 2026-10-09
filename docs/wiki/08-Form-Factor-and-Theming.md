@@ -29,7 +29,7 @@
 
 사용하는 앱마다 서로 다른 키보드 동작을 지정할 수 있습니다.
 
-- **업무용 앱 (Slack, Notion, Gmail):** 두벌식 자판 + 비즈니스 AI 글쓰기 기본 켜짐
+- **업무용 앱 (Slack, Notion, Gmail):** 두벌식 자판
 - **메신저 앱 (카카오톡, Line, Discord):** 천지인 자판 + GIF/이모지 툴바 우선
 - **터미널/개발 앱 (Termux, Code Editor):** 세벌식 390 자판 + Ctrl/Alt 보조열 표시
 

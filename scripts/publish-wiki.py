@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 def main():
-    wiki_src = Path(r"d:\workspace\fcitx5-android\docs\wiki")
+    wiki_src = Path(r"d:\workspace\Saegul\docs\wiki")
     if not wiki_src.exists():
         print(f"Error: {wiki_src} does not exist")
         return

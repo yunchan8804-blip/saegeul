@@ -1,8 +1,10 @@
+> 2026-09-14 스냅샷. AI 공급자·OAuth·컴패니언 항목은 2026-09-24 제거되어 지금 코드와 다르다.
+
 # Android 스마트 입력·AI 인벤토리 (2026-09-14)
 
 목적: iOS 1:1 이식 격차표의 기준 인벤토리. 모든 행은 코드 또는 문서에서 직접 확인한 사실만 담는다. 추측은 `추정`으로 표시한다.
 
-조사 범위: `app/src/main/java/org/fcitx/fcitx5/android/input/**`(특히 `input/ai/**`), `app/src/debug/**`, `app/src/release/**`, `plugin/hangul/**`, `app/src/main/assets/**`, `docs/korean-input/korean-smart-input-ssot.md`, `docs/logs/2026-09/gemma-*.md`, `docs/wiki/*.md`, `docs/independent-fork/privacy-data-safety.md`.
+조사 범위: `app/src/main/java/org/fcitx/fcitx5/android/input/**`(특히 `input/ai/**`), `app/src/debug/**`, `app/src/release/**`, `plugin/hangul/**`, `app/src/main/assets/**`, `docs/korean-input/korean-smart-input-ssot.md`, `docs/archive/logs/2026-09/gemma-*.md`, `docs/wiki/*.md`, `docs/independent-fork/privacy-data-safety.md`.
 
 경로는 따로 명시하지 않는 한 `app/src/main/java/org/fcitx/fcitx5/android/` 기준 상대 경로다.
 
@@ -85,7 +87,7 @@ val automaticSuggestionsSupported: Boolean
 | 개인 n-gram 예측 | `input/ai/PersonalNgramModel.kt` (663줄), `PersonalNgramTokenizer.kt`, 참조 `FcitxInputMethodService.kt:1765,3215,3448` | 언어 지문 기능에 종속 | **필요 추정.** 암호화 파일 저장소 사용 | 배지 `⭐` (`AiContextualPredictor.kt:499-500`) |
 | 개인 문장 RAG (BM25) | `input/ai/rag/PersonalSentenceVault.kt:19-35`, 후보화 `AiContextualPredictor.kt:402-403`, 게이트 `input/ai/PersonalSentenceCompletionGate.kt` | 언어 지문 기능에 종속 | **필요 추정.** 암호화 파일 저장소 사용 | 최대 3,000문장, 반감기 45일. 주석: "No LLM, no embeddings, no network". 배지 `✨ 내기록` |
 | 문장 팩 | `input/ai/sentencepack/SentencePackRepository.kt`, `SentencePackCatalog.kt`, `SentencePackIndex.kt`, `SentencePackCsv.kt`, UI `ui/main/settings/behavior/SentencePackDialog.kt`, 요약 `PrivacyAiSettingsFragment.kt:150-164,375-405`, 자산 `app/src/main/assets/sentence-packs/ko-basic-v1.txt` | `문장 팩` 설정 항목 | 기본팩은 불필요, 추가 팩 다운로드는 **필요** | 기본팩 10,093 bytes 오프라인 번들. 프로젝트 자체 작성 예문(`sentence-packs/NOTICE.md`: "외부 말뭉치를 복제하지 않고 프로젝트에서 작성한 기본 예문"). 배지 `기본문장`. 오프라인 모드 켜면 다운로드 즉시 취소 (`PrivacyAiSettingsFragment.kt:143-146`) |
-| AI 어시스턴트 창 | `input/ai/AiAssistantWindow.kt` (708줄), `AiAssistantUi.kt` (1123줄), 툴바 버튼 `ButtonsBarUi.kt:180`, 연결 `input/bar/KawaiiBarComponent.kt:482` | 툴바 AI 버튼 | 조건부. 로컬 문맥 완성만 쓰면 불필요, 외부 AI는 **필요** | `docs/logs/2026-09/gemma-context-ime-2026-09-12.md:46`: "AI 도구 버튼은 debug 로컬 기능의 개인정보·앱 정책 조건을 만족해도 열 수 있다. 외부 AI 실행의 네트워크 차단은 그대로 유지한다." |
+| AI 어시스턴트 창 | `input/ai/AiAssistantWindow.kt` (708줄), `AiAssistantUi.kt` (1123줄), 툴바 버튼 `ButtonsBarUi.kt:180`, 연결 `input/bar/KawaiiBarComponent.kt:482` | 툴바 AI 버튼 | 조건부. 로컬 문맥 완성만 쓰면 불필요, 외부 AI는 **필요** | `docs/archive/logs/2026-09/gemma-context-ime-2026-09-12.md:46`: "AI 도구 버튼은 debug 로컬 기능의 개인정보·앱 정책 조건을 만족해도 열 수 있다. 외부 AI 실행의 네트워크 차단은 그대로 유지한다." |
 
 **소계: 14개**
 
@@ -117,7 +119,7 @@ val automaticSuggestionsSupported: Boolean
 | 기능 | Android 근거 파일:줄 | 설정 이름 | Full Access 필요 여부 추정 근거 | 비고 |
 |---|---|---|---|---|
 | AI 글쓰기 액션 | `input/ai/AiAction.kt:12-99`, 실행 `input/ai/OpenAiResponsesClient.kt`, 적용 `input/ai/AiEditorTransaction.kt`, `AiResultApplyPolicy.kt`, diff `AiTextDiff.kt` | `AI 공급자 설정` (`PrivacyAiSettingsFragment.kt:166-185`) | **필요.** HTTPS 전송 | 액션 16종: `Proofread`·`Polite`·`Casual`·`Business`·`Decline`·`Apology`·`CustomerService`·`Compose`·`Reply`·`Custom`·`ContinueTyping`·`TranslateEnglish`·`TranslateKorean`·`TranslateJapanese`·`TranslateChinese`·`GraphEnrich`. 결과 적용 4갈래: 교체·뒤에 넣기·복사·취소 |
-| 컴패니언 자동 발견 (mDNS) | `input/ai/AiProviderDiscovery.kt` (234줄), `AiProviderDiscoveryManifest.kt:1-30`, `AiProviderManifestFailure.kt`, `AiProviderSetupActivity.kt` (457줄) | `내 컴퓨터 자동으로 찾기 (추천)` | **필요.** DNS-SD/mDNS 로컬 네트워크 검색 + HTTPS 매니페스트 검증 | service type `_saegeul-ai._tcp.`. TXT의 `manifest` 값만 신뢰하고 mDNS 이름·IP는 신뢰하지 않음. 매니페스트는 `https://<trusted-host>/.well-known/saegeul-ai-provider` 고정 (SSOT 8.2.3). 예시 `docs/examples/saegeul-ai-provider-manifest.debug.json` |
+| 컴패니언 자동 발견 (mDNS) | `input/ai/AiProviderDiscovery.kt` (234줄), `AiProviderDiscoveryManifest.kt:1-30`, `AiProviderManifestFailure.kt`, `AiProviderSetupActivity.kt` (457줄) | `내 컴퓨터 자동으로 찾기 (추천)` | **필요.** DNS-SD/mDNS 로컬 네트워크 검색 + HTTPS 매니페스트 검증 | service type `_saegeul-ai._tcp.`. TXT의 `manifest` 값만 신뢰하고 mDNS 이름·IP는 신뢰하지 않음. 매니페스트는 `https://<trusted-host>/.well-known/saegeul-ai-provider` 고정 (SSOT 8.2.3). 예시 `docs/examples/saegeul-ai-provider-manifest.debug.json`(삭제됨) |
 | Tailscale Serve HTTPS 경계 | `docs/korean-input/korean-smart-input-ssot.md:1333-1350,1438-1443` | 없음 (앱 밖 구성) | **필요** | loopback gateway `127.0.0.1:9211`, tailnet 공개면 Tailscale Serve HTTPS `:9210`, 발견 `_saegeul-ai._tcp.local.`. SSOT: "public host뿐 아니라 loopback, RFC1918, CGNAT/Tailscale IP, MagicDNS, `.ts.net`에도 평문 HTTP 예외를 두지 않는다" |
 | PC 컴패니언 설치·실행 | `companion/windows/{install.bat,install.ps1,start.bat,uninstall.bat,uninstall.ps1}`, `companion/macos/{install.command,install.sh,start.command,uninstall.sh}`, `companion/linux/{install.sh,start.sh,uninstall.sh}`, `scripts/ai-provider-companion.py` | 앱 밖 | 해당 없음 (PC 측) | Windows 작업 스케줄러 / macOS LaunchAgent / systemd user 서비스. PC에 로그인된 Codex·Claude Code·AGY CLI를 stdio로 재사용. grant는 `%LOCALAPPDATA%/Saegeul/ai-companion-oauth.bin`에 DPAPI current-user 범위로 저장 |
 | endpoint OAuth (`AI-07`) | `input/ai/AiOAuthLoginActivity.kt` (207줄), `AiOAuthRefreshPolicy.kt`, `AiOAuthSessionIdentity.kt`, `AiOAuthStartFailure.kt`, `AiProviderCredentialStore.kt` (234줄) | `AI 공급자 설정` | **필요.** 외부 브라우저 + Keystore 저장 | public client Authorization Code + PKCE S256, 외부 브라우저(Custom Tab). API key와 상호 배타 (SSOT 8.2.1) |
@@ -199,7 +201,7 @@ val automaticSuggestionsSupported: Boolean
 
 > 생성 재료 기반 교정의 첫 범위는 **명시적으로 선택하는 띄어쓰기 제안**이다. 입력한 완결 문장과 저장 문장의 글자·문장부호가 모두 같고 ASCII 공백 위치만 다르며 저장소의 정답 후보가 하나일 때만 제시한다. 글자·조사·어미를 추측해서 바꾸지 않는다. 입력 중에는 메모리 인덱스만 조회하며 사용자 입력을 모델이나 별도 저장소로 보내지 않는다. 제안에는 `기기 AI 띄어쓰기` 출처를 표시한다. 적용은 캡처한 editor 세션·선택 위치·원문이 현재와 모두 일치할 때 한 번만 허용하며 민감 입력에서는 조회·적용을 차단한다. 정식 앱 승격은 포함하지 않는다.
 
-### 5.6 자동 문맥 추천 개인정보·상태 경계 — `docs/logs/2026-09/gemma-automatic-context-2026-09-12.md:16-21`
+### 5.6 자동 문맥 추천 개인정보·상태 경계 — `docs/archive/logs/2026-09/gemma-automatic-context-2026-09-12.md:16-21`
 
 > - 기능 활성화는 별도 opt-in이며 설정에서 처리 범위를 설명한다. 비밀번호·민감 필드·학습 금지·앱 차단 정책을 그대로 적용한다. 완전 오프라인에서 동작하며 외부 공급자 fallback이 없다.
 > - 앱 정보는 현재 EditorInfo의 패키지와 필드 종류 등 입력 대상 메타데이터로 한정한다. 화면 수집, 클립보드, 위치, 다른 앱 기록, 개인 금고를 자동으로 읽지 않는다. 앱 종류를 확실히 알 수 없으면 일반 문맥으로 처리한다.
@@ -207,7 +209,7 @@ val automaticSuggestionsSupported: Boolean
 > - 캐시 키는 앱·field ID·IME 세션·편집 revision·정확한 원문·커서다. 세션 전환, 숨김, 개인정보 제한, 선택·커서 이동, 삭제·치환은 요청과 캐시를 폐기한다. 원문이 되돌아와도 이전 요청을 되살리지 않는다.
 > - 자동 관측이 한글 조합을 강제로 확정해서는 안 된다. 조합 중 상태를 포함한 snapshot·적용 계약은 별도 통합 검증을 거친다. 후보 적용은 사용자 터치와 현재 snapshot 재검증이 필요하다.
 
-### 5.7 명시 문맥 완성 확정 경계 — `docs/logs/2026-09/gemma-context-ime-2026-09-12.md:44-53` (발췌)
+### 5.7 명시 문맥 완성 확정 경계 — `docs/archive/logs/2026-09/gemma-context-ime-2026-09-12.md:44-53` (발췌)
 
 > - 기존 AI 패널에서 별도 명시 동작으로 문맥 완성을 연다. 원문을 먼저 보여주고 사용자가 실행을 눌러야 모델에 전달한다. 자동 입력·공개 재료 조회에 모델 생성을 끼워 넣지 않는다.
 > - 최초 지원 범위는 커서가 문맥 끝에 있고 선택 영역이 없는 미완성 입력이다. 선택 영역이나 중간 커서는 안내 후 거부하며 임의로 이동하지 않는다. 문맥은 최대 2048자다.

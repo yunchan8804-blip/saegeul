@@ -7,7 +7,7 @@
 ## 실행
 
 ```powershell
-cd D:\workspace\fcitx5-android\admin
+cd D:\workspace\Saegul\admin
 npm install
 npm run dev
 ```

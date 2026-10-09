@@ -24,7 +24,7 @@
 | 항목 | 값 |
 | --- | --- |
 | 저장소 | D:\workspace\Saegul (`origin` = yunchan8804-blip/saegeul) |
-| 브랜치 | main (원래 옛 로컬 저장소 D:\workspace\fcitx5-android의 feat/hangul-buffered-input에서 시작) |
+| 브랜치 | main (원래 옛 로컬 저장소의 feat/hangul-buffered-input에서 시작) |
 | 기준 커밋 | 5338d80ac247a21b6831626d4b3ae09710f1c65b (현재 main HEAD의 조상) |
 | 기준 커밋 제목 | Add buffered Hangul compatibility mode |
 | 기준 커밋 작성자 | Yun Chan |

@@ -168,7 +168,7 @@
   - `plugin/hangul/**` (cpp 서브모듈 제외)
   - `admin/**`, `scripts/**`, `site/**`, `docs/**`
 - 워커가 건드리지 않는 것: `Versions.kt` 버전 범프, `ProductIdentity.kt`, 서명·릴리스 스크립트, `.github/workflows/**`, 개인정보 선언 문서, 서브모듈 포인터, `.env`. 필요하면 멈추고 보고한다. 오케스트레이터가 직접 한다.
-- 릴리스 아티팩트 생성, Play 콘솔 조작(`admin/tools/play-*.py`), 원격 push, 태그는 오케스트레이터가 사용자 확인 후 직접 한다.
+- 릴리스 아티팩트 생성, Play 콘솔 조작, 원격 push, 태그는 오케스트레이터가 사용자 확인 후 직접 한다.
 
 ### 9.4 표준 개발 흐름
 

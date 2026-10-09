@@ -135,3 +135,9 @@ lint/tmp/
 /opencode.json
 /GEMINI.md
 /.github/copilot-instructions.md
+
+# 관제 UI 설계 게이트가 만드는 보고서
+/admin/gate-report.md
+
+# 로컬 컴패니언 잔재 폴더
+/tools/

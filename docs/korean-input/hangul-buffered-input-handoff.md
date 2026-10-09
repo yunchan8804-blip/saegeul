@@ -2,7 +2,7 @@
 
 작성 기준일: 2026-07-25
 
-저장소: `D:\workspace\fcitx5-android`
+저장소: `D:\workspace\Saegul`
 
 대상 독자: 이 브랜치를 이어서 개발·검증·배포할 작업자
 
@@ -10,7 +10,7 @@
 
 관련 문서: [기능·빌드 개요](hangul-buffered-input.md), [우선순위 백로그](hangul-buffered-input-backlog.md)
 
-> **현재 상태(2026-09-28)**: 이 문서는 2026-07-25 옛 로컬 저장소(`D:\workspace\fcitx5-android`) 기준 기록이다.
+> **현재 상태(2026-09-28)**: 이 문서는 2026-07-25 옛 로컬 저장소 기준 기록이다.
 > 구현 커밋 `5338d80a`는 현재 저장소(`D:\workspace\Saegul`, `origin` = `yunchan8804-blip/saegeul`)의
 > `main` 이력에 들어와 있고 HEAD의 조상이다. 옛 저장소와 로컬 기능 브랜치를 보존하라는 안내(1절, 9.2절,
 > 18절, 20절)는 보관용 기록이며 더 따를 필요가 없다. 이후 바뀐 사실은
@@ -41,10 +41,10 @@
 
 > 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상). 아래 보존 안내와 확인 명령은 옛 로컬 저장소 기준이다.
 
-구현 커밋 자체는 깨끗한 상태로 만들어졌고, 백로그·인수인계·문서 링크는 그 뒤의 문서 전용 커밋으로 분리한다. `D:\workspace\fcitx5-android`는 당시 원격에 없는 기능 커밋을 보유한 현재 작업본이므로, 승인된 원격 push나 검증된 bundle/patch 백업 전에는 삭제하거나 새 clone으로 교체하지 마라. 다음 작업 시작 시 아래 명령으로 동적 상태를 다시 확인해라.
+구현 커밋 자체는 깨끗한 상태로 만들어졌고, 백로그·인수인계·문서 링크는 그 뒤의 문서 전용 커밋으로 분리한다. 당시 옛 로컬 저장소는 원격에 없는 기능 커밋을 보유한 현재 작업본이므로, 승인된 원격 push나 검증된 bundle/patch 백업 전에는 삭제하거나 새 clone으로 교체하지 마라. 다음 작업 시작 시 아래 명령으로 동적 상태를 다시 확인해라.
 
 ```powershell
-Set-Location D:\workspace\fcitx5-android
+Set-Location D:\workspace\Saegul
 git status --short
 git branch -vv
 git log -3 --oneline --decorate
@@ -431,12 +431,12 @@ Android 버전의 source of truth는 `build-logic/convention/src/main/kotlin/Ver
 
 > 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상). 아래 bundle·patch 보존 절차는 더 필요 없고 기록으로만 남긴다.
 
-`upstream` 저장소(`fcitx5-android/fcitx5-android`, 독립 포크 전 원 프로젝트)를 clone하면 `master` 기준선만 받을 수 있다. 현재 `feat/hangul-buffered-input`은 이 upstream에도, 현재 `origin`(`yunchan8804-blip/saegeul`)에도 없으므로 아래 clone 명령만으로 구현 커밋이나 이 문서를 복구할 수 없다. 현재 `D:\workspace\fcitx5-android`를 보존한 채 별도 baseline이 필요할 때만 다른 빈 경로에 clone해라.
+`upstream` 저장소(`fcitx5-android/fcitx5-android`, 독립 포크 전 원 프로젝트)를 clone하면 `master` 기준선만 받을 수 있다. 현재 `feat/hangul-buffered-input`은 이 upstream에도, 현재 `origin`(`yunchan8804-blip/saegeul`)에도 없으므로 아래 clone 명령만으로 구현 커밋이나 이 문서를 복구할 수 없다. 현재 `D:\workspace\Saegul`를 보존한 채 별도 baseline이 필요할 때만 다른 빈 경로에 clone해라.
 
 ```powershell
 git config --global core.symlinks true
-git clone --recurse-submodules https://github.com/fcitx5-android/fcitx5-android.git D:\workspace\fcitx5-android-upstream
-Set-Location D:\workspace\fcitx5-android-upstream
+git clone --recurse-submodules https://github.com/fcitx5-android/fcitx5-android.git build\fcitx5-android-upstream
+Set-Location build\fcitx5-android-upstream
 git submodule update --init --recursive
 ```
 
@@ -449,7 +449,7 @@ git submodule update --init --recursive
 예를 들어 승인된 로컬 백업 위치에 bundle을 만들 때는 덮어쓰기를 피하도록 새 파일명을 사용한다.
 
 ```powershell
-Set-Location D:\workspace\fcitx5-android
+Set-Location D:\workspace\Saegul
 $Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $Bundle = "D:\workspace\fcitx5-hangul-buffered-$Stamp.bundle"
 git bundle create $Bundle feat/hangul-buffered-input master
@@ -515,7 +515,7 @@ if (-not (Test-Path -LiteralPath $sdkManager)) {
 ### 9.5 매 PowerShell 세션에서 고정할 환경
 
 ```powershell
-Set-Location D:\workspace\fcitx5-android
+Set-Location D:\workspace\Saegul
 
 $env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-17.0.14.7-hotspot'
 $env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
@@ -1161,7 +1161,7 @@ Service private method를 억지 reflection으로 시험하기보다 transport d
 
 다음 작업 시작 시 위에서부터 순서대로 확인해라.
 
-- [x] `D:\workspace\fcitx5-android`가 로컬 기능 커밋을 보유한 현재 작업본인지 확인 — 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상)
+- [x] 옛 로컬 저장소가 로컬 기능 커밋을 보유한 현재 작업본인지 확인 — 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상)
 - [x] branch가 `feat/hangul-buffered-input`인지 확인 — 보관(현재 저장소로 이전 완료, `5338d80a`가 HEAD의 조상)
 - [ ] HEAD와 base hash 확인
 - [ ] 예상하지 못한 working-tree 변경 보존 및 소유자 확인

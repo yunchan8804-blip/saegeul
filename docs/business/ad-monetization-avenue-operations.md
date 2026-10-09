@@ -17,7 +17,7 @@
 - **IME 프로세스와 SDK 분리 없음**: 4.6절과 달리 앱은 단일 프로세스이고 SDK의 `MobileAdsInitProvider`가 매니페스트에 자동 병합된다. 앱이 `MobileAds.initialize`를 부르는 곳은 대시보드 Activity와 테마 상점 구매 창뿐이다.
 - **전면 파일럿 조건 일부만 구현**: 4.5절 조건 중 일 1회·24시간 간격·기능 3회 사용만 있다. 최소 7세션, 1% 홀드아웃, 지표 악화 시 자동 중지가 없고, 위치도 3.1절의 `theme-export-complete`가 아니라 대시보드 동기화 뒤다.
 - **14.1절 레벨 보너스 미연결**: `TypingDnaLevelCurve.rewardBonusPoints`는 테스트에서만 쓰이고, 보상형 적립은 `PointPricing.POINTS_PER_AD`(1점)만 준다.
-- **낡은 문장**: 4.4절의 개발자 응원 화면 “응원하고 광고 보기” 흐름은 구현되지 않았고 실제 보상형은 테마 상점 「광고 보고 +1」이다. 2.2절은 공개 문서가 광고 SDK 없음을 약속한다고 적고 `privacy-data-safety-contract.json`을 가리키지만, 지금 공개 문서는 AdMob을 고지하고 계약 파일은 `play-data-safety-declaration.json`이다. 8장 끝 문장(목표 연령 미확정, 공개 약속이 “광고 SDK 없음”)도 지금과 다르다. 대상 연령은 13세 이상으로 정했다(`docs/independent-fork/privacy-data-safety.md`의 `DONE-PRIVACY-05`).
+- **낡은 문장**: 4.4절의 개발자 응원 화면 “응원하고 광고 보기” 흐름은 구현되지 않았고 실제 보상형은 테마 상점 「광고 보고 +1」이다. 2.2절은 공개 문서가 광고 SDK 없음을 약속한다고 적고 `privacy-data-safety-contract.json`(삭제됨)을 가리키지만, 지금 공개 문서는 AdMob을 고지하고 계약 파일은 `play-data-safety-declaration.json`이다. 8장 끝 문장(목표 연령 미확정, 공개 약속이 “광고 SDK 없음”)도 지금과 다르다. 대상 연령은 13세 이상으로 정했다(`docs/independent-fork/privacy-data-safety.md`의 `DONE-PRIVACY-05`).
 
 ## 1. 결론
 
@@ -55,7 +55,7 @@
 - `site/privacy/index.html`: 광고 SDK나 분석 추적을 넣지 않는다고 명시한다.
 - `site/faq/index.html`: 개발자 서버, 광고 SDK, 분석 추적기가 없다고 설명한다.
 - `docs/independent-fork/privacy-data-safety.md`: 광고와 데이터 판매가 없다는 계약을 담고 있다.
-- `docs/independent-fork/privacy-data-safety-contract.json`: 현재 네트워크 제공자와 데이터 처리 경계를 기계 판독 가능한 계약으로 고정한다.
+- `docs/independent-fork/privacy-data-safety-contract.json`(삭제됨): 현재 네트워크 제공자와 데이터 처리 경계를 기계 판독 가능한 계약으로 고정한다.
 
 따라서 광고 SDK를 추가하는 일은 단순 기능 추가가 아니라 개인정보 계약 변경이다. 이 문서와 관리자 데모를 만들었다고 기존 개인정보 문구를 미리 바꾸면 안 된다. 실제 SDK, 동의 흐름, 목표 연령, Data Safety 답변, 테스트가 모두 준비된 릴리스에서 같은 변경 집합으로 갱신해야 한다.
 

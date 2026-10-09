@@ -37,6 +37,8 @@ CI(`.github/workflows/release-contract.yml`, `user-release.yml`)가 실행하는
 
 - `build-ko-corpus-ngram.py` — FineWeb-2(kor_Hang) 로컬 parquet 샤드에서 어절 단위 n-gram 후보 팩을 만든다.
   `python scripts/build-ko-corpus-ngram.py --shard <parquet> --out-dir <dir>`
+- `build-next-word-heldout.py` — FineWeb-2(kor_Hang) test 분할에서 번들 n-gram이 보지 않은 문장 3000개를 뽑아 다음 어절 예측 벤치마크용 held-out 세트(`app/src/test/resources/benchmark/ko-heldout-fineweb2-test.txt`)를 만든다.
+  `python scripts/build-next-word-heldout.py`
 - `ko_doc_quality.py` — 위 코퍼스 구축이 가져오는 문서 품질 게이트 모듈(스팸·광고 문서를 걸러낸다). 단독 실행용이 아니라 `build-ko-corpus-ngram.py`가 import한다.
 - `merge-ko-casual-layer.py` — 웹 n-gram 팩에 `songys/Chatbot_data` 구어체 층을 섞어 기본 팩을 만든다.
   `python scripts/merge-ko-casual-layer.py --web-pack <dir> --chatbot-csv <csv>`
@@ -77,6 +79,8 @@ Google Play 콘솔에 붙여넣거나 올릴 리스팅 자료를 만들고 점�
 
 - `redteam-extreme-accuracy.ps1` — 에뮬레이터·기기에서 한글 조합 정확도를 반복 입력으로 공격적으로 재현·점검한다.
   `.\scripts\redteam-extreme-accuracy.ps1 -Serial emulator-5554 -Iterations 5`
+- `verify-bfu-keyboard.ps1` — 에뮬레이터에 화면 잠금을 걸고 재부팅한 뒤, Direct Boot 잠금 화면에서 키보드가 실제로 뜨고 대상 패키지에 FATAL EXCEPTION이 없는지 확인한다. 실기기 serial은 거부한다.
+  `.\scripts\verify-bfu-keyboard.ps1 -Serial emulator-5554 -AppApk <apk> -PluginApk <apk>`
 - `measure-gemma-utility.ps1` — 실기기에서 온디바이스 Gemma 추천의 유용성(수용률 등)을 베이스라인과 비교 측정한다.
   `.\scripts\measure-gemma-utility.ps1 -DeviceSerial <adb serial> -OutputDirectory <dir> -BaselineDirectory <dir>`
 
