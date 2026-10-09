@@ -13,7 +13,6 @@ import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import org.fcitx.fcitx5.android.BuildConfig
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -55,7 +54,7 @@ class TypingDnaInterstitialController(
     private fun gateAllows(): Boolean {
         val now = System.currentTimeMillis()
         return TypingDnaAdGate.shouldShowInterstitial(
-            offlineMode = isOffline(),
+            offlineMode = AdOfflineGate.isOffline(),
             frequency = frequencyStore.state(LocalAvenueCatalog.TYPING_DNA_SYNC_COMPLETE),
             nowEpochMs = now
         )
@@ -126,11 +125,5 @@ class TypingDnaInterstitialController(
 
     private fun canShow(): Boolean {
         return !activity.isFinishing && !activity.isDestroyed
-    }
-
-    private fun isOffline(): Boolean {
-        return runCatching {
-            AppPrefs.getInstance().advanced.offlineMode.getValue()
-        }.getOrDefault(false)
     }
 }

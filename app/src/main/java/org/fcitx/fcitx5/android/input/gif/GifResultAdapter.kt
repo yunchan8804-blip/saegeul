@@ -49,7 +49,8 @@ class GifResultAdapter(
     private val onAttach: (GifResult) -> Unit,
     private val onSelectionChanged: () -> Unit,
     private val onVisible: (GifResult) -> Unit = {},
-    private val onCardTap: (GifResult) -> Unit = {}
+    private val onCardTap: (GifResult) -> Unit = {},
+    private val allowsNetwork: () -> Boolean
 ) : RecyclerView.Adapter<GifResultAdapter.Holder>() {
 
     private val items = mutableListOf<GifResult>()
@@ -150,13 +151,14 @@ class GifResultAdapter(
         holder.image.setImageDrawable(null)
         holder.loading.visibility = View.VISIBLE
         holder.thumbnailJob = scope.launch {
+            val networkAllowed = allowsNetwork()
             val drawable = withContext(Dispatchers.IO) {
                 val bytes = if (result.providerId == GiphyGifProvider.PROVIDER_ID) {
                     // GIPHY standard integrations may not cache media copies without approval.
-                    downloadBytes(result.thumbnailUrl)
+                    downloadBytes(result.thumbnailUrl, networkAllowed)
                 } else {
                     thumbnailCache[result.thumbnailUrl]
-                        ?: downloadBytes(result.thumbnailUrl)?.also {
+                        ?: downloadBytes(result.thumbnailUrl, networkAllowed)?.also {
                             thumbnailCache.put(result.thumbnailUrl, it)
                         }
                 }
@@ -169,6 +171,11 @@ class GifResultAdapter(
             holder.image.setImageDrawable(drawable)
             (drawable as? Animatable)?.start()
         }
+    }
+
+    private fun downloadBytes(url: String, networkAllowed: Boolean): ByteArray? {
+        if (!networkAllowed) return null
+        return downloadBytes(url)
     }
 
     private fun downloadBytes(url: String): ByteArray? = runCatching {

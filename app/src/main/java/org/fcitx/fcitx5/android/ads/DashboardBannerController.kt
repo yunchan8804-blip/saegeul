@@ -16,7 +16,6 @@ import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import org.fcitx.fcitx5.android.BuildConfig
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -45,16 +44,15 @@ class DashboardBannerController(
         if (registered.compareAndSet(false, true)) {
             activity.application.registerActivityLifecycleCallbacks(this)
         }
-        if (
-            !TypingDnaAdGate.shouldShowBanner(
-                offlineMode = isOffline(),
-                frequency = frequencyStore.state(LocalAvenueCatalog.TYPING_DNA_DASHBOARD_BANNER)
-            )
-        ) {
-            return
-        }
+        if (!gateAllows()) return
         ensureInitialized { loadAd() }
     }
+
+    private fun gateAllows(): Boolean =
+        TypingDnaAdGate.shouldShowBanner(
+            offlineMode = AdOfflineGate.isOffline(),
+            frequency = frequencyStore.state(LocalAvenueCatalog.TYPING_DNA_DASHBOARD_BANNER)
+        )
 
     private fun ensureInitialized(onReady: () -> Unit) {
         runCatching {
@@ -117,14 +115,10 @@ class DashboardBannerController(
         return !activity.isFinishing && !activity.isDestroyed
     }
 
-    private fun isOffline(): Boolean {
-        return runCatching {
-            AppPrefs.getInstance().advanced.offlineMode.getValue()
-        }.getOrDefault(false)
-    }
-
     override fun onActivityResumed(activity: Activity) {
-        if (activity === this.activity) adView?.resume()
+        if (activity !== this.activity) return
+        val view = adView ?: return
+        if (gateAllows()) view.resume() else hide()
     }
 
     override fun onActivityPaused(activity: Activity) {

@@ -13,11 +13,18 @@ import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class GifCache(private val context: Context) {
+class GifCache internal constructor(
+    private val directory: File,
+    private val transport: (String) -> ByteArray
+) {
 
-    private val directory = File(context.cacheDir, DIRECTORY_NAME)
+    constructor(context: Context) : this(File(context.cacheDir, DIRECTORY_NAME), { url -> download(url) })
 
-    suspend fun getOrDownload(result: GifResult): File = withContext(Dispatchers.IO) {
+    /**
+     * Returns the cached copy, or downloads it only when [allowsNetwork] is true.
+     * Returns null when a download is needed but the network gate is closed; no request is made.
+     */
+    suspend fun getOrDownload(result: GifResult, allowsNetwork: Boolean): File? = withContext(Dispatchers.IO) {
         cleanupExpired()
         check(result.attachmentDownloadAllowed) {
             "Provider media-copy approval is required"
@@ -32,10 +39,11 @@ class GifCache(private val context: Context) {
             if (GifFileInspector.isAnimated(bytes)) return@withContext target
             target.delete()
         }
+        if (!allowsNetwork) return@withContext null
         val partial = File(directory, "${target.name}.partial")
         partial.delete()
         try {
-            val bytes = download(result.mediaUrl)
+            val bytes = transport(result.mediaUrl)
             if (!GifFileInspector.isAnimated(bytes)) {
                 throw InvalidGifException("Downloaded file is not an animated GIF")
             }
@@ -81,38 +89,6 @@ class GifCache(private val context: Context) {
         .take(48)
         .ifEmpty { "unknown" }
 
-    private fun download(url: String): ByteArray {
-        val connection = URI(url).toURL().openConnection() as HttpURLConnection
-        try {
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 30_000
-            connection.instanceFollowRedirects = true
-            connection.setRequestProperty("Accept", "image/gif")
-            connection.setRequestProperty("User-Agent", USER_AGENT)
-            val status = connection.responseCode
-            if (status !in 200..299) throw GifNetworkException("GIF download HTTP $status")
-            val contentLength = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
-            if (contentLength > MAX_BYTES) throw InvalidGifException("GIF exceeds 20 MiB")
-            val output = ByteArrayOutputStream(
-                contentLength.takeIf { it in 1..Int.MAX_VALUE }?.toInt() ?: DEFAULT_BUFFER_SIZE
-            )
-            connection.inputStream.use { input ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var total = 0L
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    total += count
-                    if (total > MAX_BYTES) throw InvalidGifException("GIF exceeds 20 MiB")
-                    output.write(buffer, 0, count)
-                }
-            }
-            return output.toByteArray()
-        } finally {
-            connection.disconnect()
-        }
-    }
-
     private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
         .digest(value.toByteArray())
         .joinToString("") { "%02x".format(it) }
@@ -127,6 +103,38 @@ class GifCache(private val context: Context) {
 
         private const val USER_AGENT =
             "Saegeul-GifSearch/0.2 (https://github.com/yunchan8804-blip/saegeul)"
+
+        private fun download(url: String): ByteArray {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = 10_000
+                connection.readTimeout = 30_000
+                connection.instanceFollowRedirects = true
+                connection.setRequestProperty("Accept", "image/gif")
+                connection.setRequestProperty("User-Agent", USER_AGENT)
+                val status = connection.responseCode
+                if (status !in 200..299) throw GifNetworkException("GIF download HTTP $status")
+                val contentLength = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
+                if (contentLength > MAX_BYTES) throw InvalidGifException("GIF exceeds 20 MiB")
+                val output = ByteArrayOutputStream(
+                    contentLength.takeIf { it in 1..Int.MAX_VALUE }?.toInt() ?: DEFAULT_BUFFER_SIZE
+                )
+                connection.inputStream.use { input ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var total = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        if (total > MAX_BYTES) throw InvalidGifException("GIF exceeds 20 MiB")
+                        output.write(buffer, 0, count)
+                    }
+                }
+                return output.toByteArray()
+            } finally {
+                connection.disconnect()
+            }
+        }
     }
 }
 

@@ -69,7 +69,8 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
             onAttach = ::attachGif,
             onSelectionChanged = { ui.clearActionStatus() },
             onVisible = { result -> trackGiphyAction(result, GifAnalyticsEvent.Load) },
-            onCardTap = { result -> trackGiphyAction(result, GifAnalyticsEvent.Click) }
+            onCardTap = { result -> trackGiphyAction(result, GifAnalyticsEvent.Click) },
+            allowsNetwork = service::allowsNetworkInputFeatures
         )
         ui.recyclerView.layoutManager = GridLayoutManager(context, 2)
         ui.recyclerView.adapter = adapter
@@ -346,8 +347,16 @@ class GifSearchWindow : InputWindow.ExtendedInputWindow<GifSearchWindow>() {
         retryAction = { attachGif(result) }
         actionJob = service.lifecycleScope.launch {
             try {
-                val file = cache.getOrDownload(result)
-                when (committer.commit(result, file, attachmentTarget)) {
+                val file = cache.getOrDownload(
+                    result,
+                    allowsNetwork = service.allowsNetworkInputFeatures()
+                )
+                val commitResult = if (file == null) {
+                    GifCommitResult.SensitiveEditor
+                } else {
+                    committer.commit(result, file, attachmentTarget)
+                }
+                when (commitResult) {
                     GifCommitResult.Success -> {
                         trackGiphyAction(result, GifAnalyticsEvent.Send)
                         Toast.makeText(context, R.string.gif_attached, Toast.LENGTH_SHORT).show()

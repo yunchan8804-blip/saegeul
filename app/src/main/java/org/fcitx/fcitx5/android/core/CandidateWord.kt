@@ -23,6 +23,9 @@ data class CandidateWord @JvmOverloads constructor(
         }
     }
 
+    override fun toString(): String =
+        "CandidateWord(labelLen=${label.length}, textLen=${text.length}, commentLen=${comment.length})"
+
     companion object {
         val Empty = CandidateWord("", "", "", false)
     }

@@ -15,8 +15,7 @@ sealed class FcitxEvent<T>(open val data: T) {
 
         data class Data(val total: Int = -1, val candidates: Array<CandidateWord> = emptyArray()) {
 
-            override fun toString(): String =
-                "total=$total, candidates=[${candidates.joinToString(limit = 5)}]"
+            override fun toString(): String = "total=$total, candidates=${candidates.size}"
 
             override fun equals(other: Any?): Boolean {
                 if (this === other) return true
@@ -43,7 +42,9 @@ sealed class FcitxEvent<T>(open val data: T) {
 
         override val eventType = EventType.Commit
 
-        data class Data(val text: String, val cursor: Int)
+        data class Data(val text: String, val cursor: Int) {
+            override fun toString(): String = "Data(textLen=${text.length}, cursor=$cursor)"
+        }
     }
 
     data class ClientPreeditEvent(override val data: FormattedText) :
@@ -51,7 +52,7 @@ sealed class FcitxEvent<T>(open val data: T) {
 
         override val eventType = EventType.ClientPreedit
 
-        override fun toString(): String = "ClientPreeditEvent('$data', ${data.cursor})"
+        override fun toString(): String = "ClientPreeditEvent(len=${data.length}, ${data.cursor})"
     }
 
     data class InputPanelEvent(override val data: Data) : FcitxEvent<InputPanelEvent.Data>(data) {
@@ -70,6 +71,10 @@ sealed class FcitxEvent<T>(open val data: T) {
                 FormattedText.Empty,
                 emptyArray()
             )
+
+            override fun toString(): String =
+                "Data(preeditLen=${preedit.length}, auxUpLen=${auxUp.length}, " +
+                    "auxDownLen=${auxDown.length}, tabs=${tabs.size})"
 
             override fun equals(other: Any?): Boolean {
                 if (this === other) return true
@@ -112,7 +117,9 @@ sealed class FcitxEvent<T>(open val data: T) {
             val unicode: Int,
             val up: Boolean,
             val timestamp: Int
-        )
+        ) {
+            override fun toString(): String = "Data(states=$states, up=$up, timestamp=$timestamp)"
+        }
     }
 
     data class IMChangeEvent(override val data: InputMethodEntry) :
@@ -179,6 +186,10 @@ sealed class FcitxEvent<T>(open val data: T) {
                 @Suppress("BooleanLiteralArgument")
                 val Empty = Data(emptyArray(), -1, LayoutHint.NotSet, false, false)
             }
+
+            override fun toString(): String =
+                "Data(candidates=${candidates.size}, cursorIndex=$cursorIndex, " +
+                    "layoutHint=$layoutHint, hasPrev=$hasPrev, hasNext=$hasNext)"
 
             override fun equals(other: Any?): Boolean {
                 if (this === other) return true
@@ -289,7 +300,10 @@ sealed class FcitxEvent<T>(open val data: T) {
     data class InternalPromptDirectCommitBarrier(override val data: Data) : FcitxEvent<InternalPromptDirectCommitBarrier.Data>(data) {
         override val eventType = EventType.Unknown
 
-        data class Data(val token: Long, val sequence: Long, val text: String)
+        data class Data(val token: Long, val sequence: Long, val text: String) {
+            override fun toString(): String =
+                "Data(token=$token, sequence=$sequence, textLen=${text.length})"
+        }
     }
 
     enum class EventType {

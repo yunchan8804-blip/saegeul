@@ -15,7 +15,6 @@ import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.data.points.PointLedger
 import org.fcitx.fcitx5.android.data.points.PointPricing
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -121,15 +120,9 @@ class ThemePointRewardedController(
     private fun gateAllows(): Boolean {
         val now = System.currentTimeMillis()
         return TypingDnaAdGate.shouldShowThemePointEarn(
-            offlineMode = isOffline(),
+            offlineMode = AdOfflineGate.isOffline(),
             frequency = frequencyStore.state(LocalAvenueCatalog.THEME_POINT_EARN),
             nowEpochMs = now
         )
-    }
-
-    private fun isOffline(): Boolean {
-        return runCatching {
-            AppPrefs.getInstance().advanced.offlineMode.getValue()
-        }.getOrDefault(false)
     }
 }
