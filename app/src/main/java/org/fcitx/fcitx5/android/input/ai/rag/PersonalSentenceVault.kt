@@ -12,7 +12,9 @@ import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
 import java.util.Collections
 import kotlin.math.ln
@@ -258,30 +260,33 @@ class PersonalSentenceVault(
                 docLen.clear()
                 revision++
             }
-            vaultFile?.delete()
+            vaultFile?.deleteForUser()
         }
     }
 
     fun save() {
         val vf = vaultFile ?: return
         synchronized(persistenceLock) {
-            runCatching {
-                val snapshot = synchronized(this) {
-                    val root = JSONObject()
-                    root.put("v", 1)
-                    val arr = JSONArray()
-                    docs.values.forEach { doc ->
-                        val o = JSONObject()
-                        o.put("t", doc.text)
-                        o.put("cnt", doc.count)
-                        o.put("cat", doc.category)
-                        o.put("ls", doc.lastSeenMs)
-                        arr.put(o)
-                    }
-                    root.put("docs", arr)
-                    root
+            val snapshot = synchronized(this) {
+                val root = JSONObject()
+                root.put("v", 1)
+                val arr = JSONArray()
+                docs.values.forEach { doc ->
+                    val o = JSONObject()
+                    o.put("t", doc.text)
+                    o.put("cnt", doc.count)
+                    o.put("cat", doc.category)
+                    o.put("ls", doc.lastSeenMs)
+                    arr.put(o)
                 }
+                root.put("docs", arr)
+                root
+            }
+            try {
                 vf.writeText(snapshot.toString())
+            } catch (exception: Exception) {
+                // A read-blocked or unwritable file keeps its previous bytes; sentences stay in memory.
+                Timber.w(exception, "Personal sentence vault could not be saved")
             }
         }
     }
@@ -326,9 +331,17 @@ class PersonalSentenceVault(
     private fun load() {
         val vf = vaultFile ?: return
         if (!vf.exists()) return
-        runCatching {
-            val raw = vf.readTextAndMigrate() ?: return
-            if (raw.isBlank()) return
+        val raw = try {
+            vf.readTextAndMigrate()
+        } catch (exception: Exception) {
+            // The file stays read-blocked, so save() cannot replace it with the empty vault.
+            Timber.w(exception, "Personal sentence vault could not be read")
+            return
+        } ?: return
+        if (raw.isBlank()) return
+        val now = clock()
+        val loaded = LinkedHashMap<String, Doc>()
+        try {
             val root = JSONObject(raw)
             val arr = root.optJSONArray("docs") ?: JSONArray()
             for (i in 0 until arr.length()) {
@@ -337,21 +350,28 @@ class PersonalSentenceVault(
                 if (text.isBlank()) continue
                 val tokens = PersonalNgramTokenizer.tokenize(text)
                 if (tokens.size < 2) continue
-                val doc = Doc(
+                loaded[text] = Doc(
                     id = text,
                     text = text,
                     category = o.optString("cat", TypingDnaVault.CATEGORY_GENERAL),
-                    lastSeenMs = o.optLong("ls", clock()),
+                    lastSeenMs = o.optLong("ls", now),
                     count = o.optInt("cnt", 1),
                     tokens = tokens
                 )
-                docs[doc.text] = doc
-                indexDoc(doc)
             }
-        }.onFailure {
-            docs.clear()
-            postings.clear()
-            docLen.clear()
+        } catch (exception: JSONException) {
+            vf.markUnreadable()
+            Timber.w("Personal sentence vault could not be parsed (%s)", exception.javaClass.simpleName)
+            return
+        }
+        val kept = if (loaded.size > maxSentences) {
+            loaded.values.sortedByDescending { decayedCount(it, now) }.take(maxSentences)
+        } else {
+            loaded.values
+        }
+        kept.forEach { doc ->
+            docs[doc.text] = doc
+            indexDoc(doc)
         }
     }
 

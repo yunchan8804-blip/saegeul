@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="personal_dictionary_save_unavailable" tools:ignore="MissingTranslation">Can\'t save the dictionary right now. Please try again in a moment.</string>
+</resources>

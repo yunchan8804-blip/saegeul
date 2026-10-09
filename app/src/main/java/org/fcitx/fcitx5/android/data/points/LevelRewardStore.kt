@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.points
 
 import android.content.Context
+import java.io.IOException
 
 object LevelRewardMath {
     /** Levels gained since the last reward, or null when nothing is owed. */
@@ -28,7 +29,17 @@ class LevelRewardStore(
     private val prefs = context.applicationContext
         .getSharedPreferences("point_meta", Context.MODE_PRIVATE)
 
-    fun grantIfLevelUp(newLevel: Int, nowEpochMs: Long): Int {
+    /**
+     * Pays [LevelRewardMath.pointsFor] for every level gained since the last rewarded one and
+     * returns the points paid, or 0 when nothing was paid.
+     *
+     * Double payment is worse than a lost payment, so the new level is committed first and the
+     * points are earned second: if the level cannot be saved nothing is paid, and if the ledger
+     * refuses the points the level goes back to its previous value so a later call pays again.
+     * A process death between those two steps loses that payment instead of repeating it.
+     * Calls are serialized across all instances in the process.
+     */
+    fun grantIfLevelUp(newLevel: Int, nowEpochMs: Long): Int = synchronized(GRANT_LOCK) {
         val last = prefs.getInt(KEY_LAST_LEVEL, Int.MIN_VALUE)
         if (last == Int.MIN_VALUE) {
             prefs.edit().putInt(KEY_LAST_LEVEL, newLevel).apply()
@@ -36,12 +47,13 @@ class LevelRewardStore(
         }
         val gained = LevelRewardMath.gainedLevels(last, newLevel) ?: return 0
         val points = LevelRewardMath.pointsFor(gained)
-        ledger.earn(points, VENUE_LEVEL_UP, nowEpochMs, "levels:$gained")
-        prefs.edit()
-            .putInt(KEY_LAST_LEVEL, newLevel)
-            .putInt(KEY_PENDING_CELEBRATION, newLevel)
-            .apply()
-        return points
+        if (!prefs.edit().putInt(KEY_LAST_LEVEL, newLevel).commit()) return 0
+        if (!ledger.earn(points, VENUE_LEVEL_UP, nowEpochMs, "levels:$gained")) {
+            prefs.edit().putInt(KEY_LAST_LEVEL, last).commit()
+            return 0
+        }
+        prefs.edit().putInt(KEY_PENDING_CELEBRATION, newLevel).apply()
+        points
     }
 
     /**
@@ -51,11 +63,17 @@ class LevelRewardStore(
      * next [grantIfLevelUp] pay out points for progress the user didn't just earn by typing.
      * Deliberately does not touch [KEY_PENDING_CELEBRATION], so a silent restore never triggers a
      * level-up celebration.
+     *
+     * Persists synchronously (`commit()`) because the import caller restarts the process right
+     * after, which would drop an asynchronous `apply()`; throws [IOException] when the write fails.
+     * Blocks on disk I/O, so call it off the main thread.
      */
-    fun markAlreadyRewardedUpTo(level: Int) {
+    fun markAlreadyRewardedUpTo(level: Int): Unit = synchronized(GRANT_LOCK) {
         val current = prefs.getInt(KEY_LAST_LEVEL, Int.MIN_VALUE)
         if (current == Int.MIN_VALUE || level > current) {
-            prefs.edit().putInt(KEY_LAST_LEVEL, level).apply()
+            if (!prefs.edit().putInt(KEY_LAST_LEVEL, level).commit()) {
+                throw IOException("Failed to persist the already-rewarded level: $level")
+            }
         }
     }
 
@@ -67,6 +85,7 @@ class LevelRewardStore(
 
     companion object {
         const val VENUE_LEVEL_UP = "level-up"
+        private val GRANT_LOCK = Any()
         private const val KEY_LAST_LEVEL = "last_rewarded_level"
         private const val KEY_PENDING_CELEBRATION = "pending_celebration_level"
     }

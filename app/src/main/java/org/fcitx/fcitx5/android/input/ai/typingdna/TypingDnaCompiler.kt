@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.input.ai.KoreanTone
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceRecord
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
+import timber.log.Timber
 
 /**
  * 0ms Local Knowledge Compiler:
@@ -27,13 +28,20 @@ class TypingDnaCompiler(
      * [persist] writes into [TypingDnaRepository]. Pass false for startup/runtime rehydrate,
      * which updates runtime models only.
      * [analyzedSentenceCount] is the actual number of newly analyzed sentences to add.
+     * [expectedGeneration] is [TypingDnaRepository.generation] read before the batch was profiled;
+     * when the profile was erased since, nothing is compiled or persisted.
      */
     @Synchronized
     fun compilePersona(
         persona: PersonaDna,
         persist: Boolean = true,
-        analyzedSentenceCount: Int = 15
+        analyzedSentenceCount: Int = 15,
+        expectedGeneration: Long? = null
     ) {
+        if (persist && expectedGeneration != null && repository != null && repository.generation() != expectedGeneration) {
+            Timber.w("Typing DNA batch dropped: the profile was erased while it was being built")
+            return
+        }
         val isInformal = persona.dominantTone.equals("Informal", ignoreCase = true)
 
         // 1. Inject Bigrams into KoreanCollocationModel
@@ -69,7 +77,7 @@ class TypingDnaCompiler(
         }
 
         if (persist) {
-            repository?.updatePersona(persona, analyzedSentenceCount)
+            repository?.updatePersona(persona, analyzedSentenceCount, expectedGeneration)
         }
     }
 

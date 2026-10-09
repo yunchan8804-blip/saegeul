@@ -22,12 +22,14 @@ class TypingDnaInstantSync(
     private val compiler: TypingDnaCompiler
 ) {
     fun syncNow(category: String? = null): TypingDnaStats {
+        val generation = repository.generation()
         vault.processPending(category) { pendingCategory, sentences ->
             val persona = profiler.profileOnDevice(pendingCategory, sentences)
             compiler.compilePersona(
                 persona,
                 persist = true,
-                analyzedSentenceCount = sentences.size
+                analyzedSentenceCount = sentences.size,
+                expectedGeneration = generation
             )
         }
         return repository.getStats()

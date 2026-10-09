@@ -24,6 +24,8 @@ import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
 import splitties.dimensions.dp
+import timber.log.Timber
+import java.io.IOException
 
 class PersonalDictionaryFragment : PaddingPreferenceFragment() {
     private val store by lazy { PersonalDictionaryStore(requireContext()) }
@@ -49,11 +51,7 @@ class PersonalDictionaryFragment : PaddingPreferenceFragment() {
                             .onFailure {
                                 // The switch snaps back on failure; say why instead of
                                 // reverting silently.
-                                Toast.makeText(
-                                    ctx,
-                                    R.string.voice_provider_save_failed,
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                showSaveUnavailable()
                             }
                             .isSuccess
                     }
@@ -130,8 +128,12 @@ class PersonalDictionaryFragment : PaddingPreferenceFragment() {
                         dialog.dismiss()
                         rebuild()
                     }
-                    .onFailure {
-                        wordField.error = getString(R.string.personal_dictionary_invalid_word)
+                    .onFailure { failure ->
+                        if (failure is IOException) {
+                            showSaveUnavailable()
+                        } else {
+                            wordField.error = getString(R.string.personal_dictionary_invalid_word)
+                        }
                     }
             }
         }
@@ -143,11 +145,20 @@ class PersonalDictionaryFragment : PaddingPreferenceFragment() {
             .setTitle(R.string.personal_dictionary_delete)
             .setMessage(getString(R.string.personal_dictionary_delete_confirm, word.value))
             .setPositiveButton(R.string.delete) { _, _ ->
-                store.remove(word.value)
+                try {
+                    store.remove(word.value)
+                } catch (exception: IOException) {
+                    Timber.w(exception, "Personal dictionary word could not be removed")
+                    showSaveUnavailable()
+                }
                 rebuild()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun showSaveUnavailable() {
+        Toast.makeText(requireContext(), R.string.personal_dictionary_save_unavailable, Toast.LENGTH_SHORT).show()
     }
 
     private fun categoryLabel(category: PersonalWordCategory): String = getString(

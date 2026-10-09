@@ -11,8 +11,11 @@ import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
+import java.io.IOException
 
 /**
  * 사용자가 "지우고 다시 쓴" 오타-교정 쌍을 온디바이스로 학습하는 저장소.
@@ -128,7 +131,12 @@ class CorrectionPatternStore(
                 obj.put("confusions", confusionArray)
                 obj
             }
-            vf.writeText(snapshot.toString(2))
+            try {
+                vf.writeText(snapshot.toString(2))
+            } catch (exception: IOException) {
+                // A read-blocked or unwritable file keeps its previous bytes; learning stays in memory.
+                Timber.w(exception, "Correction patterns could not be saved")
+            }
         }
     }
 
@@ -138,14 +146,22 @@ class CorrectionPatternStore(
                 pairs.clear()
                 confusions.clear()
             }
-            vaultFile?.delete() ?: storeFile?.delete()
+            vaultFile?.deleteForUser() ?: storeFile?.delete()
         }
     }
 
     private fun loadFromDisk(vaultFile: VaultFile) {
+        val content = try {
+            vaultFile.readTextAndMigrate()
+        } catch (exception: Exception) {
+            // The file stays read-blocked, so save() cannot replace it with the empty state.
+            Timber.w(exception, "Correction patterns could not be read")
+            return
+        } ?: return
+        if (content.isBlank()) return
+        val loadedPairs = LinkedHashMap<String, PairRecord>()
+        val loadedConfusions = HashMap<Pair<Char, Char>, Float>()
         try {
-            val content = vaultFile.readTextAndMigrate() ?: return
-            if (content.isBlank()) return
             val obj = JSONObject(content)
             val pairsArray = obj.optJSONArray("pairs")
             if (pairsArray != null) {
@@ -155,7 +171,7 @@ class CorrectionPatternStore(
                     val c = p.getString("corrected")
                     val count = p.optDouble("count", 1.0).toFloat()
                     val lastSeen = p.optLong("lastSeenMs", 0L)
-                    pairs[pairKey(t, c)] = PairRecord(t, c, count, lastSeen)
+                    loadedPairs[pairKey(t, c)] = PairRecord(t, c, count, lastSeen)
                 }
             }
             val confusionArray = obj.optJSONArray("confusions")
@@ -166,13 +182,16 @@ class CorrectionPatternStore(
                     val to = entry.getString("to")
                     if (from.isEmpty() || to.isEmpty()) continue
                     val count = entry.optDouble("count", 0.0).toFloat()
-                    confusions[from[0] to to[0]] = count
+                    loadedConfusions[from[0] to to[0]] = count
                 }
             }
-        } catch (_: Exception) {
-            pairs.clear()
-            confusions.clear()
+        } catch (exception: JSONException) {
+            vaultFile.markUnreadable()
+            Timber.w("Correction patterns could not be parsed (%s)", exception.javaClass.simpleName)
+            return
         }
+        pairs.putAll(loadedPairs)
+        confusions.putAll(loadedConfusions)
     }
 
     private fun recordConfusions(typed: String, corrected: String) {

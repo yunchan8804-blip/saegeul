@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.File
@@ -191,7 +192,7 @@ class TypingDnaVault(
                 batchReadyCallback?.invoke(category, sentences)
             }
         }
-        purge()
+        purgeBuffers(null)
         return snapshot
     }
 
@@ -200,9 +201,16 @@ class TypingDnaVault(
      * Irreversibly purges the raw staging buffers once knowledge has been compiled.
      * Throws [TypingDnaPersistenceException] if the staging file cannot be rewritten; the purged
      * buffers are then restored, so memory keeps matching the file that still holds them.
+     * A full purge is the user's request to erase the staged sentences, so it also removes a
+     * staging file that could not be read instead of failing on its read block.
      */
     @Synchronized
     fun purge(category: String? = null) {
+        if (category == null) vaultFile?.takeIf { it.isReadBlocked() }?.deleteForUser()
+        purgeBuffers(category)
+    }
+
+    private fun purgeBuffers(category: String?) {
         val purged = HashMap<String, ArrayDeque<String>>()
         if (category != null) {
             categoryBuffers.remove(category)?.let { purged[category] = it }
@@ -241,25 +249,46 @@ class TypingDnaVault(
     private fun rehydrateFromStaging() {
         val vf = vaultFile ?: return
         if (!vf.exists()) return
-        runCatching {
-            val raw = vf.readTextAndMigrate() ?: return
-            if (raw.isBlank()) return
-            val root = JSONObject(raw)
-            val keys = root.keys()
-            while (keys.hasNext()) {
-                val category = keys.next()
-                val arr = root.optJSONArray(category) ?: continue
-                val deque = ArrayDeque<String>()
-                for (i in 0 until arr.length()) {
-                    val sentence = arr.optString(i, "").trim()
-                    if (sentence.length >= 4) {
-                        deque.addLast(sentence)
-                    }
-                }
-                if (deque.isNotEmpty()) {
-                    categoryBuffers[category] = deque
+        val raw = try {
+            vf.readTextAndMigrate()
+        } catch (exception: Exception) {
+            // The staging file stays read-blocked, so later saves cannot replace it.
+            Timber.w(exception, "Typing DNA staging could not be read")
+            return
+        }
+        if (raw.isNullOrBlank()) return
+        val loaded = try {
+            parseStaging(raw)
+        } catch (exception: JSONException) {
+            vf.markUnreadable()
+            Timber.w("Typing DNA staging could not be parsed (%s)", exception.javaClass.simpleName)
+            return
+        }
+        categoryBuffers.putAll(loaded)
+    }
+
+    private fun parseStaging(raw: String): Map<String, ArrayDeque<String>> {
+        val root = JSONObject(raw)
+        val loaded = HashMap<String, ArrayDeque<String>>()
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val category = keys.next()
+            if (PersonaRegistry.byId(category) == null) continue
+            val arr = root.optJSONArray(category) ?: continue
+            val deque = ArrayDeque<String>()
+            for (i in 0 until arr.length()) {
+                val sentence = arr.optString(i, "").trim()
+                if (sentence.length >= 4) {
+                    deque.addLast(sentence)
                 }
             }
+            while (deque.size > maxCapacityPerCategory) {
+                deque.removeFirst()
+            }
+            if (deque.isNotEmpty()) {
+                loaded[category] = deque
+            }
         }
+        return loaded
     }
 }

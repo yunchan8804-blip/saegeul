@@ -9,6 +9,9 @@ import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFileVersion
+import org.json.JSONException
+import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
 
 /**
@@ -24,6 +27,7 @@ class TypingDnaRepository(
     private var cachedVersion: VaultFileVersion? = null
     private var cachedSummary: DerivedCache<TypingDnaSummary>? = null
     private var cachedStats: DerivedCache<TypingDnaStats>? = null
+    private var generation = 0L
     private val vaultFile = VaultFile(storageFile, cipher, VaultFile.aadFor(storageFile.name))
 
     @Synchronized
@@ -43,9 +47,25 @@ class TypingDnaRepository(
         clearCaches()
     }
 
+    /**
+     * Counter that [clear] raises. A caller that builds a persona from the stored profile or from a
+     * pending batch reads it first and passes it back to [updatePersona], so work that was already
+     * under way when the user erased the profile is dropped instead of bringing it back.
+     */
     @Synchronized
-    fun updatePersona(newPersona: PersonaDna, analyzedSentenceCount: Int = 15) {
+    fun generation(): Long = generation
+
+    /**
+     * Merges [newPersona] into the stored profile. With [expectedGeneration], the update is
+     * dropped (and logged) when [clear] ran since that generation was read.
+     */
+    @Synchronized
+    fun updatePersona(newPersona: PersonaDna, analyzedSentenceCount: Int = 15, expectedGeneration: Long? = null) {
         vaultFile.withLock {
+            if (expectedGeneration != null && expectedGeneration != generation) {
+                Timber.w("Typing DNA update dropped: the profile was erased while it was being built")
+                return@withLock
+            }
             updatePersonaLocked(newPersona, analyzedSentenceCount)
         }
     }
@@ -53,9 +73,8 @@ class TypingDnaRepository(
     @Synchronized
     fun clear() {
         vaultFile.withLock {
-            runCatching {
-                vaultFile.delete()
-            }
+            generation++
+            vaultFile.deleteForUser()
             clearCaches()
         }
     }
@@ -70,9 +89,21 @@ class TypingDnaRepository(
         invalidateDerivedCaches()
         val text = try {
             vaultFile.readTextAndMigrate()
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            // The file stays read-blocked, so a later save cannot replace it with this empty profile.
+            Timber.w(exception, "Typing DNA profile could not be read")
             clearCaches()
             return TypingDnaProfile.fromJson("")
+        }
+        if (!text.isNullOrBlank()) {
+            try {
+                JSONObject(text)
+            } catch (exception: JSONException) {
+                vaultFile.markUnreadable()
+                Timber.w("Typing DNA profile could not be parsed (%s)", exception.javaClass.simpleName)
+                clearCaches()
+                return TypingDnaProfile.fromJson("")
+            }
         }
         val profile = TypingDnaProfile.fromJson(text ?: "")
         cachedProfile = profile
@@ -134,10 +165,18 @@ class TypingDnaRepository(
         )
         saveLocked(updatedProfile)
         if (analyzedSentenceCount > 0) {
-            onSentencesAnalyzed?.invoke(
-                analyzedSentenceCount,
-                TypingDnaLevelCurve.levelFor(updatedProfile.totalAnalyzedSentences)
-            )
+            // The profile is already saved, so a failing listener must not make the caller roll
+            // back and count this batch a second time.
+            try {
+                onSentencesAnalyzed?.invoke(
+                    analyzedSentenceCount,
+                    TypingDnaLevelCurve.levelFor(updatedProfile.totalAnalyzedSentences)
+                )
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                Timber.w(exception, "Typing DNA analyzed-sentence listener failed")
+            }
         }
     }
 

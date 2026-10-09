@@ -412,6 +412,9 @@ class GemmaGraphEnrichmentWorker(
                 }
 
                 val chunkText = current.chunks[current.nextChunkIndex]
+                // Read before generating: a graph the user erases while this chunk runs must not
+                // be rebuilt from the sentences exported earlier.
+                val graphGeneration = FcitxApplication.getInstance().personalGraphStore.generation()
                 val chunkStartedAtMs = System.currentTimeMillis()
                 val waitBeforeChunkMs = totalWaitMs
                 when (val outcome = runChunk(session, model, chunkText, mode, manual, onWaitingChanged)) {
@@ -424,7 +427,7 @@ class GemmaGraphEnrichmentWorker(
                         // and this log line both reflect actual generation time only.
                         val waitMs = (totalWaitMs - waitBeforeChunkMs).coerceAtLeast(0L)
                         val elapsedMs = (rawElapsedMs - waitMs).coerceAtLeast(0L)
-                        current = applyChunkResultIncrementally(current, outcome.result, elapsedMs, waitMs, statusStore)
+                        current = applyChunkResultIncrementally(current, outcome.result, elapsedMs, waitMs, statusStore, graphGeneration)
                         stagingStore.save(current)
                         processedThisRun++
                         if (outcome.result.skippedSentences > 0) {
@@ -483,7 +486,8 @@ class GemmaGraphEnrichmentWorker(
         chunkResult: ChunkEnrichResult,
         elapsedMs: Long,
         waitMs: Long,
-        statusStore: GraphEnrichmentStatusStore
+        statusStore: GraphEnrichmentStatusStore,
+        graphGeneration: Long
     ): PersonalGraphEnrichmentStagingStore.State {
         val succeeded = chunkResult.outcome == GraphEnrichmentChunkOutcome.VALID
         if (succeeded && (chunkResult.nodes.isNotEmpty() || chunkResult.edges.isNotEmpty() || chunkResult.topics.isNotEmpty())) {
@@ -493,14 +497,17 @@ class GemmaGraphEnrichmentWorker(
                 baseNodes, baseEdges, baseTopics,
                 chunkResult.nodes, chunkResult.edges, chunkResult.topics
             )
-            app.personalGraphStore.replaceGraph(
+            val applied = app.personalGraphStore.replaceGraph(
                 mergedNodes, mergedEdges, mergedTopics,
                 System.currentTimeMillis(),
-                sourceSentenceCount = app.personalSentenceVault.stats().sentences
+                sourceSentenceCount = app.personalSentenceVault.stats().sentences,
+                expectedGeneration = graphGeneration
             )
-            app.personalGraphStore.save()
-            val stats = app.personalGraphStore.stats()
-            statusStore.recordIncrementalApply(System.currentTimeMillis(), stats.nodes, stats.edges, stats.topics)
+            if (applied) {
+                app.personalGraphStore.save()
+                val stats = app.personalGraphStore.stats()
+                statusStore.recordIncrementalApply(System.currentTimeMillis(), stats.nodes, stats.edges, stats.topics)
+            }
         }
         return state.copy(
             nextChunkIndex = state.nextChunkIndex + 1,
@@ -519,7 +526,7 @@ class GemmaGraphEnrichmentWorker(
         statusStore: GraphEnrichmentStatusStore,
         stagingStore: PersonalGraphEnrichmentStagingStore
     ): Result {
-        stagingStore.clear()
+        stagingStore.discard()
         if (state.successCount == 0) {
             val result = PersonalGraphEnricher.EnrichResult(false, "parse_failed", 0, 0, 0)
             statusStore.recordResult(result, System.currentTimeMillis())

@@ -9,7 +9,9 @@ import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
+import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -203,16 +205,27 @@ class PredictionMetricsStore(
                     put("archived", archivedJson)
                 }
             }
-            vf.writeText(snapshot.toString())
+            try {
+                vf.writeText(snapshot.toString())
+            } catch (exception: IOException) {
+                // A read-blocked or unwritable file keeps its previous bytes; counters stay in memory.
+                Timber.w(exception, "Prediction metrics could not be saved")
+            }
         }
     }
 
     private fun load() {
         val vf = vaultFile ?: return
         if (!vf.exists()) return
+        val content = try {
+            vf.readTextAndMigrate()
+        } catch (exception: Exception) {
+            // The file stays read-blocked, so save() cannot replace it with the empty counters.
+            Timber.w(exception, "Prediction metrics could not be read")
+            return
+        } ?: return
+        if (content.isBlank()) return
         try {
-            val content = vf.readTextAndMigrate() ?: return
-            if (content.isBlank()) return
             val root = JSONObject(content)
             val daysJson = root.optJSONObject("days") ?: JSONObject()
             val loadedDays = TreeMap<String, MutableDay>()
@@ -248,9 +261,9 @@ class PredictionMetricsStore(
             days.clear()
             days.putAll(loadedDays)
             archived = loadedArchived
-        } catch (_: Throwable) {
-            days.clear()
-            archived = Archived()
+        } catch (exception: Exception) {
+            vf.markUnreadable()
+            Timber.w("Prediction metrics could not be parsed (%s)", exception.javaClass.simpleName)
         }
     }
 
@@ -260,7 +273,7 @@ class PredictionMetricsStore(
                 days.clear()
                 archived = Archived()
             }
-            vaultFile?.delete()
+            vaultFile?.deleteForUser()
         }
     }
 

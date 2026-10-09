@@ -9,7 +9,9 @@ import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
 import kotlin.math.ln
 
@@ -76,7 +78,8 @@ class PersonalNgramModel(
 
     /**
      * complete()의 매 호출마다 decomposeHangul()을 재계산하지 않도록 유니그램 단어의
-     * 자모열·초성열을 메모이즈한다. 단어 철자에 대한 순수 함수 결과이므로 만료가 필요 없다.
+     * 자모열·초성열을 메모이즈한다. 단어 철자에 대한 순수 함수 결과이므로 값은 만료되지 않지만,
+     * 어느 테이블에도 남지 않은 단어는 prune()에서 이 맵과 아래 첫 글자 인덱스에서 함께 지운다.
      */
     private val completionIndex = HashMap<String, Pair<String, String>>()
 
@@ -223,9 +226,9 @@ class PersonalNgramModel(
         val strokeJamo = morphology.decomposeHangul(stroke)
 
         // 후보 폭 좁히기: stroke가 비어있으면(모든 단어가 매치) 전체 vocabulary를 그대로 쓰고,
-        // 그 외에는 표면/자모/초성 첫 글자 인덱스에서 뽑은 후보만 검사한다. 인덱스는 학습 시점부터
-        // 누적되어 절대 줄어들지 않으므로(pruning으로 인한 stale 항목 가능) 아래 루프에서
-        // 반드시 현재 vocabulary 소속 여부를 다시 확인한다 — 완전성은 각 매칭 조건의 첫 글자가
+        // 그 외에는 표면/자모/초성 첫 글자 인덱스에서 뽑은 후보만 검사한다. 인덱스는 학습 시점에
+        // 채워지고 pruneUni가 유니그램을 지울 때 함께 줄어든다. 그래도 아래 루프에서 현재
+        // vocabulary 소속 여부를 다시 확인한다 — 완전성은 각 매칭 조건의 첫 글자가
         // 곧 해당 인덱스의 키와 같다는 사실로 보장된다.
         val candidateWords: Collection<String>
         val vocabulary: HashSet<String>
@@ -328,11 +331,13 @@ class PersonalNgramModel(
     @Synchronized
     fun prune() {
         val now = clock()
+        val removedWords = HashSet<String>()
         for (t in tables.values) {
-            pruneUni(t, now)
+            removedWords.addAll(pruneUni(t, now))
             pruneNested(t.bi, maxBigrams, now)
             pruneNested(t.tri, maxTrigrams, now)
         }
+        dropUnusedCompletionEntries(removedWords)
     }
 
     @Synchronized
@@ -352,7 +357,7 @@ class PersonalNgramModel(
                 wordsByJamoFirst.clear()
                 wordsByChoseongFirst.clear()
             }
-            vaultFile?.delete() ?: storeFile?.delete()
+            vaultFile?.deleteForUser() ?: storeFile?.delete()
         }
     }
 
@@ -372,8 +377,11 @@ class PersonalNgramModel(
                 root.put("tables", tablesJson)
                 root
             }
-            runCatching {
+            try {
                 vf.writeText(snapshot.toString())
+            } catch (exception: Exception) {
+                // A read-blocked or unwritable file keeps its previous bytes; learning stays in memory.
+                Timber.w(exception, "Personal n-gram model could not be saved")
             }
         }
     }
@@ -541,14 +549,37 @@ class PersonalNgramModel(
         return merged
     }
 
-    private fun pruneUni(t: Table, now: Long) {
-        if (t.uni.size <= maxUnigrams) return
+    /** Prunes [t]'s unigrams down to 90% of the cap and returns the words it removed. */
+    private fun pruneUni(t: Table, now: Long): List<String> {
+        if (t.uni.size <= maxUnigrams) return emptyList()
         val target = (maxUnigrams * 0.9).toInt()
         val sorted = t.uni.entries.sortedBy { decayed(it.value, now) }
         val toRemove = t.uni.size - target
+        val removed = ArrayList<String>(toRemove)
         for (i in 0 until toRemove) {
-            t.uni.remove(sorted[i].key)
+            val word = sorted[i].key
+            t.uni.remove(word)
+            removed.add(word)
         }
+        return removed
+    }
+
+    /** Drops [words] that no table's unigrams contain any more from the completion indexes. */
+    private fun dropUnusedCompletionEntries(words: Collection<String>) {
+        for (word in words) {
+            if (tables.values.any { word in it.uni }) continue
+            val (jamo, choseong) = completionIndex.remove(word) ?: continue
+            removeFromFirstKeyIndex(wordsByFirstChar, word.firstOrNull(), word)
+            removeFromFirstKeyIndex(wordsByJamoFirst, jamo.firstOrNull(), word)
+            removeFromFirstKeyIndex(wordsByChoseongFirst, choseong.firstOrNull(), word)
+        }
+    }
+
+    private fun removeFromFirstKeyIndex(index: HashMap<Char, MutableList<String>>, key: Char?, word: String) {
+        if (key == null) return
+        val bucket = index[key] ?: return
+        bucket.remove(word)
+        if (bucket.isEmpty()) index.remove(key)
     }
 
     private fun pruneNested(map: HashMap<String, HashMap<String, Entry>>, max: Int, now: Long) {
@@ -601,44 +632,62 @@ class PersonalNgramModel(
     private fun load() {
         val vf = vaultFile ?: return
         if (!vf.exists()) return
-        runCatching {
-            val raw = vf.readTextAndMigrate() ?: return@runCatching
-            if (raw.isBlank()) return@runCatching
-            val root = JSONObject(raw)
-            val tablesJson = root.optJSONObject("tables") ?: return@runCatching
-            val starLearned = root.optInt("learned", 0)
-            val starLast = root.optLong("last", 0L)
-            val keys = tablesJson.keys()
-            while (keys.hasNext()) {
-                val name = keys.next()
-                val tableJson = tablesJson.optJSONObject(name) ?: continue
-                val t = Table()
-                val uniJson = tableJson.optJSONObject("uni")
-                if (uniJson != null) {
-                    val uniKeys = uniJson.keys()
-                    while (uniKeys.hasNext()) {
-                        val w = uniKeys.next()
-                        val arr = uniJson.optJSONArray(w) ?: continue
-                        if (arr.length() >= 2) {
-                            t.uni[w] = Entry(arr.getDouble(0).toFloat(), arr.getLong(1))
-                        }
-                    }
-                }
-                deserializeNested(tableJson.optJSONObject("bi"), t.bi)
-                deserializeNested(tableJson.optJSONObject("tri"), t.tri)
-                if (name == "*") {
-                    t.learnedSentences = starLearned
-                    t.lastLearnedMs = starLast
-                }
-                tables[name] = t
-            }
-            for (t in tables.values) {
-                for (w in t.uni.keys) {
-                    if (w == START) continue
-                    ensureCompletionIndexed(w)
-                }
+        val raw = try {
+            vf.readTextAndMigrate()
+        } catch (exception: Exception) {
+            // The file stays read-blocked, so save() cannot replace it with the empty model.
+            Timber.w(exception, "Personal n-gram model could not be read")
+            return
+        } ?: return
+        if (raw.isBlank()) return
+        val loaded = try {
+            parseTables(raw)
+        } catch (exception: JSONException) {
+            vf.markUnreadable()
+            Timber.w("Personal n-gram model could not be parsed (%s)", exception.javaClass.simpleName)
+            return
+        } ?: return
+        tables.putAll(loaded)
+        for (t in tables.values) {
+            for (w in t.uni.keys) {
+                if (w == START) continue
+                ensureCompletionIndexed(w)
             }
         }
+    }
+
+    /** Parses every table into a new map so a failure midway never leaves a partly filled model. */
+    private fun parseTables(raw: String): Map<String, Table>? {
+        val root = JSONObject(raw)
+        val tablesJson = root.optJSONObject("tables") ?: return null
+        val starLearned = root.optInt("learned", 0)
+        val starLast = root.optLong("last", 0L)
+        val loaded = HashMap<String, Table>()
+        val keys = tablesJson.keys()
+        while (keys.hasNext()) {
+            val name = keys.next()
+            val tableJson = tablesJson.optJSONObject(name) ?: continue
+            val t = Table()
+            val uniJson = tableJson.optJSONObject("uni")
+            if (uniJson != null) {
+                val uniKeys = uniJson.keys()
+                while (uniKeys.hasNext()) {
+                    val w = uniKeys.next()
+                    val arr = uniJson.optJSONArray(w) ?: continue
+                    if (arr.length() >= 2) {
+                        t.uni[w] = Entry(arr.getDouble(0).toFloat(), arr.getLong(1))
+                    }
+                }
+            }
+            deserializeNested(tableJson.optJSONObject("bi"), t.bi)
+            deserializeNested(tableJson.optJSONObject("tri"), t.tri)
+            if (name == "*") {
+                t.learnedSentences = starLearned
+                t.lastLearnedMs = starLast
+            }
+            loaded[name] = t
+        }
+        return loaded
     }
 
     private fun deserializeNested(json: JSONObject?, target: HashMap<String, HashMap<String, Entry>>) {

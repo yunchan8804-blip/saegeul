@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
 
 /**
@@ -50,6 +51,9 @@ class PersonalGraphStore(
 
     private var topics: List<Topic> = emptyList()
 
+    // Raised by clear() so a merge built on an older snapshot cannot bring erased data back.
+    private var generation = 0L
+
     private var graphBuiltMs: Long = 0L
 
     // Vault sentence count at the time the graph was last built, so the enrichment loop can tell
@@ -73,8 +77,13 @@ class PersonalGraphStore(
         edges: List<Edge>,
         topics: List<Topic>,
         builtMs: Long,
-        sourceSentenceCount: Int = 0
-    ) {
+        sourceSentenceCount: Int = 0,
+        expectedGeneration: Long? = null
+    ): Boolean {
+        if (expectedGeneration != null && expectedGeneration != generation) {
+            Timber.w("Personal graph update dropped: the graph was erased while it was being built")
+            return false
+        }
         this.nodes.clear()
         this.edges.clear()
         nodes.sortedByDescending { it.weight }
@@ -89,6 +98,7 @@ class PersonalGraphStore(
         this.graphBuiltMs = builtMs
         this.sourceSentenceCount = sourceSentenceCount
         rebuildAliases()
+        return true
     }
 
     @Synchronized
@@ -100,18 +110,34 @@ class PersonalGraphStore(
      * [replaceGraph] - which still owns cap enforcement and alias rebuilding either way.
      */
     @Synchronized
-    fun snapshot(): Triple<List<Node>, List<Edge>, List<Topic>> =
-        Triple(nodes.values.toList(), edges.values.toList(), topics)
+    fun generation(): Long = generation
+
+    @Synchronized
+    fun snapshot(): GraphSnapshot =
+        GraphSnapshot(nodes.values.toList(), edges.values.toList(), topics, generation)
+
+    /**
+     * The stored graph plus the [generation] it was read at. Destructures as nodes, edges, topics;
+     * pass [generation] back to [replaceGraph] so a merge built on this snapshot is dropped when
+     * [clear] ran in between.
+     */
+    data class GraphSnapshot(
+        val nodes: List<Node>,
+        val edges: List<Edge>,
+        val topics: List<Topic>,
+        val generation: Long
+    )
 
     @Synchronized
     fun clear() {
+        generation++
         nodes.clear()
         edges.clear()
         nodeAliases.clear()
         topics = emptyList()
         graphBuiltMs = 0L
         sourceSentenceCount = 0
-        vaultFile?.delete()
+        vaultFile?.deleteForUser()
     }
 
     /**
@@ -193,61 +219,88 @@ class PersonalGraphStore(
     private fun load() {
         val vf = vaultFile ?: return
         if (!vf.exists()) return
-        runCatching {
-            val raw = vf.readTextAndMigrate() ?: return
-            if (raw.isBlank()) return
-            val root = JSONObject(raw)
-            graphBuiltMs = root.optLong("built", 0L)
-            sourceSentenceCount = root.optInt("src", 0)
-
-            val nodesArr = root.optJSONArray("nodes") ?: JSONArray()
-            for (i in 0 until nodesArr.length()) {
-                val o = nodesArr.optJSONObject(i) ?: continue
-                val id = o.optString("id", "")
-                if (id.isBlank()) continue
-                val tagsArr = o.optJSONArray("tags")
-                val tags = mutableListOf<String>()
-                if (tagsArr != null) {
-                    for (j in 0 until tagsArr.length()) tags.add(tagsArr.optString(j, ""))
-                }
-                val weight = o.optDouble("w", 1.0).toFloat()
-                nodes[id] = Node(id, tags, weight)
-            }
-
-            val edgesArr = root.optJSONArray("edges") ?: JSONArray()
-            for (i in 0 until edgesArr.length()) {
-                val o = edgesArr.optJSONObject(i) ?: continue
-                val a = o.optString("a", "")
-                val b = o.optString("b", "")
-                if (a.isBlank() || b.isBlank()) continue
-                if (!nodes.containsKey(a) || !nodes.containsKey(b)) continue
-                val weight = o.optDouble("w", 1.0).toFloat()
-                edges[edgeKey(a, b)] = Edge(a, b, weight)
-            }
-
-            val topicsArr = root.optJSONArray("topics") ?: JSONArray()
-            val loadedTopics = mutableListOf<Topic>()
-            for (i in 0 until topicsArr.length()) {
-                val o = topicsArr.optJSONObject(i) ?: continue
-                val id = o.optString("id", "")
-                val label = o.optString("label", "")
-                val membersArr = o.optJSONArray("members")
-                val members = mutableListOf<String>()
-                if (membersArr != null) {
-                    for (j in 0 until membersArr.length()) members.add(membersArr.optString(j, ""))
-                }
-                loadedTopics.add(Topic(id, label, members))
-            }
-            topics = loadedTopics
-            rebuildAliases()
-        }.onFailure {
-            nodes.clear()
-            edges.clear()
-            nodeAliases.clear()
-            topics = emptyList()
-            graphBuiltMs = 0L
-            sourceSentenceCount = 0
+        val raw = try {
+            vf.readTextAndMigrate()
+        } catch (exception: Exception) {
+            // The file stays read-blocked, so save() cannot replace it with the empty graph.
+            Timber.w(exception, "Personal graph could not be read")
+            return
+        } ?: return
+        if (raw.isBlank()) return
+        val loaded = try {
+            parseGraph(raw)
+        } catch (exception: Exception) {
+            vf.markUnreadable()
+            Timber.w("Personal graph could not be parsed (%s)", exception.javaClass.simpleName)
+            return
         }
+        graphBuiltMs = loaded.builtMs
+        sourceSentenceCount = loaded.sourceSentenceCount
+        nodes.putAll(loaded.nodes)
+        edges.putAll(loaded.edges)
+        topics = loaded.topics
+        rebuildAliases()
+    }
+
+    private class LoadedGraph(
+        val builtMs: Long,
+        val sourceSentenceCount: Int,
+        val nodes: Map<String, Node>,
+        val edges: Map<Pair<String, String>, Edge>,
+        val topics: List<Topic>
+    )
+
+    /** Parses the whole graph into new collections so a failure midway never leaves a partial graph. */
+    private fun parseGraph(raw: String): LoadedGraph {
+        val root = JSONObject(raw)
+        val loadedNodes = LinkedHashMap<String, Node>()
+        val loadedEdges = LinkedHashMap<Pair<String, String>, Edge>()
+
+        val nodesArr = root.optJSONArray("nodes") ?: JSONArray()
+        for (i in 0 until nodesArr.length()) {
+            val o = nodesArr.optJSONObject(i) ?: continue
+            val id = o.optString("id", "")
+            if (id.isBlank()) continue
+            val tagsArr = o.optJSONArray("tags")
+            val tags = mutableListOf<String>()
+            if (tagsArr != null) {
+                for (j in 0 until tagsArr.length()) tags.add(tagsArr.optString(j, ""))
+            }
+            val weight = o.optDouble("w", 1.0).toFloat()
+            loadedNodes[id] = Node(id, tags, weight)
+        }
+
+        val edgesArr = root.optJSONArray("edges") ?: JSONArray()
+        for (i in 0 until edgesArr.length()) {
+            val o = edgesArr.optJSONObject(i) ?: continue
+            val a = o.optString("a", "")
+            val b = o.optString("b", "")
+            if (a.isBlank() || b.isBlank()) continue
+            if (!loadedNodes.containsKey(a) || !loadedNodes.containsKey(b)) continue
+            val weight = o.optDouble("w", 1.0).toFloat()
+            loadedEdges[edgeKey(a, b)] = Edge(a, b, weight)
+        }
+
+        val topicsArr = root.optJSONArray("topics") ?: JSONArray()
+        val loadedTopics = mutableListOf<Topic>()
+        for (i in 0 until topicsArr.length()) {
+            val o = topicsArr.optJSONObject(i) ?: continue
+            val id = o.optString("id", "")
+            val label = o.optString("label", "")
+            val membersArr = o.optJSONArray("members")
+            val members = mutableListOf<String>()
+            if (membersArr != null) {
+                for (j in 0 until membersArr.length()) members.add(membersArr.optString(j, ""))
+            }
+            loadedTopics.add(Topic(id, label, members))
+        }
+        return LoadedGraph(
+            builtMs = root.optLong("built", 0L),
+            sourceSentenceCount = root.optInt("src", 0),
+            nodes = loadedNodes,
+            edges = loadedEdges,
+            topics = loadedTopics
+        )
     }
 
     /**

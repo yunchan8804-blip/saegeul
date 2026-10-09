@@ -9,6 +9,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
+import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.KeyGenerator
@@ -92,21 +93,11 @@ class KeystoreVaultCipher(
         return keyStore.getEntry(targetAlias, null) is KeyStore.SecretKeyEntry
     }
 
-    private fun keyOrCreate(targetAlias: String): SecretKey = keyed(targetAlias) {
+    private fun keyOrCreate(targetAlias: String): SecretKey = keyCache.keyed(targetAlias) {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         val existing = keyStore.getKey(targetAlias, null) as? SecretKey
         existing ?: generateKey()
     }
-
-    private inline fun keyed(targetAlias: String, block: () -> SecretKey): SecretKey {
-        val existing = cachedKeys[targetAlias]
-        if (existing != null) return existing
-        val key = block()
-        cachedKeys[targetAlias] = key
-        return key
-    }
-
-    private val cachedKeys = HashMap<String, SecretKey>()
 
     private fun generateKey(): SecretKey {
         // StrongBox는 의도적으로 요구하지 않는다. SPU 연산이 수 초로 측정된 기기에서 금고
@@ -154,6 +145,8 @@ class KeystoreVaultCipher(
     }.getOrDefault(false)
 
     companion object {
+        private val keyCache = AliasKeyCache()
+
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_SIZE_BITS = 256
 
@@ -162,5 +155,25 @@ class KeystoreVaultCipher(
 
         /** First generation alias, kept only for decrypting data written by older installs. */
         const val LEGACY_ALIAS = "saegeul.vault.v1"
+    }
+}
+
+/**
+ * Process-wide key cache that runs the creator at most once per alias, so two threads racing on a
+ * first run cannot each generate a Keystore key under the same alias. Creation is serialized per
+ * alias, not globally, because Keystore key generation can take seconds.
+ */
+internal class AliasKeyCache {
+    private val keys = ConcurrentHashMap<String, SecretKey>()
+    private val locks = ConcurrentHashMap<String, Any>()
+
+    fun keyed(alias: String, create: () -> SecretKey): SecretKey {
+        keys[alias]?.let { return it }
+        synchronized(locks.getOrPut(alias) { Any() }) {
+            keys[alias]?.let { return it }
+            val key = create()
+            keys[alias] = key
+            return key
+        }
     }
 }

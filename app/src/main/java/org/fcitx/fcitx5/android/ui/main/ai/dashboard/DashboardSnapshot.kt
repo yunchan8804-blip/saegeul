@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.ui.main.ai.dashboard
 
 import android.content.Context
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.backup.VaultBackup
 import org.fcitx.fcitx5.android.data.points.PointLedger
 import org.fcitx.fcitx5.android.input.ai.KoreanSuggestionSurface
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaInstantSync
@@ -125,7 +126,14 @@ internal class DashboardSnapshotReader(context: Context) {
         return read()
     }
 
+    /**
+     * Erases every learned store. Background Gemma work is cancelled first so a graph or profile
+     * batch that is still being built cannot write its result back after the erase; whatever slips
+     * past the cancellation is dropped by the stores' generation checks. Blocks, so call it off the
+     * main thread.
+     */
     fun clearAll(): DashboardSnapshot {
+        VaultBackup.cancelBackgroundGemmaWorkAndWait(appContext)
         val app = FcitxApplication.getInstance()
         app.typingDnaRepository.clear()
         app.typingDnaVault.purge()

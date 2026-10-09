@@ -9,7 +9,9 @@ import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
+import java.io.IOException
 
 /**
  * Encrypted-at-rest progress for an in-flight on-device graph-enrichment cycle: the cursor, the
@@ -68,9 +70,15 @@ class PersonalGraphEnrichmentStagingStore(
     fun load(): State? {
         val vf = vaultFile ?: return null
         if (!vf.exists()) return null
-        return runCatching {
-            val raw = vf.readTextAndMigrate() ?: return null
-            if (raw.isBlank()) return null
+        val raw = try {
+            vf.readTextAndMigrate()
+        } catch (exception: Exception) {
+            // The file stays read-blocked, so save() cannot replace it with a fresh cycle.
+            Timber.w(exception, "Graph enrichment staging could not be read")
+            return null
+        } ?: return null
+        if (raw.isBlank()) return null
+        return try {
             val root = JSONObject(raw)
             val chunksArr = root.optJSONArray("chunks") ?: JSONArray()
             val chunks = (0 until chunksArr.length()).map { chunksArr.optString(it, "") }
@@ -96,7 +104,11 @@ class PersonalGraphEnrichmentStagingStore(
                 processedSentenceCount = root.optInt("processedSentenceCount", 0),
                 skippedSentenceCount = root.optInt("skippedSentenceCount", 0)
             )
-        }.getOrNull()
+        } catch (exception: Exception) {
+            vf.markUnreadable()
+            Timber.w("Graph enrichment staging could not be parsed (%s)", exception.javaClass.simpleName)
+            null
+        }
     }
 
     fun save(state: State) {
@@ -122,7 +134,20 @@ class PersonalGraphEnrichmentStagingStore(
         vf.writeText(root.toString())
     }
 
+    /** Removes the staged cycle at the user's request, even when its file cannot be read. */
     fun clear() {
-        vaultFile?.delete()
+        vaultFile?.deleteForUser()
+    }
+
+    /**
+     * Drops the staged cycle once the worker has finished it. Unlike [clear] this respects a read
+     * block, so a staging file that could not be read is never deleted automatically.
+     */
+    fun discard() {
+        try {
+            vaultFile?.delete()
+        } catch (exception: IOException) {
+            Timber.w(exception, "Graph enrichment staging could not be discarded")
+        }
     }
 }

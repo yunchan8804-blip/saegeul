@@ -9,7 +9,9 @@ import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.json.JSONArray
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.File
+import java.io.IOException
 import kotlin.math.max
 
 /**
@@ -142,7 +144,12 @@ class PersonalizedSentenceStore(
                 }
                 array.put(obj)
             }
-            vf.writeText(array.toString(2))
+            try {
+                vf.writeText(array.toString(2))
+            } catch (exception: IOException) {
+                // A read-blocked or unwritable file keeps its previous bytes; sentences stay in memory.
+                Timber.w(exception, "Personalized sentences could not be saved")
+            }
         }
     }
 
@@ -150,38 +157,53 @@ class PersonalizedSentenceStore(
     fun load() {
         val vf = vaultFile ?: return
         if (!vf.exists()) return
-        try {
-            val content = vf.readTextAndMigrate() ?: return
-            if (content.isBlank()) return
-            val array = JSONArray(content)
-            records.clear()
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                val keywordsList = mutableListOf<String>()
-                val kwArray = obj.optJSONArray("keywords")
-                if (kwArray != null) {
-                    for (k in 0 until kwArray.length()) {
-                        keywordsList.add(kwArray.getString(k))
-                    }
-                }
-                val record = PersonalizedSentenceRecord(
-                    id = obj.optString("id"),
-                    sentence = obj.getString("sentence"),
-                    choseong = obj.optString("choseong"),
-                    intent = runCatching { ContextualIntent.valueOf(obj.getString("intent")) }.getOrDefault(ContextualIntent.General),
-                    tone = runCatching { KoreanTone.valueOf(obj.getString("tone")) }.getOrDefault(KoreanTone.Honorific),
-                    keywords = keywordsList,
-                    source = obj.optString("source", "synthetic_llm"),
-                    score = obj.optDouble("score", 1.0).toFloat(),
-                    useCount = obj.optInt("useCount", 0),
-                    lastUsedTimestamp = obj.optLong("lastUsedTimestamp", System.currentTimeMillis()),
-                    packageName = if (obj.has("packageName")) obj.getString("packageName") else null
-                )
-                upsert(record)
-            }
-        } catch (_: Throwable) {
-            // Failsafe: on corruption, preserve operation with clean state
+        val content = try {
+            vf.readTextAndMigrate()
+        } catch (exception: Exception) {
+            // The file stays read-blocked, so save() cannot replace it with the current records.
+            Timber.w(exception, "Personalized sentences could not be read")
+            return
+        } ?: return
+        if (content.isBlank()) return
+        val loaded = try {
+            parseRecords(content)
+        } catch (exception: Exception) {
+            vf.markUnreadable()
+            Timber.w("Personalized sentences could not be parsed (%s)", exception.javaClass.simpleName)
+            return
         }
+        records.clear()
+        loaded.forEach(::upsert)
+    }
+
+    /** Parses every record before any is applied, so a failure midway leaves the store unchanged. */
+    private fun parseRecords(content: String): List<PersonalizedSentenceRecord> {
+        val array = JSONArray(content)
+        val loaded = ArrayList<PersonalizedSentenceRecord>(array.length())
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            val keywordsList = mutableListOf<String>()
+            val kwArray = obj.optJSONArray("keywords")
+            if (kwArray != null) {
+                for (k in 0 until kwArray.length()) {
+                    keywordsList.add(kwArray.getString(k))
+                }
+            }
+            loaded += PersonalizedSentenceRecord(
+                id = obj.optString("id"),
+                sentence = obj.getString("sentence"),
+                choseong = obj.optString("choseong"),
+                intent = runCatching { ContextualIntent.valueOf(obj.getString("intent")) }.getOrDefault(ContextualIntent.General),
+                tone = runCatching { KoreanTone.valueOf(obj.getString("tone")) }.getOrDefault(KoreanTone.Honorific),
+                keywords = keywordsList,
+                source = obj.optString("source", "synthetic_llm"),
+                score = obj.optDouble("score", 1.0).toFloat(),
+                useCount = obj.optInt("useCount", 0),
+                lastUsedTimestamp = obj.optLong("lastUsedTimestamp", System.currentTimeMillis()),
+                packageName = if (obj.has("packageName")) obj.getString("packageName") else null
+            )
+        }
+        return loaded
     }
 
     @Synchronized
