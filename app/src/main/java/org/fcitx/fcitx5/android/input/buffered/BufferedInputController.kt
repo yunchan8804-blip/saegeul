@@ -106,6 +106,24 @@ class BufferedInputController {
         return true
     }
 
+    /**
+     * Deletes up to [count] Unicode code points from the end, the unit an engine's
+     * DeleteSurrounding request uses. Returns how many code points were actually removed.
+     */
+    fun deleteLastCodePoints(count: Int): Int {
+        if (count <= 0 || committed.isEmpty()) return 0
+        val total = committed.codePointCount(0, committed.length)
+        val removed = minOf(count, total)
+        val start = committed.offsetByCodePoints(committed.length, -removed)
+        committed.delete(start, committed.length)
+        state = if (committed.isEmpty()) {
+            BufferedSessionState.Idle
+        } else {
+            BufferedSessionState.Composing(committed.toString())
+        }
+        return removed
+    }
+
     fun clear() {
         committed.clear()
         state = BufferedSessionState.Idle

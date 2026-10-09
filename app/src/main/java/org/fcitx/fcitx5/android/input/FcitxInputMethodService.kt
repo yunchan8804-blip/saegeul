@@ -6,6 +6,7 @@
 package org.fcitx.fcitx5.android.input
 
 import org.fcitx.fcitx5.android.BuildConfig
+import org.fcitx.fcitx5.android.input.buffered.BufferedDeleteSurrounding
 import org.fcitx.fcitx5.android.input.buffered.BufferedHangulMode
 import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
 import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
@@ -348,6 +349,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             editorInfo = { currentInputEditorInfo },
             inputConnection = { currentInputConnection },
             activePreedit = ::activePreeditForContextualInput,
+            editorComposingText = ::editorComposingTextForContextualInput,
             appPersona = { effectiveAppProfile?.source?.persona },
             isDestroyed = { lifecycle.currentState == Lifecycle.State.DESTROYED },
             lifecycleScope = { lifecycleScope },
@@ -376,6 +378,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             selection = { currentInputSelection },
             inputSessionEpoch = { inputSessionEpoch },
             activePreedit = ::activePreeditForContextualInput,
+            editorComposingText = ::editorComposingTextForContextualInput,
             finishCompositionForDirectAction = ::finishCompositionForDirectAction,
             commitTextToEditor = { text, cursor -> commitTextToEditor(text, cursor) },
             replaceAiRange = ::replaceAiRange,
@@ -467,9 +470,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     )
 
     private fun effectiveInputTheme(globalTheme: Theme = ThemeManager.activeTheme): Theme =
-        effectiveAppProfile?.source?.themeName?.let { name ->
-            ThemeManager.getAllThemes().firstOrNull { it.name == name }
-        } ?: globalTheme
+        effectiveAppProfile?.source?.themeName?.let(ThemeManager::findSelectableTheme) ?: globalTheme
 
     private fun replaceInputView(theme: Theme): InputView {
         val newInputView = InputView(this, fcitx, theme)
@@ -1010,7 +1011,39 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
+    /**
+     * The engine's own commits sit in the buffer, not the editor, so a delete request that
+     * targets them (a Hanja replacement removing the Hangul it just committed) is applied to the
+     * buffer end. Like the buffered Backspace path, nothing reaches the editor, so editor
+     * continuity and the selection prediction stay untouched.
+     */
+    private fun handleBufferedDeleteSurrounding(before: Int, after: Int) {
+        val bufferText = bufferedHangul.prefix
+        val plan = BufferedDeleteSurrounding.plan(
+            bufferCodePoints = bufferText.codePointCount(0, bufferText.length),
+            before = before,
+            after = after,
+            resetPending = bufferedHangulEngineResetPending
+        )
+        val deleted = bufferedHangul.deleteLastCodePoints(plan.deleteFromBuffer)
+        if (plan.dropped > 0) {
+            Timber.w(
+                "Dropped buffered Hangul delete request: before=$before after=$after " +
+                    "deleted=$deleted resetPending=$bufferedHangulEngineResetPending"
+            )
+        }
+        if (deleted > 0) {
+            onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
+            inputView?.refreshBufferedHangulPreedit()
+            inputView?.postRefreshContextualCandidates(16L)
+        }
+    }
+
     private fun handleDeleteSurrounding(before: Int, after: Int) {
+        if (bufferedHangulSessionActive) {
+            handleBufferedDeleteSurrounding(before, after)
+            return
+        }
         val ic = currentInputConnection ?: return
         if (before > 0 || after > 0) {
             val dnaInspectionAllowed = allowsTextInspectionFeatures()
@@ -1456,8 +1489,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             ),
             privateEditor = EditorPrivacyPolicy.forbidsTextInspection(info, flags)
         )
-        val targetTheme = ThemeManager.getAllThemes().firstOrNull { it.name == resolved.themeName }
-            ?: globalTheme
+        val targetTheme = ThemeManager.findSelectableTheme(resolved.themeName) ?: globalTheme
         effectiveAppProfile = resolved.copy(themeName = targetTheme.name)
         if (::contentView.isInitialized && inputView != null && appliedInputThemeName != targetTheme.name) {
             replaceInputViews(targetTheme)
@@ -1710,6 +1742,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     fun retryAutomaticSuggestionWarmup() = automaticSuggestion.retryAutomaticSuggestionWarmup()
 
+    /**
+     * 편집기 안에 실제로 들어가 있는 조합 글자. 일반 모드는 setComposingText로 넣은 composingText,
+     * 버퍼 세션은 편집기에 조합 글자가 없으므로 빈 문자열이다.
+     */
+    private fun editorComposingTextForContextualInput(): String =
+        if (bufferedHangulSessionActive) "" else composingText.toString()
+
     private fun activePreeditForContextualInput(): String {
         val clientPreedit = composingText.toString()
         if (clientPreedit.trim().isNotEmpty()) {
@@ -1807,9 +1846,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (bufferedHangulSessionActive) {
             if (!submitBufferedHangul()) return false
         } else if (composing.isNotEmpty()) {
-            composing.clear()
-            composingText = FormattedText.Empty
+            val finishedText = composingText.toString()
+            resetComposingState()
             if (!ic.finishComposingText()) return false
+            observeCommittedEditorText(finishedText)
         }
         postFcitxJob { reset() }
         return true
@@ -2350,7 +2390,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         ) return true
         val sym = KeySym.fromKeyEvent(event)
         if (sym == null) {
-            Timber.d("Skipped KeyEvent: $event")
+            Timber.d("Skipped KeyEvent: action=${event.action}")
             // An unsupported hardware/dead/shortcut key must not fall through to the app while
             // the internal prompt owns the keyboard target.
             return isInternalPromptInputOwned
@@ -2721,7 +2761,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     // of surprising the user by pasting the segment at a different position.
                     Timber.i("Discarding buffered Hangul after an external selection change")
                     bufferedHangul.clear()
-                    if (engineHasPreedit) queueBufferedHangulEngineReset()
+                    queueBufferedHangulEngineReset()
                     inputView?.refreshBufferedHangulPreedit()
                 }
                 selection.resetTo(newSelStart, newSelEnd)
@@ -2811,7 +2851,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
         } else {
             // composing text content changed
-            Timber.d("updateComposingText: '$text' lastSelection=$lastSelection")
+            Timber.d("updateComposingText: len=${text.length} lastSelection=$lastSelection")
             if (text.isEmpty()) {
                 if (composing.isEmpty()) {
                     // do not reset saved selection range when incoming composing

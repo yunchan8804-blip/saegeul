@@ -998,6 +998,7 @@ System paste와 Ctrl+V는 사용자의 기존 primary clipboard를 새 segment�
 
 9. **Hanja/WordCommit 미검증**
    native engine의 commit 경계가 달라질 수 있으므로 후보 선택과 buffer snapshot을 따로 시험해야 한다.
+   버퍼 모드의 엔진 삭제 요청(DeleteSurrounding)은 편집기가 아니라 버퍼 끝에서 코드포인트 단위로 처리한다. 버퍼보다 긴 넘침분과 커서 뒤 삭제는 버린다. 엔진 reset 대기 중 도착한 삭제 요청은 무시한다. 외부 선택 변경으로 버퍼를 비울 때는 엔진도 항상 reset한다. (2026-10-09)
 
 10. **Target-side 변환과 selection 예측**
     자동 대문자화, filter, formatting, maxLength가 실제 삽입 길이를 바꾸면 selection 예측과 어긋날 수 있다.
