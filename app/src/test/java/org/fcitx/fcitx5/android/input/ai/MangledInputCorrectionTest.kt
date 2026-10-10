@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.typo.DubeolsikKeyMap
 import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.TouchSubstitutionCost
 import org.fcitx.fcitx5.android.input.typo.TouchTestFixtures
 import org.fcitx.fcitx5.android.input.typo.TouchTrace
 import org.fcitx.fcitx5.android.input.typo.TypedKeyReader
@@ -103,6 +104,52 @@ class MangledInputCorrectionTest {
         trace = TouchTestFixtures.centeredTrace(DubeolsikKeyMap.keySequence("얀냄ㅎㅏ게요"))
 
         assertEquals("안녕하세요", typoWords("얀냄ㅎㅏ게요").first())
+    }
+
+    @Test
+    fun centerTouchesKeepTheMangledFragmentFarInsideTheCostLimit() {
+        val corrector = KeyboardAwareTypoCorrector()
+        corrector.addWord("안녕하세요", 0.5f)
+        val typed = "얀냄ㅎㅏ게요"
+        val keys = DubeolsikKeyMap.keySequence(typed)
+        val limit = KeyboardAwareTypoCorrector.keyboardMaxCost(keys.length)
+
+        val grid = corrector.correct(typed, maxCost = limit).single().cost
+        val centered = corrector.correct(typed, maxCost = limit, touchTrace = TouchTestFixtures.centeredTrace(keys)).single().cost
+
+        // 바뀐 네 자리(ㅑ->ㅏ, ㅐ->ㅕ, ㅁ->ㅇ, ㄱ->ㅅ)는 모두 격자 이웃(격자 비용 0.7 이하)이라 터치 식의 상한 0.47이다.
+        // 터치가 어디에 닿아도 이보다 비싸지지 않는다.
+        for ((typedKey, intendedKey) in listOf('i' to 'k', 'o' to 'u', 'a' to 'd', 'r' to 't')) {
+            assertTrue("$typedKey->$intendedKey", DubeolsikKeyMap.substitutionCost(typedKey, intendedKey) <= TouchSubstitutionCost.NEIGHBOR_GRID_MAX)
+        }
+        assertEquals(2.2f, grid, 0.0001f)
+        assertEquals(4 * TouchSubstitutionCost.SUBSTITUTION_CAP, centered, 0.0001f)
+        assertTrue("centered=$centered limit=$limit", centered <= limit - 1f)
+    }
+
+    @Test
+    fun ordinaryWordsWithCenterTouchesGetNoCorrection() {
+        val controls = listOf(
+            "10시", "2024년", "100원", "카페24", "안녕하세요", "감사합니다", "수고하셨습니다",
+            "오늘", "내일", "점심", "회사", "친구", "가족", "시간", "약속", "생각", "이야기", "공부"
+        )
+        val flagged = controls.filter {
+            trace = TouchTestFixtures.centeredTrace(DubeolsikKeyMap.keySequence(it))
+            predictor.predict(it, "", pkg, limit = 10).any { p -> p.badge == "✏️" }
+        }
+
+        assertEquals(emptyList<String>(), flagged)
+    }
+
+    @Test
+    fun unknownOrdinaryWordsWithCenterTouchesGetNoCorrection() {
+        // 사전 밖 정상어: 받침과 조사 자리의 먼 키 치환이 터치 식으로 싸지면 라면을·피자를로 잘못 뜬다.
+        val flagged = listOf("라면집", "피자집").filter {
+            trace = TouchTestFixtures.centeredTrace(DubeolsikKeyMap.keySequence(it))
+            predictor.predict(it, "", pkg, limit = 10).any { p -> p.badge == "✏️" }
+        }
+
+        assertEquals(emptyList<String>(), flagged)
     }
 
     @Test

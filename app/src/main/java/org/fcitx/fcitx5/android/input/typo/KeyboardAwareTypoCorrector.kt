@@ -16,7 +16,7 @@ import kotlin.math.min
  * [CorrectionPatternStore]가 혼동을 기록하는 순서와 같다. [correct]에 [TouchTrace]가 있고
  * 어절의 키 순서와 흔적 끝부분이 정확히 같으면, 그 키 위치의 치환 비용은 격자 대신 실제 터치
  * 지점([TouchSubstitutionCost])으로 계산하고 [personalDiscount]를 곱한다. [touchHabit]은 그 터치 비용의
- * 키 중심을 사용자의 손버릇만큼 옮긴다.
+ * 의도한 키 중심을 그 키가 속한 군집의 손버릇만큼 옮긴다.
  */
 class KeyboardAwareTypoCorrector(
     private val substitutionCost: (Char, Char) -> Float = DubeolsikKeyMap::substitutionCost,
@@ -118,7 +118,7 @@ class KeyboardAwareTypoCorrector(
     private fun substitution(typedKey: Char, intendedKey: Char, touch: KeyTouch?): Float {
         val touchCost = touch?.let { TouchSubstitutionCost.cost(it, intendedKey, touchHabit) }
             ?: return substitutionCost(typedKey, intendedKey)
-        return max(TouchSubstitutionCost.MIN_COST, touchCost * personalDiscount(typedKey, intendedKey))
+        return max(MIN_TOUCH_SUBSTITUTION_COST, touchCost * personalDiscount(typedKey, intendedKey))
     }
 
     private fun dfsCorrect(
@@ -153,6 +153,9 @@ class KeyboardAwareTypoCorrector(
     }
 
     companion object {
+        /** 터치 비용에 개인 할인을 곱한 뒤에도 치환이 이보다 공짜가 되지는 않는다. */
+        const val MIN_TOUCH_SUBSTITUTION_COST = 0.1f
+
         fun defaultMaxCost(typed: String): Float = standardMaxCost(DubeolsikKeyMap.keySequence(typed).length)
 
         /** 키가 [keyCount]개인 어절의 표준 비용 상한. */

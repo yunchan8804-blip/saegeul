@@ -62,7 +62,7 @@ class TouchHabitStoreTest {
     }
 
     @Test
-    fun aKeyIsNotAppliedBeforeThirtySamples() {
+    fun aClusterIsNotAppliedBeforeThirtySamples() {
         val store = TouchHabitStore()
 
         store.learn(TouchHabitStore.MIN_SAMPLES - 1, dx = 0.2f)
@@ -71,7 +71,7 @@ class TouchHabitStoreTest {
         store.learn(1, dx = 0.2f)
         val bias = checkNotNull(store.bias('k'))
         assertEquals(0.2f, bias.dx, 0.0001f)
-        assertNull("다른 키는 따로 센다", store.bias('q'))
+        assertNull("다른 군집은 따로 센다", store.bias('q'))
     }
 
     @Test
@@ -122,11 +122,11 @@ class TouchHabitStoreTest {
     @Test
     fun touchesFarFromTheIntendedKeyAreNotCountedAsHandHabit() {
         val store = TouchHabitStore()
-        // 첫 터치가 k 위에 한 칸 반 벗어나 눌렸다.
-        assertTrue(store.learnConfirmedWord("암", trace(touch('d', dx = 1.4f), touch('k'), touch('a')), knownWord))
+        // 가운데 터치가 k에서 한 칸 반 벗어나 눌렸다. d·a는 같은 군집이라 둘 다 센다.
+        assertTrue(store.learnConfirmedWord("암", trace(touch('d'), touch('k', dx = 1.4f), touch('a')), knownWord))
 
-        assertEquals(0, store.sampleCount('d'))
-        assertEquals(1, store.sampleCount('k'))
+        assertEquals(0, store.sampleCount('k'))
+        assertEquals(2, store.sampleCount('d'))
     }
 
     @Test
@@ -139,11 +139,13 @@ class TouchHabitStoreTest {
         val learned = store.learnTappedCorrection("감사합니더", "감사합니다", trace(*touches))
 
         assertTrue(learned)
-        // ㅏ(k)는 네 번 의도됐다. 앞의 세 번은 가운데를 눌렀고, 마지막은 j 위 x = 6.5 + 0.4 = 6.9로 k(7.5) 중심에서 -0.6이다.
-        assertEquals(4, store.sampleCount('k'))
-        assertEquals(-0.15f, checkNotNull(store.learnedMean('k')).dx, 0.0001f)
-        assertEquals("의도하지 않은 키는 세지 않는다", 0, store.sampleCount('j'))
-        assertEquals(1, store.sampleCount('s'))
+        // 교정어의 k, k, k, l, k는 모두 jkl 군집이다. 앞의 네 번은 가운데를 눌렀고, 마지막은 j 위
+        // x = 6.5 + 0.4 = 6.9로 k(7.5) 중심에서 -0.6이라 군집 평균이 0.2 가중으로 -0.12가 된다.
+        assertEquals(5, store.sampleCount('k'))
+        assertEquals(5, store.sampleCount('j'))
+        assertEquals(-0.12f, checkNotNull(store.learnedMean('k')).dx, 0.0001f)
+        assertEquals("a와 s는 asd 군집이다", 2, store.sampleCount('s'))
+        assertEquals("의도하지 않은 군집은 세지 않는다", 0, store.sampleCount('p'))
     }
 
     @Test
@@ -160,18 +162,21 @@ class TouchHabitStoreTest {
     }
 
     @Test
-    fun theHabitMovesTheKeyCentersOfTheTouchCost() {
-        val touchOnE = touch('e', dx = 0.3f)
+    fun theHabitMovesTheCenterOfTheIntendedKeyOnly() {
+        val touchOnE = touch('e', dx = 0.5f)
         val plain = checkNotNull(TouchSubstitutionCost.cost(touchOnE, 'r'))
-
-        // 사용자는 e를 평소 오른쪽으로 치우쳐 누른다: e의 중심이 오른쪽으로 옮겨져, 같은 터치가 e다운 터치가 된다.
-        val rightLeaning = TouchHabit { key -> if (key == 'e') KeyBias(0.3f, 0f) else null }
-        assertTrue(checkNotNull(TouchSubstitutionCost.cost(touchOnE, 'r', rightLeaning)) > plain)
 
         // r을 평소 왼쪽으로 치우쳐 누른다: r의 중심이 왼쪽으로 옮겨져, e를 누른 터치가 r에 더 가까워진다.
         val leftLeaningR = TouchHabit { key -> if (key == 'r') KeyBias(-0.3f, 0f) else null }
         assertTrue(checkNotNull(TouchSubstitutionCost.cost(touchOnE, 'r', leftLeaningR)) < plain)
 
+        // r을 평소 오른쪽으로 치우쳐 누른다: 같은 터치가 r에서 더 멀어진다.
+        val rightLeaningR = TouchHabit { key -> if (key == 'r') KeyBias(0.3f, 0f) else null }
+        assertTrue(checkNotNull(TouchSubstitutionCost.cost(touchOnE, 'r', rightLeaningR)) > plain)
+
+        // 친 키 e의 손버릇은 비용을 바꾸지 않는다.
+        val leftLeaningE = TouchHabit { key -> if (key == 'e') KeyBias(-0.3f, 0f) else null }
+        assertEquals(plain, checkNotNull(TouchSubstitutionCost.cost(touchOnE, 'r', leftLeaningE)), 0f)
         assertEquals(plain, checkNotNull(TouchSubstitutionCost.cost(touchOnE, 'r', TouchHabit { null })), 0f)
     }
 
@@ -180,15 +185,90 @@ class TouchHabitStoreTest {
         val trie = { habit: TouchHabit? ->
             KeyboardAwareTypoCorrector(touchHabit = habit).also { it.addWord("가", 0.5f) }
         }
-        val trace = trace(touch('e', dx = 0.3f), touch('k'))
-        val rightLeaning = TouchHabit { key -> if (key == 'e') KeyBias(0.3f, 0f) else null }
+        val trace = trace(touch('e', dx = 0.5f), touch('k'))
+        val rightLeaningR = TouchHabit { key -> if (key == 'r') KeyBias(0.3f, 0f) else null }
 
         val without = trie(null).correct("다", limit = 3, touchTrace = trace).single().cost
-        val with = trie(rightLeaning).correct("다", limit = 3, touchTrace = trace).single().cost
-        val gridOnly = trie(rightLeaning).correct("다", limit = 3).single().cost
+        val with = trie(rightLeaningR).correct("다", limit = 3, touchTrace = trace).single().cost
+        val gridOnly = trie(rightLeaningR).correct("다", limit = 3).single().cost
 
         assertTrue("$with > $without", with > without)
         assertEquals("흔적이 없으면 손버릇은 쓰이지 않는다", 0.4f, gridOnly, 0.0001f)
+    }
+
+    @Test
+    fun clustersSplitTheLetterKeysIntoThreeRowsOfThreeZones() {
+        val jamoByCluster = TouchHabitStore.CLUSTERS.map { cluster ->
+            cluster.map { DubeolsikKeyMap.KEY_TO_JAMO.getValue(it) }.joinToString("")
+        }
+
+        assertEquals(
+            listOf("ㅂㅈㄷ", "ㄱㅅㅛ", "ㅕㅑㅐㅔ", "ㅁㄴㅇ", "ㄹㅎㅗ", "ㅓㅏㅣ", "ㅋㅌㅊ", "ㅍㅠ", "ㅜㅡ"),
+            jamoByCluster
+        )
+        val letters = DubeolsikKeyMap.KEY_TO_JAMO.keys.filter { it.isLowerCase() }.sorted()
+        assertEquals(letters, TouchHabitStore.CLUSTERS.flatMap { it.toList() }.sorted())
+        assertNull(TouchHabitStore.clusterOf('1'))
+        assertEquals(TouchHabitStore.clusterOf('k'), TouchHabitStore.clusterOf('J'))
+    }
+
+    @Test
+    fun samplesOfDifferentKeysInOneClusterAddUpToThirty() {
+        val store = TouchHabitStore()
+        // "아어"는 d, k, d, j. k와 j는 둘 다 jkl 군집이고, d 두 번은 asd 군집이다.
+        fun learnAhEo() = assertTrue(
+            store.learnConfirmedWord(
+                "아어",
+                trace(touch('d'), touch('k', dx = 0.2f), touch('d'), touch('j', dx = 0.2f)),
+                knownWord
+            )
+        )
+
+        repeat(14) { learnAhEo() }
+        assertNull("k 14 + j 14 = 28개", store.bias('k'))
+        assertNull(store.bias('j'))
+
+        learnAhEo()
+        assertEquals(30, store.sampleCount('l'))
+        for (key in "kjl") {
+            assertEquals(0.2f, checkNotNull(store.bias(key)).dx, 0.0001f)
+        }
+        assertNull("다른 군집은 섞이지 않는다", store.bias('q'))
+    }
+
+    @Test
+    fun differentClustersKeepTheirOwnMeans() {
+        val store = TouchHabitStore()
+        repeat(TouchHabitStore.MIN_SAMPLES) {
+            assertTrue(
+                store.learnConfirmedWord("암", trace(touch('d'), touch('k', dx = 0.2f), touch('a', dx = -0.2f)), knownWord)
+            )
+        }
+
+        assertEquals(0.2f, checkNotNull(store.bias('k')).dx, 0.0001f)
+        val asd = checkNotNull(store.bias('d')).dx
+        assertTrue("$asd", asd < 0f && asd > -0.2f)
+        assertEquals(asd, checkNotNull(store.bias('s')).dx, 0f)
+    }
+
+    @Test
+    fun aFileInThePerKeyFormatIsIgnoredAndLearningStartsEmpty() {
+        val file = File(folder.root, "touch_habits.json")
+        VaultFile(file, PlainVaultCipher, VaultFile.aadFor(file.name)).writeText(
+            "{\"keys\":[{\"key\":\"k\",\"dx\":0.2,\"dy\":0.0,\"count\":50}]}"
+        )
+
+        val store = TouchHabitStore(file)
+
+        assertEquals(0, store.sampleCount('k'))
+        assertNull(store.learnedMean('k'))
+        assertNull(store.bias('k'))
+
+        store.learn(1, dx = 0.1f)
+        store.save()
+        val text = file.readText()
+        assertTrue(text, text.contains("\"clusters\"") && !text.contains("\"keys\""))
+        assertEquals(1, TouchHabitStore(file).sampleCount('k'))
     }
 
     @Test
@@ -207,7 +287,7 @@ class TouchHabitStoreTest {
     }
 
     @Test
-    fun theSavedFileKeepsOnlyKeyMeansAndCounts() {
+    fun theSavedFileKeepsOnlyClusterMeansAndCounts() {
         val file = File(folder.root, "touch_habits.json")
         val store = TouchHabitStore(file)
         store.learn(3, dx = 0.2f)
@@ -215,7 +295,7 @@ class TouchHabitStoreTest {
 
         val text = file.readText()
 
-        assertTrue(text, text.contains("\"key\"") && text.contains("\"count\""))
+        assertTrue(text, text.contains("\"cluster\"") && text.contains("\"count\""))
         assertFalse("어절을 저장하지 않는다", text.contains("암"))
     }
 

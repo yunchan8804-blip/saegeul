@@ -40,38 +40,38 @@ class TouchAwareTypoCorrectionTest {
 
     @Test
     fun touchNearTheRightBoundaryPromotesTheRightNeighbor() {
-        val trace = trace(touch('e', dx = 0.45f), touch('k'))
+        val trace = trace(touch('e', dx = 0.5f), touch('k'))
         val results = corrector.correct("다", limit = 3, touchTrace = trace)
 
         assertEquals("가", results.first().word)
-        assertEquals(TouchSubstitutionCost.MIN_COST, results.first().cost, 0.0001f)
-        assertTrue(results.first { it.word == "자" }.cost > 0.4f)
+        assertEquals(0.413f, results.first().cost, 0.001f)
+        assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP, results.first { it.word == "자" }.cost, 0.0001f)
     }
 
     @Test
     fun touchNearTheLeftBoundaryPromotesTheLeftNeighbor() {
-        val trace = trace(touch('e', dx = -0.45f), touch('k'))
+        val trace = trace(touch('e', dx = -0.5f), touch('k'))
         val results = corrector.correct("다", limit = 3, touchTrace = trace)
 
         assertEquals("자", results.first().word)
-        assertEquals(TouchSubstitutionCost.MIN_COST, results.first().cost, 0.0001f)
+        assertEquals(0.413f, results.first().cost, 0.001f)
     }
 
     @Test
-    fun centerTouchKeepsBothNeighborsAtTheTouchScaleCost() {
+    fun centerTouchKeepsBothNeighborsAtTheSubstitutionCap() {
         val results = corrector.correct("다", limit = 3, touchTrace = centeredTrace("ek"))
-        results.forEach { assertEquals(0.37f, it.cost, 0.005f) }
+        results.forEach { assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP, it.cost, 0.0001f) }
     }
 
     @Test
     fun traceAlignsToTheTailOfAlongerHistory() {
-        val trace = trace(touch('a'), touch('h'), touch('e', dx = 0.45f), touch('k'))
+        val trace = trace(touch('a'), touch('h'), touch('e', dx = 0.5f), touch('k'))
         assertEquals("가", corrector.correct("다", limit = 3, touchTrace = trace).first().word)
     }
 
     @Test
     fun traceWithDifferentKeysIsIgnoredAndTheGridCostApplies() {
-        val trace = trace(touch('e', dx = 0.45f), touch('j'))
+        val trace = trace(touch('e', dx = 0.5f), touch('j'))
         val costs = corrector.correct("다", limit = 3, touchTrace = trace).associate { it.word to it.cost }
         assertEquals(0.4f, costs.getValue("가"), 0.0001f)
         assertEquals(0.4f, costs.getValue("자"), 0.0001f)
@@ -79,7 +79,7 @@ class TouchAwareTypoCorrectionTest {
 
     @Test
     fun traceShorterThanTheWordIsIgnored() {
-        val costs = corrector.correct("다", limit = 3, touchTrace = trace(touch('k', dx = 0.45f)))
+        val costs = corrector.correct("다", limit = 3, touchTrace = trace(touch('k', dx = 0.5f)))
             .associate { it.word to it.cost }
         assertEquals(0.4f, costs.getValue("가"), 0.0001f)
     }
@@ -92,8 +92,8 @@ class TouchAwareTypoCorrectionTest {
         val results = discounted.correct("다", limit = 3, touchTrace = centeredTrace("ek"))
 
         assertEquals("자", results.first().word)
-        assertEquals(0.185f, results.first().cost, 0.005f)
-        assertEquals(0.37f, results.first { it.word == "가" }.cost, 0.005f)
+        assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP * 0.5f, results.first().cost, 0.0001f)
+        assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP, results.first { it.word == "가" }.cost, 0.0001f)
     }
 
     @Test
@@ -128,16 +128,16 @@ class TouchAwareTypoCorrectionTest {
     @Test
     fun probeChoseongEditFollowsTheTouch() {
         val probe = probeFor("가", "자")
-        assertEquals("가", probe.words("다", trace(touch('e', dx = 0.45f), touch('k'))).first())
-        assertEquals("자", probe.words("다", trace(touch('e', dx = -0.45f), touch('k'))).first())
+        assertEquals("가", probe.words("다", trace(touch('e', dx = 0.5f), touch('k'))).first())
+        assertEquals("자", probe.words("다", trace(touch('e', dx = -0.5f), touch('k'))).first())
     }
 
     @Test
     fun probeJungseongEditFollowsTheTouchOnTheSecondKey() {
-        // 기 = rl. l의 왼쪽 이웃은 k(가), 위쪽 이웃은 o(개)다.
+        // 기 = rl. l의 왼쪽 이웃은 k(가), 왼쪽 위 이웃은 o(개)다.
         val probe = probeFor("가", "개")
-        assertEquals("가", probe.words("기", trace(touch('r'), touch('l', dx = -0.45f))).first())
-        assertEquals("개", probe.words("기", trace(touch('r'), touch('l', dx = 0.1f, dy = -0.45f))).first())
+        assertEquals("가", probe.words("기", trace(touch('r'), touch('l', dx = -0.5f))).first())
+        assertEquals("개", probe.words("기", trace(touch('r'), touch('l', dx = -0.5f, dy = -0.5f))).first())
     }
 
     @Test
@@ -146,14 +146,14 @@ class TouchAwareTypoCorrectionTest {
         val probe = probeFor("나강", "나감")
         val keys = listOf('s', 'k', 'r', 'k')
         fun traceOf(jongTouch: KeyTouch) = trace(*keys.map { touch(it) }.toTypedArray(), jongTouch)
-        assertEquals("나강", probe.words("나간", traceOf(touch('s', dx = 0.45f))).first())
-        assertEquals("나감", probe.words("나간", traceOf(touch('s', dx = -0.45f))).first())
+        assertEquals("나강", probe.words("나간", traceOf(touch('s', dx = 0.5f))).first())
+        assertEquals("나감", probe.words("나간", traceOf(touch('s', dx = -0.5f))).first())
     }
 
     @Test
     fun probeIgnoresATraceThatDoesNotMatchTheWord() {
         val probe = probeFor("가", "자")
-        val hits = probe.probe("다", limit = 5, touchTrace = trace(touch('e', dx = 0.45f), touch('j')))
+        val hits = probe.probe("다", limit = 5, touchTrace = trace(touch('e', dx = 0.5f), touch('j')))
         assertEquals(listOf(0.4f, 0.4f), hits.map { it.correction.cost })
     }
 }

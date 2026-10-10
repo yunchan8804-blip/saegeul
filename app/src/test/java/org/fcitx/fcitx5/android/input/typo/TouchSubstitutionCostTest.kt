@@ -12,41 +12,95 @@ import org.junit.Test
 
 class TouchSubstitutionCostTest {
 
-    private fun cost(key: Char, dx: Float, dy: Float, intended: Char): Float =
-        requireNotNull(TouchSubstitutionCost.cost(touch(key, dx, dy), intended))
+    private fun cost(key: Char, dx: Float, dy: Float, intended: Char, habit: TouchHabit? = null): Float =
+        requireNotNull(TouchSubstitutionCost.cost(touch(key, dx, dy), intended, habit))
+
+    // 키 경계에서 의도한 키 중심까지의 거리 0.5키 -> (0.5 / 0.55)^2 / 2.
+    private val boundaryCost = 0.5f * 0.5f / (TouchSubstitutionCost.SIGMA * TouchSubstitutionCost.SIGMA) / 2f
 
     @Test
-    fun centerTouchMakesNeighborExpensive() {
-        assertEquals(0.37f, cost('e', 0f, 0f, 'r'), 0.005f)
-        assertEquals(0.37f, cost('e', 0f, 0f, 'w'), 0.005f)
+    fun theConstantsAreThePaperSigmaAndTheLatinImeDerivedCap() {
+        assertEquals(0.55f, TouchSubstitutionCost.SIGMA, 0f)
+        assertEquals(0.47f, TouchSubstitutionCost.SUBSTITUTION_CAP, 0f)
+        assertEquals(0.9f * 0.3806f / 0.7248f, TouchSubstitutionCost.SUBSTITUTION_CAP, 0.005f)
     }
 
     @Test
-    fun touchNearBoundaryMakesThatNeighborCheap() {
-        val towardNeighbor = cost('e', 0.45f, 0f, 'r')
-        val awayFromNeighbor = cost('e', 0.45f, 0f, 'w')
-        val centered = cost('e', 0f, 0f, 'r')
-        assertEquals(TouchSubstitutionCost.MIN_COST, towardNeighbor, 0.0001f)
-        assertTrue("toward=$towardNeighbor centered=$centered", towardNeighbor < centered)
-        assertTrue("away=$awayFromNeighbor centered=$centered", awayFromNeighbor > centered)
+    fun touchAtTheIntendedKeyCenterCostsNothing() {
+        // e를 쳤지만 터치 지점은 오른쪽 이웃 r의 정중앙이다.
+        assertEquals(0f, cost('e', 1f, 0f, 'r'), 0.0001f)
+    }
+
+    @Test
+    fun touchAtTheIntendedKeyBoundaryCostsAboutFourTenths() {
+        val atBoundary = cost('e', 0.5f, 0f, 'r')
+
+        assertEquals(boundaryCost, atBoundary, 0.0001f)
+        assertEquals(0.41f, atBoundary, 0.005f)
+    }
+
+    @Test
+    fun theCostFollowsTheDistanceToTheIntendedKeyCenterOnBothAxes() {
+        // 같은 거리 0.5키: 중심 너머로 지나친 터치도, 위쪽에서 닿은 터치도 같은 비용이다.
+        assertEquals(boundaryCost, cost('e', 1.5f, 0f, 'r'), 0.0001f)
+        // r의 정중앙 위 0.5키.
+        assertEquals(boundaryCost, cost('e', 1f, -0.5f, 'r'), 0.0001f)
+    }
+
+    @Test
+    fun centerTouchMakesTheNeighborCostTheCap() {
+        assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP, cost('e', 0f, 0f, 'r'), 0.0001f)
+        assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP, cost('e', 0f, 0f, 'w'), 0.0001f)
+    }
+
+    @Test
+    fun keysTwoCellsAwayStillUseTheTouchFormula() {
+        // e와 t는 격자 비용 0.7이다.
+        assertEquals(0.7f, DubeolsikKeyMap.substitutionCost('e', 't'), 0f)
+        assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP, cost('e', 0f, 0f, 't'), 0.0001f)
+        assertEquals(boundaryCost, cost('e', 1.5f, 0f, 't'), 0.0001f)
+    }
+
+    @Test
+    fun farKeyKeepsTheGridCostEvenWithATouchAtItsCenter() {
+        assertEquals(1.0f, DubeolsikKeyMap.substitutionCost('e', 'p'), 0f)
+        assertNull(TouchSubstitutionCost.cost(touch('e', dx = 7f), 'p'))
+        assertNull(TouchSubstitutionCost.cost(touch('e'), 'p'))
+    }
+
+    @Test
+    fun touchNearBoundaryMakesThatNeighborCheaperThanTheOtherSide() {
+        val towardNeighbor = cost('e', 0.5f, 0f, 'r')
+        val awayFromNeighbor = cost('e', 0.5f, 0f, 'w')
+        assertTrue("toward=$towardNeighbor away=$awayFromNeighbor", towardNeighbor < awayFromNeighbor)
+        assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP, awayFromNeighbor, 0.0001f)
     }
 
     @Test
     fun verticalNeighborFollowsTheActualRowOffset() {
-        // s는 윗줄의 w와 e 사이 아래에 있다. 위쪽 경계를 누르면 위의 두 키가 옆 키 d보다 싸다.
-        val toUpperKey = cost('s', -0.3f, -0.45f, 'w')
-        val toSideKey = cost('s', -0.3f, -0.45f, 'd')
-        assertTrue("upper=$toUpperKey side=$toSideKey", toUpperKey < toSideKey)
+        // s는 윗줄의 w와 e 사이 아래에 있다. 왼쪽 위 모서리(w의 아래 경계)를 누르면 w가 옆 키 d보다 싸다.
+        val toUpperKey = cost('s', -0.5f, -0.5f, 'w')
+        val toSideKey = cost('s', -0.5f, -0.5f, 'd')
+        assertEquals(boundaryCost, toUpperKey, 0.0001f)
+        assertEquals(TouchSubstitutionCost.SUBSTITUTION_CAP, toSideKey, 0.0001f)
     }
 
     @Test
-    fun farKeyIsCappedAtTheGridScale() {
-        assertEquals(TouchSubstitutionCost.MAX_COST, cost('e', 0f, 0f, 'p'), 0.0001f)
+    fun theHabitOfTheIntendedKeyMovesItsCenter() {
+        // 사용자는 r을 평소 왼쪽(e 쪽)으로 0.5키 치우쳐 누른다: e의 중앙을 누른 터치는 r의 옮겨진 중심과 0.5키 떨어진다.
+        val leftLeaningR = TouchHabit { key -> if (key == 'r') KeyBias(-0.5f, 0f) else null }
+
+        assertEquals(boundaryCost, cost('e', 0f, 0f, 'r', leftLeaningR), 0.0001f)
+        // r의 중심이 e 쪽으로 한 칸 옮겨져 있으면 e의 중앙이 곧 r의 중심이다.
+        assertEquals(0f, cost('e', 0f, 0f, 'r', TouchHabit { KeyBias(-1f, 0f) }), 0.0001f)
+        assertEquals(0.47f, cost('e', 0f, 0f, 'r', TouchHabit { null }), 0.0001f)
     }
 
     @Test
-    fun touchLandingBeyondTheTypedKeyNeverGoesBelowTheFloor() {
-        assertEquals(TouchSubstitutionCost.MIN_COST, cost('e', 0.9f, 0f, 'r'), 0.0001f)
+    fun theHabitOfTheTypedKeyDoesNotMoveTheCost() {
+        val onlyTypedKey = TouchHabit { key -> if (key == 'e') KeyBias(0.3f, 0f) else null }
+
+        assertEquals(cost('e', 0.5f, 0f, 'r'), cost('e', 0.5f, 0f, 'r', onlyTypedKey), 0f)
     }
 
     @Test
