@@ -973,7 +973,6 @@
     <string name="vault_feedback_personal_line" tools:ignore="MissingTranslation">%1$d%% of those came from your own writing</string>
     <string name="vault_style_title" tools:ignore="MissingTranslation">My style</string>
     <string name="vault_style_categories_line" tools:ignore="MissingTranslation">Mostly used in: %1$s</string>
-    <string name="vault_style_report_row" tools:ignore="MissingTranslation">View my style report</string>
     <string name="vault_storage_title" tools:ignore="MissingTranslation">Storage and backup</string>
     <string name="vault_storage_lock_line" tools:ignore="MissingTranslation">🔒 Kept encrypted on this phone only</string>
     <string name="vault_storage_info_content_description" tools:ignore="MissingTranslation">More details</string>
@@ -1023,7 +1022,6 @@
     <string name="style_report_style_title" tools:ignore="MissingTranslation">Your style</string>
     <string name="style_report_transitions_title" tools:ignore="MissingTranslation">Top words you often connect</string>
     <string name="style_report_endings_title" tools:ignore="MissingTranslation">Endings you often use</string>
-    <string name="style_report_footer_privacy" tools:ignore="MissingTranslation">This report is only ever made on this phone</string>
 
     <string name="enrichment_card_title" tools:ignore="MissingTranslation">LLM enrichment</string>
     <string name="enrichment_card_description" tools:ignore="MissingTranslation">It organizes relationships and topics in saved expressions to affect recommendation ranking.</string>

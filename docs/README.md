@@ -12,4 +12,4 @@
 - **`brand/`** — 브랜드 자산·컬러 토큰. 시작점: [`brand/README.md`](brand/README.md).
 - **`independent-fork/`** — 개인정보·데이터 안전 선언 정본과 서명·배포 문서. Play 콘솔 릴리스 게이트가 이 경로를 직접 참조한다. 시작점: [`privacy-data-safety.md`](independent-fork/privacy-data-safety.md), [`signing.md`](independent-fork/signing.md).
 - **`wiki/`** — 저장소 위키(개발·빌드 가이드 등). 시작점: [`wiki/Home.md`](wiki/Home.md).
-- **`archive/`** — 끝난 계획·핸드오프·오래된 로그의 보관소. 내용은 고치지 않는다. 규칙: [`archive/README.md`](archive/README.md). 보관 중인 것: `archive/extreme-ai/`(극한 AI 마스터 플랜·백로그·조사), `archive/engineering/`(끝난 리팩토링 계획), `archive/logs/2026-09/`(2026-09월 작업 기록).
+- **`archive/`** — 끝난 계획·핸드오프·오래된 로그의 보관소. 내용은 고치지 않는다. 규칙: [`archive/README.md`](archive/README.md). 보관 중인 것: `archive/extreme-ai/`(극한 AI 마스터 플랜·백로그·조사), `archive/engineering/`(끝난 리팩토링 계획), `archive/logs/2026-09/`(2026-09월 작업 기록), `archive/ai/`·`archive/korean-input/`(외부 AI 제거 이전 계획), `archive/independent-fork/`(독립 포크 전환 초기 기획안).

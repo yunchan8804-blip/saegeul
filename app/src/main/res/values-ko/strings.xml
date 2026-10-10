@@ -967,7 +967,6 @@
     <string name="vault_feedback_personal_line">그중 %1$d%%는 내 기록에서 나왔어요</string>
     <string name="vault_style_title">내 말투</string>
     <string name="vault_style_categories_line">주로 쓰는 곳: %1$s</string>
-    <string name="vault_style_report_row">내 말투 리포트 보기</string>
     <string name="vault_storage_title">보관과 백업</string>
     <string name="vault_storage_lock_line">🔒 이 휴대폰 안에만 암호화해 보관해요</string>
     <string name="vault_storage_info_content_description">자세히 보기</string>
@@ -1017,7 +1016,6 @@
     <string name="style_report_style_title">말투의 특징</string>
     <string name="style_report_transitions_title">자주 이어 쓰는 말 TOP</string>
     <string name="style_report_endings_title">자주 쓰는 말끝</string>
-    <string name="style_report_footer_privacy">이 리포트는 이 휴대폰 안에서만 만들어져요</string>
 
     <string name="enrichment_card_title">LLM 강화</string>
     <string name="enrichment_card_description">저장된 표현의 관계와 주제를 정리해 추천 순위에 반영해요.</string>

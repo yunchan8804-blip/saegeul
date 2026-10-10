@@ -91,7 +91,6 @@ class VaultHomeStringsTerminologyTest {
         "typing_dna_chart_accessibility_accumulation",
         "vault_timeline_summary",
         "vault_timeline_empty",
-        "vault_style_report_row",
         "style_report_title",
         "style_report_empty_message",
         "style_report_accumulation_footer",
@@ -100,8 +99,7 @@ class VaultHomeStringsTerminologyTest {
         "style_report_category_empty",
         "style_report_style_title",
         "style_report_transitions_title",
-        "style_report_endings_title",
-        "style_report_footer_privacy"
+        "style_report_endings_title"
     )
 
     private val exemptFromRelationshipGraphBan = emptySet<String>()
