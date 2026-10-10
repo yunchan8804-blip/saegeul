@@ -16,7 +16,6 @@ object GeneratedMaterialPolicy {
     )
 
     const val TARGET_PER_PREFIX = 4
-    const val MAX_ATTEMPTS_PER_PREFIX = 6
     val PREFIXES = listOf(
         "회의 자료를 ", "오늘 저녁 ", "약속을 ", "내일 회의는 ", "자료를 확인하고 ",
         "답장이 늦어서 ", "지금 출발하면 ", "도착하면 바로 ", "시간이 괜찮으면 ", "이번 주말에는 ",

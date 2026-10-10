@@ -103,7 +103,7 @@ class VoiceTranscriptionContractTest {
         val target = VoiceEditorTarget("chat.app", 7, 1, 12)
 
         queue.begin(41L, target)
-        queue.complete(41L, granted = true)
+        queue.complete(41L, true)
 
         assertEquals(
             VoicePermissionResumeResult(target, granted = true),
@@ -118,7 +118,7 @@ class VoiceTranscriptionContractTest {
         val target = VoiceEditorTarget("chat.app", 7, 1, 12)
 
         queue.begin(42L, target)
-        queue.complete(42L, granted = true)
+        queue.complete(42L, true)
 
         assertNull(queue.consumeForEditor("other.app", 7, 1))
         assertNull(queue.consumeForEditor("chat.app", 7, 1))
@@ -132,8 +132,8 @@ class VoiceTranscriptionContractTest {
 
         queue.begin(1L, oldTarget)
         queue.begin(2L, currentTarget)
-        queue.complete(1L, granted = true)
-        queue.complete(2L, granted = false)
+        queue.complete(1L, true)
+        queue.complete(2L, false)
 
         assertEquals(
             VoicePermissionResumeResult(currentTarget, granted = false),

@@ -10,6 +10,7 @@ import com.googlecode.tesseract.android.TessBaseAPI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 import kotlin.coroutines.coroutineContext
 
 interface KoreanOcrEngine {
@@ -57,7 +58,7 @@ internal object OcrOrientationPolicy {
     private fun isHangul(char: Char): Boolean = char.code in 0x1100..0x11ff ||
         char.code in 0x3130..0x318f ||
         char.code in 0xa960..0xa97f ||
-        char.code in 0xac00..0xd7af
+        HangulSyllable.isSyllable(char)
 }
 
 class TesseractKoreanOcrEngine(

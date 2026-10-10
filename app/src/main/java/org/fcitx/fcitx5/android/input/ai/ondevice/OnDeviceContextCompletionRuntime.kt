@@ -252,16 +252,11 @@ class OnDeviceContextCompletionRuntime(context: Context) {
         else -> "GENERATION_FAILED_${error.javaClass.simpleName}"
     }
 
-    private fun hasEligibleResources(): Boolean = try {
-        requireEligibleResources()
-        true
-    } catch (_: ContextCompletionException) {
-        false
-    }
+    private fun hasEligibleResources(): Boolean =
+        OnDeviceResourceSnapshot.foregroundBlockCode(appContext) == null
 
     private fun requireEligibleResources() {
-        OnDeviceResourceSnapshot.read(appContext)
-            .foregroundGenerationBlockCode(MINIMUM_BATTERY_PERCENT)
+        OnDeviceResourceSnapshot.foregroundBlockCode(appContext)
             ?.let { throw ContextCompletionException(it) }
     }
 
@@ -285,7 +280,6 @@ class OnDeviceContextCompletionRuntime(context: Context) {
     private class ContextCompletionException(code: String) : IllegalStateException(code)
 
     private companion object {
-        const val MINIMUM_BATTERY_PERCENT = 20
         const val RESOURCE_CHECK_INTERVAL_MS = 100L
         const val GENERATION_BUDGET_MS = 120_000L
         const val NATIVE_STOP_BUDGET_MS = 30_000L

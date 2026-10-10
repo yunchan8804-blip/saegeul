@@ -4,12 +4,15 @@
  */
 package org.fcitx.fcitx5.android.input.ocr
 
+import org.fcitx.fcitx5.android.input.EditorResumeQueue
+import org.fcitx.fcitx5.android.input.EditorResumeTarget
+
 data class OcrEditorTarget(
-    val packageName: String,
-    val fieldId: Int,
-    val inputType: Int,
+    override val packageName: String,
+    override val fieldId: Int,
+    override val inputType: Int,
     val cursor: Int
-)
+) : EditorResumeTarget
 
 data class OcrDocumentResumeResult(
     val target: OcrEditorTarget,
@@ -23,45 +26,8 @@ data class OcrDocumentResumeResult(
  * result. Keep the one-shot URI with the original editor identity and let [InputView] restore the
  * OCR window only when that editor becomes active again.
  */
-internal class OcrDocumentResumeQueue {
-    private data class Pending(val id: Long, val target: OcrEditorTarget)
-
-    private var pending: Pending? = null
-    private var completed: OcrDocumentResumeResult? = null
-
-    @Synchronized
-    fun begin(id: Long, target: OcrEditorTarget) {
-        pending = Pending(id, target)
-        completed = null
-    }
-
-    @Synchronized
-    fun complete(id: Long, documentUri: String?) {
-        val request = pending?.takeIf { it.id == id } ?: return
-        pending = null
-        completed = OcrDocumentResumeResult(request.target, documentUri)
-    }
-
-    @Synchronized
-    fun cancel(id: Long) {
-        if (pending?.id == id) pending = null
-    }
-
-    @Synchronized
-    fun consumeForEditor(
-        packageName: String?,
-        fieldId: Int,
-        inputType: Int
-    ): OcrDocumentResumeResult? {
-        val result = completed ?: return null
-        completed = null
-        return result.takeIf {
-            packageName == it.target.packageName &&
-                fieldId == it.target.fieldId &&
-                inputType == it.target.inputType
-        }
-    }
-}
+internal class OcrDocumentResumeQueue :
+    EditorResumeQueue<OcrEditorTarget, String?, OcrDocumentResumeResult>(::OcrDocumentResumeResult)
 
 data class OcrTextBlock(
     val id: String,

@@ -26,7 +26,6 @@ data class GemmaAccumulationState(
     val status: String = STATUS_IDLE,
     val stored: Int = 0,
     val covered: Int = 0,
-    val totalPrefixes: Int = GeneratedMaterialPolicy.PREFIXES.size,
     val added: Int = 0,
     val rejected: Int = 0,
     val duplicates: Int = 0,
@@ -48,7 +47,6 @@ data class GemmaAccumulationState(
         const val STATUS_IDLE = "대기"
         const val STATUS_RUNNING = "실행 중"
         const val STATUS_COMPLETED = "완료"
-        const val STATUS_TARGET_REACHED = "목표 충족"
         const val STATUS_ATTEMPTS_EXHAUSTED = "시도 소진"
     }
 }

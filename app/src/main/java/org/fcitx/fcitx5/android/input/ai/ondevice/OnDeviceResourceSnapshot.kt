@@ -14,7 +14,8 @@ import android.os.PowerManager
 
 /**
  * One read of the device resources that gate on-device generation. Thresholds and the action
- * taken on a blocked resource stay with each caller.
+ * taken on a blocked resource stay with each caller, except the foreground generation gate that
+ * [foregroundBlockCode] shares.
  */
 data class OnDeviceResourceSnapshot(
     val batteryPercent: Int?,
@@ -46,6 +47,12 @@ data class OnDeviceResourceSnapshot(
     }
 
     companion object {
+        private const val FOREGROUND_MINIMUM_BATTERY_PERCENT = 20
+
+        /** Reads the device resources and returns the [foregroundGenerationBlockCode] for them. */
+        fun foregroundBlockCode(context: Context): String? =
+            read(context).foregroundGenerationBlockCode(FOREGROUND_MINIMUM_BATTERY_PERCENT)
+
         fun read(context: Context): OnDeviceResourceSnapshot {
             val appContext = context.applicationContext
             val battery = appContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))

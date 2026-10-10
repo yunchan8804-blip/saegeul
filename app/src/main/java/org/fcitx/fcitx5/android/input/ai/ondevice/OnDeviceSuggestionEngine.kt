@@ -631,16 +631,11 @@ class OnDeviceSuggestionEngine(
         modifiedAt = model.lastModified()
     )
 
-    private fun hasEligibleResources(): Boolean = try {
-        requireEligibleResources()
-        true
-    } catch (_: OnDeviceSuggestionException) {
-        false
-    }
+    private fun hasEligibleResources(): Boolean =
+        OnDeviceResourceSnapshot.foregroundBlockCode(appContext) == null
 
     private fun requireEligibleResources() {
-        OnDeviceResourceSnapshot.read(appContext)
-            .foregroundGenerationBlockCode(MINIMUM_BATTERY_PERCENT)
+        OnDeviceResourceSnapshot.foregroundBlockCode(appContext)
             ?.let { throw OnDeviceSuggestionException(it) }
     }
 
@@ -678,7 +673,6 @@ class OnDeviceSuggestionEngine(
     private companion object {
         const val MAX_PROMPT_UTF8_BYTES = 8192
         const val MAX_RESPONSE_CHARS = 400
-        const val MINIMUM_BATTERY_PERCENT = 20
         const val RESOURCE_CHECK_INTERVAL_MS = 500L
         const val RESOURCE_VIOLATION_GRACE_MS = 3_000L
         const val GENERATION_BUDGET_MS = 120_000L

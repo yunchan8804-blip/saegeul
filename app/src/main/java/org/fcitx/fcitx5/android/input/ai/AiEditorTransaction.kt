@@ -58,9 +58,7 @@ enum class AiApplyMode {
 data class AiAppliedEdit(
     val editor: AiEditorTarget,
     val inserted: String,
-    val restore: String,
-    /** Cursor position relative to [restore] after a successful undo. */
-    val restoreCursorOffset: Int = restore.length
+    val restore: String
 )
 
 /**

@@ -29,9 +29,6 @@ object KoreanJosaBitmaskEngine {
     const val FLAG_RIEUL_BATCHIM = 1 shl 2        // T == 8 ('ㄹ' 받침)
     const val FLAG_NON_RIEUL_BATCHIM = 1 shl 3    // T != 0 && T != 8 ('ㄹ' 제외 자음 받침)
 
-    const val HANGUL_SYLLABLE_START = HangulSyllable.BASE
-    const val HANGUL_SYLLABLE_END = HangulSyllable.END
-
     enum class JosaKind(
         val withBatchim: String,
         val withoutBatchim: String,
