@@ -43,11 +43,15 @@ object DeviceSpeechProbe {
  * The recognizer instance is reused for the following starts of one session, because destroying
  * and re-creating it for every sentence leaves the recognition service busy or disconnected. An
  * instance that failed or never reported back is destroyed and replaced once per start.
+ *
+ * With [segmented] on Android 13 and later, one start keeps listening across sentences and hands
+ * each finished sentence to [Listener.onSegment], so no sentence starts while the microphone is off.
  */
 class DeviceSpeechSession(
     private val context: Context,
     private val environment: DeviceSpeechEnvironment,
-    private val listener: Listener
+    private val listener: Listener,
+    private val segmented: Boolean = false
 ) {
     interface Listener {
         fun onReady()
@@ -55,6 +59,12 @@ class DeviceSpeechSession(
         fun onFinal(text: String)
         fun onError(code: Int)
         fun onRms(db: Float)
+
+        /** A sentence of a segmented session is finished while the session keeps listening. */
+        fun onSegment(text: String) = Unit
+
+        /** A segmented session ended after the silence limit or a stop request. */
+        fun onSegmentedSessionEnd() = Unit
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -165,6 +175,16 @@ class DeviceSpeechSession(
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageCandidates[languageIndex])
             if (target == DeviceSpeechEngine.SystemService) {
                 putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            }
+            if (segmented && Build.VERSION.SDK_INT >= SEGMENTED_SESSION_MIN_SDK) {
+                putExtra(
+                    RecognizerIntent.EXTRA_SEGMENTED_SESSION,
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS
+                )
+                putExtra(
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    SEGMENTED_SESSION_SILENCE_MS
+                )
             }
         }
 
@@ -293,6 +313,20 @@ class DeviceSpeechSession(
             listener.onFinal(firstResult(results).orEmpty())
         }
 
+        override fun onSegmentResults(segmentResults: Bundle) {
+            if (id != generation) return
+            clearStartTimeout()
+            heardSpeech = true
+            listener.onSegment(firstResult(segmentResults).orEmpty())
+        }
+
+        override fun onEndOfSegmentedSession() {
+            if (id != generation) return
+            clearStartTimeout()
+            ready = false
+            listener.onSegmentedSessionEnd()
+        }
+
         override fun onError(error: Int) = fail(id, error)
 
         override fun onBeginningOfSpeech() {
@@ -308,5 +342,8 @@ class DeviceSpeechSession(
     private companion object {
         const val START_TIMEOUT_MS = 5_000L
         const val RECREATE_DELAY_MS = 300L
+        const val SEGMENTED_SESSION_MIN_SDK = 33
+        // Int, not Long: Google's on-device service reads it with getInt and ignores the segmented session otherwise.
+        const val SEGMENTED_SESSION_SILENCE_MS = 8_000
     }
 }

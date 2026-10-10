@@ -597,4 +597,275 @@ class InlineDictationMachineTest {
         rig.machine.onErasePressed()
         assertEquals("첫 번째", rig.editor.text.toString())
     }
+
+    @Test
+    fun segmentsGoInOneByOneWhileTheSessionKeepsListening() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onPartial("안녕하세요")
+        rig.machine.onSegment("안녕하세요")
+
+        assertEquals("안녕하세요", rig.editor.text.toString())
+        assertEquals("", rig.last.partial)
+        assertEquals(DictationPhase.Listening, rig.machine.phase)
+
+        rig.machine.onPartial("반갑")
+        rig.machine.onSegment("반갑습니다")
+
+        assertEquals("안녕하세요 반갑습니다", rig.editor.text.toString())
+        assertEquals(1, rig.starts)
+        assertEquals(DictationPhase.Listening, rig.machine.phase)
+    }
+
+    @Test
+    fun anEmptySegmentIsIgnoredAndDoesNotCountAsSilence() {
+        val rig = Rig()
+        rig.listen()
+        repeat(5) { rig.machine.onSegment("  ") }
+        rig.machine.onSegment("말했어요")
+        rig.machine.onSegmentedSessionEnd()
+
+        assertEquals("말했어요", rig.editor.text.toString())
+        assertEquals(DictationPhase.Starting, rig.machine.phase)
+        assertEquals(2, rig.starts)
+    }
+
+    @Test
+    fun whenASegmentedSessionEndsListeningStartsAgainAndTheRestIsTypedIn() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onSegment("첫 문장")
+        rig.machine.onPartial("남은 말")
+        rig.machine.onSegmentedSessionEnd()
+
+        assertEquals("첫 문장 남은 말", rig.editor.text.toString())
+        assertEquals(2, rig.starts)
+        assertEquals(DictationPhase.Starting, rig.machine.phase)
+    }
+
+    @Test
+    fun aSegmentedSessionThatEndsAfterSegmentsDoesNotCountAsSilence() {
+        val rig = Rig()
+        rig.listen()
+        repeat(5) {
+            rig.machine.onSegment("말")
+            rig.machine.onSegmentedSessionEnd()
+            rig.machine.onReady()
+        }
+
+        assertEquals(DictationPhase.Listening, rig.machine.phase)
+        assertEquals(6, rig.starts)
+    }
+
+    @Test
+    fun anEmptySegmentedSessionCountsAsSilenceLikeAnEmptyFinal() {
+        val rig = Rig()
+        rig.listen()
+        repeat(3) {
+            rig.machine.onSegmentedSessionEnd()
+            rig.machine.onReady()
+        }
+
+        assertEquals(DictationPhase.Paused, rig.machine.phase)
+        assertEquals(DictationPauseReason.Silence, rig.last.pauseReason)
+    }
+
+    @Test
+    fun aFinalResultEqualToTheSegmentsIsNotTypedTwice() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onSegment("하나")
+        rig.machine.onSegment("둘")
+        rig.machine.onFinal("하나 둘")
+
+        assertEquals("하나 둘", rig.editor.text.toString())
+        assertEquals(DictationPhase.Starting, rig.machine.phase)
+        assertEquals(2, rig.starts)
+    }
+
+    @Test
+    fun aFinalResultThatContinuesTheSegmentsAddsOnlyTheRest() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onSegment("하나")
+        rig.machine.onFinal("하나 둘 셋")
+
+        assertEquals("하나 둘 셋", rig.editor.text.toString())
+    }
+
+    @Test
+    fun aFinalResultUnrelatedToTheSegmentsIsIgnored() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onSegment("하나")
+        rig.machine.onFinal("전혀 다른 말")
+
+        assertEquals("하나", rig.editor.text.toString())
+        assertEquals(DictationPhase.Starting, rig.machine.phase)
+    }
+
+    @Test
+    fun theSegmentsOfAnEarlierSessionDoNotHideTheNextFinalResult() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onSegment("하나")
+        rig.machine.onSegmentedSessionEnd()
+        rig.machine.onReady()
+        rig.machine.onFinal("둘")
+
+        assertEquals("하나 둘", rig.editor.text.toString())
+    }
+
+    @Test
+    fun anEngineWithoutSegmentsKeepsTheSentenceBySentenceFlow() {
+        val rig = Rig()
+        rig.listen()
+        rig.say("하나")
+        rig.say("둘")
+
+        assertEquals("하나 둘", rig.editor.text.toString())
+        assertEquals(3, rig.starts)
+    }
+
+    @Test
+    fun aSegmentThatCannotBeInsertedCancelsTheSessionAndPauses() {
+        val rig = Rig()
+        rig.listen()
+        rig.editor.insertResult = false
+        rig.machine.onSegment("넣을 수 없어요")
+
+        assertEquals(DictationPhase.Paused, rig.machine.phase)
+        assertEquals(DictationPauseReason.InsertFailed, rig.last.pauseReason)
+        assertEquals("cancel", rig.recognizer.calls.last())
+    }
+
+    @Test
+    fun segmentsAfterTheMicrophoneButtonStillGoInBeforeThePause() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onMicPressed()
+        rig.machine.onSegment("마지막 말")
+
+        assertEquals("마지막 말", rig.editor.text.toString())
+        assertEquals(DictationPhase.Finishing, rig.machine.phase)
+
+        rig.machine.onSegmentedSessionEnd()
+
+        assertEquals(DictationPhase.Paused, rig.machine.phase)
+        assertEquals(DictationPauseReason.User, rig.last.pauseReason)
+        assertEquals(1, rig.starts)
+    }
+
+    @Test
+    fun releasingHoldToTalkKeepsWhatIsLeftWhenTheSegmentedSessionEnds() {
+        val rig = Rig()
+        rig.listen(DictationMode.PushToTalk)
+        rig.machine.onSegment("하나")
+        rig.machine.onPartial("둘")
+        rig.machine.finishPushToTalk()
+
+        assertEquals("stop", rig.recognizer.calls.last())
+        rig.machine.onSegmentedSessionEnd()
+
+        assertEquals("하나 둘", rig.editor.text.toString())
+        assertFalse(rig.machine.isOpen)
+        assertEquals(1, rig.output.closedCount)
+    }
+
+    @Test
+    fun releasingHoldToTalkKeepsASegmentThatArrivesAfterTheStopRequest() {
+        val rig = Rig()
+        rig.listen(DictationMode.PushToTalk)
+        rig.machine.onPartial("하나")
+        rig.machine.finishPushToTalk()
+        rig.machine.onSegment("하나")
+        rig.machine.onFinishTimeout()
+
+        assertEquals("하나", rig.editor.text.toString())
+        assertFalse(rig.machine.isOpen)
+    }
+
+    @Test
+    fun theSentenceBeingHeardIsKeptWhenTheFinalResultIsEmpty() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onPartial("들리던 말")
+        rig.machine.onFinal("")
+
+        assertEquals("들리던 말", rig.editor.text.toString())
+        assertEquals(DictationPhase.Starting, rig.machine.phase)
+        assertEquals(2, rig.starts)
+    }
+
+    @Test
+    fun theSentenceBeingHeardIsKeptWhenNothingMatchedAndTheListeningContinues() {
+        listOf(SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT).forEach { code ->
+            val rig = Rig()
+            rig.listen()
+            repeat(2) { rig.silence() }
+            rig.machine.onPartial("들리던 말")
+            rig.machine.onError(code)
+
+            assertEquals("들리던 말", rig.editor.text.toString())
+            assertEquals(DictationPhase.Starting, rig.machine.phase)
+            assertEquals(4, rig.starts)
+        }
+    }
+
+    @Test
+    fun aRescuedSentenceResetsTheSilenceCount() {
+        val rig = Rig()
+        rig.listen()
+        repeat(2) { rig.silence() }
+        rig.machine.onPartial("들리던 말")
+        rig.machine.onError(SpeechRecognizer.ERROR_NO_MATCH)
+        rig.machine.onReady()
+        repeat(2) { rig.silence() }
+
+        assertEquals(DictationPhase.Listening, rig.machine.phase)
+    }
+
+    @Test
+    fun theSentenceBeingHeardIsKeptBeforeAFailurePauses() {
+        val codes = listOf(
+            SpeechRecognizer.ERROR_NETWORK to DictationPauseReason.Network,
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY to DictationPauseReason.Busy,
+            SpeechRecognizer.ERROR_AUDIO to DictationPauseReason.Other
+        )
+        codes.forEach { (code, reason) ->
+            val rig = Rig()
+            rig.listen()
+            rig.machine.onPartial("들리던 말")
+            rig.machine.onError(code)
+
+            assertEquals("들리던 말", rig.editor.text.toString())
+            assertEquals(DictationPhase.Paused, rig.machine.phase)
+            assertEquals(reason, rig.last.pauseReason)
+            assertEquals(1, rig.starts)
+        }
+    }
+
+    @Test
+    fun aFailureStillPausesWithInsertFailedWhenTheSentenceBeingHeardCannotBeKept() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onPartial("들리던 말")
+        rig.editor.insertResult = false
+        rig.machine.onError(SpeechRecognizer.ERROR_NETWORK)
+
+        assertEquals(DictationPhase.Paused, rig.machine.phase)
+        assertEquals(DictationPauseReason.InsertFailed, rig.last.pauseReason)
+    }
+
+    @Test
+    fun aFailureWhileFinishingToCloseKeepsTheSentenceBeingHeard() {
+        val rig = Rig()
+        rig.listen()
+        rig.machine.onPartial("들리던 말")
+        rig.machine.onDonePressed()
+        rig.machine.onError(SpeechRecognizer.ERROR_NETWORK)
+
+        assertEquals("들리던 말", rig.editor.text.toString())
+        assertFalse(rig.machine.isOpen)
+    }
 }

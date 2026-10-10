@@ -102,7 +102,7 @@ internal class InlineDictationController(
 
     private fun start(environment: DeviceSpeechEnvironment, mode: DictationMode) {
         boundEditor = service.currentInputEditorInfo?.let(EditorIdentity::of)
-        session = DeviceSpeechSession(context, environment, SessionListener())
+        session = DeviceSpeechSession(context, environment, SessionListener(), segmented = true)
         onOpenChanged(true)
         val serviceNotice = environment.engine == DeviceSpeechEngine.SystemService
         machine.open(mode, serviceNotice)
@@ -163,6 +163,8 @@ internal class InlineDictationController(
         override fun onFinal(text: String) = machine.onFinal(text)
         override fun onError(code: Int) = machine.onError(code)
         override fun onRms(db: Float) = machine.onRms(db)
+        override fun onSegment(text: String) = machine.onSegment(text)
+        override fun onSegmentedSessionEnd() = machine.onSegmentedSessionEnd()
     }
 
     private inner class ServiceEditor : DictationEditor {

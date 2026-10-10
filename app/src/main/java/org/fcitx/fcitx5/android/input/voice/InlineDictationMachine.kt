@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import timber.log.Timber
+
 internal enum class DictationMode {
     /** Keeps listening sentence after sentence until the user finishes. */
     Continuous,
@@ -73,9 +75,12 @@ internal class InlineDictationMachine(
     private val editor: DictationEditor,
     private val output: DictationOutput,
     private val timers: DictationTimers,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
     private val languageTag: () -> String
 ) {
     private enum class AfterFinal { Pause, Close }
+
+    private enum class RescueReason { EMPTY_FINAL, NO_SPEECH, ERROR }
 
     var phase: DictationPhase = DictationPhase.Closed
         private set
@@ -91,6 +96,9 @@ internal class InlineDictationMachine(
     private var lastInserted: String? = null
     private var pauseReason: DictationPauseReason? = null
     private var serviceNotice = false
+    private var segmentedSeen = false
+    private val typedSegments = mutableListOf<String>()
+    private var resultAtMillis: Long? = null
 
     fun open(mode: DictationMode, serviceNotice: Boolean) {
         check(phase == DictationPhase.Closed) { "Dictation is already open" }
@@ -118,6 +126,8 @@ internal class InlineDictationMachine(
 
     fun onReady() {
         if (phase != DictationPhase.Starting) return
+        resultAtMillis?.let { Timber.tag(LOG_TAG).d("result→ready gap ms=%d", nowMillis() - it) }
+        resultAtMillis = null
         phase = DictationPhase.Listening
         render()
     }
@@ -137,13 +147,47 @@ internal class InlineDictationMachine(
 
     fun onFinal(text: String) {
         if (!isRecognizing) return
-        finishSentence(text)
+        resultAtMillis = nowMillis()
+        finishSentence(textBeyondSegments(text), RescueReason.EMPTY_FINAL)
+    }
+
+    /** A sentence of a segmented session: it goes in at once and the session keeps listening. */
+    fun onSegment(text: String) {
+        if (!isRecognizing) return
+        if (!segmentedSeen) {
+            segmentedSeen = true
+            Timber.tag(LOG_TAG).d("segmented supported=true")
+        }
+        Timber.tag(LOG_TAG).d("segment len=%d", text.length)
+        val sentence = VoiceTranscriptPolicy.normalize(text) ?: return
+        partial = ""
+        silentRounds = 0
+        if (!insert(sentence)) {
+            if (afterFinal == AfterFinal.Close) {
+                close()
+            } else {
+                recognizer.cancel()
+                pause(DictationPauseReason.InsertFailed)
+            }
+            return
+        }
+        typedSegments += sentence
+        if (phase == DictationPhase.Starting) phase = DictationPhase.Listening
+        render()
+    }
+
+    /** A segmented session ended: what is left of the last sentence goes in, then the usual next step. */
+    fun onSegmentedSessionEnd() {
+        if (!isRecognizing) return
+        resultAtMillis = nowMillis()
+        Timber.tag(LOG_TAG).d("segmented session end")
+        finishSentence(partial)
     }
 
     fun onError(code: Int) {
         if (!isRecognizing) return
         when (DeviceSpeechErrorKind.of(code)) {
-            DeviceSpeechErrorKind.NoSpeech -> finishSentence("")
+            DeviceSpeechErrorKind.NoSpeech -> finishSentence("", RescueReason.NO_SPEECH)
             DeviceSpeechErrorKind.Permission -> close()
             DeviceSpeechErrorKind.Language -> fail(DictationPauseReason.Language)
             DeviceSpeechErrorKind.Busy -> fail(DictationPauseReason.Busy)
@@ -215,6 +259,7 @@ internal class InlineDictationMachine(
     fun close() {
         if (phase == DictationPhase.Closed) return
         timers.cancelFinishTimeout()
+        resultAtMillis = null
         phase = DictationPhase.Closed
         partial = ""
         level = 0f
@@ -233,6 +278,8 @@ internal class InlineDictationMachine(
     private fun startListening() {
         phase = DictationPhase.Starting
         partial = ""
+        segmentedSeen = false
+        typedSegments.clear()
         level = 0f
         afterFinal = null
         pauseReason = null
@@ -251,6 +298,7 @@ internal class InlineDictationMachine(
 
     private fun pause(reason: DictationPauseReason) {
         timers.cancelFinishTimeout()
+        resultAtMillis = null
         phase = DictationPhase.Paused
         pauseReason = reason
         partial = ""
@@ -260,15 +308,46 @@ internal class InlineDictationMachine(
     }
 
     private fun fail(reason: DictationPauseReason) {
-        if (afterFinal == AfterFinal.Close) close() else pause(reason)
+        val inserted = takePartial(RescueReason.ERROR)?.let(::insert) ?: true
+        when {
+            afterFinal == AfterFinal.Close -> close()
+            !inserted -> pause(DictationPauseReason.InsertFailed)
+            else -> pause(reason)
+        }
     }
 
-    private fun finishSentence(text: String) {
+    /** The partial text the strip shows, normalized, or null when there is nothing to keep. */
+    private fun takePartial(reason: RescueReason): String? {
+        val sentence = VoiceTranscriptPolicy.normalize(partial) ?: return null
+        Timber.tag(LOG_TAG).d("partial rescued reason=%s len=%d", reason, sentence.length)
+        silentRounds = 0
+        return sentence
+    }
+
+    /** What a final result adds beyond the segments of its session that are already typed in. */
+    private fun textBeyondSegments(text: String): String {
+        if (typedSegments.isEmpty()) return text
+        return when (val tail = DictationSegmentTail.of(typedSegments, text)) {
+            SegmentTail.Duplicate -> ""
+            is SegmentTail.Rest -> tail.text
+            SegmentTail.Unrelated -> {
+                Timber.tag(LOG_TAG).w(
+                    "final result ignored after segments finalLen=%d segmentsLen=%d",
+                    text.length,
+                    typedSegments.sumOf(String::length)
+                )
+                ""
+            }
+        }
+    }
+
+    private fun finishSentence(text: String, emptyReason: RescueReason? = null) {
         timers.cancelFinishTimeout()
         val sentence = VoiceTranscriptPolicy.normalize(text)
+            ?: emptyReason?.let(::takePartial)
         var inserted = true
         if (sentence == null) {
-            silentRounds++
+            if (typedSegments.isEmpty()) silentRounds++
         } else {
             silentRounds = 0
             inserted = insert(sentence)
@@ -313,5 +392,6 @@ internal class InlineDictationMachine(
 
     private companion object {
         const val MAX_SILENT_ROUNDS = 3
+        const val LOG_TAG = "Dictation"
     }
 }

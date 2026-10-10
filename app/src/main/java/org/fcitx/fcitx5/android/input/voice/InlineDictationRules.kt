@@ -26,3 +26,31 @@ internal object DictationErasePolicy {
     fun canErase(textBeforeCursor: CharSequence?, inserted: String): Boolean =
         inserted.isNotEmpty() && textBeforeCursor != null && textBeforeCursor.toString() == inserted
 }
+
+/** What a final result adds on top of the segments of the same session that were already typed in. */
+internal sealed interface SegmentTail {
+    /** The final result is exactly what the segments already put in. */
+    data object Duplicate : SegmentTail
+
+    /** The final result continues the segments; [text] is the part not typed in yet. */
+    data class Rest(val text: String) : SegmentTail
+
+    /** The final result does not start with the segments, so nothing of it can be told apart. */
+    data object Unrelated : SegmentTail
+}
+
+internal object DictationSegmentTail {
+    private val WHITESPACE = Regex("\\s+")
+
+    fun of(typedSegments: List<String>, finalText: String): SegmentTail {
+        val typed = squeeze(typedSegments.joinToString(" "))
+        val final = squeeze(finalText)
+        return when {
+            final == typed -> SegmentTail.Duplicate
+            final.startsWith(typed) -> SegmentTail.Rest(final.substring(typed.length).trim())
+            else -> SegmentTail.Unrelated
+        }
+    }
+
+    private fun squeeze(text: String): String = text.trim().replace(WHITESPACE, " ")
+}

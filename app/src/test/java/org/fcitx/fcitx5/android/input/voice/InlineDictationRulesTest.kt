@@ -76,3 +76,35 @@ class DictationErasePolicyTest {
         assertFalse(DictationErasePolicy.canErase("", ""))
     }
 }
+
+class DictationSegmentTailTest {
+    @Test
+    fun aFinalResultEqualToTheSegmentsIsADuplicate() {
+        assertEquals(
+            SegmentTail.Duplicate,
+            DictationSegmentTail.of(listOf("하나", "둘"), "하나 둘")
+        )
+        assertEquals(
+            SegmentTail.Duplicate,
+            DictationSegmentTail.of(listOf("하나", "둘"), "  하나   둘 ")
+        )
+    }
+
+    @Test
+    fun aFinalResultThatContinuesTheSegmentsLeavesTheRest() {
+        assertEquals(
+            SegmentTail.Rest("셋 넷"),
+            DictationSegmentTail.of(listOf("하나", "둘"), "하나 둘 셋 넷")
+        )
+    }
+
+    @Test
+    fun aFinalResultThatDoesNotStartWithTheSegmentsIsUnrelated() {
+        assertEquals(
+            SegmentTail.Unrelated,
+            DictationSegmentTail.of(listOf("하나", "둘"), "하나 셋")
+        )
+        assertEquals(SegmentTail.Unrelated, DictationSegmentTail.of(listOf("하나", "둘"), "하나"))
+        assertEquals(SegmentTail.Unrelated, DictationSegmentTail.of(listOf("하나"), ""))
+    }
+}
