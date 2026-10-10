@@ -47,7 +47,6 @@ import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
-import android.widget.Toast
 import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
@@ -60,18 +59,14 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.EditorPrivacyPolicy
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -86,23 +81,17 @@ import org.fcitx.fcitx5.android.core.TextFormatFlag
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
-import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.TRANSIENT_BUFFERED_PASTE_LABEL
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
-import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseProfileStore
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseTemplate
-import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseValues
-import org.fcitx.fcitx5.android.data.quickphrase.snippet.SnippetCatalog
-import org.fcitx.fcitx5.android.data.quickphrase.snippet.SnippetRepository
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import org.fcitx.fcitx5.android.input.dynamicphrase.DynamicPhraseEditorTarget
 import org.fcitx.fcitx5.android.input.dynamicphrase.SensitivePhraseSession
-import org.fcitx.fcitx5.android.input.ai.AiApplyMode
 import org.fcitx.fcitx5.android.input.ai.AiEditorTransaction
 import org.fcitx.fcitx5.android.input.ai.AiInputCaptureResult
 import org.fcitx.fcitx5.android.input.ai.AiInputSnapshot
@@ -126,23 +115,21 @@ import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidateSnapshot
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualPredictionController
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
-import org.fcitx.fcitx5.android.input.context.KoreanParticleCommitContract
-import org.fcitx.fcitx5.android.input.context.KoreanParticleEditorTarget
 import org.fcitx.fcitx5.android.input.context.KoreanParticleSnapshot
-import org.fcitx.fcitx5.android.input.context.KoreanParticleSuggester
 import org.fcitx.fcitx5.android.input.keyboard.MobileHangulLayout
 import org.fcitx.fcitx5.android.input.policy.InputFeaturePolicy
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardGlobalDefaults
-import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileResolver
 import org.fcitx.fcitx5.android.input.profile.AppKeyboardProfileStore
-import org.fcitx.fcitx5.android.input.profile.AppToolbarVisibility
-import org.fcitx.fcitx5.android.input.profile.EffectiveAppKeyboardProfile
 import org.fcitx.fcitx5.android.input.prompt.InternalPromptController
-import org.fcitx.fcitx5.android.input.search.KoreanDictionaryQuery
-import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery
+import org.fcitx.fcitx5.android.input.service.AppKeyboardProfileSession
+import org.fcitx.fcitx5.android.input.service.BufferedHangulSnippetPort
+import org.fcitx.fcitx5.android.input.service.EditorDirectActions
+import org.fcitx.fcitx5.android.input.service.EditorLearningObserver
+import org.fcitx.fcitx5.android.input.service.FcitxEventCollector
+import org.fcitx.fcitx5.android.input.service.SnippetBoundary
+import org.fcitx.fcitx5.android.input.service.SnippetExpander
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
 import org.fcitx.fcitx5.android.input.typo.TypoRecoverySnapshot
-import org.fcitx.fcitx5.android.input.voice.DictationErasePolicy
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.clipboardManager
@@ -156,8 +143,6 @@ import splitties.bitflags.hasFlag
 import splitties.dimensions.dp
 import splitties.resources.styledColor
 import timber.log.Timber
-import java.time.ZonedDateTime
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
 
 class FcitxInputMethodService : LifecycleInputMethodService() {
@@ -171,14 +156,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         get() = DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode)
 
     private lateinit var fcitx: FcitxConnection
-    private var fcitxEventCollectorJob: Job? = null
-    private var fcitxEventCollectorRestartJob: Job? = null
-    private var fcitxEventCollectorGeneration = 0L
-    private var fcitxEventCollectorRestartRequest = 0L
-    private var fcitxEventCollectorEngineGeneration = Long.MIN_VALUE
-    private var readyFcitxEventCollectorGeneration = Long.MIN_VALUE
-    private var observedFcitxEngineGeneration = Long.MIN_VALUE
     private val engineRestartEditorRehydrationGate = EngineRestartEditorRehydrationGate()
+    private val eventCollector = FcitxEventCollector(
+        FcitxEventCollector.Host(
+            fcitx = { fcitx },
+            lifecycleScope = { lifecycleScope },
+            handleEvent = ::handleFcitxEvent,
+            postFcitxJob = ::postFcitxJob,
+            setEffectiveCapFlags = { flags, ime, packageName ->
+                setEffectiveCapFlags(flags, ime, packageName)
+            },
+            discardLocalInputState = ::discardLocalInputStateForFcitxEngineRestart,
+            resetPromptForEngineRestart = { internalPrompt.resetForEngineRestart() }
+        ),
+        engineRestartEditorRehydrationGate
+    )
 
     private var jobs = Channel<Job>(capacity = Channel.UNLIMITED)
 
@@ -245,14 +237,33 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val bufferedHangulInputPref = prefs.advanced.bufferedHangulInput
     private val bufferedHangulTransport by prefs.advanced.bufferedHangulTransport
     private val appProfileStore by lazy { AppKeyboardProfileStore(this) }
-    @Volatile
-    private var effectiveAppProfile: EffectiveAppKeyboardProfile? = null
+    private val appProfileSession = AppKeyboardProfileSession(
+        AppKeyboardProfileSession.Host(
+            allowsCredentialProtectedFeatures = { allowsCredentialProtectedFeatures },
+            profiles = { appProfileStore.profiles() },
+            upsertProfile = { profile -> appProfileStore.upsert(profile) },
+            globalTheme = { ThemeManager.activeTheme },
+            globalDefaults = { globalTheme ->
+                AppKeyboardGlobalDefaults(
+                    mobileHangulLayout = prefs.keyboard.mobileHangulLayout.getValue(),
+                    themeName = globalTheme.name,
+                    toolbarExpanded = prefs.keyboard.expandToolbarByDefault.getValue(),
+                    bufferedInputTransport = prefs.advanced.bufferedHangulTransport.getValue(),
+                    offlineMode = prefs.advanced.offlineMode.getValue()
+                )
+            },
+            findSelectableTheme = ThemeManager::findSelectableTheme,
+            canReplaceInputViews = { ::contentView.isInitialized && inputView != null },
+            appliedThemeName = { appliedInputThemeName },
+            replaceInputViews = ::replaceInputViews
+        )
+    )
     private val featurePolicy: InputFeaturePolicy = InputFeaturePolicy(
         isDirectBootMode = { isDirectBootInputMode },
         editorInfo = { currentInputEditorInfo },
         capabilityFlags = { capabilityFlags },
         offlineMode = { offlineMode },
-        appProfile = { effectiveAppProfile }
+        appProfile = { appProfileSession.effective }
     )
 
     private val extractedTextTokens = ExtractedTextTokens()
@@ -285,7 +296,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             selection = { currentInputSelection },
             inputSessionEpoch = { inputSessionEpoch },
             isDirectBootMode = { isDirectBootInputMode },
-            appAiPolicy = { effectiveAppProfile?.source?.aiPolicy },
+            appAiPolicy = { appProfileSession.effective?.source?.aiPolicy },
             allowsCompletion = ::allowsOnDeviceContextCompletionFeatures,
             isPromptInputOwned = { internalPrompt.isInternalPromptInputOwned },
             isPromptCaptureActive = { internalPrompt.isInternalPromptCaptureActive },
@@ -325,17 +336,46 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     private val consumedPhysicalKeysDown = mutableSetOf<Int>()
 
-    @Volatile
-    private var snippetCatalog = SnippetCatalog.builtIns()
-    private var snippetRefreshJob: Job? = null
+    private val snippets = SnippetExpander(
+        SnippetExpander.Host(
+            context = { this },
+            lifecycleScope = { lifecycleScope },
+            allowsCredentialProtectedFeatures = { allowsCredentialProtectedFeatures },
+            isPromptCaptureStarting = { isInternalPromptCaptureStarting },
+            autoExpansionEnabled = { autoSnippetExpansion },
+            allowsTextInspection = ::allowsTextInspectionFeatures,
+            selection = { selection },
+            inputConnection = { currentInputConnection },
+            finishCompositionForDirectAction = ::finishCompositionForDirectAction
+        ),
+        object : BufferedHangulSnippetPort {
+            override val isBuffered: Boolean
+                get() = bufferedHangulSessionActive
+
+            override fun snapshot(): String = bufferedHangul.snapshot(bufferedEnginePreedit())
+
+            override fun dispatchBufferedText(text: String): Boolean =
+                this@FcitxInputMethodService.dispatchBufferedText(text)
+
+            override fun clear() = bufferedHangul.clear()
+
+            override fun queueEngineReset() = queueBufferedHangulEngineReset()
+
+            override fun refreshPreedit() {
+                inputView?.refreshBufferedHangulPreedit()
+            }
+        }
+    )
 
     private val internalPrompt: InternalPromptController = InternalPromptController(
         InternalPromptController.Host(
             engineGeneration = { fcitx.engineGeneration.value },
             isEngineReady = { fcitx.runImmediately { isReady } },
-            isEventCollectorReady = { isFcitxEventCollectorReady },
-            eventCollectorEngineGeneration = { fcitxEventCollectorEngineGeneration },
-            discardEventGeneration = ::discardFcitxEventGenerationForPromptSafety,
+            isEventCollectorReady = { eventCollector.isCollectorReady },
+            eventCollectorEngineGeneration = { eventCollector.collectorEngineGeneration },
+            discardEventGeneration = { engineRestart ->
+                eventCollector.discardGenerationForPromptSafety(engineRestart)
+            },
             postFcitxJob = ::postFcitxJob,
             lifecycleScope = { lifecycleScope },
             inputView = { inputView },
@@ -378,7 +418,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             inputConnection = { currentInputConnection },
             activePreedit = ::activePreeditForContextualInput,
             editorComposingText = ::editorComposingTextForContextualInput,
-            appPersona = { effectiveAppProfile?.source?.persona },
+            appPersona = { appProfileSession.effective?.source?.persona },
             isDestroyed = { lifecycle.currentState == Lifecycle.State.DESTROYED },
             lifecycleScope = { lifecycleScope },
             inputView = { inputView }
@@ -427,11 +467,57 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 personalLearning.enqueueContextualSelectionFeedback(context, selected, reinforced, packageName)
             },
             scheduleNgramSave = { personalLearning.scheduleNgramSave() },
-            observeCommittedEditorText = ::observeCommittedEditorText,
+            observeCommittedEditorText = { text -> learningObserver.observeCommittedText(text) },
             captureCorrectionBoundarySnapshot = { personalLearning.captureCorrectionBoundarySnapshot() },
             onEditorSuffixDeleted = { packageName, removedText, inspectionAllowed ->
                 personalLearning.typingDnaCommitSink.onEditorSuffixDeleted(packageName, removedText, inspectionAllowed)
             }
+        )
+    )
+
+    private val learningObserver = EditorLearningObserver(
+        EditorLearningObserver.Host(
+            allowsCredentialProtectedFeatures = { allowsCredentialProtectedFeatures },
+            allowsTextInspection = ::allowsTextInspectionFeatures,
+            inputConnection = { currentInputConnection },
+            packageName = { currentInputEditorInfo?.packageName },
+            currentWordBeforeCursor = { personalLearning.currentWordBeforeCursor() },
+            recordCorrectionBackspace = { word ->
+                personalLearning.correctionSessionTracker.onBackspace(word)
+            },
+            onEditorContinuityLost = { packageName, removedText, inspectionAllowed ->
+                personalLearning.typingDnaCommitSink.onEditorContinuityLost(
+                    packageName,
+                    removedText,
+                    inspectionAllowed
+                )
+            },
+            flushPending = { personalLearning.flushTypingDnaForCurrentEditor() },
+            observeCommittedText = { text -> personalLearning.observeCommittedEditorText(text) },
+            onEditorSessionStarted = { packageName, fieldId, restarting ->
+                personalLearning.typingDnaCommitSink.onEditorSessionStarted(
+                    packageName,
+                    fieldId,
+                    restarting
+                )
+            }
+        )
+    )
+
+    private val directActions = EditorDirectActions(
+        EditorDirectActions.Host(
+            allowsTextInspection = ::allowsTextInspectionFeatures,
+            allowsNetworkInput = ::allowsNetworkInputFeatures,
+            finishCompositionForDirectAction = ::finishCompositionForDirectAction,
+            editorInfo = { currentInputEditorInfo },
+            inputConnection = { currentInputConnection },
+            selection = { selection },
+            markEditorStateChanged = ::markEditorStateChanged,
+            notifySnapshotInvalidated = {
+                onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
+            },
+            postRefreshContextualCandidates = { inputView?.postRefreshContextualCandidates(16L) },
+            commitTextToEditor = { text, cursor -> commitTextToEditor(text, cursor) }
         )
     )
 
@@ -499,7 +585,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     )
 
     private fun effectiveInputTheme(globalTheme: Theme = ThemeManager.activeTheme): Theme =
-        effectiveAppProfile?.source?.themeName?.let(ThemeManager::findSelectableTheme) ?: globalTheme
+        appProfileSession.effective?.source?.themeName?.let(ThemeManager::findSelectableTheme) ?: globalTheme
 
     private fun replaceInputView(theme: Theme): InputView {
         val newInputView = InputView(this, fcitx, theme)
@@ -557,6 +643,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         packageName
     )
 
+    private suspend fun FcitxAPI.setEffectiveCapFlags(
+        flags: CapabilityFlags,
+        ime: InputMethodEntry,
+        packageName: String?
+    ) {
+        setCapFlags(effectiveCapabilityFlags(flags, ime, packageName))
+    }
+
     @Keep
     private val bufferedHangulInputListener = ManagedPreference.OnChangeListener<Boolean> { _, enabled ->
         if (isInternalPromptInputOwned) {
@@ -576,12 +670,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
         if (!bufferedHangulSessionActive) clearBufferedHangul()
         postFcitxJob {
-            setCapFlags(
-                effectiveCapabilityFlags(
-                    capabilityFlags,
-                    inputMethodEntryCached,
-                    currentInputEditorInfo?.packageName
-                )
+            setEffectiveCapFlags(
+                capabilityFlags,
+                inputMethodEntryCached,
+                currentInputEditorInfo?.packageName
             )
         }
     }
@@ -601,174 +693,34 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return job
     }
 
-    /** Starts a fresh, replay-free event subscription for the current Fcitx engine generation. */
-    private fun startFcitxEventCollector() {
-        if (fcitxEventCollectorJob?.isActive == true) return
-        val generation = ++fcitxEventCollectorGeneration
-        val engineGeneration = fcitx.engineGeneration.value
-        fcitxEventCollectorEngineGeneration = engineGeneration
-        readyFcitxEventCollectorGeneration = Long.MIN_VALUE
-        fcitxEventCollectorJob = lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            fcitx.runImmediately { eventFlow }.onSubscription {
-                if (generation == fcitxEventCollectorGeneration &&
-                    engineGeneration == fcitx.engineGeneration.value
-                ) {
-                    readyFcitxEventCollectorGeneration = generation
-                }
-            }.collect {
-                if (generation != fcitxEventCollectorGeneration) return@collect
-                if (engineGeneration != fcitx.engineGeneration.value) {
-                    // A restart can move STOPPING -> STOPPED -> READY before StateFlow collectors
-                    // run. Never route a new-engine event through an old prompt/collector epoch.
-                    discardFcitxEventGenerationForPromptSafety(engineRestart = true)
-                    return@collect
-                }
-                handleFcitxEvent(it)
-            }
-        }
-    }
-
-    private val isFcitxEventCollectorReady: Boolean
-        get() = fcitxEventCollectorJob?.isActive == true &&
-            readyFcitxEventCollectorGeneration == fcitxEventCollectorGeneration &&
-            fcitxEventCollectorEngineGeneration == fcitx.engineGeneration.value
-
-    /**
-     * Subscribes only once the current engine has fully reached READY.
-     *
-     * The engine generation advances only after Fcitx.stop() returned from its native dispatcher.
-     * Re-subscribing earlier could give an old native callback a new collector epoch.
-     */
-    private fun restartFcitxEventCollectorWhenReady() {
-        val request = ++fcitxEventCollectorRestartRequest
-        val engineGeneration = fcitx.engineGeneration.value
-        fcitxEventCollectorRestartJob?.cancel()
-        fcitxEventCollectorRestartJob = lifecycleScope.launch {
-            fcitx.runOnReady { }
-            if (request == fcitxEventCollectorRestartRequest &&
-                engineGeneration == fcitx.engineGeneration.value
-            ) {
-                val restored = restoreEditorAfterFcitxEngineRestart(
-                    engineRestartEditorRehydrationGate.claimReady(engineGeneration)
-                )
-                if (restored && request == fcitxEventCollectorRestartRequest &&
-                    engineGeneration == fcitx.engineGeneration.value
-                ) {
-                    startFcitxEventCollector()
-                }
-            }
-        }
-    }
-
-    /**
-     * A daemon-only engine restart creates a fresh native AndroidFrontend without another Android
-     * bind/start callback. Recreate its InputContext before events or keys are allowed through.
-     */
-    private suspend fun restoreEditorAfterFcitxEngineRestart(
-        plan: EngineRestartEditorRehydrationGate.Plan?
-    ): Boolean {
-        val engineStillReady = {
-            fcitx.runImmediately { isReady }
-        }
-        if (plan == null) return engineStillReady()
-        if (plan.engineGeneration != fcitx.engineGeneration.value || !engineStillReady()) {
-            return false
-        }
-        // A start-input-view callback may refine EditorInfo without issuing a second bind/start.
-        // Resolve the claim again so its native restore targets that latest same-generation field.
-        val currentPlan = engineRestartEditorRehydrationGate.refreshClaimedPlan(plan) ?: return true
-        val failure = AtomicReference<Throwable?>()
-        val appliedPlan = AtomicReference<EngineRestartEditorRehydrationGate.Plan?>()
-        val restoreJob = postFcitxJob {
-            // The Android editor may have changed while this job waited behind another operation.
-            val latestPlan = engineRestartEditorRehydrationGate.refreshClaimedPlan(currentPlan)
-                ?: return@postFcitxJob
-            if (!isReady || latestPlan.engineGeneration != fcitx.engineGeneration.value
-            ) return@postFcitxJob
-            appliedPlan.set(latestPlan)
-            activate(latestPlan.uid, latestPlan.packageName)
-            latestPlan.inputMethodUniqueName?.takeIf { it.isNotBlank() }?.let { activateIme(it) }
-            setCandidatePagingMode(if (latestPlan.isVirtualKeyboard) 0 else 1)
-            setCapFlags(
-                effectiveCapabilityFlags(
-                    latestPlan.capabilityFlags,
-                    inputMethodEntryCached,
-                    latestPlan.packageName
-                )
-            )
-            if (latestPlan.shouldFocus) focus(true)
-        }
-        restoreJob.invokeOnCompletion { cause -> failure.set(cause) }
-        restoreJob.join()
-        if (plan.engineGeneration != fcitx.engineGeneration.value || !engineStillReady()) {
-            return false
-        }
-        val cause = failure.get()
-        if (cause == null) return true
-        Timber.w(cause, "Fcitx editor rehydration did not complete")
-        if (engineRestartEditorRehydrationGate.retryAfterFailedRestore(appliedPlan.get() ?: currentPlan)) {
-            restartFcitxEventCollectorWhenReady()
-        }
-        return false
-    }
-
-    /**
-     * Drops the old event subscription before releasing a prompt gate.
-     *
-     * Once the collector is cancelled, any callback that predates a failed marker or a restart is
-     * deliberately never routed through a later editor. Replacement collection waits for the
-     * current engine's READY boundary, where its replay-free SharedFlow is safe to subscribe.
-     */
-    private fun discardFcitxEventGenerationForPromptSafety(engineRestart: Boolean = false) {
-        // Invalidate before cancellation: an in-flight collector callback must not write after
-        // the prompt gate becomes idle.
-        val engineGeneration = fcitx.engineGeneration.value
-        observedFcitxEngineGeneration = engineGeneration
-        if (engineRestart) {
-            engineRestartEditorRehydrationGate.requestForEngineGeneration(engineGeneration)
-            discardLocalInputStateForFcitxEngineRestart()
-        }
-        fcitxEventCollectorGeneration += 1
-        fcitxEventCollectorRestartJob?.cancel()
-        fcitxEventCollectorRestartJob = null
-        fcitxEventCollectorEngineGeneration = Long.MIN_VALUE
-        readyFcitxEventCollectorGeneration = Long.MIN_VALUE
-        fcitxEventCollectorJob?.cancel()
-        fcitxEventCollectorJob = null
-        internalPrompt.resetForEngineRestart()
-        restartFcitxEventCollectorWhenReady()
-    }
-
     /** Never submit a composition that belonged to an engine instance that no longer exists. */
     private fun discardLocalInputStateForFcitxEngineRestart() {
         bufferedHangul.clear()
         bufferedHangulEngineResetPending = false
         resetComposingState()
+        resetKeyEventState()
+    }
+
+    private fun resetKeyEventState() {
+        consumedPhysicalKeysDown.clear()
         cachedKeyEvents.evictAll()
         cachedKeyEventIndex = 0
-        consumedPhysicalKeysDown.clear()
         cursorUpdateIndex = 0
+    }
+
+    private fun endBufferedHangulSession() {
+        bufferedHangulSessionActive = false
+        bufferedHangul.clear()
     }
 
     override fun onCreate() {
         activeInstance = this
         OnDeviceGenerationControl.onServiceStarted()
         fcitx = FcitxDaemon.connect(javaClass.name)
-        observedFcitxEngineGeneration = fcitx.engineGeneration.value
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }
         }
-        restartFcitxEventCollectorWhenReady()
-        lifecycleScope.launch {
-            fcitx.engineGeneration.collect { generation ->
-                if (generation != observedFcitxEngineGeneration) {
-                    observedFcitxEngineGeneration = generation
-                    // The monotonically increasing boundary survives StateFlow state conflation,
-                    // so active, starting, and draining prompts all die with their old engine.
-                    discardFcitxEventGenerationForPromptSafety(engineRestart = true)
-                }
-            }
-        }
+        eventCollector.start()
         pkgNameCache = PackageNameCache(this)
         recreateInputViewPrefs.forEach {
             it.registerOnChangeListener(recreateInputViewListener)
@@ -798,7 +750,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun attachCredentialProtectedFeatures() {
         automaticSuggestion.registerListeners()
         contextualPrediction.observeSentencePackRevision()
-        refreshSnippetCatalog()
+        snippets.refreshCatalog()
         personalLearning.attachTypingDnaBatchCompiler()
     }
 
@@ -840,7 +792,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 )
             }
             is FcitxEvent.CommitStringEvent -> {
-                val snippetBoundary = boundaryForText(event.data.text)
+                val snippetBoundary = SnippetBoundary.forText(event.data.text)
                 if (internalPrompt.captureInternalPromptCommit(event.data.text)) {
                     // Internal prompt capture owns this commit; never forward it to the target editor.
                 } else if (isInternalPromptCaptureStarting) {
@@ -848,7 +800,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     // original editor, but must bypass normal direct-UI gates that freeze new
                     // input while the prompt is waiting for that marker.
                     commitFcitxEventToEditor(event.data.text, event.data.cursor)
-                } else if (snippetBoundary != null && tryExpandSnippet(snippetBoundary)) {
+                } else if (snippetBoundary != null && snippets.tryExpand(snippetBoundary)) {
                     // The boundary is part of the atomic snippet replacement.
                 } else if (beginDynamicPhrasePreview(event.data.text)) {
                     // Dynamic templates are committed only from their explicit preview action.
@@ -866,7 +818,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     when (it.sym.sym) {
                         FcitxKeyMapping.FcitxKey_BackSpace -> handleBackspaceKey()
                         FcitxKeyMapping.FcitxKey_Return -> {
-                            if (!tryExpandSnippet(SnippetBoundary.Enter)) handleReturnKey()
+                            if (!snippets.tryExpand(SnippetBoundary.Enter)) handleReturnKey()
                         }
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(KeyEvent.KEYCODE_DPAD_LEFT)
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(KeyEvent.KEYCODE_DPAD_RIGHT)
@@ -875,8 +827,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                             if (isInternalPromptCaptureStarting) {
                                 commitFcitxEventToEditor(text)
                             } else {
-                                val boundary = boundaryForText(text)
-                                if (boundary == null || !tryExpandSnippet(boundary)) {
+                                val boundary = SnippetBoundary.forText(text)
+                                if (boundary == null || !snippets.tryExpand(boundary)) {
                                     commitToEditor(text)
                                 }
                             }
@@ -915,29 +867,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         } else {
                             null
                         }
-                        if (physicalBoundary != null && tryExpandSnippet(physicalBoundary)) {
+                        if (physicalBoundary != null && snippets.tryExpand(physicalBoundary)) {
                             consumedPhysicalKeysDown.add(it.sym.sym)
                             return@event
-                        }
-                        if (keyEvent.keyCode == KeyEvent.KEYCODE_DEL &&
-                            keyEvent.action == KeyEvent.ACTION_DOWN &&
-                            allowsTextInspectionFeatures()
-                        ) {
-                            personalLearning.correctionSessionTracker.onBackspace(personalLearning.currentWordBeforeCursor())
                         }
                         if (keyEvent.action == KeyEvent.ACTION_DOWN &&
                             (keyEvent.keyCode == KeyEvent.KEYCODE_DEL ||
                                 keyEvent.keyCode == KeyEvent.KEYCODE_FORWARD_DEL)
                         ) {
-                            val dnaInspectionAllowed = allowsTextInspectionFeatures()
-                            val dnaRemovedText = if (
-                                keyEvent.keyCode == KeyEvent.KEYCODE_DEL && dnaInspectionAllowed
-                            ) {
-                                currentInputConnection?.getTextBeforeCursor(1, 0)?.toString()
-                            } else {
-                                null
-                            }
-                            notifyTypingDnaContinuityLost(dnaRemovedText, dnaInspectionAllowed)
+                            learningObserver.onForwardedDeleteDown(
+                                backspace = keyEvent.keyCode == KeyEvent.KEYCODE_DEL
+                            )
                         }
                         currentInputConnection?.sendKeyEvent(keyEvent)
                         if (keyEvent.action == KeyEvent.ACTION_DOWN) {
@@ -970,7 +910,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         } else {
                             null
                         }
-                        if (simulatedBoundary != null && tryExpandSnippet(simulatedBoundary)) {
+                        if (simulatedBoundary != null && snippets.tryExpand(simulatedBoundary)) {
                             if (!it.states.virtual) consumedPhysicalKeysDown.add(it.sym.sym)
                             return@event
                         }
@@ -1035,12 +975,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     showStatusIcon(StatusIconMapping.fromEntry(event.data))
                 }
                 postFcitxJob {
-                    setCapFlags(
-                        effectiveCapabilityFlags(
-                            capabilityFlags,
-                            event.data,
-                            currentInputEditorInfo?.packageName
-                        )
+                    setEffectiveCapFlags(
+                        capabilityFlags,
+                        event.data,
+                        currentInputEditorInfo?.packageName
                     )
                 }
             }
@@ -1094,13 +1032,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         val ic = currentInputConnection ?: return
         if (before > 0 || after > 0) {
-            val dnaInspectionAllowed = allowsTextInspectionFeatures()
-            val dnaRemovedText = if (before > 0 && dnaInspectionAllowed) {
-                ic.getTextBeforeCursor(before, 0)?.toString()
-            } else {
-                null
-            }
-            notifyTypingDnaContinuityLost(dnaRemovedText, dnaInspectionAllowed)
+            learningObserver.onDeleting(before)
         }
         if (before > 0) {
             selection.predictOffset(-before)
@@ -1119,16 +1051,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleBackspaceKey() {
         if (internalPrompt.deleteInternalPromptBeforeCursor(1)) return
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
-        val dnaInspectionAllowed = allowsTextInspectionFeatures()
-        val dnaRemovedText = if (dnaInspectionAllowed) {
-            currentInputConnection?.getTextBeforeCursor(1, 0)?.toString()
-        } else {
-            null
-        }
-        notifyTypingDnaContinuityLost(dnaRemovedText, dnaInspectionAllowed)
-        if (dnaInspectionAllowed) {
-            personalLearning.correctionSessionTracker.onBackspace(personalLearning.currentWordBeforeCursor())
-        }
+        learningObserver.onBackspaceKey()
         val lastSelection = selection.latest
         if (lastSelection.isNotEmpty()) {
             selection.predict(lastSelection.start)
@@ -1164,7 +1087,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             inputView?.submitInternalPromptInput()
             return
         }
-        flushTypingDnaForCurrentEditor()
+        learningObserver.flushPending()
         personalLearning.finalizeCorrectionSessionAtBoundary()
         currentInputEditorInfo.run {
             if (inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL ||
@@ -1208,140 +1131,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         currentInputConnection.setSelection(target, target)
-    }
-
-    private enum class SnippetBoundary(val suffix: String, val consumeOnFailure: Boolean) {
-        Space(" ", false),
-        // A recognized snippet must never be sent to a chat accidentally because its personal
-        // profile value is missing. The first Enter expands (or reports the issue); a second one
-        // performs the editor action.
-        Enter("", true)
-    }
-
-    private fun boundaryForText(text: String): SnippetBoundary? = when (text) {
-        " " -> SnippetBoundary.Space
-        "\n", "\r" -> SnippetBoundary.Enter
-        else -> null
-    }
-
-    private fun refreshSnippetCatalog() {
-        snippetRefreshJob?.cancel()
-        if (!DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode)) {
-            snippetRefreshJob = null
-            snippetCatalog = SnippetCatalog.builtIns()
-            return
-        }
-        snippetRefreshJob = lifecycleScope.launch(Dispatchers.IO) {
-            snippetCatalog = runCatching { SnippetRepository.load() }
-                .onFailure { Timber.w(it, "Unable to refresh snippet catalog") }
-                .getOrElse { SnippetCatalog.builtIns() }
-        }
-    }
-
-    private fun resolveSnippetTemplate(template: String): String? {
-        val clipboard = ClipboardManager.lastEntry
-        val result = DynamicPhraseTemplate.expand(
-            template,
-            DynamicPhraseValues(
-                now = ZonedDateTime.now(),
-                profile = DynamicPhraseProfileStore(this).load(),
-                clipboardText = clipboard?.takeUnless { it.sensitive }?.text,
-                clipboardSensitive = clipboard?.sensitive == true,
-                privateEditor = false
-            )
-        )
-        if (!result.canInsert) {
-            Toast.makeText(this, R.string.snippet_missing_value, Toast.LENGTH_SHORT).show()
-            return null
-        }
-        return result.text
-    }
-
-    private fun tryExpandSnippet(boundary: SnippetBoundary): Boolean {
-        // A boundary ahead of an internal-prompt start marker is historical editor input. Do not
-        // let it become a deferred direct action while starting freezes new editor writes.
-        if (isInternalPromptCaptureStarting || !autoSnippetExpansion || !allowsTextInspectionFeatures() ||
-            currentInputSelection.isNotEmpty()
-        ) return false
-        return if (bufferedHangulSessionActive) {
-            tryExpandBufferedSnippet(boundary)
-        } else {
-            tryExpandEditorSnippet(boundary)
-        }
-    }
-
-    private fun tryExpandEditorSnippet(boundary: SnippetBoundary): Boolean {
-        val ic = currentInputConnection ?: return false
-        val before = ic.getTextBeforeCursor(SNIPPET_CONTEXT_CHARS, 0)?.toString() ?: return false
-        val initialPlan = snippetCatalog.plan(before) ?: return false
-        val expanded = resolveSnippetTemplate(initialPlan.template)
-            ?: return boundary.consumeOnFailure
-        if (!finishCompositionForDirectAction()) return boundary.consumeOnFailure
-
-        // Finishing a composing span can change what the editor exposes. Match again and only
-        // mutate when the same trigger/template still ends exactly at the cursor.
-        val verifiedBefore = ic.getTextBeforeCursor(SNIPPET_CONTEXT_CHARS, 0)?.toString()
-            ?: return boundary.consumeOnFailure
-        val plan = snippetCatalog.plan(verifiedBefore)
-            ?.takeIf { it.trigger == initialPlan.trigger && it.template == initialPlan.template }
-            ?: return boundary.consumeOnFailure
-        val originalStart = selection.latest.start
-        val originalEnd = selection.latest.end
-        val selectionStart = originalStart - plan.deleteBeforeCursor
-        if (selectionStart < 0 || !ic.setSelection(selectionStart, originalEnd)) {
-            return boundary.consumeOnFailure
-        }
-        selection.resetTo(selectionStart, originalEnd)
-        val replacement = plan.replacement(expanded, boundary.suffix)
-        val dispatched = ic.commitText(replacement, 1)
-        if (dispatched) {
-            selection.resetTo(selectionStart + replacement.length)
-            return true
-        }
-
-        // setSelection is non-destructive. Restore the cursor so a failed commit leaves the
-        // literal trigger available for editing instead of silently deleting it.
-        ic.setSelection(originalStart, originalEnd)
-        selection.resetTo(originalStart, originalEnd)
-        Toast.makeText(this, R.string.snippet_insert_failed, Toast.LENGTH_SHORT).show()
-        return boundary.consumeOnFailure
-    }
-
-    private fun tryExpandBufferedSnippet(boundary: SnippetBoundary): Boolean {
-        val ic = currentInputConnection ?: return false
-        val originalStart = selection.latest.start
-        val originalEnd = selection.latest.end
-        if (originalStart != originalEnd) return false
-        val editorBefore = ic.getTextBeforeCursor(SNIPPET_CONTEXT_CHARS, 0)?.toString()
-            ?: return false
-        val currentPreedit = if (bufferedHangulEngineResetPending) {
-            ""
-        } else {
-            fcitx.runImmediately { inputPanelCached.preedit.toString() }
-        }
-        val pending = bufferedHangul.snapshot(currentPreedit)
-        val plan = snippetCatalog.plan(editorBefore, pending) ?: return false
-        val expanded = resolveSnippetTemplate(plan.template)
-            ?: return boundary.consumeOnFailure
-        val selectionStart = originalStart - plan.deleteBeforeCursor
-        if (selectionStart < 0 || !ic.setSelection(selectionStart, originalEnd)) {
-            return boundary.consumeOnFailure
-        }
-        selection.resetTo(selectionStart, originalEnd)
-        val replacement = plan.replacement(expanded, boundary.suffix)
-        val dispatched = dispatchBufferedText(replacement)
-        if (dispatched) {
-            bufferedHangul.clear()
-            queueBufferedHangulEngineReset()
-            inputView?.refreshBufferedHangulPreedit()
-            selection.resetTo(selectionStart + replacement.length)
-            return true
-        }
-
-        ic.setSelection(originalStart, originalEnd)
-        selection.resetTo(originalStart, originalEnd)
-        Toast.makeText(this, R.string.snippet_insert_failed, Toast.LENGTH_SHORT).show()
-        return boundary.consumeOnFailure
     }
 
     /**
@@ -1401,9 +1190,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * final: never insert the unresolved template as an implicit fallback.
      */
     private fun beginDynamicPhrasePreview(template: String): Boolean {
-        if (!DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode)) {
-            return false
-        }
+        if (!allowsCredentialProtectedFeatures) return false
         if (!DynamicPhraseTemplate.containsSupportedToken(template)) return false
         if (!prepareDynamicPhrasePreview()) return true
         val view = inputView
@@ -1411,17 +1198,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             Timber.w("Unable to preview a dynamic phrase without an input view")
             return true
         }
-        val info = currentInputEditorInfo
         val currentSelection = currentInputSelection
         view.showDynamicPhrasePreview(
             template,
-            DynamicPhraseEditorTarget(
-                packageName = info.packageName,
-                fieldId = info.fieldId,
-                inputType = info.inputType,
-                selectionStart = currentSelection.start,
-                selectionEnd = currentSelection.end
-            )
+            dynamicPhraseTarget(currentInputEditorInfo, currentSelection.start, currentSelection.end)
         )
         return true
     }
@@ -1449,39 +1229,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return true
     }
 
-    /** Typing DNA collection lives in credential-protected storage, so Direct Boot never starts it. */
-    private fun notifyTypingDnaContinuityLost(removedText: String?, inspectionAllowed: Boolean) {
-        if (!allowsCredentialProtectedFeatures) return
-        personalLearning.typingDnaCommitSink.onEditorContinuityLost(
-            currentInputEditorInfo?.packageName,
-            removedText,
-            inspectionAllowed
-        )
-    }
-
-    private fun flushTypingDnaForCurrentEditor() {
-        if (!allowsCredentialProtectedFeatures) return
-        personalLearning.flushTypingDnaForCurrentEditor()
-    }
-
-    /**
-     * A messenger clears its input field after sending, so an emptied editor means the pending
-     * sentence was sent and is flushed whole; any other external cursor move only breaks continuity.
-     */
-    private fun notifyTypingDnaExternalCursorMove(newSelStart: Int, newSelEnd: Int) {
-        val inspectionAllowed = allowsTextInspectionFeatures()
-        if (inspectionAllowed && isEditorEmptied(newSelStart, newSelEnd, currentInputConnection)) {
-            flushTypingDnaForCurrentEditor()
-        } else {
-            notifyTypingDnaContinuityLost(null, inspectionAllowed)
-        }
-    }
-
-    private fun observeCommittedEditorText(text: String) {
-        if (!allowsCredentialProtectedFeatures) return
-        personalLearning.observeCommittedEditorText(text)
-    }
-
     fun allowsTextInspectionFeatures(): Boolean = featurePolicy.allowsTextInspectionFeatures()
 
     fun allowsNetworkInputFeatures(): Boolean = featurePolicy.allowsNetworkInputFeatures()
@@ -1496,53 +1243,25 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
 
     fun effectiveMobileHangulLayout(global: MobileHangulLayout): MobileHangulLayout =
-        effectiveAppProfile?.source?.mobileHangulLayout ?: global
+        appProfileSession.effectiveMobileHangulLayout(global)
 
-    fun effectiveToolbarExpanded(global: Boolean): Boolean = when (
-        effectiveAppProfile?.source?.toolbarVisibility
-    ) {
-        AppToolbarVisibility.Expanded -> true
-        AppToolbarVisibility.Collapsed -> false
-        else -> global
-    }
+    fun effectiveToolbarExpanded(global: Boolean): Boolean =
+        appProfileSession.effectiveToolbarExpanded(global)
 
-    fun updateCurrentAppMobileHangulLayout(layout: MobileHangulLayout): Boolean {
-        val effective = effectiveAppProfile ?: return false
-        val source = effective.source ?: return false
-        return runCatching {
-            val updated = source.copy(mobileHangulLayout = layout)
-            appProfileStore.upsert(updated)
-            effectiveAppProfile = effective.copy(source = updated, mobileHangulLayout = layout)
-        }.isSuccess
-    }
+    fun updateCurrentAppMobileHangulLayout(layout: MobileHangulLayout): Boolean =
+        appProfileSession.updateCurrentAppMobileHangulLayout(layout)
 
     private fun effectiveBufferedInputTransport(): BufferedInputTransport =
-        effectiveAppProfile?.source?.bufferedInputTransport ?: bufferedHangulTransport
+        appProfileSession.effective?.source?.bufferedInputTransport ?: bufferedHangulTransport
 
-    private fun resolveAndApplyAppKeyboardProfile(info: EditorInfo, flags: CapabilityFlags) {
-        if (!DirectBootInputPolicy.allowsCredentialProtectedFeatures(isDirectBootInputMode)) {
-            effectiveAppProfile = null
-            return
-        }
-        val globalTheme = ThemeManager.activeTheme
-        val resolved = AppKeyboardProfileResolver.resolve(
+    private fun dynamicPhraseTarget(info: EditorInfo, selectionStart: Int, selectionEnd: Int) =
+        DynamicPhraseEditorTarget(
             packageName = info.packageName,
-            profiles = appProfileStore.profiles(),
-            defaults = AppKeyboardGlobalDefaults(
-                mobileHangulLayout = prefs.keyboard.mobileHangulLayout.getValue(),
-                themeName = globalTheme.name,
-                toolbarExpanded = prefs.keyboard.expandToolbarByDefault.getValue(),
-                bufferedInputTransport = prefs.advanced.bufferedHangulTransport.getValue(),
-                offlineMode = prefs.advanced.offlineMode.getValue()
-            ),
-            privateEditor = EditorPrivacyPolicy.forbidsTextInspection(info, flags)
+            fieldId = info.fieldId,
+            inputType = info.inputType,
+            selectionStart = selectionStart,
+            selectionEnd = selectionEnd
         )
-        val targetTheme = ThemeManager.findSelectableTheme(resolved.themeName) ?: globalTheme
-        effectiveAppProfile = resolved.copy(themeName = targetTheme.name)
-        if (::contentView.isInitialized && inputView != null && appliedInputThemeName != targetTheme.name) {
-            replaceInputViews(targetTheme)
-        }
-    }
 
     /** Uses native selection replacement so a failed commit cannot first delete the source. */
     private fun replaceAiRange(
@@ -1645,107 +1364,30 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Commit the current Hangul/composing segment before a rich-content transaction. Returning
      * false is final: callers must not attach content or silently fall back to inserting a URL.
      */
-    fun prepareRichContentCommit(): Boolean {
-        if (!allowsNetworkInputFeatures()) return false
-        return finishCompositionForDirectAction()
-    }
+    fun prepareRichContentCommit(): Boolean = directActions.prepareRichContentCommit()
 
     /** Finishes composition for user-selected, entirely on-device OCR without requiring network. */
-    fun prepareOcrCommit(): Boolean {
-        if (!allowsTextInspectionFeatures()) return false
-        return finishCompositionForDirectAction()
-    }
+    fun prepareOcrCommit(): Boolean = directActions.prepareTextInspectionCommit()
 
     /** Finishes composition for on-device dictation so its text lands after everything already typed. */
-    fun prepareDictationCommit(): Boolean {
-        if (!allowsTextInspectionFeatures()) return false
-        return finishCompositionForDirectAction()
-    }
+    fun prepareDictationCommit(): Boolean = directActions.prepareTextInspectionCommit()
 
     /**
      * Removes [expected] in front of the cursor, but only while it is exactly what is there. Text
      * typed or a cursor moved since it was dictated makes this do nothing and return false.
      */
-    fun eraseDictatedText(expected: String): Boolean {
-        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return false
-        if (!finishCompositionForDirectAction()) return false
-        val ic = currentInputConnection ?: return false
-        if (!DictationErasePolicy.canErase(ic.getTextBeforeCursor(expected.length, 0), expected)) {
-            return false
-        }
-        markEditorStateChanged()
-        val deleted = ic.deleteSurroundingText(expected.length, 0)
-        if (deleted) {
-            selection.predictOffset(-expected.length)
-            onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
-            inputView?.postRefreshContextualCandidates(16L)
-        }
-        return deleted
-    }
+    fun eraseDictatedText(expected: String): Boolean = directActions.eraseDictatedText(expected)
 
     /** Captures only the explicitly selected or cursor-adjacent Korean headword for local lookup. */
-    fun captureKoreanDictionaryQuery(): String? {
-        if (!allowsTextInspectionFeatures()) return null
-        if (!finishCompositionForDirectAction()) return null
-        val connection = currentInputConnection ?: return null
-        return KoreanDictionaryQuery.extract(
-            selectedText = connection.getSelectedText(0)?.toString(),
-            beforeCursor = connection.getTextBeforeCursor(
-                KoreanDictionaryQuery.MAX_LENGTH * 2,
-                0
-            )?.toString()
-        )
-    }
+    fun captureKoreanDictionaryQuery(): String? = directActions.captureKoreanDictionaryQuery()
 
     /** Captures a bounded local context only after the user explicitly opens particle suggestions. */
-    fun captureKoreanParticleSnapshot(): KoreanParticleSnapshot? {
-        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return null
-        if (!finishCompositionForDirectAction()) return null
-        val info = currentInputEditorInfo
-        val cursor = currentInputSelection.start
-        if (cursor < 0) return null
-        val tail = currentInputConnection?.getTextBeforeCursor(
-            KOREAN_PARTICLE_CONTEXT_CHARACTERS,
-            0
-        )?.toString() ?: return null
-        val suggestions = KoreanParticleSuggester.suggest(tail)
-        if (suggestions.isEmpty()) return null
-        return KoreanParticleSnapshot(
-            editor = KoreanParticleEditorTarget(
-                packageName = info.packageName,
-                fieldId = info.fieldId,
-                inputType = info.inputType,
-                cursor = cursor
-            ),
-            contextTail = tail,
-            suggestions = suggestions
-        )
-    }
+    fun captureKoreanParticleSnapshot(): KoreanParticleSnapshot? =
+        directActions.captureKoreanParticleSnapshot()
 
     /** Inserts one explicitly selected particle. A stale editor/context fails without fallback. */
-    fun commitKoreanParticle(snapshot: KoreanParticleSnapshot, text: String): Boolean {
-        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return false
-        val info = currentInputEditorInfo
-        val currentEditor = KoreanParticleEditorTarget(
-            packageName = info.packageName,
-            fieldId = info.fieldId,
-            inputType = info.inputType,
-            cursor = currentInputSelection.start
-        )
-        if (currentEditor != snapshot.editor || snapshot.suggestions.none { it.text == text }) {
-            return false
-        }
-        if (!finishCompositionForDirectAction()) return false
-        val connection = currentInputConnection ?: return false
-        val currentTail = connection.getTextBeforeCursor(
-            KOREAN_PARTICLE_CONTEXT_CHARACTERS,
-            0
-        )?.toString() ?: return false
-        if (!KoreanParticleCommitContract.canCommit(snapshot, currentEditor, currentTail, text)) {
-            return false
-        }
-        return commitTextToEditor(text, 1)
-    }
+    fun commitKoreanParticle(snapshot: KoreanParticleSnapshot, text: String): Boolean =
+        directActions.commitKoreanParticle(snapshot, text)
 
     fun captureOnDeviceContextSnapshot(): AiInputCaptureResult =
         onDeviceContextCompletion.captureOnDeviceContextSnapshot()
@@ -1813,15 +1455,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 enginePreedit = ""
             )
         }
-        val enginePreedit = if (bufferedHangulEngineResetPending) {
-            ""
-        } else {
-            fcitx.runImmediately { inputPanelCached.preedit.toString() }
-        }
         return org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput.activePreedit(
             bufferedHangulPrefix = bufferedHangulPrefix,
             clientPreedit = clientPreedit,
-            enginePreedit = enginePreedit
+            enginePreedit = bufferedEnginePreedit()
         )
     }
 
@@ -1855,44 +1492,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replacementSnapshot
     )
 
-    fun captureTypoRecoverySnapshot(): TypoRecoverySnapshot? {
-        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return null
-        if (!finishCompositionForDirectAction()) return null
-        val info = currentInputEditorInfo
-        val beforeCursor = currentInputConnection?.getTextBeforeCursor(64, 0)?.toString() ?: return null
-        val chunk = KoreanTypoRecovery.lastChunk(beforeCursor) ?: return null
-        val proposals = KoreanTypoRecovery.proposals(chunk)
-        if (proposals.isEmpty()) return null
-        return TypoRecoverySnapshot(
-            editor = TypoRecoveryEditorTarget(info.packageName, info.fieldId, info.inputType),
-            chunk = chunk,
-            proposals = proposals
-        )
-    }
+    fun captureTypoRecoverySnapshot(): TypoRecoverySnapshot? =
+        directActions.captureTypoRecoverySnapshot()
 
     fun replaceTypoRecoveryText(
         editor: TypoRecoveryEditorTarget,
         expected: String,
         replacement: String
-    ): Boolean {
-        if (!allowsTextInspectionFeatures() || currentInputSelection.isNotEmpty()) return false
-        val info = currentInputEditorInfo
-        if (info.packageName != editor.packageName || info.fieldId != editor.fieldId ||
-            info.inputType != editor.inputType
-        ) return false
-        if (!finishCompositionForDirectAction()) return false
-        val ic = currentInputConnection ?: return false
-        if (ic.getTextBeforeCursor(expected.length, 0)?.toString() != expected) return false
-        val previousCursor = currentInputSelection.start
-        markEditorStateChanged()
-        var dispatched = true
-        ic.withBatchEdit {
-            dispatched = deleteSurroundingText(expected.length, 0) && dispatched
-            if (dispatched) dispatched = commitText(replacement, 1) && dispatched
-        }
-        if (dispatched) selection.predict(previousCursor - expected.length + replacement.length)
-        return dispatched
-    }
+    ): Boolean = directActions.replaceTypoRecoveryText(editor, expected, replacement)
 
     private fun finishCompositionForDirectAction(): Boolean {
         // Reviewed editor actions must wait until an internal prompt has either completed its
@@ -1905,7 +1512,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             val finishedText = composingText.toString()
             resetComposingState()
             if (!ic.finishComposingText()) return false
-            observeCommittedEditorText(finishedText)
+            learningObserver.observeCommittedText(finishedText)
         }
         postFcitxJob { reset() }
         return true
@@ -1934,7 +1541,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 dispatched = ic.finishComposingText() && dispatched
             }
             if (dispatched) {
-                observeCommittedEditorText(text)
+                learningObserver.observeCommittedText(text)
                 inputView?.postRefreshContextualCandidates(16L)
             }
             return dispatched
@@ -1958,7 +1565,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (dispatchedResult) {
             onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
-            observeCommittedEditorText(text)
+            learningObserver.observeCommittedText(text)
             inputView?.postRefreshContextualCandidates(16L)
         }
         return dispatchedResult
@@ -1999,7 +1606,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 FcitxKeyMapping.FcitxKey_Return -> SnippetBoundary.Enter
                 else -> null
             }
-            if (boundary != null && tryExpandBufferedSnippet(boundary)) {
+            if (boundary != null && snippets.tryExpandBuffered(boundary)) {
                 if (!data.states.virtual) {
                     cachedKeyEvents.remove(data.timestamp)
                     consumedPhysicalKeysDown.add(data.sym.sym)
@@ -2019,9 +1626,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             FcitxKeyMapping.FcitxKey_BackSpace -> {
                 val preeditEmpty = fcitx.runImmediately { inputPanelCached.preedit.isEmpty() }
                 if (preeditEmpty) {
-                    if (allowsTextInspectionFeatures()) {
-                        personalLearning.correctionSessionTracker.onBackspace(personalLearning.currentWordBeforeCursor())
-                    }
+                    learningObserver.onBackspace()
                     if (bufferedHangul.deleteLastCharacter()) {
                         inputView?.refreshBufferedHangulPreedit()
                     } else {
@@ -2100,11 +1705,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         inputView?.refreshBufferedHangulPreedit()
     }
 
+    /** The engine's live preedit, which is empty while a buffered-mode engine reset is in flight. */
+    private fun bufferedEnginePreedit(): String =
+        if (bufferedHangulEngineResetPending) {
+            ""
+        } else {
+            fcitx.runImmediately { inputPanelCached.preedit.toString() }
+        }
+
     /** Whether an unsent segment exists in the captured prefix or in the engine's live preedit. */
     private fun hasPendingBufferedHangul(): Boolean {
         if (!bufferedHangul.isEmpty) return true
-        return !bufferedHangulEngineResetPending &&
-            fcitx.runImmediately { inputPanelCached.preedit.isNotEmpty() }
+        return bufferedEnginePreedit().isNotEmpty()
     }
 
     /**
@@ -2128,11 +1740,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             discardBufferedHangulForInternalPrompt()
             return false
         }
-        val currentPreedit = if (bufferedHangulEngineResetPending) {
-            ""
-        } else {
-            fcitx.runImmediately { inputPanelCached.preedit.toString() }
-        }
+        val currentPreedit = bufferedEnginePreedit()
         val text = bufferedHangul.snapshot(currentPreedit)
         if (text.isEmpty()) return true
         val dispatched = dispatchBufferedText(text, forcedTransport, allowPromptStart)
@@ -2176,7 +1784,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         currentInputConnection?.performContextMenuAction(android.R.id.paste) == true
                     if (dispatched) {
                         predictBufferedInsertion(text)
-                        observeCommittedEditorText(text)
+                        learningObserver.observeCommittedText(text)
                     }
                     dispatched
                 } catch (exception: RuntimeException) {
@@ -2193,7 +1801,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 )
                 if (dispatched) {
                     predictBufferedInsertion(text)
-                    observeCommittedEditorText(text)
+                    learningObserver.observeCommittedText(text)
                 }
                 dispatched
             }
@@ -2205,10 +1813,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /** Drops a stale buffered segment instead of dispatching it into an internal prompt's editor. */
-    private fun discardBufferedHangulForInternalPrompt() {
-        bufferedHangul.clear()
-        inputView?.refreshBufferedHangulPreedit()
-    }
+    private fun discardBufferedHangulForInternalPrompt() = clearBufferedHangul()
 
     private fun setBufferedClipboard(text: String): Boolean {
         val clip = ClipData.newPlainText(TRANSIENT_BUFFERED_PASTE_LABEL, text).apply {
@@ -2238,34 +1843,33 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         eventTime: Long,
         keyEventCode: Int,
         metaState: Int = 0
-    ): Boolean {
-        markEditorStateChanged()
-        return currentInputConnection?.sendKeyEvent(
-            KeyEvent(
-                eventTime,
-                eventTime,
-                KeyEvent.ACTION_DOWN,
-                keyEventCode,
-                0,
-                metaState,
-                KeyCharacterMap.VIRTUAL_KEYBOARD,
-                ScancodeMapping.keyCodeToScancode(keyEventCode),
-                KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
-            )
-        ) == true
-    }
+    ): Boolean = sendSoftKeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, keyEventCode, metaState)
 
     private fun sendUpKeyEvent(
         eventTime: Long,
         keyEventCode: Int,
         metaState: Int = 0
+    ): Boolean = sendSoftKeyEvent(
+        eventTime,
+        SystemClock.uptimeMillis(),
+        KeyEvent.ACTION_UP,
+        keyEventCode,
+        metaState
+    )
+
+    private fun sendSoftKeyEvent(
+        downTime: Long,
+        eventTime: Long,
+        action: Int,
+        keyEventCode: Int,
+        metaState: Int
     ): Boolean {
         markEditorStateChanged()
         return currentInputConnection?.sendKeyEvent(
             KeyEvent(
+                downTime,
                 eventTime,
-                SystemClock.uptimeMillis(),
-                KeyEvent.ACTION_UP,
+                action,
                 keyEventCode,
                 0,
                 metaState,
@@ -2573,15 +2177,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         personalLearning.correctionSessionTracker.onEditorChanged()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.onEditorChanged(
-            DynamicPhraseEditorTarget(
-                packageName = attribute.packageName,
-                fieldId = attribute.fieldId,
-                inputType = attribute.inputType,
-                selectionStart = attribute.initialSelStart,
-                selectionEnd = attribute.initialSelEnd
-            )
+            dynamicPhraseTarget(attribute, attribute.initialSelStart, attribute.initialSelEnd)
         )
-        refreshSnippetCatalog()
+        snippets.refreshCatalog()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         val restartTransport = if (
             BufferedHangulMode.mustAvoidClipboard(capabilityFlags) ||
@@ -2602,16 +2200,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         bufferedHangulSessionActive = nextBufferedHangulSessionActive
         inputView?.refreshBufferedHangulPreedit()
-        if (allowsCredentialProtectedFeatures) {
-            // An app that clears its field after sending (setText("")) restarts the same field empty
-            // instead of moving the cursor, so the pending text was sent and must not glue onto the next one.
-            if (restarting && allowsTextInspectionFeatures() &&
-                isEditorEmptied(attribute.initialSelStart, attribute.initialSelEnd, currentInputConnection)
-            ) {
-                flushTypingDnaForCurrentEditor()
-            }
-            personalLearning.typingDnaCommitSink.onEditorSessionStarted(attribute.packageName, attribute.fieldId, restarting)
-        }
+        learningObserver.onEditorSessionStarted(
+            attribute.packageName,
+            attribute.fieldId,
+            attribute.initialSelStart,
+            attribute.initialSelEnd,
+            restarting
+        )
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
@@ -2619,7 +2214,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         selection.resetTo(attribute.initialSelStart, attribute.initialSelEnd)
         resetComposingState()
         capabilityFlags = flags
-        resolveAndApplyAppKeyboardProfile(attribute, flags)
+        appProfileSession.resolveAndApply(attribute, flags)
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
@@ -2644,9 +2239,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             // EditorInfo can be different in onStartInput and onStartInputView,
             // especially in browsers
-            setCapFlags(
-                effectiveCapabilityFlags(flags, inputMethodEntryCached, attribute.packageName)
-            )
+            setEffectiveCapFlags(flags, inputMethodEntryCached, attribute.packageName)
             // for hardware keyboard, focus to allow switching input methods before onStartInputView
             if (!isNullType) {
                 focus(true)
@@ -2671,16 +2264,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             shouldFocus = !info.isTypeNull()
         )
         SensitivePhraseSession.onEditorChanged(
-            DynamicPhraseEditorTarget(
-                packageName = info.packageName,
-                fieldId = info.fieldId,
-                inputType = info.inputType,
-                selectionStart = info.initialSelStart,
-                selectionEnd = info.initialSelEnd
-            )
+            dynamicPhraseTarget(info, info.initialSelStart, info.initialSelEnd)
         )
         // Browsers may replace EditorInfo between onStartInput and onStartInputView.
-        resolveAndApplyAppKeyboardProfile(info, viewCapabilityFlags)
+        appProfileSession.resolveAndApply(info, viewCapabilityFlags)
         postFcitxJob {
             focus(true)
         }
@@ -2716,17 +2303,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         lastEditorActivityAtMs = SystemClock.elapsedRealtime()
         markEditorStateChanged()
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
-        currentInputEditorInfo.let { info ->
-            SensitivePhraseSession.onEditorChanged(
-                DynamicPhraseEditorTarget(
-                    packageName = info.packageName,
-                    fieldId = info.fieldId,
-                    inputType = info.inputType,
-                    selectionStart = newSelStart,
-                    selectionEnd = newSelEnd
-                )
-            )
-        }
+        SensitivePhraseSession.onEditorChanged(
+            dynamicPhraseTarget(currentInputEditorInfo, newSelStart, newSelEnd)
+        )
         // onUpdateSelection can left behind when user types quickly enough, eg. long press backspace
         cursorUpdateIndex += 1
         Timber.d("onUpdateSelection: old=[$oldSelStart,$oldSelEnd] new=[$newSelStart,$newSelEnd] cand=[$candidatesStart,$candidatesEnd]")
@@ -2828,9 +2407,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (bufferedHangulSessionActive) {
             if (!selection.consume(newSelStart, newSelEnd)) {
-                notifyTypingDnaExternalCursorMove(newSelStart, newSelEnd)
-                val engineHasPreedit = !bufferedHangulEngineResetPending &&
-                    fcitx.runImmediately { inputPanelCached.preedit.isNotEmpty() }
+                learningObserver.onExternalCursorMove(newSelStart, newSelEnd)
+                val engineHasPreedit = bufferedEnginePreedit().isNotEmpty()
                 if (!bufferedHangul.isEmpty || engineHasPreedit) {
                     // The target has already moved its cursor, so the original insertion anchor
                     // cannot be restored reliably without using composing spans. Discard instead
@@ -2857,7 +2435,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             // cursor update can't match any prediction: it's treated as a user input
             if (composing.isEmpty() || newSelStart != newSelEnd || !composing.contains(newSelStart)) {
-                notifyTypingDnaExternalCursorMove(newSelStart, newSelEnd)
+                learningObserver.onExternalCursorMove(newSelStart, newSelEnd)
             }
             selection.resetTo(newSelStart, newSelEnd)
         }
@@ -3068,10 +2646,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (wasBufferedHangul) {
             submitBufferedHangul()
         }
-        flushTypingDnaForCurrentEditor()
+        learningObserver.flushPending()
         if (finishingInput) {
-            bufferedHangulSessionActive = false
-            bufferedHangul.clear()
+            endBufferedHangulSession()
             consumedPhysicalKeysDown.clear()
         }
         currentInputConnection?.apply {
@@ -3104,13 +2681,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (wasBufferedHangul) {
             submitBufferedHangul()
         }
-        flushTypingDnaForCurrentEditor()
+        learningObserver.flushPending()
         contextualPrediction.onFinishInput()
         if (allowsCredentialProtectedFeatures) {
             personalLearning.onFinishInput()
         }
-        bufferedHangulSessionActive = false
-        bufferedHangul.clear()
+        endBufferedHangulSession()
         postFcitxJob {
             if (wasBufferedHangul) reset()
             focus(false)
@@ -3125,12 +2701,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         engineRestartEditorRehydrationGate.onUnbindInput()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()
-        bufferedHangulSessionActive = false
-        bufferedHangul.clear()
-        consumedPhysicalKeysDown.clear()
-        cachedKeyEvents.evictAll()
-        cachedKeyEventIndex = 0
-        cursorUpdateIndex = 0
+        endBufferedHangulSession()
+        resetKeyEventState()
         // currentInputBinding can be null on some devices under some special Multi-screen mode
         val uid = currentInputBinding?.uid ?: return
         Timber.d("onUnbindInput: uid=$uid")
@@ -3215,9 +2787,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         var activeInstance: FcitxInputMethodService? = null
             private set
 
-        private const val KOREAN_PARTICLE_CONTEXT_CHARACTERS = 64
         val DeleteSurroundingFlag = "${BuildConfig.APPLICATION_ID}.DELETE_SURROUNDING"
-        private const val SNIPPET_CONTEXT_CHARS = 128
     }
 }
 
