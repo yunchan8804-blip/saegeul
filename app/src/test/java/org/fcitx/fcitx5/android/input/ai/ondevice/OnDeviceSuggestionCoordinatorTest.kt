@@ -554,6 +554,104 @@ class OnDeviceSuggestionCoordinatorTest {
         assertEquals(closeCallsBefore + 1, fixture.backend.closeCalls.get())
     }
 
+    @Test
+    fun `word fallback is shown only as a word chip and keeps that kind while typing on`() = runBlocking {
+        val fixture = Fixture(coroutineContext)
+
+        fixture.coordinator.setEnabled(true)
+        fixture.observe(fixture.snapshot(revision = 1L, text = "내일"))
+        fixture.backend.awaitRequest(0).complete(" 오전에 시작하고,")
+        fixture.awaitReady()
+
+        val word = fixture.coordinator.candidates.single()
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, word.mode)
+        assertEquals(" 오전에", word.insertion)
+
+        fixture.observe(fixture.snapshot(revision = 2L, text = "내일 오"))
+        fixture.awaitReady()
+
+        assertEquals(1, fixture.backend.requests.size)
+        val continued = fixture.coordinator.candidates.single()
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, continued.mode)
+        assertEquals("전에", continued.insertion)
+    }
+
+    @Test
+    fun `sentence that is too short is stored only as a word chip`() = runBlocking {
+        val fixture = Fixture(coroutineContext)
+
+        fixture.coordinator.setEnabled(true)
+        fixture.observe(fixture.snapshot(revision = 1L, text = "알겠습니다. "))
+        fixture.backend.awaitRequest(0).complete("네~")
+        fixture.awaitReady()
+
+        val chip = fixture.coordinator.candidates.single()
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, chip.mode)
+        assertEquals("네~", chip.insertion)
+    }
+
+    @Test
+    fun `reply that fails the quality gate publishes no candidate`() = runBlocking {
+        val fixture = Fixture(coroutineContext)
+
+        fixture.coordinator.setEnabled(true)
+        fixture.observe(fixture.snapshot(revision = 1L, text = "내일 이 일을"))
+        fixture.backend.awaitRequest(0).complete(" 할수있어요.")
+        OnDeviceSuggestionCoordinatorTest.awaitCondition {
+            fixture.coordinator.status.state == OnDeviceSuggestionCoordinator.State.NO_CANDIDATE
+        }
+
+        assertTrue(fixture.coordinator.candidates.isEmpty())
+    }
+
+    @Test
+    fun `typo restatement becomes a replacement chip showing the whole sentence`() = runBlocking {
+        val fixture = Fixture(coroutineContext)
+        val snapshot = fixture.snapshot(revision = 1L, text = "안녕하세여")
+
+        fixture.coordinator.setEnabled(true)
+        fixture.observe(snapshot)
+        fixture.backend.awaitRequest(0).complete("안녕하세요.")
+        fixture.awaitReady()
+
+        val chip = fixture.coordinator.candidates.single()
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, chip.mode)
+        assertEquals("안녕하세요.", chip.insertion)
+        assertEquals("안녕하세여", chip.replaces)
+        assertEquals("안녕하세요.", fixture.coordinator.takeForApply(chip, snapshot))
+        assertNull(fixture.coordinator.takeForApply(chip, snapshot))
+    }
+
+    @Test
+    fun `replacement chip is dropped as soon as the typed text changes`() = runBlocking {
+        val fixture = Fixture(coroutineContext)
+
+        fixture.coordinator.setEnabled(true)
+        fixture.observe(fixture.snapshot(revision = 1L, text = "안녕하세여"))
+        fixture.backend.awaitRequest(0).complete("안녕하세요.")
+        fixture.awaitReady()
+
+        fixture.observe(fixture.snapshot(revision = 2L, text = "안녕하세여 안"))
+
+        assertTrue(fixture.coordinator.candidates.isEmpty())
+        fixture.backend.awaitRequest(1)
+        assertEquals(2, fixture.backend.requests.size)
+    }
+
+    @Test
+    fun `exact echo still appends only the continuation`() = runBlocking {
+        val fixture = Fixture(coroutineContext)
+
+        fixture.coordinator.setEnabled(true)
+        fixture.observe(fixture.snapshot(revision = 1L, text = "회의 자료를"))
+        fixture.backend.awaitRequest(0).complete("회의 자료를 공유합니다.")
+        fixture.awaitReady()
+
+        val chip = fixture.coordinator.candidates.first { it.mode == OnDeviceSuggestionPolicy.Mode.SENTENCE }
+        assertEquals(" 공유합니다.", chip.insertion)
+        assertNull(chip.replaces)
+    }
+
     private class Fixture(
         context: CoroutineContext,
         promptContextEnricher: ((OnDeviceSuggestionPolicy.Input) -> OnDeviceSuggestionPolicy.Input)? = null

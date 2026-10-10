@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import androidx.test.platform.app.InstrumentationRegistry
+import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -57,6 +58,7 @@ class GemmaSuggestionQualityDeviceTest {
         val repeat = requiredRepeat()
         val templateName = optionalFileName("templateFile")
         val template = templateName?.let { readWorkFile(workDir, it) }
+        val samplerConfig = requiredSamplerConfig()
         val scenarios = filterScenarios(loadScenarios(workDir))
         val backend = when (backendArgument) {
             "cpu" -> OnDeviceSuggestionEngine.BackendSelection.Cpu(
@@ -74,14 +76,14 @@ class GemmaSuggestionQualityDeviceTest {
             OnDeviceGenerationControl.onKeyboardVisibilityChanged(true)
             assertTrue("측정은 테스트 키보드 gate가 활성 상태여야 합니다.", OnDeviceGenerationControl.isKeyboardActive)
 
-            val createdEngine = OnDeviceSuggestionEngine(targetContext.applicationContext, backend)
+            val createdEngine = OnDeviceSuggestionEngine(targetContext.applicationContext, backend, samplerConfig)
             engine = createdEngine
             assertFalse("새 Engine은 시작 시 warm 상태일 수 없습니다.", createdEngine.isWarm)
             assertFalse("새 Engine은 시작 시 실행 중일 수 없습니다.", createdEngine.isRunning)
 
             scenarioLoop@ for (scenario in scenarios) {
                 for (repeatIndex in 1..repeat) {
-                    val sample = measure(createdEngine, scenario, template, repeatIndex)
+                    val sample = measure(createdEngine, scenario, template, templateName, repeatIndex)
                     samples.put(sample)
                     instrumentation.sendStatus(0, Bundle().apply {
                         putString(SAMPLE_EVIDENCE_KEY, sample.toString())
@@ -90,7 +92,7 @@ class GemmaSuggestionQualityDeviceTest {
                 }
             }
 
-            val summary = summarize(samples, backendArgument, cpuThreads, templateName)
+            val summary = summarize(samples, backendArgument, cpuThreads, templateName, samplerConfig)
             val result = JSONObject().put("summary", summary).put("samples", samples).toString()
             File(workDir, "results-latest.json").writeText(result, Charsets.UTF_8)
             File(workDir, "results-${System.currentTimeMillis()}.json").writeText(result, Charsets.UTF_8)
@@ -155,6 +157,7 @@ class GemmaSuggestionQualityDeviceTest {
         engine: OnDeviceSuggestionEngine,
         scenario: Scenario,
         template: String?,
+        templateName: String?,
         repeatIndex: Int
     ): JSONObject {
         val sample = JSONObject()
@@ -163,6 +166,8 @@ class GemmaSuggestionQualityDeviceTest {
             .put("text", scenario.text)
             .put("recentSentences", JSONArray(scenario.recentSentences))
             .put("repeatIndex", repeatIndex)
+            .put("sampler", samplerJson(engine.samplerConfig))
+            .put("template", templateName ?: PRODUCTION_TEMPLATE)
         val input = OnDeviceSuggestionPolicy.Input(
             textBeforeCursor = scenario.text,
             packageName = scenario.packageName,
@@ -181,13 +186,23 @@ class GemmaSuggestionQualityDeviceTest {
             prompt = builtPrompt
             val result = withTimeout(GENERATION_BUDGET_MS) { engine.suggest(builtPrompt) }
             val suffix = OnDeviceSuggestionPolicy.parseSuffix(input, result.text)
+            val stored = OnDeviceSuggestionPolicy.parseForStorage(input, result.text)
             return sample
                 .put("promptChars", builtPrompt.length)
                 .put("prompt", builtPrompt)
                 .put("raw", result.text)
                 .put("suffix", suffix ?: JSONObject.NULL)
                 .put("rejection", OnDeviceSuggestionPolicy.rejectionReason(input, result.text) ?: JSONObject.NULL)
-                .put("joined", suffix?.let { scenario.text + it } ?: JSONObject.NULL)
+                .put("joined", joined(scenario.text, stored) ?: JSONObject.NULL)
+                .put(
+                    "stored",
+                    JSONObject()
+                        .put("suffix", stored.suffix ?: JSONObject.NULL)
+                        .put("mode", stored.mode?.name ?: JSONObject.NULL)
+                        .put("replaces", stored.replaces ?: JSONObject.NULL)
+                        .put("sentenceRejection", stored.sentenceRejection ?: JSONObject.NULL)
+                        .put("wordRejection", stored.wordRejection ?: JSONObject.NULL)
+                )
                 .put("initializationMs", result.initializationMs)
                 .put("firstTextMs", result.firstTextMs ?: JSONObject.NULL)
                 .put("totalMs", result.totalMs)
@@ -206,6 +221,12 @@ class GemmaSuggestionQualityDeviceTest {
                     )
             )
         }
+    }
+
+    /** 저장 결과를 편집기에 적용했을 때의 글. 대체 문장이면 쓰던 문장을 바꾸고, 아니면 접미부를 이어 붙인다. */
+    private fun joined(text: String, stored: OnDeviceSuggestionPolicy.StoredParse): String? {
+        val suffix = stored.suffix ?: return null
+        return stored.replaces?.let { text.removeSuffix(it) + suffix } ?: (text + suffix)
     }
 
     private fun renderTemplate(template: String, scenario: Scenario): String {
@@ -251,7 +272,8 @@ class GemmaSuggestionQualityDeviceTest {
         samples: JSONArray,
         backendArgument: String,
         cpuThreads: Int,
-        templateName: String?
+        templateName: String?,
+        samplerConfig: SamplerConfig
     ): JSONObject {
         var suffixCount = 0
         var errorCount = 0
@@ -288,7 +310,31 @@ class GemmaSuggestionQualityDeviceTest {
             .put("firstInitializationMs", firstInitializationMs ?: JSONObject.NULL)
             .put("backend", backendArgument)
             .put("cpuThreads", cpuThreads)
-            .put("templateFile", templateName ?: "production")
+            .put("templateFile", templateName ?: PRODUCTION_TEMPLATE)
+            .put("sampler", samplerJson(samplerConfig))
+    }
+
+    private fun samplerJson(config: SamplerConfig): JSONObject = JSONObject()
+        .put("topK", config.topK)
+        .put("topP", config.topP)
+        .put("temperature", config.temperature)
+
+    /** 인자를 주지 않은 값은 운영 기본값을 쓴다. 셋 다 없으면 운영 경로와 같은 설정이다. */
+    private fun requiredSamplerConfig(): SamplerConfig {
+        val base = OnDeviceSuggestionEngine.DEFAULT_SAMPLER_CONFIG
+        val topK = arguments.getString("samplerTopK")?.let { raw ->
+            raw.toIntOrNull()?.takeIf { it >= 1 }
+                ?: throw IllegalArgumentException("samplerTopK 인자는 1 이상의 정수여야 합니다: $raw")
+        } ?: base.topK
+        val topP = arguments.getString("samplerTopP")?.let { raw ->
+            raw.toDoubleOrNull()?.takeIf { it > 0.0 && it <= 1.0 }
+                ?: throw IllegalArgumentException("samplerTopP 인자는 0 초과 1 이하여야 합니다: $raw")
+        } ?: base.topP
+        val temperature = arguments.getString("samplerTemperature")?.let { raw ->
+            raw.toDoubleOrNull()?.takeIf { it >= 0.0 }
+                ?: throw IllegalArgumentException("samplerTemperature 인자는 0 이상이어야 합니다: $raw")
+        } ?: base.temperature
+        return SamplerConfig(topK = topK, topP = topP, temperature = temperature, seed = base.seed)
     }
 
     private fun loadScenarios(workDir: File): List<Scenario> {
@@ -392,6 +438,7 @@ class GemmaSuggestionQualityDeviceTest {
         const val SUMMARY_EVIDENCE_KEY = "gemmaQualitySummaryJson"
         const val SCENARIOS_ASSET = "gemma_quality_scenarios.json"
         const val WORK_DIR_NAME = "gemma-quality"
+        const val PRODUCTION_TEMPLATE = "production"
         const val INPUT_TYPE = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         const val IME_ACTION = EditorInfo.IME_ACTION_NONE
         const val GENERATION_BUDGET_MS = 180_000L

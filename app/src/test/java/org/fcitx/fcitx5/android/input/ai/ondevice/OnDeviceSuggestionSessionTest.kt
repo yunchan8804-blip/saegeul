@@ -258,6 +258,57 @@ class OnDeviceSuggestionSessionTest {
         assertFalse(activeSession.publish(ticket, "를 준비할게요.", 2L))
     }
 
+    @Test
+    fun `word kind and continuation keep the stored mode`() {
+        val session = OnDeviceSuggestionSession()
+        val first = snapshot(text = "내일")
+        assertTrue(session.observe(first))
+        val ticket = requireNotNull(session.begin(0L))
+        assertTrue(session.publish(ticket, " 오전에", 1L, OnDeviceSuggestionPolicy.Mode.WORD))
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, requireNotNull(session.cached(1L)).storedMode)
+
+        assertTrue(session.observe(snapshotAtEnd(first, revision = 2L, textBeforeCursor = "내일 오")))
+
+        val continued = requireNotNull(session.cached(1L))
+        assertEquals("전에", continued.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, continued.storedMode)
+    }
+
+    @Test
+    fun `sentence kind is the default stored mode`() {
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, requireNotNull(completedSession().cached(1L)).storedMode)
+        assertNull(requireNotNull(completedSession().cached(1L)).replaces)
+    }
+
+    @Test
+    fun `replacement proposal keeps the replaced text and never continues from typed text`() {
+        val session = OnDeviceSuggestionSession()
+        val first = snapshot(text = "안녕하세여")
+        assertTrue(session.observe(first))
+        val ticket = requireNotNull(session.begin(0L))
+        assertTrue(session.publish(ticket, "안녕하세요.", 1L, replaces = "안녕하세여"))
+
+        val proposal = requireNotNull(session.cached(1L))
+        assertEquals("안녕하세요.", proposal.suffix)
+        assertEquals("안녕하세여", proposal.replaces)
+
+        assertTrue(session.observe(snapshotAtEnd(first, revision = 2L, textBeforeCursor = "안녕하세여안")))
+        assertNull(session.cached(1L))
+    }
+
+    @Test
+    fun `replacement proposal is consumed once by the exact snapshot`() {
+        val session = OnDeviceSuggestionSession()
+        val first = snapshot(text = "안녕하세여")
+        assertTrue(session.observe(first))
+        val ticket = requireNotNull(session.begin(0L))
+        assertTrue(session.publish(ticket, "안녕하세요.", 1L, replaces = "안녕하세여"))
+        val proposal = requireNotNull(session.cached(1L))
+
+        assertEquals("안녕하세요.", session.takeForApply(proposal, first, 1L))
+        assertNull(session.takeForApply(proposal, first, 1L))
+    }
+
     private fun completedSession(
         suffix: String = "를 준비할게요.",
         createdAt: Long = 0L

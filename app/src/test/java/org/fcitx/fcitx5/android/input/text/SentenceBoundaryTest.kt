@@ -33,7 +33,7 @@ class SentenceBoundaryTest {
             BoundaryCase("좋아요.ㅋㅋ", 3, true),
             BoundaryCase("끝났다.😊", 3, true),
             BoundaryCase("좋아?응", 2, true),
-            BoundaryCase("알았어~내일", 3, true),
+            BoundaryCase("알았어~내일", 3, false),
             BoundaryCase("그래.(웃음)", 2, true),
             BoundaryCase("좋아요.", 3, true),
             BoundaryCase("좋아요. 그", 3, true),
@@ -51,7 +51,23 @@ class SentenceBoundaryTest {
             BoundaryCase("3.", 1, true),
             BoundaryCase("첫\n둘", 1, true),
             BoundaryCase("첫\r둘", 1, true),
-            BoundaryCase("첫 둘", 1, false)
+            BoundaryCase("첫 둘", 1, false),
+            BoundaryCase("월~금 근무해요.", 1, false),
+            BoundaryCase("월~금 근무해요.", 8, true),
+            BoundaryCase("오후~저녁에 갈게요.", 2, false),
+            BoundaryCase("그게…좀 어려울 것 같아요.", 2, false),
+            BoundaryCase("그게… 좀 어려울 것 같아요.", 2, true),
+            BoundaryCase("그게…\n좀", 2, true),
+            BoundaryCase("네~ 내일 봬요.", 1, true),
+            BoundaryCase("네~", 1, true),
+            BoundaryCase("네~~ 내일", 1, true),
+            BoundaryCase("네~!", 1, true),
+            BoundaryCase("네~.", 1, true),
+            BoundaryCase("\"네~\" 하고", 2, true),
+            BoundaryCase("그게…)", 2, true),
+            BoundaryCase("그게…ㅋㅋ", 2, false),
+            BoundaryCase("그게…😊", 2, false),
+            BoundaryCase("그게…z", 2, false)
         )
         for (case in cases) {
             assertEquals(
@@ -77,6 +93,8 @@ class SentenceBoundaryTest {
             "(좋아요.)",
             "그래…",
             "알았어~",
+            "네~ ",
+            "그게… ",
             "정말?!",
             "...",
             "그래。",
@@ -93,6 +111,9 @@ class SentenceBoundaryTest {
             "naver.com",
             "3.5km",
             "1~2",
+            "월~금",
+            "그게…좀",
+            "알았어~내일",
             "그래!\" 하고",
             "\"",
             "\")",
@@ -119,6 +140,10 @@ class SentenceBoundaryTest {
             "그래!\" 하고" to 5,
             "그래… 그런데" to 4,
             "알았어~ 내일" to 5,
+            "월~금 근무" to 0,
+            "오후~저녁에 갈게요" to 0,
+            "그게…좀 어려울" to 0,
+            "월~금 근무해요. 네~ 내일" to 13,
             "a. b. c" to 6,
             "끝.\n\n다음" to 4,
             "좋아요." to 4,
@@ -151,6 +176,12 @@ class SentenceBoundaryTest {
         assertEquals(listOf("정말?!", "그래…"), SentenceBoundary.splitSentences("정말?! 그래…"))
         assertEquals(listOf("알았어~", "내일 봐"), SentenceBoundary.splitSentences("알았어~ 내일 봐"))
         assertEquals(listOf("좋아요...", "다음"), SentenceBoundary.splitSentences("좋아요...  다음"))
+        assertEquals(listOf("월~금 근무해요."), SentenceBoundary.splitSentences("월~금 근무해요."))
+        assertEquals(listOf("오후~저녁에 갈게요."), SentenceBoundary.splitSentences("오후~저녁에 갈게요."))
+        assertEquals(listOf("그게…", "좀 어려울 것 같아요."), SentenceBoundary.splitSentences("그게… 좀 어려울 것 같아요."))
+        assertEquals(listOf("그게…좀 어려울 것 같아요."), SentenceBoundary.splitSentences("그게…좀 어려울 것 같아요."))
+        assertEquals(listOf("월~금 근무해요.", "네~", "내일 봬요."), SentenceBoundary.splitSentences("월~금 근무해요. 네~ 내일 봬요."))
+        assertEquals(listOf("알았어~내일 봐"), SentenceBoundary.splitSentences("알았어~내일 봐"))
         assertEquals(listOf("끝。", "다음"), SentenceBoundary.splitSentences("끝。 다음"))
         assertEquals(listOf("그래!\"", "하고 갔다"), SentenceBoundary.splitSentences("그래!\" 하고 갔다"))
         assertEquals(listOf("\"좋아.\"", "그래"), SentenceBoundary.splitSentences("\"좋아.\" 그래"))
@@ -176,6 +207,9 @@ class SentenceBoundaryTest {
         assertEquals(listOf(4), SentenceBoundary.boundaryEnds("그래!\" 하고"))
         assertEquals(listOf(4), SentenceBoundary.boundaryEnds("끝.\n\n다음"))
         assertEquals(emptyList<Int>(), SentenceBoundary.boundaryEnds("naver.com"))
+        assertEquals(listOf(9), SentenceBoundary.boundaryEnds("월~금 근무해요."))
+        assertEquals(emptyList<Int>(), SentenceBoundary.boundaryEnds("오후~저녁에 갈게요"))
+        assertEquals(listOf(3), SentenceBoundary.boundaryEnds("네~~ 내일"))
     }
 
     @Test

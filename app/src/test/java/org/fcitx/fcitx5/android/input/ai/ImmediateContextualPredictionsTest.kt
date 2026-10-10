@@ -63,6 +63,75 @@ class ImmediateContextualPredictionsTest {
     }
 
     @Test
+    fun `generated material rejects every evidence except a sentence prefix`() {
+        val predictions = collect(
+            rawContext = "오늘 회의 ",
+            generatedSentenceLookup = { _, _ ->
+                listOf(
+                    SentencePackMatch(
+                        suffix = "회의록을 공유하겠습니다.",
+                        joinMode = ContextualAppend.JoinMode.NEXT_WORD,
+                        matchedTokens = 2,
+                        evidence = MatchEvidence.CONTEXT_SUFFIX
+                    ),
+                    SentencePackMatch(
+                        suffix = "약속을 정할까요?",
+                        joinMode = ContextualAppend.JoinMode.NEXT_WORD,
+                        matchedTokens = 1,
+                        evidence = MatchEvidence.LAST_WORD
+                    )
+                )
+            }
+        )
+
+        assertTrue(predictions.isEmpty())
+    }
+
+    @Test
+    fun `human made sentence pack keeps context suffix evidence`() {
+        val predictions = collect(
+            rawContext = "앞 문장은 끝났고 오늘 회의 ",
+            sentencePackLookup = { _, _ ->
+                listOf(
+                    SentencePackMatch(
+                        suffix = "끝나고 공유하겠습니다.",
+                        joinMode = ContextualAppend.JoinMode.NEXT_WORD,
+                        matchedTokens = 2,
+                        evidence = MatchEvidence.CONTEXT_SUFFIX
+                    )
+                )
+            }
+        )
+
+        assertEquals("sentence_pack", predictions.single().source)
+    }
+
+    @Test
+    fun `casual context gets no polite generated material`() {
+        var lookups = 0
+        val lookup: (String, Int) -> List<SentencePackMatch> = { _, _ ->
+            lookups++
+            listOf(
+                SentencePackMatch(
+                    suffix = "회의록을 공유하겠습니다.",
+                    joinMode = ContextualAppend.JoinMode.NEXT_WORD,
+                    matchedTokens = 2,
+                    evidence = MatchEvidence.PREFIX
+                )
+            )
+        }
+
+        val casual = collect(rawContext = "밥 먹었어. 오늘 회의 ", generatedSentenceLookup = lookup)
+        val polite = collect(rawContext = "식사하셨어요. 오늘 회의 ", generatedSentenceLookup = lookup)
+        val unknown = collect(rawContext = "오늘 회의 ", generatedSentenceLookup = lookup)
+
+        assertEquals(2, lookups)
+        assertTrue(casual.isEmpty())
+        assertEquals("ondevice_generated", polite.single().source)
+        assertEquals("ondevice_generated", unknown.single().source)
+    }
+
+    @Test
     fun `generated material keeps provenance and only accepts strong context evidence`() {
         val predictions = collect(
             rawContext = "오늘 회의 ",

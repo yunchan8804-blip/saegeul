@@ -312,6 +312,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             composing = { composing },
             composingText = { composingText },
             finishCompositionForDirectAction = ::finishCompositionForDirectAction,
+            replaceAiRange = ::replaceAiRange,
             commitAiTextAtCursor = ::commitAiTextAtCursor,
             predictSelection = { position -> selection.predict(position) }
         )

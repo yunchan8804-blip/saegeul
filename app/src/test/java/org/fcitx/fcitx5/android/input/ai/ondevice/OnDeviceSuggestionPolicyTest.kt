@@ -621,6 +621,232 @@ class OnDeviceSuggestionPolicyTest {
         )
     }
 
+    @Test
+    fun `parser uses only the first non-blank line of a multi-line reply`() {
+        val request = input(text = "회의 자료를")
+
+        assertEquals(" 공유합니다.", OnDeviceSuggestionPolicy.parseSuffix(request, " 공유합니다.\n그리고 다음 줄입니다."))
+        assertEquals(" 공유합니다.", OnDeviceSuggestionPolicy.parseSuffix(request, "\n\n 공유합니다.\r\n둘째 줄입니다."))
+        assertEquals(" 공유합니다.", OnDeviceSuggestionPolicy.parseSuffix(request, "  \n 공유합니다.\n"))
+        assertEquals(" 공유합니다.", OnDeviceSuggestionPolicy.parseSuffix(request, " 공유합니다.\n둘째\u0000줄"))
+        assertEquals(
+            " 공유합니다.",
+            OnDeviceSuggestionPolicy.parseSuffix(
+                input(text = "회의 자료를", mode = OnDeviceSuggestionPolicy.Mode.WORD),
+                " 공유합니다.\n둘째 줄"
+            )
+        )
+    }
+
+    @Test
+    fun `parser still rejects other control characters in a multi-line reply`() {
+        val request = input(text = "회의 자료를")
+
+        assertEquals("UNSAFE_CHAR", OnDeviceSuggestionPolicy.rejectionReason(request, " 공유\u0000합니다.\n둘째 줄"))
+        assertEquals("UNSAFE_CHAR", OnDeviceSuggestionPolicy.rejectionReason(request, " 공유합니다.\r둘째 줄"))
+        assertEquals("UNSAFE_CHAR", OnDeviceSuggestionPolicy.rejectionReason(request, "\n 공유\t합니다.\n둘째 줄"))
+        assertEquals("EMPTY", OnDeviceSuggestionPolicy.rejectionReason(request, "\n\n"))
+    }
+
+    @Test
+    fun `parser removes a restatement that only differs in spacing`() {
+        val request = input(text = "회의록 정리해서 공유드릴게")
+
+        assertEquals("요.", OnDeviceSuggestionPolicy.parseSuffix(request, "회의록 정리해서 공유 드릴게요."))
+        assertEquals("요.", OnDeviceSuggestionPolicy.parseSuffix(request, " 회의록 정리해서 공유 드릴게요."))
+        assertEquals(
+            "요.",
+            OnDeviceSuggestionPolicy.parseSuffix(
+                input(text = "회의록 정리해서 공유드릴게", mode = OnDeviceSuggestionPolicy.Mode.WORD),
+                "회의록 정리해서 공유 드릴게요."
+            )
+        )
+        assertEquals("ECHO_ONLY", OnDeviceSuggestionPolicy.rejectionReason(request, "회의록 정리해서 공유 드릴게"))
+        assertEquals(
+            "에 시작해요.",
+            OnDeviceSuggestionPolicy.parseSuffix(input(text = "내일 오전 회의는 3시"), "오전 회의는 3 시에 시작해요.")
+        )
+        assertEquals(
+            " 공유 드릴게요.",
+            OnDeviceSuggestionPolicy.parseSuffix(input(text = "회의록 정리해서"), "회의록 정리해서 공유 드릴게요.")
+        )
+    }
+
+    @Test
+    fun `parser keeps a single syllable tail from being taken as a spacing echo`() {
+        assertEquals(" 나 갑니다.", OnDeviceSuggestionPolicy.parseSuffix(input(text = "지금 나"), " 나 갑니다."))
+        assertEquals(
+            "래요.",
+            OnDeviceSuggestionPolicy.parseSuffix(input(text = "그"), "그래요.")
+        )
+    }
+
+    @Test
+    fun `parser rejects a reply that repeats the sentence being typed`() {
+        val request = input(text = "회의는 모레 오전 아침에 시작해요")
+
+        assertEquals("REPEATS_PREV", OnDeviceSuggestionPolicy.rejectionReason(request, " 그러면 아침에 시작해요."))
+        assertNull(OnDeviceSuggestionPolicy.rejectionReason(request, " 점심은 같이 먹어요."))
+    }
+
+    @Test
+    fun `parser rejects a reply that restates the typed sentence with a different start as an append`() {
+        val request = input(text = "회의는 아침에 시작해요 그리고")
+
+        assertEquals("RESTATES_TYPED", OnDeviceSuggestionPolicy.rejectionReason(request, " 참고로 아침에 시작해요 그리고."))
+    }
+
+    @Test
+    fun `parser rejects a sentence with two or fewer Hangul syllables`() {
+        val request = input(text = "알겠습니다. ")
+
+        assertEquals("TOO_SHORT", OnDeviceSuggestionPolicy.rejectionReason(request, "네~"))
+        assertEquals("TOO_SHORT", OnDeviceSuggestionPolicy.rejectionReason(request, "응."))
+        assertEquals("TOO_SHORT", OnDeviceSuggestionPolicy.rejectionReason(request, "그래."))
+        assertEquals("TOO_SHORT", OnDeviceSuggestionPolicy.rejectionReason(request, "네~ 내일 봬요."))
+        assertEquals("TOO_SHORT", OnDeviceSuggestionPolicy.rejectionReason(input(text = "좋아요"), "."))
+        assertNull(OnDeviceSuggestionPolicy.rejectionReason(request, "그래요."))
+        assertNull(OnDeviceSuggestionPolicy.rejectionReason(request, "내일 봬요."))
+        assertEquals(
+            "네~",
+            OnDeviceSuggestionPolicy.parseSuffix(
+                input(text = "알겠습니다. ", mode = OnDeviceSuggestionPolicy.Mode.WORD),
+                "네~"
+            )
+        )
+    }
+
+    @Test
+    fun `a short ending that completes a longer typed sentence is not too short`() {
+        assertEquals("요.", OnDeviceSuggestionPolicy.parseSuffix(input(text = "회의록을 공유드릴게"), "요."))
+        assertEquals("요.", OnDeviceSuggestionPolicy.parseSuffix(input(text = "그래"), "요."))
+    }
+
+    @Test
+    fun `isCasualTone shares the tone detection of the prompt`() {
+        assertTrue(OnDeviceSuggestionPolicy.isCasualTone("밥 먹었어. 오늘 뭐 해"))
+        assertTrue(OnDeviceSuggestionPolicy.isCasualTone("오늘 뭐 해", recentSentences = listOf("밥 먹었어.", "집에 가자")))
+        assertFalse(OnDeviceSuggestionPolicy.isCasualTone("식사하셨어요. 오늘 뭐 하세요"))
+        assertFalse(OnDeviceSuggestionPolicy.isCasualTone("오늘 회의"))
+
+        val prompt = OnDeviceSuggestionPolicy.promptFor(input(text = "밥 먹었어. 오늘 뭐 해"))
+        assertTrue(prompt.contains("말투: 반말"))
+    }
+
+    @Test
+    fun `parseForStorage stores a sentence that passes the quality gate`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 회의는"), " 오전에 시작합니다.")
+
+        assertEquals(" 오전에 시작합니다.", stored.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, stored.mode)
+        assertNull(stored.sentenceRejection)
+        assertNull(stored.wordRejection)
+    }
+
+    @Test
+    fun `parseForStorage records a word when the sentence cannot be used`() {
+        val notSentence = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일"), " 오전에 시작하고,")
+        assertEquals(" 오전에", notSentence.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, notSentence.mode)
+        assertEquals("NOT_SINGLE_SENTENCE", notSentence.sentenceRejection)
+
+        val tooShort = OnDeviceSuggestionPolicy.parseForStorage(input(text = "알겠습니다. "), "네~")
+        assertEquals("네~", tooShort.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, tooShort.mode)
+        assertEquals("TOO_SHORT", tooShort.sentenceRejection)
+
+        val gate = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의는"), " 오늘 할수있어요.")
+        assertEquals(" 오늘", gate.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, gate.mode)
+        assertEquals("GATE_SPACING", gate.sentenceRejection)
+    }
+
+    @Test
+    fun `parseForStorage stores nothing when the gate rejects both forms`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을"), " 할수있어요.")
+
+        assertNull(stored.suffix)
+        assertNull(stored.mode)
+        assertEquals("GATE_SPACING", stored.sentenceRejection)
+        assertEquals("GATE_SPACING", stored.wordRejection)
+    }
+
+    @Test
+    fun `a typo restatement is stored as a replacement of the typed sentence`() {
+        val garbled = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "오늘 회으ㅣ 몇시에"),
+            "오늘 회의 몇 시에 시작해요?"
+        )
+        assertEquals("오늘 회의 몇 시에 시작해요?", garbled.suffix)
+        assertEquals("오늘 회으ㅣ 몇시에", garbled.replaces)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, garbled.mode)
+
+        val ending = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세여"), "안녕하세요.")
+        assertEquals("안녕하세요.", ending.suffix)
+        assertEquals("안녕하세여", ending.replaces)
+    }
+
+    @Test
+    fun `a replacement keeps only the first sentence and the whole typed sentence including its trailing space`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "지난번 애기하신 자료 "),
+            "지난번 얘기하신 자료 보내드릴게요. 감사합니다."
+        )
+
+        assertEquals("지난번 얘기하신 자료 보내드릴게요.", stored.suffix)
+        assertEquals("지난번 애기하신 자료 ", stored.replaces)
+    }
+
+    @Test
+    fun `a restatement is never an append suffix`() {
+        val request = input(text = "안녕하세여")
+        val word = input(text = "안녕하세여", mode = OnDeviceSuggestionPolicy.Mode.WORD)
+
+        assertNull(OnDeviceSuggestionPolicy.parseSuffix(request, "안녕하세요."))
+        assertEquals("RESTATES_TYPED", OnDeviceSuggestionPolicy.rejectionReason(request, "안녕하세요."))
+        assertEquals("RESTATES_TYPED", OnDeviceSuggestionPolicy.rejectionReason(word, "안녕하세요."))
+    }
+
+    @Test
+    fun `an unrelated sentence is still appended and an exact echo still strips the typed part`() {
+        val unrelated = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세여"), "내일 회의 일정을 공유할게요.")
+        assertEquals("내일 회의 일정을 공유할게요.", unrelated.suffix)
+        assertNull(unrelated.replaces)
+
+        val echoed = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의 자료를"), "회의 자료를 공유합니다.")
+        assertEquals(" 공유합니다.", echoed.suffix)
+        assertNull(echoed.replaces)
+    }
+
+    @Test
+    fun `a restatement that fails the sentence checks is rejected without a word fallback`() {
+        val tooShort = OnDeviceSuggestionPolicy.parseForStorage(input(text = "네에"), "네요.")
+        assertNull(tooShort.suffix)
+        assertEquals("TOO_SHORT", tooShort.sentenceRejection)
+        assertEquals("RESTATES_TYPED", tooShort.wordRejection)
+
+        val noEnd = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세여"), "안녕하세요,")
+        assertNull(noEnd.suffix)
+        assertEquals("NOT_SINGLE_SENTENCE", noEnd.sentenceRejection)
+    }
+
+    @Test
+    fun `no replacement is considered for the next sentence or a single syllable`() {
+        val next = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세요. "), "안녕하세요 반갑습니다.")
+        assertNull(next.replaces)
+
+        val single = OnDeviceSuggestionPolicy.parseForStorage(input(text = "네"), "네 알겠습니다.")
+        assertNull(single.replaces)
+    }
+
+    @Test
+    fun `a replacement that fails the quality gate is not stored`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "이거 할수잇어요"), "이거 할수있어요.")
+
+        assertNull(stored.suffix)
+        assertEquals("GATE_SPACING", stored.sentenceRejection)
+    }
+
     private fun input(
         text: String,
         packageName: String = "com.example.app",

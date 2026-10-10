@@ -28,6 +28,13 @@ class SentencePackIndexTest {
     }
 
     @Test
+    fun prefixOnlyNeverFallsBackToContextTailOrLastWord() {
+        assertTrue(index.complete("앞 문장은 끝났고 오늘 회의 ", 4, prefixOnly = true).isEmpty())
+        assertTrue(index.complete("오늘 회의 ", 4, prefixOnly = true).all { it.evidence == MatchEvidence.PREFIX })
+        assertTrue(index.complete("오늘 회의 ", 4, prefixOnly = true).isNotEmpty())
+    }
+
+    @Test
     fun incompleteWordUsesAttachContinuation() {
         val result = index.complete("오늘 회의 끝", 4)
 

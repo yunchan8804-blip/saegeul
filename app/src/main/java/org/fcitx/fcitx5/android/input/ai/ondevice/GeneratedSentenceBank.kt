@@ -9,7 +9,6 @@ import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSpacingLint
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
-import org.fcitx.fcitx5.android.input.ai.sentencepack.MatchEvidence
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackIndex
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackText
@@ -176,8 +175,9 @@ class GeneratedSentenceBank(
         }
     }
 
+    /** 모델이 만든 문장은 앞부분이 맞을 때만 잇는다. 중간 일치로 꼬리를 붙이면 문장이 어색하게 이어진다. */
     fun complete(rawContext: String, limit: Int): List<SentencePackMatch> =
-        snapshot.index.complete(rawContext, limit).filter { it.evidence != MatchEvidence.LAST_WORD }
+        snapshot.index.complete(rawContext, limit, prefixOnly = true)
 
     fun suggestSpacing(sentence: String): String? = snapshot.spacingIndex.suggestSpacing(sentence)
 

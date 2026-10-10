@@ -46,7 +46,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class OnDeviceSuggestionEngine(
     context: Context,
-    private val backend: BackendSelection = BackendSelection.Cpu()
+    private val backend: BackendSelection = BackendSelection.Cpu(),
+    /** 운영 경로는 기본값을 쓴다. 기기 비교 측정만 다른 값을 넣는다. */
+    val samplerConfig: SamplerConfig = DEFAULT_SAMPLER_CONFIG
 ) {
 
     sealed interface BackendSelection {
@@ -76,6 +78,11 @@ class OnDeviceSuggestionEngine(
     )
 
     class OnDeviceSuggestionException(val code: String) : IllegalStateException(code)
+
+    private val conversationConfig = ConversationConfig(
+        samplerConfig = samplerConfig,
+        extraContext = mapOf("enable_thinking" to false)
+    )
 
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -289,7 +296,7 @@ class OnDeviceSuggestionEngine(
             engineWasReused = established.reused
             checkNotCancelled(request)
 
-            val created = established.engine.createConversation(CONVERSATION_CONFIG)
+            val created = established.engine.createConversation(conversationConfig)
             conversation = created
             synchronized(nativeLock) {
                 if (request.cancelled.get()) throw CancellationException()
@@ -670,18 +677,15 @@ class OnDeviceSuggestionEngine(
         val modifiedAt: Long
     )
 
-    private companion object {
-        const val MAX_PROMPT_UTF8_BYTES = 8192
-        const val MAX_RESPONSE_CHARS = 400
-        const val RESOURCE_CHECK_INTERVAL_MS = 500L
-        const val RESOURCE_VIOLATION_GRACE_MS = 3_000L
-        const val GENERATION_BUDGET_MS = 120_000L
-        const val NATIVE_STOP_BUDGET_MS = 30_000L
-        const val IDLE_CLOSE_MS = 600_000L
+    companion object {
+        val DEFAULT_SAMPLER_CONFIG = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0)
 
-        val CONVERSATION_CONFIG = ConversationConfig(
-            samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
-            extraContext = mapOf("enable_thinking" to false)
-        )
+        private const val MAX_PROMPT_UTF8_BYTES = 8192
+        private const val MAX_RESPONSE_CHARS = 400
+        private const val RESOURCE_CHECK_INTERVAL_MS = 500L
+        private const val RESOURCE_VIOLATION_GRACE_MS = 3_000L
+        private const val GENERATION_BUDGET_MS = 120_000L
+        private const val NATIVE_STOP_BUDGET_MS = 30_000L
+        private const val IDLE_CLOSE_MS = 600_000L
     }
 }

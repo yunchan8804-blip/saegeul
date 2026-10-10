@@ -63,15 +63,15 @@ class GeneratedSentenceBankTest {
     }
 
     @Test
-    fun onlyStrongPrefixAndContextSuffixEvidenceAreReturned() {
+    fun onlySentencePrefixEvidenceIsReturned() {
         val bank = GeneratedSentenceBank(file("strong-match.json"), AesGcmVaultCipher(AesGcmVaultCipher.randomKey()))
         bank.addGenerated(responseWith("오늘 회의는 정해진 시간에 진행하겠습니다."), MODEL_ID, SHA)
 
         assertTrue(bank.complete("회의는", 3).isEmpty())
-        val matches = bank.complete("앞 문장은 끝났고 오늘 회의는 ", 3)
-        assertTrue(matches.isNotEmpty())
+        assertTrue(bank.complete("앞 문장은 끝났고 오늘 회의는 ", 3).isEmpty())
+        val matches = bank.complete("오늘 회의는 ", 3)
         assertEquals(listOf("정해진 시간에 진행하겠습니다."), matches.map { it.suffix })
-        assertTrue(matches.all { it.evidence == MatchEvidence.CONTEXT_SUFFIX })
+        assertTrue(matches.all { it.evidence == MatchEvidence.PREFIX })
     }
 
     @Test

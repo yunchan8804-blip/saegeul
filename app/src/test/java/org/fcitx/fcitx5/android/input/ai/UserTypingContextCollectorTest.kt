@@ -374,11 +374,42 @@ class UserTypingContextCollectorTest {
     }
 
     @Test
-    fun perCharacterTildeGluedToNextSyllableIsABoundary() {
+    fun perCharacterTildeGluedToNextSyllableIsNotABoundary() {
         "알았어~내일 ".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
 
-        assertEquals(listOf("알았어~"), committedSentences.map { it.second })
-        assertTrue(collector.hasPending("com.kakao.talk"))
+        assertTrue(committedSentences.isEmpty())
+        collector.flushPending("com.kakao.talk")
+        assertEquals(listOf("알았어~내일"), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterTildeRangeStaysInOneSentence() {
+        "월~금 근무해요. ".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertEquals(listOf("월~금 근무해요."), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterEllipsisGluedToNextSyllableIsNotABoundary() {
+        "그게…좀 어려워요. ".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertEquals(listOf("그게…좀 어려워요."), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterEllipsisWaitsForFollowingWhitespace() {
+        "그게…".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertTrue(committedSentences.isEmpty())
+        collector.recordCommittedText("com.kakao.talk", " ")
+        assertEquals(listOf("그게…"), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun pastedChunkWithTildeRangeAndSeparateTildeSentence() {
+        collector.recordCommittedText("com.kakao.talk", "월~금 근무해요. 네~ 내일 봬요. ")
+
+        assertEquals(listOf("월~금 근무해요.", "네~", "내일 봬요."), committedSentences.map { it.second })
     }
 
     @Test

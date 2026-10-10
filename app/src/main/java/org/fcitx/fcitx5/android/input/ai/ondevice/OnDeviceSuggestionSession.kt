@@ -43,7 +43,17 @@ class OnDeviceSuggestionSession {
     data class Proposal internal constructor(
         private var trackedSnapshot: Snapshot,
         val suffix: String,
-        val origin: Origin
+        val origin: Origin,
+        /**
+         * 저장할 때 어떤 후보로 파싱돼 저장됐는지. [OnDeviceSuggestionPolicy.Mode.WORD]로 저장된 접미부는
+         * 문장 파싱이 실패해 첫 어절만 남긴 것이라, 나중에도 단어 후보로만 보여 줘야 한다.
+         */
+        val storedMode: OnDeviceSuggestionPolicy.Mode,
+        /**
+         * 있으면 [suffix]는 이어 붙일 접미부가 아니라, 커서 앞에서 이 글로 끝나는 쓰는 중인 문장을 통째로 바꿀 문장이다.
+         * 이어 붙이는 후보(APPEND)는 null이다.
+         */
+        val replaces: String? = null
     ) {
         /** Only the session's [OnDeviceSuggestionSession.rebase] moves this, keeping the proposal's identity. */
         val snapshot: Snapshot
@@ -65,7 +75,9 @@ class OnDeviceSuggestionSession {
         var snapshot: Snapshot?,
         var suffix: String?,
         val createdAtMs: Long,
-        var proposal: Proposal?
+        var proposal: Proposal?,
+        val storedMode: OnDeviceSuggestionPolicy.Mode,
+        val replaces: String?
     ) {
         fun clear() {
             snapshot = null
@@ -112,7 +124,13 @@ class OnDeviceSuggestionSession {
     }
 
     /** Records a complete engine response for the currently active snapshot. */
-    fun publish(ticket: Ticket, suffix: String, nowMs: Long): Boolean = synchronized(lock) {
+    fun publish(
+        ticket: Ticket,
+        suffix: String,
+        nowMs: Long,
+        storedMode: OnDeviceSuggestionPolicy.Mode = OnDeviceSuggestionPolicy.Mode.SENTENCE,
+        replaces: String? = null
+    ): Boolean = synchronized(lock) {
         val ownedTicket = ticket as? OwnedTicket ?: return@synchronized false
         val snapshot = currentSnapshot
         if (ownedTicket !== activeTicket || ownedTicket.snapshot != snapshot || snapshot == null) {
@@ -124,9 +142,9 @@ class OnDeviceSuggestionSession {
         }
 
         invalidateActiveTicketLocked()
-        val proposal = Proposal(snapshot, suffix, Origin.GENERATED)
+        val proposal = Proposal(snapshot, suffix, Origin.GENERATED, storedMode, replaces)
         storedCompletion?.clear()
-        storedCompletion = StoredCompletion(snapshot, suffix, nowMs, proposal)
+        storedCompletion = StoredCompletion(snapshot, suffix, nowMs, proposal, storedMode, replaces)
         true
     }
 
@@ -211,6 +229,8 @@ class OnDeviceSuggestionSession {
         completion: StoredCompletion?
     ): StoredCompletion? {
         if (previous == null || completion == null || completion.snapshot != previous) return null
+        // 대체 문장은 쓴 글 끝이 바뀌면 낡은 것이다. 더 친 글이 대체 문장의 앞부분과 우연히 같아도 이어 가지 않는다.
+        if (completion.replaces != null) return null
         if (previous.scope != current.scope || current.revision <= previous.revision) return null
         if (!current.textBeforeCursor.startsWith(previous.textBeforeCursor)) return null
 
@@ -220,8 +240,8 @@ class OnDeviceSuggestionSession {
 
         val remaining = suffix.removePrefix(appended)
         if (!isValidSuffix(remaining)) return null
-        val proposal = Proposal(current, remaining, Origin.CONTINUATION_CACHE)
-        return StoredCompletion(current, remaining, completion.createdAtMs, proposal)
+        val proposal = Proposal(current, remaining, Origin.CONTINUATION_CACHE, completion.storedMode)
+        return StoredCompletion(current, remaining, completion.createdAtMs, proposal, completion.storedMode, null)
     }
 
     private fun expireStoredCompletionLocked(nowMs: Long) {

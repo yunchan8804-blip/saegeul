@@ -26,7 +26,11 @@ internal class SentencePackIndex private constructor(
     private val suffixEntries: List<Entry>,
     val sentenceCount: Int
 ) {
-    fun complete(rawContext: String, limit: Int): List<SentencePackMatch> {
+    /**
+     * [prefixOnly]가 참이면 쓰는 중인 문장이 저장된 문장의 앞부분과 맞을 때만 돌려준다. 문장 중간이나 마지막
+     * 낱말에 맞춰 꼬리를 붙이는 경로는 사람이 만든 문장팩에서만 쓴다.
+     */
+    fun complete(rawContext: String, limit: Int, prefixOnly: Boolean = false): List<SentencePackMatch> {
         if (limit <= 0 || rawContext.isBlank() || !SentencePackText.isQuerySafe(rawContext)) return emptyList()
         val tail = SentenceBoundary.currentSentence(rawContext)
         if (tail.isBlank()) return emptyList()
@@ -35,7 +39,7 @@ internal class SentencePackIndex private constructor(
         if (normalized.isBlank()) return emptyList()
 
         val rootMatches = lookup(rootEntries, normalized, endsAtBoundary, limit, MatchEvidence.PREFIX)
-        if (rootMatches.isNotEmpty()) return rootMatches
+        if (rootMatches.isNotEmpty() || prefixOnly) return rootMatches
 
         val tokens = normalized.split(' ')
         val maximum = minOf(tokens.size, MAX_TOKENS)

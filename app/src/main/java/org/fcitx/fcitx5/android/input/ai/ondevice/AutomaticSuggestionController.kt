@@ -85,6 +85,13 @@ class AutomaticSuggestionController(
         val composing: () -> CursorRange,
         val composingText: () -> FormattedText,
         val finishCompositionForDirectAction: () -> Boolean,
+        val replaceAiRange: (
+            connection: InputConnection,
+            start: Int,
+            end: Int,
+            replacement: String,
+            restore: EditorSelection
+        ) -> Boolean,
         val commitAiTextAtCursor: (
             connection: InputConnection,
             cursor: Int,
@@ -384,7 +391,12 @@ class AutomaticSuggestionController(
         if (!isAutomaticSuggestionSnapshotCurrent(snapshot)) return AiSuggestionApplyResult.EditorChanged
         val suffix = coordinator.takeForApply(candidate, snapshot.session)
             ?: return AiSuggestionApplyResult.EditorChanged
-        val result = applyAutomaticSuggestion(snapshot, suffix)
+        val replaces = candidate.replaces
+        val result = if (replaces == null) {
+            applyAutomaticSuggestion(snapshot, suffix)
+        } else {
+            applyAutomaticReplacement(snapshot, replaces, suffix)
+        }
         host.inputView()?.postRefreshContextualCandidates(16L)
         return result
     }
@@ -908,6 +920,63 @@ class AutomaticSuggestionController(
                 ),
                 inserted = suffix,
                 restore = ""
+            )
+        )
+    }
+
+    /**
+     * 오타를 고쳐 다시 쓴 추천을 적용한다. 쓰는 중인 문장 [replaces]가 커서 앞 글의 끝에 그대로 있을 때만 그 범위를
+     * [replacement]로 바꾸고, 아니면 이어 붙이지 않고 낡은 후보로 돌려보낸다.
+     */
+    fun applyAutomaticReplacement(
+        snapshot: OnDeviceAutomaticEditorSnapshot,
+        replaces: String,
+        replacement: String
+    ): AiSuggestionApplyResult {
+        if (!AutomaticSuggestionReplacement.isReplacementSafe(replacement)) {
+            return AiSuggestionApplyResult.NotApplied
+        }
+        if (!isAutomaticSuggestionSnapshotCurrent(snapshot)) {
+            return AiSuggestionApplyResult.EditorChanged
+        }
+        if (!host.finishCompositionForDirectAction()) return AiSuggestionApplyResult.NotApplied
+        if (!matchesAutomaticSuggestionAfterComposition(snapshot)) {
+            return AiSuggestionApplyResult.EditorChanged
+        }
+        val connection = host.inputConnection() ?: return AiSuggestionApplyResult.NotApplied
+        val cursor = host.selection().start
+        val range = AutomaticSuggestionReplacement.rangeToReplace(snapshot.session.textBeforeCursor, replaces)
+            ?: return AiSuggestionApplyResult.EditorChanged
+        if (range.end != cursor ||
+            connection.getTextBeforeCursor(replaces.length, 0)?.toString() != replaces
+        ) {
+            return AiSuggestionApplyResult.EditorChanged
+        }
+        if (!host.replaceAiRange(
+                connection,
+                range.start,
+                range.end,
+                replacement,
+                EditorSelection.collapsed(cursor)
+            )
+        ) {
+            return AiSuggestionApplyResult.NotApplied
+        }
+        val end = range.start + replacement.length
+        host.predictSelection(end)
+        notifyAutomaticSuggestionSnapshotInvalidated()
+        return AiSuggestionApplyResult.Applied(
+            AiAppliedEdit(
+                editor = AiEditorTarget(
+                    packageName = snapshot.session.scope.packageName,
+                    fieldId = snapshot.session.scope.fieldId,
+                    inputType = snapshot.inputType,
+                    selectionStart = end,
+                    selectionEnd = end,
+                    inputSessionEpoch = snapshot.session.scope.editorSessionId
+                ),
+                inserted = replacement,
+                restore = replaces
             )
         )
     }

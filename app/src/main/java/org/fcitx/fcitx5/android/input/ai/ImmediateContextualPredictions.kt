@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.fcitx.fcitx5.android.input.ai.rule.SuggestionQualityGate
 import org.fcitx.fcitx5.android.input.ai.sentencepack.MatchEvidence
@@ -69,9 +70,10 @@ object ImmediateContextualPredictions {
         }
 
         val persona = PersonaRegistry.classify(input.packageName)
-        if (persona != "browser" && persona != "commerce") {
+        // 재료는 해요체 문장이라 반말로 쓰는 중이면 말투가 어긋난다. 말투는 자동 추천과 같은 판별을 쓴다.
+        if (persona != "browser" && persona != "commerce" && !OnDeviceSuggestionPolicy.isCasualTone(input.rawContext)) {
             generatedSentenceLookup?.invoke(input.rawContext, input.limit)
-                ?.filter { it.evidence == MatchEvidence.PREFIX || it.evidence == MatchEvidence.CONTEXT_SUFFIX }
+                ?.filter { it.evidence == MatchEvidence.PREFIX }
                 ?.forEach { match ->
                     predictions += AiPrediction(
                         text = match.suffix,

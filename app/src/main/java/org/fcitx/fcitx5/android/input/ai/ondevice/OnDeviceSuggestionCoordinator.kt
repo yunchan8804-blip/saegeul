@@ -75,10 +75,12 @@ class OnDeviceSuggestionCoordinator(
         val mode: OnDeviceSuggestionPolicy.Mode,
         val insertion: String,
         val origin: OnDeviceSuggestionSession.Origin,
-        private val proposal: OnDeviceSuggestionSession.Proposal
+        private val proposal: OnDeviceSuggestionSession.Proposal,
+        /** 있으면 [insertion]은 커서 앞이 이 글로 끝나는 쓰는 중인 문장을 통째로 바꿀 문장이다(REPLACE). 없으면 이어 붙이는 접미부(APPEND)다. */
+        val replaces: String? = null
     ) {
         override fun toString(): String =
-            "Candidate(mode=$mode, insertion=<redacted>, origin=$origin)"
+            "Candidate(mode=$mode, insertion=<redacted>, origin=$origin, replacement=${replaces != null})"
 
         internal fun proposal(): OnDeviceSuggestionSession.Proposal = proposal
     }
@@ -235,16 +237,20 @@ class OnDeviceSuggestionCoordinator(
                 val generateStartedMs = clockMs()
                 val raw = backend.generate(OnDeviceSuggestionPolicy.promptFor(enrichedInput))
                 val current = isRequestCurrent(requestEpoch, snapshot)
-                val suffix = if (current) parseStoredSuffix(enrichedInput, raw) else null
+                val stored = if (current) parseStoredSuffix(enrichedInput, raw) else null
                 Timber.i(
                     "Automatic suggestion generated elapsedMs=%d rawLength=%d current=%s parsed=%s",
                     clockMs() - generateStartedMs,
                     raw.length,
                     current,
-                    suffix != null
+                    stored?.suffix != null
                 )
                 if (!current) return
-                if (suffix == null || !session.publish(ticket, suffix, clockMs())) {
+                val suffix = stored?.suffix
+                val storedMode = stored?.mode
+                if (suffix == null || storedMode == null ||
+                    !session.publish(ticket, suffix, clockMs(), storedMode, stored.replaces)
+                ) {
                     update(State.NO_CANDIDATE)
                     return
                 }
@@ -289,20 +295,19 @@ class OnDeviceSuggestionCoordinator(
         }
     }
 
-    private fun parseStoredSuffix(input: OnDeviceSuggestionPolicy.Input, raw: String): String? {
-        val sentenceInput = input.withMode(OnDeviceSuggestionPolicy.Mode.SENTENCE)
-        val sentence = OnDeviceSuggestionPolicy.parseSuffix(sentenceInput, raw)
-        if (sentence != null) return sentence
-        val wordInput = input.withMode(OnDeviceSuggestionPolicy.Mode.WORD)
-        val word = OnDeviceSuggestionPolicy.parseSuffix(wordInput, raw)
-        if (word == null) {
+    private fun parseStoredSuffix(
+        input: OnDeviceSuggestionPolicy.Input,
+        raw: String
+    ): OnDeviceSuggestionPolicy.StoredParse {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input, raw)
+        if (stored.suffix == null) {
             Timber.i(
                 "Automatic suggestion rejected sentence=%s word=%s",
-                OnDeviceSuggestionPolicy.rejectionReason(sentenceInput, raw),
-                OnDeviceSuggestionPolicy.rejectionReason(wordInput, raw)
+                stored.sentenceRejection,
+                stored.wordRejection
             )
         }
-        return word
+        return stored
     }
 
     private fun publishCached(
@@ -312,10 +317,29 @@ class OnDeviceSuggestionCoordinator(
         val proposal = session.cached(clockMs()) ?: return
         val current = latestKnownSnapshot(snapshot)
         if (proposal.snapshot != current || !isCurrent(current)) return
-        val sentence = OnDeviceSuggestionPolicy.parseSuffix(
-            input.withMode(OnDeviceSuggestionPolicy.Mode.SENTENCE),
-            proposal.suffix
-        )
+        proposal.replaces?.let { replaces ->
+            // 대체 문장은 저장할 때 파싱을 마쳤고 이어 붙이는 글이 아니므로 다시 파싱하지 않는다.
+            candidates = listOf(
+                Candidate(
+                    OnDeviceSuggestionPolicy.Mode.SENTENCE,
+                    proposal.suffix,
+                    proposal.origin,
+                    proposal,
+                    replaces
+                )
+            )
+            update(State.READY)
+            return
+        }
+        // 문장 파싱이 실패해 단어로 저장된 접미부는 지금도 문장 후보로 다시 통과시키지 않는다.
+        val sentence = if (proposal.storedMode == OnDeviceSuggestionPolicy.Mode.SENTENCE) {
+            OnDeviceSuggestionPolicy.parseSuffix(
+                input.withMode(OnDeviceSuggestionPolicy.Mode.SENTENCE),
+                proposal.suffix
+            )
+        } else {
+            null
+        }
         val word = OnDeviceSuggestionPolicy.parseSuffix(
             input.withMode(OnDeviceSuggestionPolicy.Mode.WORD),
             proposal.suffix
@@ -419,20 +443,6 @@ class OnDeviceSuggestionCoordinator(
 
     private fun isSafeCode(code: String): Boolean =
         code.length in 1..64 && code.all { it == '_' || it.isDigit() || (it in 'A'..'Z') }
-
-    private fun OnDeviceSuggestionPolicy.Input.withMode(
-        mode: OnDeviceSuggestionPolicy.Mode
-    ): OnDeviceSuggestionPolicy.Input = OnDeviceSuggestionPolicy.Input(
-        textBeforeCursor = textBeforeCursor,
-        packageName = packageName,
-        inputType = inputType,
-        imeAction = imeAction,
-        mode = mode,
-        appCategory = appCategory,
-        fieldHint = fieldHint,
-        recentSentences = recentSentences,
-        styleExamples = styleExamples
-    )
 
     private data class Observation(
         val snapshot: OnDeviceSuggestionSession.Snapshot,

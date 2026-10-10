@@ -5,14 +5,20 @@
 package org.fcitx.fcitx5.android.input.text
 
 /**
- * 문장 끝 판정의 단일 정책. 끝 부호는 바로 다음 글자가 없거나 ASCII 영문자·숫자가 아닐 때 경계다.
- * 그래서 `naver.com`, `3.5km`, `v1.2`, `1~2`는 경계가 아니고 `좋아요.`, `합니다.밥`, `정말?!`, `그래…`는 경계다.
+ * 문장 끝 판정의 단일 정책.
+ * `.` `?` `!` `。` `！` `？`는 바로 다음 글자가 없거나 ASCII 영문자·숫자가 아닐 때 경계다.
+ * `~`와 `…`는 구간·말줄임에도 쓰이므로 더 엄격해서, 다음 글자가 없거나 공백·줄바꿈·닫는 기호·다른 끝 부호일 때만 경계다.
+ * 그래서 `naver.com`, `3.5km`, `v1.2`, `1~2`, `월~금`, `그게…좀`은 경계가 아니고
+ * `좋아요.`, `합니다.밥`, `정말?!`, `그래…`, `네~ 내일`은 경계다.
  */
 object SentenceBoundary {
 
     const val TERMINALS = ".?!…~。！？"
     const val LINE_BREAKS = "\n\r"
     const val CLOSERS = "\"')]」』”’》〉"
+
+    // 다음 글자가 한글·기호로 바로 붙으면 문장 끝이 아니라 구간(월~금)이나 말줄임 중간(그게…좀)인 끝 부호.
+    private const val STRICT_TERMINALS = "~…"
 
     fun isTerminal(c: Char): Boolean = c in TERMINALS
 
@@ -25,8 +31,9 @@ object SentenceBoundary {
         val c = text[i]
         if (isLineBreak(c)) return true
         if (c !in TERMINALS) return false
-        val next = text.getOrNull(i + 1)
-        return next == null || !isAsciiLetterOrDigit(next)
+        val next = text.getOrNull(i + 1) ?: return true
+        if (c in STRICT_TERMINALS) return next.isWhitespace() || next in CLOSERS || next in TERMINALS
+        return !isAsciiLetterOrDigit(next)
     }
 
     private fun isAsciiLetterOrDigit(c: Char): Boolean = c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9'

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
+import org.fcitx.fcitx5.android.input.ai.rule.SuggestionQualityGate
 import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import kotlin.text.CharCategory.CONTROL
@@ -35,6 +36,18 @@ object OnDeviceSuggestionPolicy {
         /** Similar past sentences from this user's personal store, for tone/style only. */
         val styleExamples: List<String> = emptyList()
     ) {
+        fun withMode(mode: Mode): Input = Input(
+            textBeforeCursor = textBeforeCursor,
+            packageName = packageName,
+            inputType = inputType,
+            imeAction = imeAction,
+            mode = mode,
+            appCategory = appCategory,
+            fieldHint = fieldHint,
+            recentSentences = recentSentences,
+            styleExamples = styleExamples
+        )
+
         override fun toString(): String =
             "Input(textBeforeCursor=<redacted>, packageName=<redacted>, inputType=$inputType, " +
                 "imeAction=$imeAction, mode=$mode, appCategory=$appCategory, fieldHint=<redacted>, " +
@@ -55,7 +68,9 @@ object OnDeviceSuggestionPolicy {
             return line
         }
 
-        val toneLine = reserve(detectTone(split, input)?.let { "$TONE_LINE_PREFIX${it.label}" })
+        val toneLine = reserve(
+            detectTone(split, input.recentSentences, input.appCategory)?.let { "$TONE_LINE_PREFIX${it.label}" }
+        )
         val appLine = reserve(
             appTypeLabel(input.appCategory).takeIf { it != GENERAL_APP_LABEL }?.let { "$APP_LINE_PREFIX$it" }
         )
@@ -148,11 +163,18 @@ object OnDeviceSuggestionPolicy {
         CASUAL("반말")
     }
 
-    private fun detectTone(split: SentenceSplit, input: Input): Tone? {
+    /** 자동 추천이 프롬프트에 쓰는 말투 판별을 밖에서도 쓰도록 연 것. 반말로 판정되면 true, 존댓말이거나 알 수 없으면 false. */
+    fun isCasualTone(
+        textBeforeCursor: String,
+        recentSentences: List<String> = emptyList(),
+        appCategory: String = "general"
+    ): Boolean = detectTone(splitSentences(textBeforeCursor), recentSentences, appCategory) == Tone.CASUAL
+
+    private fun detectTone(split: SentenceSplit, recentSentences: List<String>, appCategory: String): Tone? {
         var polite = 0
         var casual = 0
         val sentences = SentenceBoundary.splitSentences(split.completed) +
-            input.recentSentences.map(::oneLine)
+            recentSentences.map(::oneLine)
         for (sentence in sentences) {
             when (endingTone(sentence)) {
                 Tone.POLITE -> polite++
@@ -164,7 +186,7 @@ object OnDeviceSuggestionPolicy {
         return when {
             polite > casual -> Tone.POLITE
             casual > polite -> Tone.CASUAL
-            input.appCategory == "work" || input.appCategory == "email" -> Tone.POLITE
+            appCategory == "work" || appCategory == "email" -> Tone.POLITE
             else -> null
         }
     }
@@ -181,28 +203,93 @@ object OnDeviceSuggestionPolicy {
     private fun isTrailingMark(character: Char): Boolean =
         character.isWhitespace() || character in trailingMarks || character.category in punctuationCategories
 
-    fun parseSuffix(input: Input, raw: String): String? = parse(input, raw).suffix
+    /** 쓰는 중인 문장 뒤에 이어 붙일 접미부. 오타를 고쳐 다시 쓴 응답은 접미부가 아니므로 null이다([parseForStorage] 참고). */
+    fun parseSuffix(input: Input, raw: String): String? = parse(input, raw, allowReplacement = false).suffix
 
     /** Returns a short reason code when [raw] is rejected, or null when it yields a suffix. Never contains text. */
-    fun rejectionReason(input: Input, raw: String): String? = parse(input, raw).reason
+    fun rejectionReason(input: Input, raw: String): String? = parse(input, raw, allowReplacement = false).reason
 
-    private class Parsed(val suffix: String?, val reason: String?)
+    /**
+     * 저장할 접미부와 그 종류. [mode]가 [Mode.WORD]면 문장으로는 못 써서 첫 어절만 남긴 것이다.
+     * [replaces]가 있으면 [suffix]는 이어 붙일 접미부가 아니라, 쓰는 중인 문장 [replaces]를 통째로 바꿀 문장이다.
+     * 둘 다 실패하면 [suffix]와 [mode]가 null이다. 거부 이유는 코드뿐이고 글 내용은 담지 않는다.
+     */
+    class StoredParse(
+        val suffix: String?,
+        val mode: Mode?,
+        val sentenceRejection: String?,
+        val wordRejection: String?,
+        val replaces: String? = null
+    )
+
+    /**
+     * 자동 추천이 응답을 저장하기 전에 하는 판정 하나. 문장으로 파싱해 [SuggestionQualityGate]를 통과하면 문장으로
+     * 저장하고, 아니면 단어로 파싱해 같은 게이트를 통과할 때만 단어로 저장한다. [Input.mode]는 쓰지 않는다.
+     * 응답이 쓰는 중인 문장을 오타만 고쳐 다시 쓴 것이면 문장 대체([StoredParse.replaces])로만 저장하고,
+     * 실패해도 단어로 바꿔 이어 붙이지 않는다.
+     */
+    fun parseForStorage(input: Input, raw: String): StoredParse {
+        val sentence = parse(input.withMode(Mode.SENTENCE), raw, allowReplacement = true)
+        if (sentence.restatesTyped) {
+            val replacementRejection = sentence.reason ?: gateRejection(
+                sentence.suffix,
+                input.textBeforeCursor.removeSuffix(sentence.replaces.orEmpty()),
+                true
+            )
+            return if (sentence.suffix != null && replacementRejection == null) {
+                StoredParse(sentence.suffix, Mode.SENTENCE, null, null, sentence.replaces)
+            } else {
+                StoredParse(null, null, replacementRejection, RESTATES_TYPED)
+            }
+        }
+        val sentenceRejection = sentence.reason ?: gateRejection(sentence.suffix, input.textBeforeCursor, true)
+        if (sentence.suffix != null && sentenceRejection == null) {
+            return StoredParse(sentence.suffix, Mode.SENTENCE, null, null)
+        }
+        val word = parse(input.withMode(Mode.WORD), raw)
+        val wordRejection = word.reason ?: gateRejection(word.suffix, input.textBeforeCursor, false)
+        if (word.suffix != null && wordRejection == null) {
+            return StoredParse(word.suffix, Mode.WORD, sentenceRejection, null)
+        }
+        return StoredParse(null, null, sentenceRejection, wordRejection)
+    }
+
+    private fun gateRejection(suffix: String?, context: String, isSentenceCompletion: Boolean): String? =
+        suffix?.let { SuggestionQualityGate.evaluate(it, context, isSentenceCompletion) }?.let { "GATE_${it.name}" }
+
+    private class Parsed(
+        val suffix: String?,
+        val reason: String?,
+        /** 쓰는 중인 문장을 오타만 고쳐 다시 쓴 응답이다. 받아들였으면 [suffix]가 대체 문장이고 [replaces]가 바꿀 원문이다. */
+        val restatesTyped: Boolean = false,
+        val replaces: String? = null
+    )
 
     private fun accept(suffix: String) = Parsed(suffix, null)
     private fun reject(reason: String) = Parsed(null, reason)
 
-    private fun parse(input: Input, raw: String): Parsed {
+    private class EchoRemoval(val found: Boolean, val text: String?)
+
+    private fun parse(input: Input, raw: String, allowReplacement: Boolean = false): Parsed {
         if (!isValidInput(input)) return reject("INVALID_INPUT")
         if (raw.length > MAX_RAW_RESPONSE_CHARS) return reject("RAW_TOO_LONG")
-        if (raw.any(::isUnsafeOutputCharacter)) return reject("UNSAFE_CHAR")
+        val line = firstNonBlankLine(raw)
+        if (line.any(::isUnsafeOutputCharacter)) return reject("UNSAFE_CHAR")
 
-        val normalized = stripEmphasisMarks(stripReplyDecorations(raw))
+        val normalized = stripEmphasisMarks(stripReplyDecorations(line))
         if (normalized.isEmpty()) return reject("EMPTY")
         if (unresolvedLabel.matches(normalized)) return reject("LABEL_ONLY")
 
         val split = splitSentences(input.textBeforeCursor)
-        val withoutEcho = removeEchoedContext(input.textBeforeCursor, split.current, normalized)
-            ?: return reject("ECHO_ONLY")
+        val echo = removeEchoedContext(input.textBeforeCursor, split.current, normalized)
+        val withoutEcho = echo.text ?: return reject("ECHO_ONLY")
+        if (!echo.found && restatesTypedSentence(split.current, normalized)) {
+            return if (allowReplacement && input.mode == Mode.SENTENCE) {
+                parseReplacement(input, split, normalized)
+            } else {
+                Parsed(null, RESTATES_TYPED, restatesTyped = true)
+            }
+        }
         val unwrapped = stripWrapPairs(withoutEcho)
         val suffix = when (input.mode) {
             Mode.WORD -> unwrapped
@@ -214,7 +301,7 @@ object OnDeviceSuggestionPolicy {
         if (hasForeignScript(suffix, input.textBeforeCursor)) return reject("FOREIGN_SCRIPT")
         if (suffix.trimStart().startsWith(input.textBeforeCursor)) return reject("STARTS_WITH_CONTEXT")
         if (input.textBeforeCursor.trimEnd().endsWith(suffix.trim())) return reject("REPEATS_CONTEXT_TAIL")
-        if (repeatsPrevious(suffix, split.prev)) return reject("REPEATS_PREV")
+        if (repeatsPrevious(suffix, split.prev) || repeatsPrevious(suffix, split.current)) return reject("REPEATS_PREV")
         if (hasReplyMarker(suffix)) return reject("REPLY_MARKER")
         if (suffix.startsWith("  ") || (suffix.first().isWhitespace() && suffix.first() != ' ')) {
             return reject("LEADING_WHITESPACE")
@@ -225,8 +312,49 @@ object OnDeviceSuggestionPolicy {
 
         return when (input.mode) {
             Mode.WORD -> firstEojeolProjection(suffix)?.let(::accept) ?: reject("WORD_EMPTY")
-            Mode.SENTENCE -> if (endsSentence(suffix)) accept(suffix) else reject("NOT_SINGLE_SENTENCE")
+            Mode.SENTENCE -> when {
+                !endsSentence(suffix) -> reject("NOT_SINGLE_SENTENCE")
+                isTooShortSentence(split.current, suffix) -> reject("TOO_SHORT")
+                else -> accept(suffix)
+            }
         }
+    }
+
+    private fun restatesTypedSentence(typed: String, reply: String): Boolean =
+        typed.isNotBlank() && typed.none(Char::isISOControl) && TypoRestatement.isRestatement(typed, reply.trim())
+
+    /** 응답 전체를 쓰는 중인 문장의 대체 문장으로 본다. 첫 문장 자르기와 거부 기준은 이어 붙이는 문장과 같다. */
+    private fun parseReplacement(input: Input, split: SentenceSplit, normalized: String): Parsed {
+        fun fail(reason: String) = Parsed(null, reason, restatesTyped = true)
+        val sentence = truncateAfterFirstSentence(stripWrapPairs(normalized).trim()).trim()
+        if (sentence.isBlank()) return fail("BLANK")
+        if (sentence.length > MAX_SUFFIX_CHARS) return fail("SUFFIX_TOO_LONG")
+        if (sentence.any(disallowedReplyCharacters::contains)) return fail("DISALLOWED_CHAR")
+        if (hasForeignScript(sentence, input.textBeforeCursor)) return fail("FOREIGN_SCRIPT")
+        if (repeatsPrevious(sentence, split.completed)) return fail("REPEATS_PREV")
+        if (hasReplyMarker(sentence)) return fail("REPLY_MARKER")
+        if (!endsSentence(sentence)) return fail("NOT_SINGLE_SENTENCE")
+        if (isTooShortSentence("", sentence)) return fail("TOO_SHORT")
+        return Parsed(sentence, null, restatesTyped = true, replaces = split.current)
+    }
+
+    /**
+     * 모델이 여러 줄로 답하면 비어 있지 않은 첫 줄만 쓴다. 줄 구분은 CRLF와 LF뿐이라 홑 CR이나 다른
+     * 제어문자는 그대로 남아 호출한 쪽에서 거부된다. 모두 빈 줄이면 첫 줄을 돌려준다.
+     */
+    private fun firstNonBlankLine(raw: String): String {
+        val lines = raw.split("\r\n", "\n")
+        return lines.firstOrNull(String::isNotBlank) ?: lines.first()
+    }
+
+    /**
+     * 쓰는 중인 문장에 [suffix]를 이어 붙인 문장의 한글 음절이 [MIN_SENTENCE_SYLLABLES]개 미만이면 문장 후보로
+     * 너무 짧다(`네~`, `응.`). 이어 붙인 결과로 세므로 긴 문장의 마지막 `요.`는 짧지 않다. 글자·숫자가 하나도
+     * 없는 접미부(문장 부호뿐)도 문장 후보가 아니다.
+     */
+    private fun isTooShortSentence(current: String, suffix: String): Boolean {
+        if (suffix.none(Char::isLetterOrDigit)) return true
+        return (current + suffix).count(HangulSyllable::isSyllable) < MIN_SENTENCE_SYLLABLES
     }
 
     /**
@@ -271,32 +399,59 @@ object OnDeviceSuggestionPolicy {
      * The model is asked to write the whole sentence being typed, so it restates that sentence first.
      * Only the text after the restatement is a continuation, so the echoed part is removed instead of
      * the candidate being discarded. A restated [shownCurrent] is removed first; otherwise the whole
-     * context or its last eojeols are tried. A reply that is nothing but an echo yields null, and a
-     * reply with no echo is returned unchanged.
+     * context or its last eojeols are tried. A restatement that differs only in spacing ("공유 드릴게요"
+     * for a typed "공유드릴게") counts too. A reply that is nothing but an echo yields a null text, and a
+     * reply with no echo is returned unchanged with [EchoRemoval.found] false.
      */
-    private fun removeEchoedContext(context: String, shownCurrent: String, reply: String): String? {
+    private fun removeEchoedContext(context: String, shownCurrent: String, reply: String): EchoRemoval {
         val start = reply.trimStart()
-        if (start.isEmpty()) return reply
-        val current = oneLine(shownCurrent)
-        val echoed = (if (current.isNotEmpty() && start.startsWith(current)) current else null)
-            ?: echoedContextTail(context.trimEnd(), start)
-            ?: return reply
-        val remainder = start.substring(echoed.length)
-        if (remainder.isBlank()) return null
-        return when {
+        if (start.isEmpty()) return EchoRemoval(found = false, text = reply)
+        val echoes = echoCandidates(context.trimEnd(), oneLine(shownCurrent))
+        val echoedLength = echoes.firstNotNullOfOrNull { (echo, minChars) ->
+            echo.length.takeIf { echo.length >= minChars && start.startsWith(echo) }
+        } ?: echoes.firstNotNullOfOrNull { (echo, _) -> spacingInsensitiveEchoLength(start, echo) }
+            ?: return EchoRemoval(found = false, text = reply)
+        val remainder = start.substring(echoedLength)
+        if (remainder.isBlank()) return EchoRemoval(found = true, text = null)
+        val continuation = when {
             context.last().isWhitespace() -> remainder.trimStart()
             remainder.first().isWhitespace() -> " " + remainder.trimStart()
             else -> remainder
         }
+        return EchoRemoval(found = true, text = continuation)
     }
 
-    private fun echoedContextTail(trimmedContext: String, start: String): String? {
-        if (start.startsWith(trimmedContext)) return trimmedContext
+    /** The texts a reply may restate, most specific first, each with the shortest length that counts as an echo. */
+    private fun echoCandidates(trimmedContext: String, current: String): List<Pair<String, Int>> {
         val eojeols = trimmedContext.split(whitespaceRun).filter { it.isNotEmpty() }
-        return (minOf(eojeols.size, MAX_ECHO_EOJEOLS) downTo 1)
-            .asSequence()
-            .map { count -> eojeols.takeLast(count).joinToString(" ") }
-            .firstOrNull { tail -> tail.length >= MIN_ECHO_CHARS && start.startsWith(tail) }
+        return buildList {
+            if (current.isNotEmpty()) add(current to 0)
+            add(trimmedContext to 0)
+            for (count in minOf(eojeols.size, MAX_ECHO_EOJEOLS) downTo 1) {
+                add(eojeols.takeLast(count).joinToString(" ") to MIN_ECHO_CHARS)
+            }
+        }
+    }
+
+    /**
+     * How many characters of [start] a spacing-insensitive restatement of [echo] covers, or null when [start]
+     * does not begin with it. Whitespace is skipped on both sides and the characters are matched one by one.
+     */
+    private fun spacingInsensitiveEchoLength(start: String, echo: String): Int? {
+        val letters = echo.filterNot(Char::isWhitespace)
+        if (letters.length < MIN_ECHO_CHARS) return null
+        var matched = 0
+        var index = 0
+        while (matched < letters.length) {
+            if (index >= start.length) return null
+            val character = start[index]
+            if (!character.isWhitespace()) {
+                if (character != letters[matched]) return null
+                matched++
+            }
+            index++
+        }
+        return index
     }
 
     private fun firstEojeolProjection(suffix: String): String? {
@@ -471,6 +626,7 @@ object OnDeviceSuggestionPolicy {
     private const val MAX_RAW_RESPONSE_CHARS = 4096
     private const val MAX_ECHO_EOJEOLS = 4
     private const val MIN_ECHO_CHARS = 2
+    private const val MIN_SENTENCE_SYLLABLES = 3
     private const val MIN_REPEATED_PREV_CHARS = 4
     private const val MIN_REPEATED_PREV_RUN = 5
     private const val REPEATED_PREV_RUN_PERCENT = 60
@@ -487,6 +643,7 @@ object OnDeviceSuggestionPolicy {
      */
     private const val PROMPT_CHAR_BUDGET = 190
 
+    private const val RESTATES_TYPED = "RESTATES_TYPED"
     private const val GENERAL_APP_LABEL = "일반"
     private const val ELLIPSIS = "…"
     private const val APP_LINE_PREFIX = "앱: "
