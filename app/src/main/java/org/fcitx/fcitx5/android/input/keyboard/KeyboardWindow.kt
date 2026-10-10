@@ -74,7 +74,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // 자판은 처음 쓸 때 만든다. 예전에는 첫 표시 때 모든 자판(영문·두벌식·숫자·모바일 한글 전부)을 한꺼번에
     // 만들어 키보드가 뜨는 순간 메인 스레드를 수백 ms 막았다.
     private val keyboardFactories: Map<String, () -> BaseKeyboard> = buildMap {
-        put(TextKeyboard.Name) { TextKeyboard(context, theme) }
+        put(TextKeyboard.Name) {
+            TextKeyboard(context, theme).also { it.touchTraceSink = service.touchTraceRecorder }
+        }
         put(HangulKeyboard.Name) { HangulKeyboard(context, theme) }
         put(NumberKeyboard.Name) { NumberKeyboard(context, theme) }
         MobileHangulLayout.entries

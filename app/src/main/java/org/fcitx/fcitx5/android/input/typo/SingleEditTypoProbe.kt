@@ -20,7 +20,7 @@ class SingleEditTypoProbe(
     private val ngram: PersonalNgramModel
 ) {
 
-    private class Alt(val index: Int, val cost: Float, val isShift: Boolean)
+    private class Alt(val index: Int, val cost: Float, val isShift: Boolean, val key: Char)
 
     private class Edit(var cost: Float, var isShift: Boolean)
 
@@ -31,18 +31,27 @@ class SingleEditTypoProbe(
     fun correct(
         typed: String,
         limit: Int = 3,
-        contextBoost: (String) -> Float = { 0f }
-    ): List<KeyboardAwareTypoCorrector.Correction> = probe(typed, limit, contextBoost).map { it.correction }
+        contextBoost: (String) -> Float = { 0f },
+        touchTrace: TouchTrace? = null
+    ): List<KeyboardAwareTypoCorrector.Correction> =
+        probe(typed, limit, contextBoost, touchTrace).map { it.correction }
 
-    /** [correct]와 같은 후보를 Shift 되돌림 여부와 함께 돌려준다. */
+    /**
+     * [correct]와 같은 후보를 Shift 되돌림 여부와 함께 돌려준다. [touchTrace] 끝부분이 [typed]의 키
+     * 순서와 정확히 같으면, 인접 키로 바꾸는 편집의 비용을 격자 대신 그 키를 누른 실제 터치 지점으로
+     * 계산한다. 편집 후보의 범위와 Shift·복합 모음·중복·교환 편집의 비용은 흔적과 상관없다.
+     */
     fun probe(
         typed: String,
         limit: Int = 3,
-        contextBoost: (String) -> Float = { 0f }
+        contextBoost: (String) -> Float = { 0f },
+        touchTrace: TouchTrace? = null
     ): List<Hit> {
         if (typed.isEmpty() || typed.length > MAX_TYPED_LENGTH) return emptyList()
         val out = ArrayList<Hit>()
-        for ((word, edit) in variants(typed, upgradeOnly = false)) {
+        // 흔적 끝부분이 이 어절의 키 순서와 정확히 같을 때만 위치별 터치를 쓴다. 다르면 격자 비용이다.
+        val touches = touchTrace?.alignedTo(DubeolsikKeyMap.keySequence(typed))
+        for ((word, edit) in variants(typed, upgradeOnly = false, touches = touches)) {
             if (word == typed) continue
             val rank = baseVocabulary?.rankOf(word) ?: 0
             val personalCount = ngram.unigramCount(word)
@@ -72,7 +81,7 @@ class SingleEditTypoProbe(
         val inputRank = vocabulary.rankOf(typed)
         if (inputRank <= UPGRADE_MIN_INPUT_RANK) return null
         var best: KeyboardAwareTypoCorrector.Correction? = null
-        for ((word, edit) in variants(typed, upgradeOnly = true)) {
+        for ((word, edit) in variants(typed, upgradeOnly = true, touches = null)) {
             val cost = edit.cost
             if (word == typed) continue
             val rank = vocabulary.rankOf(word)
@@ -86,11 +95,16 @@ class SingleEditTypoProbe(
         return best
     }
 
-    private fun variants(typed: String, upgradeOnly: Boolean): Map<String, Edit> {
+    private fun variants(typed: String, upgradeOnly: Boolean, touches: List<KeyTouch>?): Map<String, Edit> {
         val out = HashMap<String, Edit>()
         val chars = typed.toCharArray()
+        // 각 글자의 첫 키가 어절 키 순서에서 놓이는 자리. 터치 흔적과 같은 자리 번호를 쓴다.
+        var keyOffset = 0
         for (i in chars.indices) {
             val syllable = chars[i]
+            val syllableKeyCount = if (touches == null) 0 else DubeolsikKeyMap.keySequence(syllable.toString()).length
+            val syllableKeyOffset = keyOffset
+            keyOffset += syllableKeyCount
             if (!HangulSyllable.isSyllable(syllable)) continue
             val cho = HangulSyllable.choseongIndex(syllable)
             val jung = HangulSyllable.jungseongIndex(syllable)
@@ -98,18 +112,23 @@ class SingleEditTypoProbe(
 
             for (alt in CHO_ALTS[cho]) {
                 if (upgradeOnly && !alt.isShift) continue
-                put(out, chars, i, compose(alt.index, jung, jong), alt.cost, alt.isShift)
+                val cost = altCost(alt, touches, syllableKeyOffset)
+                put(out, chars, i, compose(alt.index, jung, jong), cost, alt.isShift)
             }
+            // 키 하나인 중성은 초성 바로 다음 키다. 복합 모음은 키가 둘이라 JUNG_ALTS가 비어 있다.
             for (alt in JUNG_ALTS[jung]) {
                 if (upgradeOnly && !alt.isShift) continue
-                put(out, chars, i, compose(cho, alt.index, jong), alt.cost, alt.isShift)
+                val cost = altCost(alt, touches, syllableKeyOffset + 1)
+                put(out, chars, i, compose(cho, alt.index, jong), cost, alt.isShift)
             }
             for (target in JUNG_RESTORE[jung]) {
                 put(out, chars, i, compose(cho, target, jong), COMPOUND_RESTORE_COST, false)
             }
+            // 키 하나인 받침은 글자의 마지막 키다. 겹받침은 키가 둘이라 JONG_ALTS가 비어 있다.
             for (alt in JONG_ALTS[jong]) {
                 if (upgradeOnly && !alt.isShift) continue
-                put(out, chars, i, compose(cho, jung, alt.index), alt.cost, alt.isShift)
+                val cost = altCost(alt, touches, syllableKeyOffset + syllableKeyCount - 1)
+                put(out, chars, i, compose(cho, jung, alt.index), cost, alt.isShift)
             }
             if (upgradeOnly) continue
             for (target in JUNG_CONFUSE[jung]) {
@@ -132,6 +151,12 @@ class SingleEditTypoProbe(
             }
         }
         return out
+    }
+
+    /** 시프트 편집이 아닌 인접 키 편집이 흔적 있는 [keyPosition]에 놓이면 터치 지점으로 계산한 비용이다. */
+    private fun altCost(alt: Alt, touches: List<KeyTouch>?, keyPosition: Int): Float {
+        if (touches == null || alt.isShift) return alt.cost
+        return TouchSubstitutionCost.cost(touches[keyPosition], alt.key) ?: alt.cost
     }
 
     private fun put(
@@ -228,10 +253,10 @@ class SingleEditTypoProbe(
                     val toKey = keys[to] ?: continue
                     if (to == from) continue
                     if (fromKey.lowercaseChar() == toKey.lowercaseChar()) {
-                        alts.add(Alt(to, SHIFT_COST, isShift = true))
+                        alts.add(Alt(to, SHIFT_COST, isShift = true, key = toKey))
                     } else if (!toKey.isUpperCase()) {
                         val cost = DubeolsikKeyMap.substitutionCost(fromKey, toKey)
-                        if (cost <= ADJACENT_MAX_COST) alts.add(Alt(to, cost, isShift = false))
+                        if (cost <= ADJACENT_MAX_COST) alts.add(Alt(to, cost, isShift = false, key = toKey))
                     }
                 }
                 alts.toTypedArray()

@@ -386,6 +386,15 @@ class PersonalLearningController(private val host: Host) {
         }
     }
 
+    /**
+     * ✏️ 교정 후보를 눌러 [typed]를 [corrected]로 고쳤을 때 그 쌍을 학습한다. 지우고 다시 쓴 쌍과 같은
+     * 기록 경로이고, 텍스트 검사가 허용되지 않는 편집기·Direct Boot에서는 기록하지 않는다.
+     */
+    fun recordTappedCorrection(typed: String, corrected: String) {
+        if (!host.allowsTextInspection()) return
+        recordCorrectionPairIfPresent(typed to corrected)
+    }
+
     /** 공백/문장 종결 부호로 끝나는 커밋을 어절 경계로 보고, 지운-다시쓴 쌍이 있으면 학습한다. */
     private fun handleCorrectionWordBoundary(text: String) {
         if (text.isEmpty() || !correctionSessionTracker.isActive()) return

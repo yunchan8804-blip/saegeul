@@ -128,6 +128,7 @@ import org.fcitx.fcitx5.android.input.service.EditorLearningObserver
 import org.fcitx.fcitx5.android.input.service.FcitxEventCollector
 import org.fcitx.fcitx5.android.input.service.SnippetBoundary
 import org.fcitx.fcitx5.android.input.service.SnippetExpander
+import org.fcitx.fcitx5.android.input.typo.TouchTraceRecorder
 import org.fcitx.fcitx5.android.input.typo.TypoRecoveryEditorTarget
 import org.fcitx.fcitx5.android.input.typo.TypoRecoverySnapshot
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
@@ -436,6 +437,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val recentSentSentences: RecentSentSentences
         get() = personalLearning.recentSentSentences
 
+    /**
+     * 두벌식 QWERTY 자판의 최근 글자 키 터치 흔적. 서비스 메모리에만 있고, 텍스트 검사가 막힌 편집기와
+     * Direct Boot에서는 기록하지 않으며, 입력 세션이 바뀌거나 끝나면 비운다.
+     */
+    val touchTraceRecorder = TouchTraceRecorder(isRecordingAllowed = ::allowsTextInspectionFeatures)
+
     private val contextualPrediction: ContextualPredictionController = ContextualPredictionController(
         ContextualPredictionController.Host(
             lifecycleScope = { lifecycleScope },
@@ -470,6 +477,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             scheduleNgramSave = { personalLearning.scheduleNgramSave() },
             observeCommittedEditorText = { text -> learningObserver.observeCommittedText(text) },
             captureCorrectionBoundarySnapshot = { personalLearning.captureCorrectionBoundarySnapshot() },
+            recordTappedCorrection = { typed, corrected ->
+                personalLearning.recordTappedCorrection(typed, corrected)
+            },
+            touchTrace = { touchTraceRecorder.snapshot() },
             onEditorSuffixDeleted = { packageName, removedText, inspectionAllowed ->
                 personalLearning.typingDnaCommitSink.onEditorSuffixDeleted(packageName, removedText, inspectionAllowed)
             }
@@ -2173,6 +2184,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // restart: dropping a draft is safer than sending a later GIF/AI action to the wrong field.
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         inputSessionEpoch += 1
+        touchTraceRecorder.clear()
         personalLearning.onStartInput()
         contextualPrediction.onStartInput()
         personalLearning.correctionSessionTracker.onEditorChanged()
@@ -2675,6 +2687,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             automaticSuggestion.onFinishInput()
         }
         engineRestartEditorRehydrationGate.onFinishInput()
+        touchTraceRecorder.clear()
         personalLearning.finalizeCorrectionSessionAtBoundary()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
         SensitivePhraseSession.lock()

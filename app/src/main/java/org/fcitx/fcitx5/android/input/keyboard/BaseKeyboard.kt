@@ -267,7 +267,8 @@ abstract class BaseKeyboard(
     private fun KeyView.bindBehavior(behavior: KeyDef.Behavior) {
         when (behavior) {
             is KeyDef.Behavior.Press -> {
-                setOnClickListener { _ ->
+                setOnClickListener { view ->
+                    onPressTouch(view as KeyView, behavior.action)
                     onAction(behavior.action)
                 }
             }
@@ -587,6 +588,14 @@ abstract class BaseKeyboard(
         source: KeyActionListener.Source = KeyActionListener.Source.Keyboard
     ) {
         keyActionListener?.onKeyAction(action, source)
+    }
+
+    /**
+     * A key was tapped and its [action] is about to go out. The tapped [view] still holds where the
+     * finger went down ([CustomGestureView.lastDownX], [CustomGestureView.lastDownY]).
+     */
+    protected open fun onPressTouch(view: KeyView, action: KeyAction) {
+        // do nothing by default
     }
 
     @CallSuper

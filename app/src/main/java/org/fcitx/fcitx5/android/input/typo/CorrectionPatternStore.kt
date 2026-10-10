@@ -87,15 +87,21 @@ class CorrectionPatternStore(
             .toList()
     }
 
+    /** 사용자가 [typedKey]를 쳤다가 [intendedKey]로 고친 횟수. 기록하는 순서와 같은 (친 키, 의도한 키)다. */
     @Synchronized
-    fun confusionCount(fromKey: Char, toKey: Char): Float = confusions[fromKey to toKey] ?: 0f
+    fun confusionCount(typedKey: Char, intendedKey: Char): Float = confusions[typedKey to intendedKey] ?: 0f
+
+    /** 이 혼동이 잦을수록 1에서 작아지는 치환 비용 배율. 인자는 (친 키, 의도한 키)다. */
+    @Synchronized
+    fun substitutionDiscount(typedKey: Char, intendedKey: Char): Float =
+        1f / (1f + 0.5f * confusionCount(typedKey, intendedKey))
 
     @Synchronized
-    fun personalizedSubstitutionCost(a: Char, b: Char): Float {
-        val base = DubeolsikKeyMap.substitutionCost(a, b)
-        val count = confusionCount(a, b)
-        val adjusted = base * (1f / (1f + 0.5f * count))
-        return maxOf(0.2f, adjusted)
+    fun personalizedSubstitutionCost(typedKey: Char, intendedKey: Char): Float {
+        // A key that was typed as intended costs nothing; the 0.2 floor only bounds real substitutions.
+        if (typedKey == intendedKey) return 0f
+        val base = DubeolsikKeyMap.substitutionCost(typedKey, intendedKey)
+        return maxOf(0.2f, base * substitutionDiscount(typedKey, intendedKey))
     }
 
     @Synchronized

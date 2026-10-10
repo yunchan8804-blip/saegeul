@@ -161,7 +161,10 @@ class FcitxApplication : Application(), WorkConfiguration.Provider {
 
     val typoCorrector: KeyboardAwareTypoCorrector by lazy {
         requireCredentialStorage("typoCorrector")
-        KeyboardAwareTypoCorrector(substitutionCost = correctionPatternStore::personalizedSubstitutionCost)
+        KeyboardAwareTypoCorrector(
+            substitutionCost = correctionPatternStore::personalizedSubstitutionCost,
+            personalDiscount = correctionPatternStore::substitutionDiscount
+        )
     }
 
     /**

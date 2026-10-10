@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.TouchTrace
 
 data class AiPrediction(
     val text: String,
@@ -58,7 +59,8 @@ class AiContextualPredictor(
     personalSentenceVault: PersonalSentenceVault? = null,
     private val personalGraphStore: PersonalGraphStore? = null,
     private val sentencePackLookup: ((String, Int) -> List<SentencePackMatch>)? = null,
-    bundledNgram: () -> BundledKoreanNgram? = { null }
+    bundledNgram: () -> BundledKoreanNgram? = { null },
+    touchTrace: (() -> TouchTrace?)? = null
 ) {
 
     companion object {
@@ -69,7 +71,9 @@ class AiContextualPredictor(
         private val SENTENCE_LINE_SOURCE_BLOCKLIST = setOf("collocation_next_word", "base_lexicon")
     }
 
-    private val keyboardTypoSource = KeyboardTypoCorrectionSource(typoCorrector, baseVocabulary, correctionStore, ngram, bundledNgram)
+    private val keyboardTypoSource = KeyboardTypoCorrectionSource(
+        typoCorrector, baseVocabulary, correctionStore, ngram, touchTrace, bundledNgram
+    )
     private val sentenceTypoSource = SentenceTypoCorrectionSource(typoEngine, baseVocabulary)
     private val wordTypoSource = WordTypoCorrectionSource(typoEngine, baseVocabulary)
 

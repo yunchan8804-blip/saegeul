@@ -10,6 +10,7 @@ import android.view.View
 import androidx.annotation.Keep
 import androidx.core.view.allViews
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -18,6 +19,11 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.popup.AlphabetPopupLegends
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.typo.DubeolsikKeyMap
+import org.fcitx.fcitx5.android.input.typo.KeyCell
+import org.fcitx.fcitx5.android.input.typo.KeyLayoutSnapshot
+import org.fcitx.fcitx5.android.input.typo.KeyTouch
+import org.fcitx.fcitx5.android.input.typo.TouchTraceSink
 import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
@@ -125,6 +131,19 @@ class TextKeyboard(
     private var hangulInputMethodActive = false
     private var hangulKeyboardLayout: String? = null
 
+    /**
+     * 이 자판이 두벌식 QWERTY로 한글을 치는 중인지. 터치 흔적을 모으는 유일한 판단 지점이다.
+     * 영문 입력과 세벌식·안마태 같은 다른 한글 배열은 키가 다른 자모를 뜻하므로 모으지 않는다.
+     */
+    private val isDubeolsikQwerty: Boolean
+        get() = hangulInputMethodActive && MobileHangulSurfaceSwitcher.isAvailable(hangulKeyboardLayout)
+
+    /** 두벌식 QWERTY로 친 글자 키의 터치를 받는 곳. 메모리에만 두는 쪽이 정한다. */
+    var touchTraceSink: TouchTraceSink? = null
+
+    // 글자 키들의 실제 배치. 레이아웃이 다시 잡힐 때마다 버리고 다음 터치 때 다시 만든다.
+    private var keyLayoutSnapshot: KeyLayoutSnapshot? = null
+
     private val numberRowOffset = if (PinnedNumberRow.isEnabled()) 1 else 0
 
     override fun thumbSplitBoundaryIndex(rowIndex: Int, keyCount: Int): Int? =
@@ -159,9 +178,53 @@ class TextKeyboard(
     private var punctuationMapping: Map<String, String> = mapOf()
     private fun transformPunctuation(p: String) = punctuationMapping.getOrDefault(p, p)
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        keyLayoutSnapshot = null
+        super.onLayout(changed, left, top, right, bottom)
+    }
+
+    override fun onPressTouch(view: KeyView, action: KeyAction) {
+        val sink = touchTraceSink ?: return
+        if (!isDubeolsikQwerty || action !is KeyAction.FcitxKeyAction) return
+        val appearance = view.def as? KeyDef.Appearance.AltText ?: return
+        val letter = appearance.displayText.singleOrNull()?.takeIf { it.isLetter() } ?: return
+        val layout = keyLayoutSnapshot ?: buildKeyLayoutSnapshot().also { keyLayoutSnapshot = it }
+        val cell = layout.cell(letter) ?: return
+        val location = IntArray(2).also { view.getLocationInWindow(it) }
+        val touchX = location[0] + view.lastDownX
+        val touchY = location[1] + view.lastDownY
+        sink.onLetterTouch(
+            KeyTouch(
+                key = DubeolsikKeyMap.keyChar(letter, shifted = capsState != CapsState.None),
+                dx = (touchX - cell.centerX) / cell.width,
+                dy = (touchY - cell.centerY) / cell.height,
+                layout = layout
+            )
+        )
+    }
+
+    private fun buildKeyLayoutSnapshot(): KeyLayoutSnapshot {
+        val cells = HashMap<Char, KeyCell>()
+        for (key in textKeys) {
+            val appearance = key.def as? KeyDef.Appearance.AltText ?: continue
+            val letter = appearance.displayText.singleOrNull()?.takeIf { it.isLetter() } ?: continue
+            val bounds = key.bounds
+            cells[letter.lowercaseChar()] = KeyCell(
+                centerX = bounds.exactCenterX(),
+                centerY = bounds.exactCenterY(),
+                width = bounds.width().toFloat(),
+                height = bounds.height().toFloat()
+            )
+        }
+        return KeyLayoutSnapshot(cells)
+    }
+
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         var transformed = action
         when (action) {
+            is KeyAction.SymAction -> if (isDubeolsikQwerty && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace) {
+                touchTraceSink?.onBackspace()
+            }
             is KeyAction.FcitxKeyAction -> when (source) {
                 KeyActionListener.Source.Keyboard -> {
                     when (capsState) {
@@ -233,8 +296,7 @@ class TextKeyboard(
     }
 
     private fun updateSpaceLabel() {
-        val pickerAvailable = hangulInputMethodActive &&
-            MobileHangulSurfaceSwitcher.isAvailable(hangulKeyboardLayout)
+        val pickerAvailable = isDubeolsikQwerty
         space.mainText.text = if (pickerAvailable) {
             context.getString(R.string.mobile_hangul_switch_label, inputMethodLabel)
         } else {

@@ -57,6 +57,15 @@ object DubeolsikKeyMap {
         for ((compound, parts) in COMPOUND_JONGSEONG_SPLIT) put(compound, parts.map { JAMO_TO_KEY.getValue(it) }.joinToString(""))
     }
 
+    /**
+     * 글자 키 [letter]를 시프트로 눌렀는지([shifted])에 따라 [keySequence]가 만드는 키 문자.
+     * 시프트가 자모를 바꾸는 키([SHIFTED_KEYS])만 대문자이고 나머지는 시프트와 상관없이 소문자다.
+     */
+    fun keyChar(letter: Char, shifted: Boolean): Char {
+        val upper = letter.uppercaseChar()
+        return if (shifted && upper in SHIFTED_KEYS) upper else letter.lowercaseChar()
+    }
+
     private const val ROW0 = "qwertyuiop"
     private const val ROW1 = "asdfghjkl"
     private const val ROW2 = "zxcvbnm"

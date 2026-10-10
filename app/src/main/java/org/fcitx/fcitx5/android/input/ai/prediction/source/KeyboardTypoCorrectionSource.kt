@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.typo.DubeolsikKeyMap
 import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.input.typo.SingleEditTypoProbe
+import org.fcitx.fcitx5.android.input.typo.TouchTrace
 
 /**
  * Keyboard-aware corrections for the typed fragment, plus [handledFragment]: the fragment these
@@ -32,6 +33,7 @@ internal class KeyboardTypoCorrectionSource(
     private val baseVocabulary: BaseKoreanVocabulary?,
     private val correctionStore: CorrectionPatternStore?,
     private val ngram: PersonalNgramModel,
+    private val touchTrace: (() -> TouchTrace?)? = null,
     private val bundledNgram: () -> BundledKoreanNgram?
 ) {
 
@@ -80,6 +82,7 @@ internal class KeyboardTypoCorrectionSource(
 
         val candidates = mutableListOf<AiPrediction>()
         var handledFragment: String? = null
+        val trace = touchTrace?.invoke()
         val personalHits = correctionStore?.lookup(core, 2).orEmpty()
         if (personalHits.isNotEmpty()) {
             handledFragment = typed
@@ -108,10 +111,10 @@ internal class KeyboardTypoCorrectionSource(
                 }
                 val limit = if (isPersonalKnownOnly) 1 else MAX_KEYBOARD_CORRECTIONS
                 val inputRank = baseVocabulary?.rankOf(core) ?: 0
-                val probeHits = probe.probe(core, limit = CORRECTION_POOL, contextBoost = contextBoost)
+                val probeHits = probe.probe(core, limit = CORRECTION_POOL, contextBoost = contextBoost, touchTrace = trace)
                 val shiftWords = probeHits.filter { it.isShiftEdit }.map { it.correction.word }.toSet()
                 val corrections = mergeCorrections(
-                    typoCorrector.correct(core, limit = CORRECTION_POOL, contextBoost = contextBoost),
+                    typoCorrector.correct(core, limit = CORRECTION_POOL, contextBoost = contextBoost, touchTrace = trace),
                     probeHits.map { it.correction },
                     limit
                 ) { word -> inputRank == 0 || outranksRareWord(word, inputRank, word in shiftWords) }
@@ -137,12 +140,20 @@ internal class KeyboardTypoCorrectionSource(
                         if (DubeolsikKeyMap.keySequence(stem).length >= 3 &&
                             baseVocabulary?.containsWithinTop(stem, BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) != true
                         ) {
+                            // 어미를 뗀 앞부분의 흔적: 어절 흔적에서 어미를 친 키들을 뺀다.
+                            val stemTrace = trace?.withoutLast(DubeolsikKeyMap.keySequence(ending).length)
                             val stemCorrection = typoCorrector.correct(
                                 stem,
                                 limit = 1,
-                                contextBoost = contextBoost
+                                contextBoost = contextBoost,
+                                touchTrace = stemTrace
                             ).firstOrNull()?.takeIf { it.cost <= 1.0f }
-                                ?: probe.correct(stem, limit = 1, contextBoost = contextBoost).firstOrNull()
+                                ?: probe.correct(
+                                    stem,
+                                    limit = 1,
+                                    contextBoost = contextBoost,
+                                    touchTrace = stemTrace
+                                ).firstOrNull()
                             if (stemCorrection != null && stemCorrection.cost <= 1.0f) {
                                 handledFragment = typed
                                 candidates += AiPrediction(

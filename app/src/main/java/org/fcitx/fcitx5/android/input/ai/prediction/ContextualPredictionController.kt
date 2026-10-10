@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.TouchTrace
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import timber.log.Timber
@@ -123,6 +124,8 @@ class ContextualPredictionController(private val host: Host) {
         val scheduleNgramSave: () -> Unit,
         val observeCommittedEditorText: (text: String) -> Unit,
         val captureCorrectionBoundarySnapshot: () -> Unit,
+        val recordTappedCorrection: (typed: String, corrected: String) -> Unit,
+        val touchTrace: () -> TouchTrace?,
         val onEditorSuffixDeleted: (packageName: String?, removedText: String?, inspectionAllowed: Boolean) -> Unit
     )
 
@@ -153,6 +156,10 @@ class ContextualPredictionController(private val host: Host) {
             val replaceLength = predictions.firstOrNull { it.text == text }?.replaceLength ?: return null
             return ReplaceTarget.of(ContextualPredictionInput.rawFullContext(key.stroke, key.context), replaceLength)
         }
+
+        /** Whether the prediction with this [text] is a keyboard typo-correction chip. */
+        fun isTypoCorrection(text: String): Boolean =
+            predictions.firstOrNull { it.text == text }?.source?.startsWith("typo_") == true
     }
 
     /** [isComplete] is false when the editor did not return the text before the cursor. */
@@ -242,7 +249,8 @@ class ContextualPredictionController(private val host: Host) {
             personalSentenceVault = host.personalSentenceVault(),
             personalGraphStore = host.personalGraphStore(),
             sentencePackLookup = FcitxApplication.getInstance().sentencePacks::complete,
-            bundledNgram = { FcitxApplication.getInstance().bundledKoreanNgram }
+            bundledNgram = { FcitxApplication.getInstance().bundledKoreanNgram },
+            touchTrace = host.touchTrace
         )
     }
 
@@ -823,8 +831,12 @@ class ContextualPredictionController(private val host: Host) {
             val contextBeforeReinforce = beforeCursor.dropLast(replaceLength).takeLast(64)
             val shouldAppendSpace = ContextualPredictionInput.shouldAppendSpace(sentence, afterCursor)
             val textToCommit = if (shouldAppendSpace) "$sentence " else sentence
+            val isTypoCorrection = contextualResultCache?.isTypoCorrection(sentence) == true
             val committed = commitContextualCandidateText(ic, replaceLength, textToCommit, replaceTarget)
             if (committed) {
+                if (isTypoCorrection) {
+                    host.recordTappedCorrection(beforeCursor.takeLast(replaceLength), sentence)
+                }
                 enqueueContextualSelectionFeedback(
                     contextBeforeReinforce = contextBeforeReinforce,
                     selectedSentence = sentence,
