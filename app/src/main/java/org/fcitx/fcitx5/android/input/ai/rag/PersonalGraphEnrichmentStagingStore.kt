@@ -60,7 +60,20 @@ class PersonalGraphEnrichmentStagingStore(
         /** How many sentences this cycle's [chunks] were built from in total, for the incremental progress line. */
         val processedSentenceCount: Int = 0,
         /** Sentences skipped because the engine rejected even that one sentence alone as too long; counted across the cycle. */
-        val skippedSentenceCount: Int = 0
+        val skippedSentenceCount: Int = 0,
+        /**
+         * Newest `lastSeenMs` among the sentences [chunks] were built from . The enrichment cursor ([PersonalGraphStore.GraphStats.enrichedThroughMs])
+         * moves to it when the cycle ends; 0 means none, which leaves the cursor where it is.
+         */
+        val throughMs: Long = 0L,
+        /**
+         * How many times the chunk at [nextChunkIndex] was started without finishing. Saved before the
+         * engine runs, so a native crash that kills the process still counts; reset once the chunk
+         * completes. Reaching the attempt limit skips the chunk instead of repeating it forever.
+         */
+        val currentChunkAttempts: Int = 0,
+        /** Chunks given up on after repeated engine failures; counted across the cycle and included in [failCount]. */
+        val skippedChunkCount: Int = 0
     ) {
         val completedChunkCount: Int get() = successCount + failCount
     }
@@ -102,7 +115,10 @@ class PersonalGraphEnrichmentStagingStore(
                 manual = root.optBoolean("manual", false),
                 isIncremental = root.optBoolean("isIncremental", false),
                 processedSentenceCount = root.optInt("processedSentenceCount", 0),
-                skippedSentenceCount = root.optInt("skippedSentenceCount", 0)
+                skippedSentenceCount = root.optInt("skippedSentenceCount", 0),
+                throughMs = root.optLong("throughMs", 0L),
+                currentChunkAttempts = root.optInt("currentChunkAttempts", 0),
+                skippedChunkCount = root.optInt("skippedChunkCount", 0)
             )
         } catch (exception: Exception) {
             vf.markUnreadable()
@@ -131,6 +147,9 @@ class PersonalGraphEnrichmentStagingStore(
         root.put("isIncremental", state.isIncremental)
         root.put("processedSentenceCount", state.processedSentenceCount)
         root.put("skippedSentenceCount", state.skippedSentenceCount)
+        root.put("throughMs", state.throughMs)
+        root.put("currentChunkAttempts", state.currentChunkAttempts)
+        root.put("skippedChunkCount", state.skippedChunkCount)
         vf.writeText(root.toString())
     }
 

@@ -182,56 +182,34 @@ class GemmaGenerationEligibilityTest {
     }
 
     @Test
-    fun `automatic generation waits while not charging`() {
-        assertWaitReason(
-            GemmaGenerationWaitReason.NOT_CHARGING,
-            snapshot(isCharging = false, screenInteractive = false)
+    fun `automatic generation is eligible without charging while the screen is on`() {
+        val eligible = snapshot(
+            batteryPercent = 50,
+            isCharging = false,
+            inputViewVisible = false
         )
-    }
-
-    @Test
-    fun `automatic generation waits while the screen is on`() {
-        assertWaitReason(
-            GemmaGenerationWaitReason.SCREEN_ON,
-            snapshot(isCharging = true, screenInteractive = true)
-        )
-    }
-
-    @Test
-    fun `automatic generation is eligible only while charging with the screen off`() {
-        val eligible = snapshot(isCharging = true, screenInteractive = false)
 
         assertTrue(GemmaGenerationEligibility.canGenerate(eligible))
         assertNull(GemmaGenerationEligibility.evaluate(eligible))
     }
 
     @Test
-    fun `automatic generation still reports the harder blockers before charging and screen`() {
+    fun `automatic generation still reports the hard blockers when not charging`() {
         assertWaitReason(
             GemmaGenerationWaitReason.BATTERY_BELOW_MINIMUM,
-            snapshot(batteryPercent = 29, isCharging = false, screenInteractive = true)
+            snapshot(batteryPercent = 29, isCharging = false)
         )
         assertWaitReason(
             GemmaGenerationWaitReason.KEYBOARD_ACTIVE,
-            snapshot(isCharging = false, screenInteractive = true, inputViewVisible = true)
+            snapshot(isCharging = false, inputViewVisible = true)
         )
     }
 
     @Test
-    fun `screen and charging wait reasons use the plain explanation`() {
-        assertEquals("충전 중이고 화면이 꺼져 있을 때 만들어요.", GemmaGenerationWaitReason.SCREEN_ON.message)
-        assertEquals("충전 중이고 화면이 꺼져 있을 때 만들어요.", GemmaGenerationWaitReason.NOT_CHARGING.message)
-    }
-
-    @Test
-    fun `manual generation ignores charging and screen state`() {
-        listOf(
-            snapshot(isCharging = false, screenInteractive = false),
-            snapshot(isCharging = false, screenInteractive = true),
-            snapshot(isCharging = true, screenInteractive = true),
-            snapshot(isCharging = true, screenInteractive = false)
-        ).forEach { snapshot ->
-            assertTrue(GemmaGenerationEligibility.canGenerate(snapshot, GemmaGenerationMode.MANUAL))
+    fun `charging state does not change either mode`() {
+        listOf(false, true).forEach { charging ->
+            val snapshot = snapshot(isCharging = charging)
+            assertNull(GemmaGenerationEligibility.evaluate(snapshot, GemmaGenerationMode.AUTOMATIC))
             assertNull(GemmaGenerationEligibility.evaluate(snapshot, GemmaGenerationMode.MANUAL))
         }
     }
@@ -265,15 +243,13 @@ class GemmaGenerationEligibilityTest {
         powerSaveMode: Boolean = false,
         thermalStatus: Int? = null,
         lowMemory: Boolean = false,
-        inputViewVisible: Boolean = false,
-        screenInteractive: Boolean = false
+        inputViewVisible: Boolean = false
     ) = GemmaGenerationSnapshot(
         batteryPercent = batteryPercent,
         isCharging = isCharging,
         powerSaveMode = powerSaveMode,
         thermalStatus = thermalStatus,
         lowMemory = lowMemory,
-        inputViewVisible = inputViewVisible,
-        screenInteractive = screenInteractive
+        inputViewVisible = inputViewVisible
     )
 }

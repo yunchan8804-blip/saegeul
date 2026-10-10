@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentLeaseWaiter
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPauseReason
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPhase
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentRunner
+import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentSkipReason
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatusStore
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentUiState
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnrichmentCycle
@@ -70,6 +71,19 @@ internal fun decideLeaseLossOutcome(waitReason: GemmaGenerationWaitReason?, manu
     else -> LeaseLossOutcome.RETRY_SAME_CHUNK
 }
 
+/** How many times one chunk may be started without finishing before the cycle gives up on it and moves on. */
+internal const val MAX_CHUNK_ATTEMPTS = 2
+
+internal fun isChunkAttemptLimitReached(attempts: Int): Boolean = attempts >= MAX_CHUNK_ATTEMPTS
+
+/** [this] with its current chunk given up on: counted as failed, passed over, and the attempt counter reset for the next one. */
+internal fun PersonalGraphEnrichmentStagingStore.State.withChunkSkipped(): PersonalGraphEnrichmentStagingStore.State = copy(
+    nextChunkIndex = nextChunkIndex + 1,
+    failCount = failCount + 1,
+    skippedChunkCount = skippedChunkCount + 1,
+    currentChunkAttempts = 0
+)
+
 /**
  * On-device personal-graph enrichment. Chunks the user's own sentences (locally, never leaving the
  * device), sends each chunk through the on-device Gemma model, parses the response, and merges the
@@ -80,11 +94,20 @@ internal fun decideLeaseLossOutcome(waitReason: GemmaGenerationWaitReason?, manu
  * and per-chunk timing, so a run broken off partway through resumes from
  * [PersonalGraphEnrichmentStagingStore.State.nextChunkIndex] with the exact same chunks.
  *
- * When a graph already exists, a new cycle only exports sentences new since it was last built
- * ([org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault.exportSince], capped at
- * [MAX_INCREMENTAL_SENTENCES]) instead of re-scanning the whole vault - see [startNewCycleOrNull].
- * "New" is counted by last-seen time ([org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault.countSince]),
- * not by a size difference, so a vault already at its capacity still reports new sentences.
+ * A new cycle only exports sentences past the enrichment cursor
+ * ([org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore.GraphStats.enrichedThroughMs], oldest first via
+ * [org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault.exportSince], capped at
+ * [PersonalGraphEnrichmentCycle.MAX_INCREMENTAL_SENTENCES]) instead of re-scanning the whole vault - see
+ * [startNewCycleOrNull]. With no graph yet the cursor is 0, so the first cycles work off the vault the
+ * same way. The cursor moves to the newest exported sentence only when the cycle ends, so a
+ * backlog larger than one cycle's cap is worked off batch by batch and sentences typed while a cycle
+ * runs are never skipped. "New" is counted by last-seen time
+ * ([org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault.countSince]), not by a size difference,
+ * so a vault already at its capacity still reports new sentences.
+ *
+ * A chunk the engine keeps failing on (an exception, or a native crash that kills the process) is
+ * started at most [MAX_CHUNK_ATTEMPTS] times - the count is saved before each start - and is then
+ * skipped and counted as failed, so one bad chunk cannot stall every later cycle.
  *
  * Each chunk is sized so its prompt plus the generated JSON fits the engine's context
  * ([GemmaGraphPrompt.maxChunkChars]). If the engine still rejects a chunk as too long (a chunk saved
@@ -97,13 +120,12 @@ internal fun decideLeaseLossOutcome(waitReason: GemmaGenerationWaitReason?, manu
  * fallback) instead of paying a fresh engine initialization per chunk, the majority of each chunk's
  * measured 90-130s wall time.
  *
- * Automatic runs (periodic, [GemmaGenerationMode.AUTOMATIC]) run only while charging with the screen
- * off: the periodic request carries `WorkManager`'s charging + battery-not-low constraints, and
- * [GemmaGenerationEligibility] re-checks charging and the screen (on top of battery/thermal/memory/
- * keyboard) before every chunk and every [WATCHDOG_INTERVAL_MS] during generation, pausing the cycle
- * (resumable) as soon as either is lost. Manual runs (dashboard button, [GemmaGenerationMode.MANUAL])
- * have neither the charging/screen requirement, but still wait for [GemmaGenerationEligibility] and
- * for the keyboard to be hidden; they also run as a foreground service ([trySetForeground]) since a
+ * Automatic runs (periodic, [GemmaGenerationMode.AUTOMATIC]) have no charging or screen requirement:
+ * the periodic request carries `WorkManager`'s battery-not-low constraint, and
+ * [GemmaGenerationEligibility] re-checks battery/thermal/memory/keyboard before every chunk and every
+ * [WATCHDOG_INTERVAL_MS] during generation, pausing the cycle (resumable) as soon as one is lost.
+ * Manual runs (dashboard button, [GemmaGenerationMode.MANUAL]) use the same checks with a lower
+ * battery minimum, and also wait for the keyboard to be hidden; they also run as a foreground service ([trySetForeground]) since a
  * plain background job can be stopped by the system well before a multi-minute Gemma run finishes.
  *
  * When the on-device generation lease is held by another purpose (material generation, or the
@@ -112,6 +134,11 @@ internal fun decideLeaseLossOutcome(waitReason: GemmaGenerationWaitReason?, manu
  * without reaching a terminal result (success/no_data/parse_failed) records why in the staging
  * checkpoint's [PersonalGraphEnrichmentStagingStore.State.pauseReason], so the dashboard can show a
  * plain-language reason instead of a generic "interrupted" message.
+ *
+ * An automatic run that used up its chunk budget, or that ended a cycle with at least
+ * [PersonalGraphEnrichmentCycle.MIN_NEW_SENTENCES] sentences still past the cursor, also requests a
+ * single follow-up run ([GemmaGraphEnrichmentScheduler.scheduleAutomaticFollowUp]) so a backlog is
+ * worked off in minutes instead of one hourly tick at a time.
  *
  * A manual run's completion (success, failure, or pause alike) requests material generation's own
  * existing manual run ([GemmaAccumulationScheduler.requestManual]) so the two do not race for the
@@ -136,6 +163,7 @@ class GemmaGraphEnrichmentWorker(
         var cycleTerminal = true
 
         if (!processMutex.tryLock()) {
+            recordSkip(statusStore, GraphEnrichmentSkipReason.BUSY)
             return if (manual) Result.retry() else Result.success()
         }
         try {
@@ -149,6 +177,7 @@ class GemmaGraphEnrichmentWorker(
                 GemmaGenerationEligibility.snapshot(applicationContext), mode
             )
             if (startWait != null) {
+                recordSkip(statusStore, GraphEnrichmentSkipReason.DEVICE_CONDITION, detail = startWait.name)
                 cycleTerminal = false
                 return if (manual) Result.retry() else Result.success()
             }
@@ -174,7 +203,9 @@ class GemmaGraphEnrichmentWorker(
             // lease wait - never left at QUEUED. A resumed cycle previously skipped this (it was
             // only called from startNewCycleOrNull), so the dashboard kept showing "starting soon"
             // for a run that was actually already going.
-            statusStore.recordStarted(System.currentTimeMillis())
+            val startedMs = System.currentTimeMillis()
+            statusStore.recordCheck(startedMs, GraphEnrichmentSkipReason.NONE)
+            statusStore.recordStarted(startedMs)
             GraphEnrichmentRunner.markRunning()
             if (manual) trySetForeground(state)
 
@@ -295,9 +326,9 @@ class GemmaGraphEnrichmentWorker(
      * Returns a freshly started cycle's state, or null when either [PersonalGraphEnrichmentCycle]
      * says it is not yet time for a new cycle (never true for [manual], which always starts one),
      * or the vault has nothing to enrich (recorded as `no_data` immediately, since there is nothing
-     * a later run could add). When a graph already exists, only sentences new since it was last
-     * built are exported ([MAX_INCREMENTAL_SENTENCES] cap); otherwise the first-ever full export
-     * ([MAX_SENTENCES] cap) runs, matching [PersonalGraphEnrichmentCycle]'s own existing-graph check.
+     * a later run could add). Only sentences past the enrichment cursor are exported, oldest first
+     * ([PersonalGraphEnrichmentCycle.MAX_INCREMENTAL_SENTENCES] cap), whether or not a graph exists yet.
+     * Why a cycle did not start is recorded for the dashboard.
      */
     private suspend fun startNewCycleOrNull(
         stagingStore: PersonalGraphEnrichmentStagingStore,
@@ -309,26 +340,33 @@ class GemmaGraphEnrichmentWorker(
         val vaultStats = app.personalSentenceVault.stats()
         val hasExistingGraph = graphStats.builtMs > 0L
         val newSentences = PersonalGraphEnrichmentCycle.newSentenceCount(
-            hasExistingGraph, app.personalSentenceVault, graphStats.builtMs
+            app.personalSentenceVault, graphStats.enrichedThroughMs
         )
-        val msSinceBuild = System.currentTimeMillis() - graphStats.builtMs
-        if (!PersonalGraphEnrichmentCycle.shouldStart(hasExistingGraph, newSentences, msSinceBuild, manual)) {
-            return null
+        val cycleStartedMs = System.currentTimeMillis()
+        if (!manual) {
+            val skipReason = PersonalGraphEnrichmentCycle.automaticSkipReason(
+                hasExistingGraph, newSentences, cycleStartedMs - graphStats.builtMs
+            )
+            if (skipReason != GraphEnrichmentSkipReason.NONE) {
+                recordSkip(statusStore, skipReason, newSentences)
+                return null
+            }
         }
-        val sentences = if (hasExistingGraph) {
-            app.personalSentenceVault.exportSince(graphStats.builtMs, MAX_INCREMENTAL_SENTENCES)
-        } else {
-            app.personalSentenceVault.exportForEnrichment(MAX_SENTENCES)
-        }
+        val exported = app.personalSentenceVault.exportSince(
+            graphStats.enrichedThroughMs, PersonalGraphEnrichmentCycle.MAX_INCREMENTAL_SENTENCES
+        )
+        val sentences = exported.map { it.text }
+        val throughMs = exported.maxOfOrNull { it.lastSeenMs } ?: 0L
         if (sentences.isEmpty()) {
             val result = PersonalGraphEnricher.EnrichResult(false, "no_data", 0, 0, 0)
+            statusStore.recordCheck(cycleStartedMs, GraphEnrichmentSkipReason.NONE)
             statusStore.recordResult(result, System.currentTimeMillis())
             if (manual) GraphEnrichmentRunner.notifyCompletion(applicationContext, result, GraphEnrichmentFailure.NONE)
             return null
         }
         val chunks = PersonalGraphEnricher.chunksFor(sentences, maxCharsPerChunk())
         val state = PersonalGraphEnrichmentStagingStore.State(
-            cycleStartedMs = System.currentTimeMillis(),
+            cycleStartedMs = cycleStartedMs,
             sourceSentenceCountAtStart = vaultStats.sentences,
             chunks = chunks,
             nextChunkIndex = 0,
@@ -336,7 +374,8 @@ class GemmaGraphEnrichmentWorker(
             failCount = 0,
             manual = manual,
             isIncremental = hasExistingGraph,
-            processedSentenceCount = sentences.size
+            processedSentenceCount = sentences.size,
+            throughMs = throughMs
         )
         stagingStore.save(state)
         return state
@@ -353,6 +392,8 @@ class GemmaGraphEnrichmentWorker(
     ): Result {
         var current = initialState
         var processedThisRun = 0
+        // Read once up front: a graph the user erases mid-cycle must not inherit this cycle's cursor.
+        val cycleGeneration = FcitxApplication.getInstance().personalGraphStore.generation()
         // Cumulative lease-wait time across the whole cycle, used only to isolate how much of each
         // individual chunk's wall time (below) was waiting rather than actually generating - see
         // PersonalGraphEnrichmentStagingStore.State.lastWaitMs's doc.
@@ -395,6 +436,12 @@ class GemmaGraphEnrichmentWorker(
             return if (manual) Result.retry() else Result.success()
         }
 
+        // The pause is not a failed attempt at the chunk: hands back the attempt counted when it started.
+        suspend fun pauseUnattempted(reason: GraphEnrichmentPauseReason): Result {
+            current = current.copy(currentChunkAttempts = (current.currentChunkAttempts - 1).coerceAtLeast(0))
+            return pause(reason)
+        }
+
         GemmaGraphEnrichmentRuntime.register(session)
         try {
             // Manual runs process every remaining chunk to completion (no per-run cap); automatic
@@ -404,6 +451,17 @@ class GemmaGraphEnrichmentWorker(
             ) {
                 currentCoroutineContext().ensureActive()
                 if (isStopped) return pause(GraphEnrichmentPauseReason.USER_STOPPED)
+                if (isChunkAttemptLimitReached(current.currentChunkAttempts)) {
+                    val failedAttempts = current.currentChunkAttempts
+                    current = current.withChunkSkipped()
+                    stagingStore.save(current)
+                    Timber.tag(GemmaGraphGenerationSession.LOG_TAG).i(
+                        "chunk %d/%d skipped after %d failed attempts",
+                        current.nextChunkIndex, current.chunks.size, failedAttempts
+                    )
+                    if (manual) updateManualForeground(current)
+                    continue
+                }
                 val waitReason = GemmaGenerationEligibility.evaluate(
                     GemmaGenerationEligibility.snapshot(applicationContext), mode
                 )
@@ -417,9 +475,31 @@ class GemmaGraphEnrichmentWorker(
                 val graphGeneration = FcitxApplication.getInstance().personalGraphStore.generation()
                 val chunkStartedAtMs = System.currentTimeMillis()
                 val waitBeforeChunkMs = totalWaitMs
-                when (val outcome = runChunk(session, model, chunkText, mode, manual, onWaitingChanged)) {
-                    is ChunkRunOutcome.Paused -> return pause(outcome.reason)
-                    ChunkRunOutcome.LeaseTimedOut -> return pause(GraphEnrichmentPauseReason.LEASE_WAIT_TIMEOUT)
+                // Saved before the engine runs so that a native crash which kills the process still counts as an attempt.
+                current = current.copy(currentChunkAttempts = current.currentChunkAttempts + 1)
+                stagingStore.save(current)
+                val chunkOutcome = try {
+                    runChunk(session, model, chunkText, mode, manual, onWaitingChanged)
+                } catch (cancelled: CancellationException) {
+                    current = current.copy(currentChunkAttempts = (current.currentChunkAttempts - 1).coerceAtLeast(0))
+                    stagingStore.save(current)
+                    throw cancelled
+                } catch (lost: GemmaGraphGenerationSession.LeaseLostException) {
+                    throw lost
+                } catch (error: Exception) {
+                    val errorName = error.javaClass.simpleName
+                    statusStore.recordChunkError(errorName)
+                    Timber.tag(GemmaGraphGenerationSession.LOG_TAG).w(
+                        "chunk %d/%d attempt %d failed (%s)",
+                        current.nextChunkIndex + 1, current.chunks.size, current.currentChunkAttempts, errorName
+                    )
+                    // The engine session may be broken; the next attempt (or chunk) reopens it.
+                    session.close()
+                    continue
+                }
+                when (val outcome = chunkOutcome) {
+                    is ChunkRunOutcome.Paused -> return pauseUnattempted(outcome.reason)
+                    ChunkRunOutcome.LeaseTimedOut -> return pauseUnattempted(GraphEnrichmentPauseReason.LEASE_WAIT_TIMEOUT)
                     is ChunkRunOutcome.Completed -> {
                         val rawElapsedMs = (System.currentTimeMillis() - chunkStartedAtMs).coerceAtLeast(0L)
                         // Excludes any lease wait(s) this chunk hit (e.g. re-acquiring after the
@@ -455,9 +535,22 @@ class GemmaGraphEnrichmentWorker(
         if (current.nextChunkIndex < current.chunks.size) {
             // Ran out of this run's chunk budget; resumes on the next scheduled/manual run.
             markResumable()
+            GemmaGraphEnrichmentScheduler.scheduleAutomaticFollowUp(
+                applicationContext, manual, cycleFinished = false, remainingSentences = 0
+            )
             return Result.success()
         }
-        return finishCycle(current, manual, statusStore, stagingStore)
+        val result = finishCycle(current, manual, statusStore, stagingStore, cycleGeneration)
+        val app = FcitxApplication.getInstance()
+        GemmaGraphEnrichmentScheduler.scheduleAutomaticFollowUp(
+            applicationContext,
+            manual,
+            cycleFinished = true,
+            remainingSentences = PersonalGraphEnrichmentCycle.newSentenceCount(
+                app.personalSentenceVault, app.personalGraphStore.stats().enrichedThroughMs
+            )
+        )
+        return result
     }
 
     private fun pauseReasonFor(waitReason: GemmaGenerationWaitReason): GraphEnrichmentPauseReason = when (waitReason) {
@@ -468,8 +561,6 @@ class GemmaGraphEnrichmentWorker(
         GemmaGenerationWaitReason.THERMAL_LIMITED -> GraphEnrichmentPauseReason.THERMAL
         GemmaGenerationWaitReason.LOW_MEMORY -> GraphEnrichmentPauseReason.LOW_MEMORY
         GemmaGenerationWaitReason.KEYBOARD_ACTIVE -> GraphEnrichmentPauseReason.KEYBOARD_ACTIVE
-        GemmaGenerationWaitReason.SCREEN_ON -> GraphEnrichmentPauseReason.SCREEN_ON
-        GemmaGenerationWaitReason.NOT_CHARGING -> GraphEnrichmentPauseReason.NOT_CHARGING
     }
 
     /**
@@ -516,17 +607,29 @@ class GemmaGraphEnrichmentWorker(
             completedChunkDurationMsSum = state.completedChunkDurationMsSum + elapsedMs,
             lastWaitMs = waitMs,
             pauseReason = GraphEnrichmentPauseReason.NONE,
-            skippedSentenceCount = state.skippedSentenceCount + chunkResult.skippedSentences
+            skippedSentenceCount = state.skippedSentenceCount + chunkResult.skippedSentences,
+            currentChunkAttempts = 0
         )
     }
 
+    /**
+     * Ends the cycle: moves the enrichment cursor to [PersonalGraphEnrichmentStagingStore.State.throughMs]
+     * (also when no chunk succeeded, so the same sentences are not retried forever), then drops the
+     * staging checkpoint. Sentences past that point are picked up by the next cycle.
+     */
     private fun finishCycle(
         state: PersonalGraphEnrichmentStagingStore.State,
         manual: Boolean,
         statusStore: GraphEnrichmentStatusStore,
-        stagingStore: PersonalGraphEnrichmentStagingStore
+        stagingStore: PersonalGraphEnrichmentStagingStore,
+        cycleGeneration: Long
     ): Result {
+        val graphStore = FcitxApplication.getInstance().personalGraphStore
+        if (graphStore.advanceEnrichedThrough(state.throughMs, cycleGeneration)) {
+            graphStore.save()
+        }
         stagingStore.discard()
+        statusStore.recordCheck(System.currentTimeMillis(), GraphEnrichmentSkipReason.NONE)
         if (state.successCount == 0) {
             val result = PersonalGraphEnricher.EnrichResult(false, "parse_failed", 0, 0, 0)
             statusStore.recordResult(result, System.currentTimeMillis())
@@ -618,7 +721,7 @@ class GemmaGraphEnrichmentWorker(
                         }
                         GraphEnrichmentLeaseWaiter.Result.GaveUp -> leaseTimedOut = true
                         GraphEnrichmentLeaseWaiter.Result.Aborted -> {
-                            pausedReason = if (isStopped) GraphEnrichmentPauseReason.USER_STOPPED else GraphEnrichmentPauseReason.SCREEN_ON
+                            pausedReason = GraphEnrichmentPauseReason.USER_STOPPED
                         }
                     }
                 }
@@ -635,6 +738,22 @@ class GemmaGraphEnrichmentWorker(
         }
     }
 
+    /** Leaves why this run generated nothing for the dashboard, and in the log. */
+    private fun recordSkip(
+        statusStore: GraphEnrichmentStatusStore,
+        reason: GraphEnrichmentSkipReason,
+        newSentences: Int = 0,
+        detail: String? = null
+    ) {
+        statusStore.recordCheck(System.currentTimeMillis(), reason, newSentences, detail)
+        val extra = when {
+            reason == GraphEnrichmentSkipReason.NOT_ENOUGH_NEW_SENTENCES -> " new=$newSentences"
+            detail != null -> " detail=$detail"
+            else -> ""
+        }
+        Timber.tag(GemmaGraphGenerationSession.LOG_TAG).i("skip reason=%s%s", reason, extra)
+    }
+
     /** A chunk never exceeds what fits in the engine's context together with the prompt text and the generated JSON. */
     private fun maxCharsPerChunk(): Int = minOf(MAX_CHARS_PER_CHUNK, GemmaGraphPrompt.maxChunkChars())
 
@@ -646,9 +765,7 @@ class GemmaGraphEnrichmentWorker(
     private companion object {
         val processMutex = Mutex()
         const val WATCHDOG_INTERVAL_MS = 250L
-        const val MAX_SENTENCES = 400
-        const val MAX_INCREMENTAL_SENTENCES = 120
         const val MAX_CHARS_PER_CHUNK = 700
-        const val MAX_CHUNKS_PER_AUTO_RUN = 4
+        const val MAX_CHUNKS_PER_AUTO_RUN = 8
     }
 }

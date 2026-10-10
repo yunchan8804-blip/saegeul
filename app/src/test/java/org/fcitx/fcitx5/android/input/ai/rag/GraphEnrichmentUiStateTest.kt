@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.rag
 
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationWaitReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -329,5 +330,94 @@ class GraphEnrichmentUiStateTest {
 
         assertEquals(R.string.enrichment_state_error_title, state.titleRes)
         assertNull(state.errorDetailArg)
+    }
+
+    private fun upToDate(
+        phase: GraphEnrichmentPhase,
+        lastCheck: GraphEnrichmentCheck?
+    ) = GraphEnrichmentUiState.from(
+        phase = phase,
+        failure = GraphEnrichmentFailure.NONE,
+        staging = null,
+        nowMs = 0L,
+        automaticEnabled = true,
+        lastAppliedMs = 0L,
+        graphNodes = 0,
+        graphEdges = 0,
+        graphTopics = 0,
+        lastCheck = lastCheck
+    )
+
+    @Test
+    fun anUpToDateCardWordsWhyTheLastCheckGeneratedNothing() {
+        val notEnough = upToDate(
+            GraphEnrichmentPhase.SUCCEEDED,
+            GraphEnrichmentCheck(1_000L, GraphEnrichmentSkipReason.NOT_ENOUGH_NEW_SENTENCES, newSentences = 3)
+        ).checkNote
+        assertEquals(
+            GraphEnrichmentCheckNote(1_000L, reasonRes = R.string.enrichment_check_not_enough_sentences, reasonIntArg = 3),
+            notEnough
+        )
+
+        assertEquals(
+            GraphEnrichmentCheckNote(2_000L, reasonRes = R.string.enrichment_check_too_soon),
+            upToDate(GraphEnrichmentPhase.SUCCEEDED, GraphEnrichmentCheck(2_000L, GraphEnrichmentSkipReason.TOO_SOON)).checkNote
+        )
+        assertEquals(
+            GraphEnrichmentCheckNote(3_000L, reasonRes = R.string.enrichment_check_busy),
+            upToDate(GraphEnrichmentPhase.NEVER, GraphEnrichmentCheck(3_000L, GraphEnrichmentSkipReason.BUSY)).checkNote
+        )
+    }
+
+    @Test
+    fun aDeviceConditionReusesTheWaitReasonMessage() {
+        val note = upToDate(
+            GraphEnrichmentPhase.SUCCEEDED,
+            GraphEnrichmentCheck(
+                4_000L, GraphEnrichmentSkipReason.DEVICE_CONDITION, detail = GemmaGenerationWaitReason.THERMAL_LIMITED.name
+            )
+        ).checkNote
+
+        assertEquals(
+            GraphEnrichmentCheckNote(4_000L, reasonText = GemmaGenerationWaitReason.THERMAL_LIMITED.message),
+            note
+        )
+        assertEquals("기기 온도가 높아 생성을 미룹니다.", note?.reasonText)
+    }
+
+    @Test
+    fun aDeviceConditionSavedUnderARemovedNameShowsNoCheckNote() {
+        listOf("NOT_CHARGING", "SCREEN_ON").forEach { removed ->
+            val note = upToDate(
+                GraphEnrichmentPhase.SUCCEEDED,
+                GraphEnrichmentCheck(4_000L, GraphEnrichmentSkipReason.DEVICE_CONDITION, detail = removed)
+            ).checkNote
+
+            assertNull(removed, note)
+        }
+    }
+
+    @Test
+    fun noCheckNoteWhenNothingWasRecordedTheLastRunGeneratedOrTheReasonIsUnknown() {
+        assertNull(upToDate(GraphEnrichmentPhase.SUCCEEDED, null).checkNote)
+        assertNull(
+            upToDate(GraphEnrichmentPhase.SUCCEEDED, GraphEnrichmentCheck(1L, GraphEnrichmentSkipReason.NONE)).checkNote
+        )
+        assertNull(
+            upToDate(
+                GraphEnrichmentPhase.SUCCEEDED,
+                GraphEnrichmentCheck(1L, GraphEnrichmentSkipReason.DEVICE_CONDITION, detail = "NOT_A_REASON")
+            ).checkNote
+        )
+    }
+
+    @Test
+    fun theCheckNoteStaysHiddenWhileARunIsInProgressOrFailed() {
+        val check = GraphEnrichmentCheck(1L, GraphEnrichmentSkipReason.TOO_SOON)
+
+        assertNull(upToDate(GraphEnrichmentPhase.RUNNING, check).checkNote)
+        assertNull(upToDate(GraphEnrichmentPhase.QUEUED, check).checkNote)
+        assertNull(upToDate(GraphEnrichmentPhase.INTERRUPTED, check).checkNote)
+        assertNull(upToDate(GraphEnrichmentPhase.FAILED, check).checkNote)
     }
 }

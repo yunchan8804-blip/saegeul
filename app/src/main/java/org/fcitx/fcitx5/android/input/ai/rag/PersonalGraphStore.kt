@@ -35,7 +35,8 @@ class PersonalGraphStore(
         val edges: Int,
         val topics: Int,
         val builtMs: Long,
-        val sourceSentenceCount: Int = 0
+        val sourceSentenceCount: Int = 0,
+        val enrichedThroughMs: Long = 0L
     )
 
     // node id -> Node
@@ -55,6 +56,11 @@ class PersonalGraphStore(
     private var generation = 0L
 
     private var graphBuiltMs: Long = 0L
+
+    // Newest sentence last-seen time that enrichment has already processed. Kept apart from
+    // graphBuiltMs, which moves on every merged chunk and so says nothing about which sentences
+    // were actually read.
+    private var enrichedThroughMs: Long = 0L
 
     // Vault sentence count at the time the graph was last built, so the enrichment loop can tell
     // how many new sentences have accumulated since then.
@@ -102,7 +108,20 @@ class PersonalGraphStore(
     }
 
     @Synchronized
-    fun stats(): GraphStats = GraphStats(nodes.size, edges.size, topics.size, graphBuiltMs, sourceSentenceCount)
+    fun stats(): GraphStats =
+        GraphStats(nodes.size, edges.size, topics.size, graphBuiltMs, sourceSentenceCount, enrichedThroughMs)
+
+    /**
+     * Moves the enrichment cursor forward to [ms]; never backwards. Dropped (false) when [clear] ran
+     * since [expectedGeneration] was read, so an erased graph does not inherit the old cursor.
+     * Updates memory only; call [save] to persist.
+     */
+    @Synchronized
+    fun advanceEnrichedThrough(ms: Long, expectedGeneration: Long): Boolean {
+        if (expectedGeneration != generation) return false
+        enrichedThroughMs = maxOf(enrichedThroughMs, ms)
+        return true
+    }
 
     /**
      * The currently stored graph, for a caller (incremental graph enrichment) that wants to merge a
@@ -136,6 +155,7 @@ class PersonalGraphStore(
         nodeAliases.clear()
         topics = emptyList()
         graphBuiltMs = 0L
+        enrichedThroughMs = 0L
         sourceSentenceCount = 0
         vaultFile?.deleteForUser()
     }
@@ -175,6 +195,8 @@ class PersonalGraphStore(
             val root = JSONObject()
             root.put("v", 1)
             root.put("built", graphBuiltMs)
+            root.put("through", enrichedThroughMs)
+            root.put("cursorVersion", CURSOR_VERSION)
             root.put("src", sourceSentenceCount)
             val nodesArr = JSONArray()
             nodes.values.forEach { n ->
@@ -235,6 +257,7 @@ class PersonalGraphStore(
             return
         }
         graphBuiltMs = loaded.builtMs
+        enrichedThroughMs = loaded.enrichedThroughMs
         sourceSentenceCount = loaded.sourceSentenceCount
         nodes.putAll(loaded.nodes)
         edges.putAll(loaded.edges)
@@ -244,6 +267,7 @@ class PersonalGraphStore(
 
     private class LoadedGraph(
         val builtMs: Long,
+        val enrichedThroughMs: Long,
         val sourceSentenceCount: Int,
         val nodes: Map<String, Node>,
         val edges: Map<Pair<String, String>, Edge>,
@@ -294,8 +318,12 @@ class PersonalGraphStore(
             }
             loadedTopics.add(Topic(id, label, members))
         }
+        val builtMs = root.optLong("built", 0L)
+        val enrichedThroughMs =
+            if (root.optInt("cursorVersion", 0) >= CURSOR_VERSION) root.optLong("through", builtMs) else 0L
         return LoadedGraph(
-            builtMs = root.optLong("built", 0L),
+            builtMs = builtMs,
+            enrichedThroughMs = enrichedThroughMs,
             sourceSentenceCount = root.optInt("src", 0),
             nodes = loadedNodes,
             edges = loadedEdges,
@@ -321,6 +349,9 @@ class PersonalGraphStore(
     }
 
     companion object {
+        // 예전 커서 버그로 그래프에 반영되지 않은 문장을 한 번 다시 처리하려고, 이 값보다 낮은 버전으로
+        // 저장된 파일은 처리 커서를 0으로 되돌려 읽는다. 그래프 본체는 그대로 두고 커서만 되돌린다.
+        private const val CURSOR_VERSION = 2
         private const val MAX_NODES = 2000
         private const val MAX_EDGES = 6000
         private const val MAX_TOPICS = 200

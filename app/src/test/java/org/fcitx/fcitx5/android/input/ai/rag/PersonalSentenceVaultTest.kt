@@ -396,11 +396,11 @@ class PersonalSentenceVaultTest {
 
         val exported = vault.exportSince(2000L, 10)
 
-        assertEquals(listOf("이후 문장 입니다"), exported)
+        assertEquals(listOf(PersonalSentenceVault.ExportedSentence("이후 문장 입니다", 3000L)), exported)
     }
 
     @Test
-    fun exportSinceOrdersMostRecentFirstAndRespectsLimit() {
+    fun exportSinceOrdersOldestFirstAndRespectsLimit() {
         var now = 0L
         val vault = PersonalSentenceVault(clock = { now })
         now = 100L; vault.record("첫 문장 입니다", "com.android.chrome")
@@ -409,7 +409,38 @@ class PersonalSentenceVaultTest {
 
         val exported = vault.exportSince(0L, 2)
 
-        assertEquals(listOf("셋째 문장 입니다", "둘째 문장 입니다"), exported)
+        assertEquals(
+            listOf(
+                PersonalSentenceVault.ExportedSentence("첫 문장 입니다", 100L),
+                PersonalSentenceVault.ExportedSentence("둘째 문장 입니다", 200L)
+            ),
+            exported
+        )
+    }
+
+    @Test
+    fun exportSinceLeavesAWholeSameTimeGroupForTheNextExportWhenTheLimitCutsThroughIt() {
+        var now = 0L
+        val vault = PersonalSentenceVault(clock = { now })
+        now = 100L; vault.record("첫 문장 입니다", "com.android.chrome")
+        now = 200L
+        vault.record("같은 시각 문장 하나", "com.android.chrome")
+        vault.record("같은 시각 문장 둘", "com.android.chrome")
+
+        val exported = vault.exportSince(0L, 2)
+
+        assertEquals(listOf("첫 문장 입니다"), exported.map { it.text })
+        assertEquals(2, vault.countSince(exported.maxOf { it.lastSeenMs }))
+    }
+
+    @Test
+    fun exportSinceKeepsASameTimeGroupWhenItIsTheOnlyThingToExport() {
+        val vault = PersonalSentenceVault(clock = { 200L })
+        vault.record("같은 시각 문장 하나", "com.android.chrome")
+        vault.record("같은 시각 문장 둘", "com.android.chrome")
+        vault.record("같은 시각 문장 셋", "com.android.chrome")
+
+        assertEquals(2, vault.exportSince(0L, 2).size)
     }
 
     @Test

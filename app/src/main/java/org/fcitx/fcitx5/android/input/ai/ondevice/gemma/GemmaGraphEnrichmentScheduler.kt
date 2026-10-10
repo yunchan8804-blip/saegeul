@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentFailure
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentRunner
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatusStore
+import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnrichmentCycle
 import java.util.concurrent.TimeUnit
 
 /**
@@ -49,11 +50,28 @@ internal fun decideManualGraphEnrichmentAction(
 }
 
 /**
+ * Pure decision for whether a finished automatic run should register a one-shot follow-up run: only
+ * for an automatic run ([manual] false) while the automatic switch is on ([automaticEnabled]), and
+ * then either when the run's chunk budget ran out before the cycle ended ([cycleFinished] false) or
+ * when the cycle ended with at least [PersonalGraphEnrichmentCycle.MIN_NEW_SENTENCES]
+ * ([remainingSentences]) sentences still past the enrichment cursor.
+ */
+internal fun shouldScheduleGraphFollowUp(
+    manual: Boolean,
+    cycleFinished: Boolean,
+    remainingSentences: Int,
+    automaticEnabled: Boolean
+): Boolean = when {
+    manual || !automaticEnabled -> false
+    !cycleFinished -> true
+    else -> remainingSentences >= PersonalGraphEnrichmentCycle.MIN_NEW_SENTENCES
+}
+
+/**
  * Schedules the on-device [GemmaGraphEnrichmentWorker]: a periodic automatic run (paired 1:1 with
  * material-generation's own automatic toggle, since both share the dashboard's single "automatic"
- * switch) and a manual one-shot run triggered from the dashboard button. The periodic run only
- * starts while charging (and the worker itself additionally requires the screen to be off, see
- * [GemmaGenerationEligibility]); the manual run has no charging requirement.
+ * switch) and a manual one-shot run triggered from the dashboard button. Neither run requires
+ * charging or the screen to be off; the worker checks [GemmaGenerationEligibility] when it runs.
  */
 object GemmaGraphEnrichmentScheduler {
 
@@ -75,14 +93,49 @@ object GemmaGraphEnrichmentScheduler {
             enqueuePeriodic(workManager, ExistingPeriodicWorkPolicy.UPDATE)
         } else {
             workManager.cancelUniqueWork(PERIODIC_WORK_NAME).result.get(OPERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            workManager.cancelUniqueWork(FOLLOW_UP_WORK_NAME).result.get(OPERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         }
+    }
+
+    /**
+     * Registers a single automatic run [FOLLOW_UP_DELAY_MINUTES] minutes out when
+     * [shouldScheduleGraphFollowUp] says so (reading the automatic switch from
+     * [GemmaAccumulationStore]), so a backlog is not left waiting for the next hourly tick. The run
+     * is the ordinary automatic one - same worker, same eligibility checks and `processMutex`.
+     * [ExistingWorkPolicy.APPEND_OR_REPLACE] is used because a follow-up registers the next one while
+     * it is itself still running, which KEEP would silently drop; the new one queues behind it instead.
+     */
+    suspend fun scheduleAutomaticFollowUp(
+        context: Context,
+        manual: Boolean,
+        cycleFinished: Boolean,
+        remainingSentences: Int
+    ) = withContext(Dispatchers.IO) {
+        val applicationContext = context.applicationContext
+        val automaticEnabled = GemmaAccumulationStore.get(applicationContext).load().enabled
+        if (!shouldScheduleGraphFollowUp(manual, cycleFinished, remainingSentences, automaticEnabled)) {
+            return@withContext
+        }
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            FOLLOW_UP_WORK_NAME,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            OneTimeWorkRequestBuilder<GemmaGraphEnrichmentWorker>()
+                .setInputData(workDataOf(KEY_MANUAL to false))
+                .setInitialDelay(FOLLOW_UP_DELAY_MINUTES, TimeUnit.MINUTES)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiresBatteryNotLow(true)
+                        .build()
+                )
+                .build()
+        )
     }
 
     /**
      * Idempotently (re)registers the periodic automatic run when material-generation's own
      * automatic toggle ([GemmaAccumulationState.enabled]) is on, with
      * [ExistingPeriodicWorkPolicy.UPDATE] so an already-registered run picks up the current
-     * constraints (an older build registered it without the charging requirement) while keeping its
+     * constraints (an older build registered it with a charging requirement) while keeping its
      * schedule and any run already in progress. This exists because the periodic work is otherwise
      * only (re-)registered when the user flips the automatic switch: a user who had it on before
      * this feature shipped would otherwise never get the periodic work registered until they toggle
@@ -104,7 +157,6 @@ object GemmaGraphEnrichmentScheduler {
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiresBatteryNotLow(true)
-                        .setRequiresCharging(true)
                         .build()
                 )
                 .build()
@@ -169,8 +221,10 @@ object GemmaGraphEnrichmentScheduler {
     private const val OPERATION_TIMEOUT_SECONDS = 30L
     private const val PERIODIC_INTERVAL_HOURS = 1L
     private const val MANUAL_BACKOFF_SECONDS = 60L
+    private const val FOLLOW_UP_DELAY_MINUTES = 15L
     const val PERIODIC_WORK_NAME = "gemma-graph-enrichment-periodic"
     const val MANUAL_WORK_NAME = "gemma-graph-enrichment-manual"
+    const val FOLLOW_UP_WORK_NAME = "gemma-graph-enrichment-followup"
 }
 
 /** Mirrors [GemmaAccumulationRuntime]: lets [GemmaGraphEnrichmentScheduler] cancel a live run. */

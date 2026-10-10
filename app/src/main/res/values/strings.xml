@@ -1060,11 +1060,13 @@
     <string name="enrichment_pause_reason_thermal" tools:ignore="MissingTranslation">Running too hot</string>
     <string name="enrichment_pause_reason_low_memory" tools:ignore="MissingTranslation">Low on memory</string>
     <string name="enrichment_pause_reason_keyboard_active" tools:ignore="MissingTranslation">The keyboard is in use</string>
-    <string name="enrichment_pause_reason_screen_on" tools:ignore="MissingTranslation">The screen is on</string>
-    <string name="enrichment_pause_reason_not_charging" tools:ignore="MissingTranslation">Not charging</string>
     <string name="enrichment_pause_reason_user_stopped" tools:ignore="MissingTranslation">You stopped it</string>
     <string name="enrichment_pause_reason_lease_wait_timeout" tools:ignore="MissingTranslation">Waited too long for a turn</string>
     <string name="enrichment_pause_reason_app_terminated" tools:ignore="MissingTranslation">Paused because the app restarted. Tap [Apply now] to continue.</string>
+    <string name="enrichment_check_line" tools:ignore="MissingTranslation">Last checked %1$s · %2$s</string>
+    <string name="enrichment_check_not_enough_sentences" tools:ignore="MissingTranslation">Only %1$d new sentences so far. It builds once there are 10.</string>
+    <string name="enrichment_check_too_soon" tools:ignore="MissingTranslation">Just built, so it will look again in an hour.</string>
+    <string name="enrichment_check_busy" tools:ignore="MissingTranslation">It builds once the other task is done.</string>
 
     <string name="enrichment_action_stop" tools:ignore="MissingTranslation">Stop</string>
     <string name="enrichment_action_apply_now" tools:ignore="MissingTranslation">Apply now</string>

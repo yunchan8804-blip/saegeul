@@ -82,7 +82,7 @@
                     android:layout_marginTop="2dp"
                     android:textColor="?android:attr/textColorPrimary"
                     android:textSize="14sp"
-                    tools:text="실패 · 다음 충전 때 다시 시도해요" />
+                    tools:text="실패 · 잠시 뒤 다시 시도해요" />
 
             </LinearLayout>
 

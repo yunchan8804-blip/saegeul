@@ -1054,11 +1054,13 @@
     <string name="enrichment_pause_reason_thermal">온도가 너무 높아요</string>
     <string name="enrichment_pause_reason_low_memory">메모리가 부족해요</string>
     <string name="enrichment_pause_reason_keyboard_active">키보드를 쓰는 중이에요</string>
-    <string name="enrichment_pause_reason_screen_on">화면이 켜져 있어요</string>
-    <string name="enrichment_pause_reason_not_charging">충전 중이 아니에요</string>
     <string name="enrichment_pause_reason_user_stopped">사용자가 중지했어요</string>
     <string name="enrichment_pause_reason_lease_wait_timeout">기다리다 시간이 초과됐어요</string>
     <string name="enrichment_pause_reason_app_terminated">앱이 다시 시작돼서 멈췄어요. [지금 반영하기]를 누르면 이어서 해요.</string>
+    <string name="enrichment_check_line">마지막 확인 %1$s · %2$s</string>
+    <string name="enrichment_check_not_enough_sentences">새 문장이 %1$d개라 10개가 되면 만들어요</string>
+    <string name="enrichment_check_too_soon">방금 만들어서 1시간 뒤에 다시 봐요</string>
+    <string name="enrichment_check_busy">다른 작업이 끝나면 만들어요</string>
 
     <string name="enrichment_action_stop">중지</string>
     <string name="enrichment_action_apply_now">지금 반영하기</string>

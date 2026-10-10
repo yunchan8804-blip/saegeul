@@ -85,10 +85,45 @@ class PersonalGraphEnrichmentCycleTest {
             PersonalGraphEnrichmentCycle.shouldStart(true, sizeDifference, now - graphBuiltMs, manual = false)
         )
 
-        val newSentences = PersonalGraphEnrichmentCycle.newSentenceCount(true, vault, graphBuiltMs)
+        val newSentences = PersonalGraphEnrichmentCycle.newSentenceCount(vault, graphBuiltMs)
         assertEquals(PersonalGraphEnrichmentCycle.MIN_NEW_SENTENCES, newSentences)
         assertTrue(
             PersonalGraphEnrichmentCycle.shouldStart(true, newSentences, now - graphBuiltMs, manual = false)
+        )
+    }
+
+    @Test
+    fun aBacklogOfOneCycleOrMoreStartsWithoutWaitingForTheInterval() {
+        val backlog = PersonalGraphEnrichmentCycle.MAX_INCREMENTAL_SENTENCES
+        assertTrue(
+            PersonalGraphEnrichmentCycle.shouldStart(
+                hasExistingGraph = true, newSentenceCount = backlog, msSinceLastBuild = 0L, manual = false
+            )
+        )
+        assertFalse(
+            PersonalGraphEnrichmentCycle.shouldStart(
+                hasExistingGraph = true, newSentenceCount = backlog - 1, msSinceLastBuild = 0L, manual = false
+            )
+        )
+        assertEquals(
+            GraphEnrichmentSkipReason.TOO_SOON,
+            PersonalGraphEnrichmentCycle.automaticSkipReason(true, backlog - 1, msSinceLastBuild = 0L)
+        )
+    }
+
+    @Test
+    fun theMinimumSentenceCountStillAppliesToABacklogDecision() {
+        assertEquals(
+            GraphEnrichmentSkipReason.NOT_ENOUGH_NEW_SENTENCES,
+            PersonalGraphEnrichmentCycle.automaticSkipReason(
+                true, PersonalGraphEnrichmentCycle.MIN_NEW_SENTENCES - 1, msSinceLastBuild = Long.MAX_VALUE
+            )
+        )
+        assertEquals(
+            GraphEnrichmentSkipReason.NONE,
+            PersonalGraphEnrichmentCycle.automaticSkipReason(
+                true, PersonalGraphEnrichmentCycle.MIN_NEW_SENTENCES, msSinceLastBuild = PersonalGraphEnrichmentCycle.MIN_INTERVAL_MS
+            )
         )
     }
 
@@ -97,7 +132,7 @@ class PersonalGraphEnrichmentCycleTest {
         val vault = PersonalSentenceVault(clock = { 1_000L })
         repeat(12) { assertTrue(vault.record(sentence(it), "com.android.chrome")) }
 
-        assertEquals(12, PersonalGraphEnrichmentCycle.newSentenceCount(false, vault, graphBuiltMs = 0L))
+        assertEquals(12, PersonalGraphEnrichmentCycle.newSentenceCount(vault, enrichedThroughMs = 0L))
     }
 
     private fun sentence(index: Int): String = "하루 ${(0xAC00 + index).toChar()}다 기록"

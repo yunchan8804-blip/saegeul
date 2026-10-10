@@ -34,7 +34,8 @@ object GemmaPreparationFactory {
         // this change's scope), so this is the earliest reliable, already-scoped place to self-heal
         // a user who had material-generation's automatic toggle on before this graph periodic work
         // existed: it is otherwise only (re-)registered when that toggle is flipped. Idempotent
-        // (KEEP) and cheap; safe to run every time the dashboard is opened.
+        // (UPDATE keeps the schedule and applies the current constraints) and cheap; safe to run
+        // every time the dashboard is opened.
         FcitxApplication.getInstance().applicationScope.launch {
             try {
                 GemmaGraphEnrichmentScheduler.reconcileAutomaticIfEnabled(applicationContext)
@@ -42,6 +43,13 @@ object GemmaPreparationFactory {
                 throw cancelled
             } catch (error: Exception) {
                 Timber.w(error, "Failed to reconcile graph-enrichment automatic schedule")
+            }
+            try {
+                GemmaAccumulationScheduler.refreshPolicyIfEnabled(applicationContext)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Timber.w(error, "Failed to refresh material-generation automatic schedule")
             }
         }
         return GemmaPreparationControllerImpl(applicationContext)

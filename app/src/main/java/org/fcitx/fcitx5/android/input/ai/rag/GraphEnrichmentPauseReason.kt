@@ -25,8 +25,6 @@ enum class GraphEnrichmentPauseReason {
     THERMAL,
     LOW_MEMORY,
     KEYBOARD_ACTIVE,
-    SCREEN_ON,
-    NOT_CHARGING,
     USER_STOPPED,
     LEASE_WAIT_TIMEOUT
 }

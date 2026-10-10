@@ -74,7 +74,6 @@ class VaultHomeStringsTerminologyTest {
         "enrichment_pause_reason_thermal",
         "enrichment_pause_reason_low_memory",
         "enrichment_pause_reason_keyboard_active",
-        "enrichment_pause_reason_screen_on",
         "enrichment_pause_reason_user_stopped",
         "enrichment_pause_reason_lease_wait_timeout",
         "enrichment_pause_reason_app_terminated",

@@ -52,6 +52,18 @@ class PersonalGraphEnrichmentStagingStoreTest {
     }
 
     @Test
+    fun pauseReasonSavedUnderARemovedNameLoadsAsNone() {
+        listOf("SCREEN_ON", "NOT_CHARGING").forEach { removed ->
+            val file = tempFolder.newFile("staging_legacy_$removed.json")
+            val store = PersonalGraphEnrichmentStagingStore(file)
+            store.save(stateOf(pauseReason = GraphEnrichmentPauseReason.THERMAL))
+            file.writeText(file.readText().replace("\"pauseReason\":\"THERMAL\"", "\"pauseReason\":\"$removed\""))
+
+            assertEquals(removed, GraphEnrichmentPauseReason.NONE, store.load()?.pauseReason)
+        }
+    }
+
+    @Test
     fun savedStateRoundTripsExactly() {
         val store = PersonalGraphEnrichmentStagingStore(tempFolder.newFile("staging.json"))
         val state = stateOf(
@@ -123,6 +135,26 @@ class PersonalGraphEnrichmentStagingStoreTest {
         assertEquals(3, requireNotNull(store.load()).skippedSentenceCount)
     }
 
+    @Test
+    fun throughMsAndChunkAttemptFieldsRoundTripAndDefaultToZero() {
+        val store = PersonalGraphEnrichmentStagingStore(tempFolder.newFile("staging_attempts.json"))
+        val state = stateOf()
+        assertEquals(0L, state.throughMs)
+        assertEquals(0, state.currentChunkAttempts)
+        assertEquals(0, state.skippedChunkCount)
+
+        store.save(state)
+        val fresh = requireNotNull(store.load())
+        assertEquals(0L, fresh.throughMs)
+        assertEquals(0, fresh.currentChunkAttempts)
+        assertEquals(0, fresh.skippedChunkCount)
+
+        store.save(state.copy(throughMs = 1_234L, currentChunkAttempts = 2, skippedChunkCount = 3))
+        val loaded = requireNotNull(store.load())
+        assertEquals(1_234L, loaded.throughMs)
+        assertEquals(2, loaded.currentChunkAttempts)
+        assertEquals(3, loaded.skippedChunkCount)
+    }
     @Test
     fun clearRemovesTheSavedCycle() {
         val store = PersonalGraphEnrichmentStagingStore(tempFolder.newFile("staging_clear.json"))

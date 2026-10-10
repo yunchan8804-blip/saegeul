@@ -562,7 +562,7 @@
                                 android:textColor="?android:attr/textColorSecondary"
                                 android:textSize="14sp"
                                 android:visibility="gone"
-                                tools:text="충전 중 화면이 꺼지면 관계 그래프를 강화해요"
+                                tools:text="새 문장이 쌓이면 관계 그래프를 강화해요"
                                 tools:visibility="visible" />
 
                             <com.google.android.material.button.MaterialButton

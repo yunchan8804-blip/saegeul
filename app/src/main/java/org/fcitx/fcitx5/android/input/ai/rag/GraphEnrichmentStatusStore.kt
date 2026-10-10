@@ -26,7 +26,7 @@ enum class GraphEnrichmentFailure {
     UNKNOWN,
     /** 검증된 Gemma 모델이 기기에 없거나 검증에 실패했다. */
     MODEL_UNAVAILABLE,
-    /** 배터리·충전·온도·메모리·키보드 사용 등 기기 조건이 맞지 않아 보강을 미뤘다. */
+    /** 배터리·온도·메모리·키보드 사용 등 기기 조건이 맞지 않아 보강을 미뤘다. */
     DEVICE_BUSY
 }
 
@@ -41,6 +41,31 @@ data class GraphEnrichmentStatus(
     val failure: GraphEnrichmentFailure = GraphEnrichmentFailure.NONE,
     /** The failing exception's simple class name, only ever set alongside [GraphEnrichmentFailure.UNKNOWN] from a genuinely unhandled exception; null otherwise. */
     val failureDetail: String? = null
+)
+
+/** Why an automatic run ended without generating anything; [NONE] means it did generate (or resumed a cycle). */
+enum class GraphEnrichmentSkipReason {
+    NONE,
+    NOT_ENOUGH_NEW_SENTENCES,
+    TOO_SOON,
+    /** 배터리·온도·메모리·키보드 같은 기기 조건이 맞지 않았다. */
+    DEVICE_CONDITION,
+    /** 다른 보강 작업이 이미 돌고 있었다. */
+    BUSY
+}
+
+/**
+ * The most recent time the worker looked at whether to generate, and why it did not. Kept apart
+ * from [GraphEnrichmentStatus] so a check that found nothing to do never touches the phase, counts
+ * or failure of the last real run.
+ */
+data class GraphEnrichmentCheck(
+    val checkedMs: Long,
+    val reason: GraphEnrichmentSkipReason,
+    /** Only meaningful for [GraphEnrichmentSkipReason.NOT_ENOUGH_NEW_SENTENCES]. */
+    val newSentences: Int = 0,
+    /** Only meaningful for [GraphEnrichmentSkipReason.DEVICE_CONDITION]: the wait reason's enum name. */
+    val detail: String? = null
 )
 
 class GraphEnrichmentStatusStore private constructor(
@@ -83,6 +108,52 @@ class GraphEnrichmentStatusStore private constructor(
             failure = failure,
             failureDetail = prefs.getString(KEY_FAILURE_DETAIL, null)
         )
+    }
+
+    /** The last recorded check, or null when none was ever recorded (or the record was cleared). */
+    fun lastCheck(): GraphEnrichmentCheck? {
+        val checkedMs = prefs.getLong(KEY_LAST_CHECK_MS, 0L)
+        if (checkedMs <= 0L) return null
+        val reason = prefs.getString(KEY_LAST_SKIP_REASON, null)
+            ?.let { stored -> GraphEnrichmentSkipReason.entries.firstOrNull { it.name == stored } }
+            ?: return null
+        return GraphEnrichmentCheck(
+            checkedMs = checkedMs,
+            reason = reason,
+            newSentences = prefs.getInt(KEY_LAST_SKIP_NEW_SENTENCES, 0),
+            detail = prefs.getString(KEY_LAST_SKIP_DETAIL, null)
+        )
+    }
+
+    /**
+     * Records that the worker just checked whether to generate. Touches only the check keys, never
+     * the phase, counts or failure of the last real run.
+     */
+    fun recordCheck(
+        nowMs: Long,
+        reason: GraphEnrichmentSkipReason,
+        newSentences: Int = 0,
+        detail: String? = null
+    ) {
+        val editor = prefs.edit()
+            .putLong(KEY_LAST_CHECK_MS, nowMs)
+            .putString(KEY_LAST_SKIP_REASON, reason.name)
+        if (reason == GraphEnrichmentSkipReason.NOT_ENOUGH_NEW_SENTENCES) {
+            editor.putInt(KEY_LAST_SKIP_NEW_SENTENCES, newSentences)
+        } else {
+            editor.remove(KEY_LAST_SKIP_NEW_SENTENCES)
+        }
+        if (detail != null) editor.putString(KEY_LAST_SKIP_DETAIL, detail) else editor.remove(KEY_LAST_SKIP_DETAIL)
+        editor.apply()
+    }
+
+    /**
+     * The engine threw while generating one chunk: keeps the exception's simple class name next to
+     * the run's status without ending the run, so a cycle that retries or skips that chunk and goes
+     * on still leaves a trace of what went wrong. Leaves the phase and failure untouched.
+     */
+    fun recordChunkError(detail: String) {
+        prefs.edit().putString(KEY_FAILURE_DETAIL, detail).apply()
     }
 
     /**
@@ -247,6 +318,10 @@ class GraphEnrichmentStatusStore private constructor(
         const val KEY_TOPICS = "topics"
         const val KEY_FAILURE = "failure"
         const val KEY_FAILURE_DETAIL = "failure_detail"
+        const val KEY_LAST_CHECK_MS = "last_check_ms"
+        const val KEY_LAST_SKIP_REASON = "last_skip_reason"
+        const val KEY_LAST_SKIP_NEW_SENTENCES = "last_skip_new_sentences"
+        const val KEY_LAST_SKIP_DETAIL = "last_skip_detail"
 
         /**
          * Failure names stored by the external AI-provider path, still recognized in records written

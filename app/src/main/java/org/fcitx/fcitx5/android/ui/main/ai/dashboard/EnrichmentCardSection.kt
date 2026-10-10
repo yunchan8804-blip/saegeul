@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentUiState
 import org.fcitx.fcitx5.android.input.ai.rag.actionLabel
 import org.fcitx.fcitx5.android.input.ai.rag.detail
 import org.fcitx.fcitx5.android.input.ai.rag.guidance
+import org.fcitx.fcitx5.android.input.ai.rag.line
 import org.fcitx.fcitx5.android.input.ai.rag.secondaryGuidance
 import org.fcitx.fcitx5.android.input.ai.rag.title
 
@@ -66,8 +67,11 @@ internal class EnrichmentCardSection(
         onAction: (GraphEnrichmentUiState.Action?) -> Unit
     ) {
         syncLevel.text = uiState.title(activity)
-        graphStats.text = uiState.detail(activity, appliedAtText = appliedAtText(uiState.lastAppliedMs))
-            ?: ""
+        val checkText = uiState.checkNote?.let { it.line(activity, activity.formatAppliedAt(it.checkedMs, CHECKED_AT)) }
+        graphStats.text = listOfNotNull(
+            uiState.detail(activity, appliedAtText = appliedAtText(uiState.lastAppliedMs)),
+            checkText?.takeIf { it.isNotEmpty() }
+        ).joinToString("\n")
         val guidanceText = uiState.guidance(activity) ?: uiState.secondaryGuidance(activity)
         if (guidanceText != null) {
             availability.visibility = View.VISIBLE
@@ -112,6 +116,11 @@ internal class EnrichmentCardSection(
             today = R.string.enrichment_applied_today,
             yesterday = R.string.enrichment_applied_yesterday,
             date = R.string.enrichment_applied_date
+        )
+        val CHECKED_AT = AppliedAtStrings(
+            today = R.string.vault_applied_at_today,
+            yesterday = R.string.vault_applied_at_yesterday,
+            date = R.string.vault_applied_at_date
         )
     }
 }

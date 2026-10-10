@@ -19,11 +19,7 @@ data class GemmaGenerationSnapshot(
      * 입력 뷰가 지금 화면에 있는지. `isKeyboardActive`(숨김 유예 포함)가 아니라 이 신호가
      * 배경 재료 생성의 중지 경계다.
      */
-    val inputViewVisible: Boolean,
-    /**
-     * 화면이 켜져 있는지(`PowerManager.isInteractive`). 자동 생성만 이 값이 false(화면 꺼짐)일 때 돈다.
-     */
-    val screenInteractive: Boolean = false
+    val inputViewVisible: Boolean
 )
 
 enum class GemmaGenerationMode(
@@ -50,28 +46,24 @@ enum class GemmaGenerationWaitReason(val message: String) {
     POWER_SAVE_MODE("절전 모드에서는 생성을 미룹니다."),
     THERMAL_LIMITED("기기 온도가 높아 생성을 미룹니다."),
     LOW_MEMORY("메모리 부족 상태라 생성을 미룹니다."),
-    KEYBOARD_ACTIVE("키보드 사용 중에는 생성하지 않습니다."),
-    SCREEN_ON("충전 중이고 화면이 꺼져 있을 때 만들어요."),
-    NOT_CHARGING("충전 중이고 화면이 꺼져 있을 때 만들어요.")
+    KEYBOARD_ACTIVE("키보드 사용 중에는 생성하지 않습니다.")
 }
 
 /**
- * 기기 조건으로 생성을 시작·계속해도 되는지 판단한다. 자동 생성([GemmaGenerationMode.AUTOMATIC])은
- * 배터리·온도·메모리·입력 뷰 조건에 더해 충전 중이고 화면이 꺼져 있을 때만 허용한다. 수동 생성
- * ([GemmaGenerationMode.MANUAL])은 충전·화면 상태를 보지 않는다.
+ * 기기 조건으로 생성을 시작·계속해도 되는지 판단한다. 자동([GemmaGenerationMode.AUTOMATIC])과
+ * 수동([GemmaGenerationMode.MANUAL]) 모두 배터리·온도·메모리·입력 뷰 조건만 본다. 충전 여부와
+ * 화면 켜짐 여부는 보지 않는다. 두 모드는 배터리 최소치만 다르다.
  */
 object GemmaGenerationEligibility {
     fun snapshot(context: Context): GemmaGenerationSnapshot {
         val resources = OnDeviceResourceSnapshot.read(context)
-        val powerManager = context.applicationContext.getSystemService(PowerManager::class.java)
         return GemmaGenerationSnapshot(
             batteryPercent = resources.batteryPercent,
             isCharging = resources.batteryCharging || resources.powerPlugged,
             powerSaveMode = resources.powerSaveMode,
             thermalStatus = resources.thermalStatus,
             lowMemory = resources.lowMemory,
-            inputViewVisible = OnDeviceGenerationControl.isInputViewVisible,
-            screenInteractive = powerManager.isInteractive
+            inputViewVisible = OnDeviceGenerationControl.isInputViewVisible
         )
     }
 
@@ -92,10 +84,6 @@ object GemmaGenerationEligibility {
         }
         snapshot.lowMemory -> GemmaGenerationWaitReason.LOW_MEMORY
         snapshot.inputViewVisible -> GemmaGenerationWaitReason.KEYBOARD_ACTIVE
-        mode == GemmaGenerationMode.AUTOMATIC && snapshot.screenInteractive -> {
-            GemmaGenerationWaitReason.SCREEN_ON
-        }
-        mode == GemmaGenerationMode.AUTOMATIC && !snapshot.isCharging -> GemmaGenerationWaitReason.NOT_CHARGING
         else -> null
     }
 

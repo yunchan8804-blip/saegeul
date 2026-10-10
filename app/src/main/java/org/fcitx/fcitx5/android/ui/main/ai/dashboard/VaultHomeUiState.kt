@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.ui.main.ai.dashboard
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
+import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentCheckNote
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentUiState
 import kotlin.math.roundToInt
 
@@ -34,7 +35,9 @@ data class LearningStatusUiState(
     val automaticChecked: Boolean = false,
     val showNotificationHint: Boolean = false,
     /** Only meaningful for [Tier.UP_TO_DATE]: 0 when nothing has ever been applied yet. */
-    val appliedAtMs: Long = 0L
+    val appliedAtMs: Long = 0L,
+    /** Only set for [Tier.UP_TO_DATE]: when the worker last looked and why it generated nothing. */
+    val checkNote: GraphEnrichmentCheckNote? = null
 ) {
     enum class Tier {
         RELEASE, ENGINE_FAILED, RUNNING, WAITING, WAITING_KEYBOARD, PAUSED,
@@ -176,7 +179,8 @@ data class LearningStatusUiState(
                         buttonAction = GraphEnrichmentUiState.Action.RETRY,
                         showAutomaticSwitch = true,
                         automaticChecked = automaticEnabled,
-                        appliedAtMs = appliedAtMs
+                        appliedAtMs = appliedAtMs,
+                        checkNote = graph.checkNote
                     )
                 }
             }

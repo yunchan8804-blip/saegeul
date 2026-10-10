@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.ai.rag
 import android.content.Context
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaGenerationWaitReason
 
 /**
  * Everything the dashboard (and the manual run's foreground notification) needs to render the
@@ -36,6 +37,8 @@ data class GraphEnrichmentUiState(
     val processedSentenceCount: Int = 0,
     /** Only set for [Kind.ERROR] from a genuinely unhandled exception: its simple class name, shown as "(code: ...)" so this state never reads as an unexplained generic failure. */
     val errorDetailArg: String? = null,
+    /** Why the last automatic run generated nothing, for the states that otherwise read as "up to date" ([Kind.SUCCEEDED], [Kind.NEVER]); null hides the line. */
+    val checkNote: GraphEnrichmentCheckNote? = null,
     val action: Action? = null
 ) {
     enum class Kind { RUNNING, WAITING, QUEUED, PAUSED, SUCCEEDED, NEVER, MODEL_UNAVAILABLE, ERROR }
@@ -54,7 +57,27 @@ data class GraphEnrichmentUiState(
             graphNodes: Int,
             graphEdges: Int,
             graphTopics: Int,
-            failureDetail: String? = null
+            failureDetail: String? = null,
+            lastCheck: GraphEnrichmentCheck? = null
+        ): GraphEnrichmentUiState {
+            val state = fromPhase(phase, failure, staging, nowMs, automaticEnabled, lastAppliedMs, graphNodes, graphEdges, graphTopics, failureDetail)
+            return when (state.kind) {
+                Kind.SUCCEEDED, Kind.NEVER -> state.copy(checkNote = GraphEnrichmentCheckNote.from(lastCheck))
+                else -> state
+            }
+        }
+
+        private fun fromPhase(
+            phase: GraphEnrichmentPhase,
+            failure: GraphEnrichmentFailure,
+            staging: PersonalGraphEnrichmentStagingStore.State?,
+            nowMs: Long,
+            automaticEnabled: Boolean,
+            lastAppliedMs: Long,
+            graphNodes: Int,
+            graphEdges: Int,
+            graphTopics: Int,
+            failureDetail: String?
         ): GraphEnrichmentUiState = when (phase) {
             GraphEnrichmentPhase.QUEUED -> GraphEnrichmentUiState(
                 kind = Kind.QUEUED,
@@ -82,7 +105,7 @@ data class GraphEnrichmentUiState(
             nowMs: Long
         ): GraphEnrichmentUiState {
             // Only a manual cycle is user-cancellable/prioritizable through this card; an automatic
-            // cycle (screen off, no one watching) is shown read-only.
+            // cycle (no one asked for it) is shown read-only.
             val cancellable = staging?.manual == true
             val incremental = staging?.isIncremental == true
             val processedSentenceCount = staging?.processedSentenceCount ?: 0
@@ -217,8 +240,6 @@ data class GraphEnrichmentUiState(
             GraphEnrichmentPauseReason.THERMAL -> R.string.enrichment_pause_reason_thermal
             GraphEnrichmentPauseReason.LOW_MEMORY -> R.string.enrichment_pause_reason_low_memory
             GraphEnrichmentPauseReason.KEYBOARD_ACTIVE -> R.string.enrichment_pause_reason_keyboard_active
-            GraphEnrichmentPauseReason.SCREEN_ON -> R.string.enrichment_pause_reason_screen_on
-            GraphEnrichmentPauseReason.NOT_CHARGING -> R.string.enrichment_pause_reason_not_charging
             GraphEnrichmentPauseReason.USER_STOPPED -> R.string.enrichment_pause_reason_user_stopped
             GraphEnrichmentPauseReason.LEASE_WAIT_TIMEOUT -> R.string.enrichment_pause_reason_lease_wait_timeout
             // Every controlled pause path records a concrete reason before returning - NONE surviving
@@ -226,6 +247,54 @@ data class GraphEnrichmentUiState(
             GraphEnrichmentPauseReason.NONE -> R.string.enrichment_pause_reason_app_terminated
         }
     }
+}
+
+/**
+ * The "마지막 확인 … · <이유>" line's content: when the worker last looked and why it generated
+ * nothing. Exactly one of [reasonRes] and [reasonText] is set - [reasonText] only for a device
+ * condition, whose wording already lives in [GemmaGenerationWaitReason.message].
+ */
+data class GraphEnrichmentCheckNote(
+    val checkedMs: Long,
+    @StringRes val reasonRes: Int? = null,
+    /** The single %d argument of [reasonRes], when it takes one. */
+    val reasonIntArg: Int? = null,
+    val reasonText: String? = null
+) {
+    companion object {
+        /** Null when there is no check on record, the last run did generate, or its reason cannot be worded. */
+        fun from(check: GraphEnrichmentCheck?): GraphEnrichmentCheckNote? {
+            if (check == null) return null
+            return when (check.reason) {
+                GraphEnrichmentSkipReason.NONE -> null
+                GraphEnrichmentSkipReason.NOT_ENOUGH_NEW_SENTENCES -> GraphEnrichmentCheckNote(
+                    check.checkedMs,
+                    reasonRes = R.string.enrichment_check_not_enough_sentences,
+                    reasonIntArg = check.newSentences
+                )
+                GraphEnrichmentSkipReason.TOO_SOON ->
+                    GraphEnrichmentCheckNote(check.checkedMs, reasonRes = R.string.enrichment_check_too_soon)
+                GraphEnrichmentSkipReason.DEVICE_CONDITION ->
+                    GemmaGenerationWaitReason.entries.firstOrNull { it.name == check.detail }
+                        ?.let { GraphEnrichmentCheckNote(check.checkedMs, reasonText = it.message) }
+                GraphEnrichmentSkipReason.BUSY ->
+                    GraphEnrichmentCheckNote(check.checkedMs, reasonRes = R.string.enrichment_check_busy)
+            }
+        }
+    }
+}
+
+/**
+ * Renders [GraphEnrichmentCheckNote] as "마지막 확인 <checkedAtText> · <이유>". [checkedAtText] is the
+ * caller-formatted time, like [detail]'s `appliedAtText`.
+ */
+fun GraphEnrichmentCheckNote.line(ctx: Context, checkedAtText: String): String {
+    val reason = when {
+        reasonText != null -> reasonText
+        reasonRes != null -> if (reasonIntArg != null) ctx.getString(reasonRes, reasonIntArg) else ctx.getString(reasonRes)
+        else -> return ""
+    }
+    return ctx.getString(R.string.enrichment_check_line, checkedAtText, reason)
 }
 
 /**

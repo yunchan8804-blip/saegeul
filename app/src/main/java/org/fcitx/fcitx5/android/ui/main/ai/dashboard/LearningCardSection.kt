@@ -12,6 +12,7 @@ import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentUiState
+import org.fcitx.fcitx5.android.input.ai.rag.line
 
 /** "새글이 배우는 중" card: one status line, its progress, a single action, and the automatic switch. */
 internal class LearningCardSection(
@@ -20,6 +21,7 @@ internal class LearningCardSection(
     onAutomaticChanged: (Boolean) -> Unit
 ) {
     private val body: TextView = activity.findViewById(R.id.tv_learning_body)
+    private val checkLine: TextView = activity.findViewById(R.id.tv_learning_check)
     private val progress: LinearProgressIndicator = activity.findViewById(R.id.progress_learning)
     private val actionButton: MaterialButton = activity.findViewById(R.id.btn_learning_action)
     private val automaticSwitch: SwitchMaterial = activity.findViewById(R.id.switch_learning_automatic)
@@ -42,6 +44,10 @@ internal class LearningCardSection(
                 activity.getString(state.bodyRes, activity.formatAppliedAt(state.appliedAtMs, APPLIED_AT_PLAIN))
             else -> activity.getString(state.bodyRes)
         }
+
+        val checkText = state.checkNote?.let { it.line(activity, activity.formatAppliedAt(it.checkedMs, APPLIED_AT_PLAIN)) }
+        checkLine.text = checkText.orEmpty()
+        checkLine.visibility = if (checkText.isNullOrEmpty()) View.GONE else View.VISIBLE
 
         progress.visibility = if (state.showProgress) View.VISIBLE else View.GONE
         if (state.showProgress) {

@@ -592,7 +592,8 @@ class TypingDnaDashboardActivity : AppCompatActivity() {
         graphNodes = enrichment.graphNodes,
         graphEdges = enrichment.graphEdges,
         graphTopics = enrichment.graphTopics,
-        failureDetail = enrichment.failureDetail
+        failureDetail = enrichment.failureDetail,
+        lastCheck = enrichment.lastCheck
     )
 
     private fun renderEnrichment(enrichment: DashboardEnrichmentSnapshot) {

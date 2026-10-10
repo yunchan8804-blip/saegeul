@@ -6,7 +6,9 @@ package org.fcitx.fcitx5.android.input.ai.rag
 
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
 import org.fcitx.fcitx5.android.input.ai.vault.AesGcmVaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
+import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -135,6 +137,123 @@ class PersonalGraphStoreTest {
         // Loaded graph still functions for proximityBoost.
         val boost = second.proximityBoost(setOf("회의"), setOf("참석"))
         assertTrue(boost > 1.0f)
+    }
+
+    @Test
+    fun advanceEnrichedThroughMovesTheCursorForwardOnlyAndSurvivesSaveLoad() {
+        val file = tempFolder.newFile("personal_graph_cursor.json")
+        val store = PersonalGraphStore(storeFile = file)
+        store.replaceGraph(
+            nodes = listOf(PersonalGraphStore.Node("회의", emptyList(), 1.0f)),
+            edges = emptyList(),
+            topics = emptyList(),
+            builtMs = 500L
+        )
+        val generation = store.generation()
+
+        assertTrue(store.advanceEnrichedThrough(300L, generation))
+        assertEquals(300L, store.stats().enrichedThroughMs)
+        assertTrue(store.advanceEnrichedThrough(100L, generation))
+        assertEquals(300L, store.stats().enrichedThroughMs)
+        store.save()
+
+        val reloaded = PersonalGraphStore(storeFile = file).stats()
+        assertEquals(300L, reloaded.enrichedThroughMs)
+        assertEquals(500L, reloaded.builtMs)
+    }
+
+    @Test
+    fun replacingTheGraphDoesNotMoveTheEnrichmentCursor() {
+        val store = PersonalGraphStore()
+        store.replaceGraph(emptyList(), emptyList(), emptyList(), builtMs = 100L)
+        store.advanceEnrichedThrough(80L, store.generation())
+
+        store.replaceGraph(emptyList(), emptyList(), emptyList(), builtMs = 900L)
+
+        assertEquals(80L, store.stats().enrichedThroughMs)
+        assertEquals(900L, store.stats().builtMs)
+    }
+
+    @Test
+    fun advanceEnrichedThroughIsDroppedWhenTheGraphWasClearedSinceTheGenerationWasRead() {
+        val store = PersonalGraphStore()
+        val staleGeneration = store.generation()
+        store.clear()
+
+        assertFalse(store.advanceEnrichedThrough(300L, staleGeneration))
+        assertEquals(0L, store.stats().enrichedThroughMs)
+    }
+
+    @Test
+    fun clearResetsTheEnrichmentCursorToZero() {
+        val store = PersonalGraphStore()
+        store.advanceEnrichedThrough(300L, store.generation())
+
+        store.clear()
+
+        assertEquals(0L, store.stats().enrichedThroughMs)
+    }
+
+    @Test
+    fun aGraphFileWithoutCursorVersionLoadsTheCursorAsZeroEvenWithThroughAndBuilt() {
+        val file = tempFolder.newFile("personal_graph_legacy_cursor.json")
+        VaultFile(file, PlainVaultCipher, VaultFile.aadFor(file.name)).writeText(
+            """{"v":1,"built":777,"through":555,"src":5,"nodes":[{"id":"회의","tags":[],"w":1.0}],"edges":[],"topics":[]}"""
+        )
+
+        val stats = PersonalGraphStore(storeFile = file).stats()
+
+        assertEquals(777L, stats.builtMs)
+        assertEquals(0L, stats.enrichedThroughMs)
+        assertEquals(1, stats.nodes)
+    }
+
+    @Test
+    fun aGraphFileWithAnOlderCursorVersionLoadsTheCursorAsZero() {
+        val file = tempFolder.newFile("personal_graph_old_cursor_version.json")
+        VaultFile(file, PlainVaultCipher, VaultFile.aadFor(file.name)).writeText(
+            """{"v":1,"cursorVersion":1,"built":777,"through":555,"src":5,"nodes":[],"edges":[],"topics":[]}"""
+        )
+
+        assertEquals(0L, PersonalGraphStore(storeFile = file).stats().enrichedThroughMs)
+    }
+
+    @Test
+    fun aCurrentCursorVersionFileLoadsItsThroughValue() {
+        val file = tempFolder.newFile("personal_graph_current_cursor.json")
+        VaultFile(file, PlainVaultCipher, VaultFile.aadFor(file.name)).writeText(
+            """{"v":1,"cursorVersion":2,"built":777,"through":555,"src":5,"nodes":[],"edges":[],"topics":[]}"""
+        )
+
+        assertEquals(555L, PersonalGraphStore(storeFile = file).stats().enrichedThroughMs)
+    }
+
+    @Test
+    fun aCurrentCursorVersionFileWithoutThroughLoadsItsBuiltTimeAsTheCursor() {
+        val file = tempFolder.newFile("personal_graph_current_cursor_no_through.json")
+        VaultFile(file, PlainVaultCipher, VaultFile.aadFor(file.name)).writeText(
+            """{"v":1,"cursorVersion":2,"built":777,"src":5,"nodes":[],"edges":[],"topics":[]}"""
+        )
+
+        assertEquals(777L, PersonalGraphStore(storeFile = file).stats().enrichedThroughMs)
+    }
+
+    @Test
+    fun aMigratedCursorStaysZeroUntilSavedAndSurvivesTheNextSaveLoadRoundTrip() {
+        val file = tempFolder.newFile("personal_graph_migrated_cursor.json")
+        VaultFile(file, PlainVaultCipher, VaultFile.aadFor(file.name)).writeText(
+            """{"v":1,"built":777,"through":555,"src":5,"nodes":[{"id":"회의","tags":[],"w":1.0}],"edges":[],"topics":[]}"""
+        )
+        val migrated = PersonalGraphStore(storeFile = file)
+        assertEquals(0L, migrated.stats().enrichedThroughMs)
+
+        migrated.advanceEnrichedThrough(400L, migrated.generation())
+        migrated.save()
+
+        val reloaded = PersonalGraphStore(storeFile = file).stats()
+        assertEquals(400L, reloaded.enrichedThroughMs)
+        assertEquals(777L, reloaded.builtMs)
+        assertEquals(1, reloaded.nodes)
     }
 
     @Test

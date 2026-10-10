@@ -5,7 +5,10 @@
 package org.fcitx.fcitx5.android.input.ai.ondevice.gemma
 
 import androidx.work.WorkInfo
+import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnrichmentCycle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -82,5 +85,32 @@ class GemmaGraphEnrichmentSchedulerTest {
             ManualGraphEnrichmentAction.ALREADY_RUNNING,
             decideManualGraphEnrichmentAction(emptyList(), workerActuallyRunning = true)
         )
+    }
+
+    private val minNew = PersonalGraphEnrichmentCycle.MIN_NEW_SENTENCES
+
+    @Test
+    fun anAutomaticRunThatUsedUpItsChunkBudgetSchedulesAFollowUp() {
+        assertTrue(shouldScheduleGraphFollowUp(manual = false, cycleFinished = false, remainingSentences = 0, automaticEnabled = true))
+    }
+
+    @Test
+    fun anAutomaticRunThatFinishedTheCycleSchedulesAFollowUpOnlyWithEnoughSentencesLeft() {
+        assertTrue(shouldScheduleGraphFollowUp(manual = false, cycleFinished = true, remainingSentences = minNew, automaticEnabled = true))
+        assertTrue(shouldScheduleGraphFollowUp(manual = false, cycleFinished = true, remainingSentences = 2_000, automaticEnabled = true))
+        assertFalse(shouldScheduleGraphFollowUp(manual = false, cycleFinished = true, remainingSentences = minNew - 1, automaticEnabled = true))
+        assertFalse(shouldScheduleGraphFollowUp(manual = false, cycleFinished = true, remainingSentences = 0, automaticEnabled = true))
+    }
+
+    @Test
+    fun aManualRunNeverSchedulesAFollowUp() {
+        assertFalse(shouldScheduleGraphFollowUp(manual = true, cycleFinished = false, remainingSentences = 500, automaticEnabled = true))
+        assertFalse(shouldScheduleGraphFollowUp(manual = true, cycleFinished = true, remainingSentences = 500, automaticEnabled = true))
+    }
+
+    @Test
+    fun noFollowUpIsScheduledWhileTheAutomaticSwitchIsOff() {
+        assertFalse(shouldScheduleGraphFollowUp(manual = false, cycleFinished = false, remainingSentences = 500, automaticEnabled = false))
+        assertFalse(shouldScheduleGraphFollowUp(manual = false, cycleFinished = true, remainingSentences = 500, automaticEnabled = false))
     }
 }

@@ -198,10 +198,9 @@ object GemmaAccumulationScheduler {
         .setRequiresBatteryNotLow(true)
         .build()
 
-    /** 자동 주기 작업은 충전 중일 때만 시작한다. 화면이 꺼져 있는지는 작업이 돌 때 [GemmaGenerationEligibility]가 확인한다. */
+    /** 자동 주기 작업은 충전·화면 상태와 상관없이 돈다. 작업이 돌 때 [GemmaGenerationEligibility]가 배터리·온도·메모리·키보드를 확인한다. */
     private fun periodicConstraints(): Constraints = Constraints.Builder()
         .setRequiresBatteryNotLow(true)
-        .setRequiresCharging(true)
         .build()
 
     private fun await(operation: Operation) {

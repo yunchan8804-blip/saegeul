@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.ai.rag
 
 import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -263,6 +264,71 @@ class GraphEnrichmentStatusStoreTest {
         assertEquals(callsBeforeRemoval, calls)
     }
 
+    @Test
+    fun lastCheckIsNullBeforeAnyRecord() {
+        assertNull(GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit).lastCheck())
+    }
+
+    @Test
+    fun recordCheckRoundTripsEachReasonWithItsExtras() {
+        val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
+
+        store.recordCheck(100L, GraphEnrichmentSkipReason.NOT_ENOUGH_NEW_SENTENCES, newSentences = 3)
+        assertEquals(
+            GraphEnrichmentCheck(100L, GraphEnrichmentSkipReason.NOT_ENOUGH_NEW_SENTENCES, newSentences = 3),
+            store.lastCheck()
+        )
+
+        store.recordCheck(200L, GraphEnrichmentSkipReason.DEVICE_CONDITION, detail = "THERMAL_LIMITED")
+        assertEquals(
+            GraphEnrichmentCheck(200L, GraphEnrichmentSkipReason.DEVICE_CONDITION, detail = "THERMAL_LIMITED"),
+            store.lastCheck()
+        )
+
+        store.recordCheck(300L, GraphEnrichmentSkipReason.TOO_SOON)
+        assertEquals(GraphEnrichmentCheck(300L, GraphEnrichmentSkipReason.TOO_SOON), store.lastCheck())
+
+        store.recordCheck(400L, GraphEnrichmentSkipReason.BUSY)
+        assertEquals(GraphEnrichmentCheck(400L, GraphEnrichmentSkipReason.BUSY), store.lastCheck())
+
+        store.recordCheck(500L, GraphEnrichmentSkipReason.NONE)
+        assertEquals(GraphEnrichmentCheck(500L, GraphEnrichmentSkipReason.NONE), store.lastCheck())
+    }
+
+    @Test
+    fun recordCheckLeavesThePhaseCountsAndFailureOfTheLastRunUntouched() {
+        val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
+        store.recordStarted(10L)
+        store.recordResult(PersonalGraphEnricher.EnrichResult(true, "ok", 2, 1, 1), 20L)
+        val before = store.snapshot()
+
+        store.recordCheck(30L, GraphEnrichmentSkipReason.TOO_SOON)
+
+        assertEquals(before, store.snapshot())
+    }
+
+    @Test
+    fun clearForgetsTheLastCheck() {
+        val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
+        store.recordCheck(100L, GraphEnrichmentSkipReason.BUSY)
+
+        store.clear()
+
+        assertNull(store.lastCheck())
+    }
+
+    @Test
+    fun recordChunkErrorKeepsTheDetailWithoutEndingTheRun() {
+        val store = GraphEnrichmentStatusStore(MemorySharedPreferences(), Unit)
+        store.recordStarted(10L)
+
+        store.recordChunkError("LiteRtLmJniException")
+
+        val snapshot = store.snapshot()
+        assertEquals(GraphEnrichmentPhase.RUNNING, snapshot.phase)
+        assertEquals(GraphEnrichmentFailure.NONE, snapshot.failure)
+        assertEquals("LiteRtLmJniException", snapshot.failureDetail)
+    }
     private class MemorySharedPreferences : SharedPreferences {
         private val values = linkedMapOf<String, Any?>()
         private val listeners = linkedSetOf<SharedPreferences.OnSharedPreferenceChangeListener>()

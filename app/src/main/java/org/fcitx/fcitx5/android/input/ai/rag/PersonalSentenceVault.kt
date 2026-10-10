@@ -39,6 +39,8 @@ class PersonalSentenceVault(
 
     data class VaultStats(val sentences: Int, val uniqueTerms: Int)
 
+    data class ExportedSentence(val text: String, val lastSeenMs: Long)
+
     private data class Doc(
         val id: String,
         val text: String,
@@ -225,18 +227,25 @@ class PersonalSentenceVault(
 
     /**
      * Exports up to [limit] stored sentences (already PII-scrubbed) last seen strictly after
-     * [sinceMs], most-recent first - the incremental counterpart to [exportForEnrichment] for graph
-     * enrichment cycles that already have a graph to add to, so only what accumulated since it was
-     * last built gets processed instead of re-scanning the whole vault. Read-only.
+     * [sinceMs], oldest first - the cursor-based export graph enrichment cycles use, so only what
+     * accumulated since the enrichment cursor gets processed instead of re-scanning the whole vault. Oldest first lets the
+     * caller move the cursor to the newest exported [ExportedSentence.lastSeenMs] without skipping
+     * anything older that did not fit under [limit]. When [limit] cuts through sentences that share
+     * one `lastSeenMs`, that whole group is left for the next export so the cursor stays exact.
+     * Read-only.
      */
     @Synchronized
-    fun exportSince(sinceMs: Long, limit: Int): List<String> {
-        if (docs.isEmpty()) return emptyList()
-        return docs.values
+    fun exportSince(sinceMs: Long, limit: Int): List<ExportedSentence> {
+        if (docs.isEmpty() || limit <= 0) return emptyList()
+        val newer = docs.values
             .filter { it.lastSeenMs > sinceMs }
-            .sortedByDescending { it.lastSeenMs }
-            .take(limit)
-            .map { it.text }
+            .sortedBy { it.lastSeenMs }
+        var end = minOf(limit, newer.size)
+        if (end < newer.size && newer[end].lastSeenMs == newer[end - 1].lastSeenMs) {
+            val groupStart = newer.indexOfFirst { it.lastSeenMs == newer[end - 1].lastSeenMs }
+            if (groupStart > 0) end = groupStart
+        }
+        return newer.subList(0, end).map { ExportedSentence(it.text, it.lastSeenMs) }
     }
 
     /** Every stored sentence text (already PII-scrubbed), in no particular order. Read-only. */

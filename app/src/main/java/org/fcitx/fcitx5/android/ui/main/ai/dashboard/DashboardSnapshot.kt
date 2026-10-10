@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentPhase
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentFailure
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentRunner
+import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentCheck
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatusStore
 import org.fcitx.fcitx5.android.input.ai.rag.GraphEnrichmentStatus
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphEnrichmentStagingStore
@@ -60,7 +61,9 @@ internal data class DashboardEnrichmentSnapshot(
     val graphEdges: Int,
     val graphTopics: Int,
     /** The in-flight cycle's checkpoint, non-null while one exists regardless of [phase] (RUNNING mid-cycle, or INTERRUPTED/paused with progress to resume). */
-    val staging: PersonalGraphEnrichmentStagingStore.State?
+    val staging: PersonalGraphEnrichmentStagingStore.State?,
+    /** What the worker last decided about generating and why it did not, or null when nothing was recorded. */
+    val lastCheck: GraphEnrichmentCheck? = null
 )
 
 /** Reads the language-vault dashboard state away from the UI thread. */
@@ -171,7 +174,8 @@ internal class DashboardSnapshotReader(context: Context) {
             graphNodes = graphStats.nodes,
             graphEdges = graphStats.edges,
             graphTopics = graphStats.topics,
-            staging = staging
+            staging = staging,
+            lastCheck = enrichmentStatusStore.lastCheck()
         )
     }
 
