@@ -281,11 +281,12 @@ object OnDeviceSuggestionPolicy {
         if (unresolvedLabel.matches(normalized)) return reject("LABEL_ONLY")
 
         val split = splitSentences(input.textBeforeCursor)
-        val echo = removeEchoedContext(input.textBeforeCursor, split.current, normalized)
+        val withoutPrevRewording = removeRewordedPrevious(split.prev, normalized) ?: return reject("REPEATS_PREV")
+        val echo = removeEchoedContext(input.textBeforeCursor, split.current, withoutPrevRewording)
         val withoutEcho = echo.text ?: return reject("ECHO_ONLY")
-        if (!echo.found && restatesTypedSentence(split.current, normalized)) {
+        if (!echo.found && restatesTypedSentence(split.current, withoutPrevRewording)) {
             return if (allowReplacement && input.mode == Mode.SENTENCE) {
-                parseReplacement(input, split, normalized)
+                parseReplacement(input, split, withoutPrevRewording)
             } else {
                 Parsed(null, RESTATES_TYPED, restatesTyped = true)
             }
@@ -322,6 +323,19 @@ object OnDeviceSuggestionPolicy {
         }
     }
 
+    /**
+     * 모델이 앞 내용의 마지막 문장을 말투만 바꿔 맨 앞에 다시 쓰면, 그 문장은 이어 쓸 글이 아니다. 정확히 같지 않아
+     * [repeatsPrevious]에는 걸리지 않으므로 여기서 첫 문장을 떼고 남은 부분으로 이어서 판정한다. 떼고 남은 것이
+     * 없으면 null이다. 앞 내용이 없거나 첫 문장이 앞 문장을 되풀이한 것이 아니면 [reply]를 그대로 돌려준다.
+     */
+    private fun removeRewordedPrevious(prev: String, reply: String): String? {
+        val previousSentence = SentenceBoundary.splitSentences(prev).lastOrNull() ?: return reply
+        val start = reply.trimStart()
+        val firstEnd = SentenceBoundary.boundaryEnds(start).firstOrNull() ?: start.length
+        if (!TypoRestatement.isRewordingOf(previousSentence, start.substring(0, firstEnd))) return reply
+        return start.substring(firstEnd).trimStart().takeIf { it.isNotEmpty() }
+    }
+
     private fun restatesTypedSentence(typed: String, reply: String): Boolean =
         typed.isNotBlank() && typed.none(Char::isISOControl) && TypoRestatement.isRestatement(typed, reply.trim())
 
@@ -334,10 +348,24 @@ object OnDeviceSuggestionPolicy {
         if (sentence.any(disallowedReplyCharacters::contains)) return fail("DISALLOWED_CHAR")
         if (hasForeignScript(sentence, input.textBeforeCursor)) return fail("FOREIGN_SCRIPT")
         if (repeatsPrevious(sentence, split.completed)) return fail("REPEATS_PREV")
+        if (stutters(split.current, sentence)) return fail("STUTTER")
         if (hasReplyMarker(sentence)) return fail("REPLY_MARKER")
         if (!endsSentence(sentence)) return fail("NOT_SINGLE_SENTENCE")
         if (isTooShortSentence("", sentence)) return fail("TOO_SHORT")
         return Parsed(sentence, null, restatesTyped = true, replaces = split.current)
+    }
+
+    /**
+     * 대체 문장이 쓰는 중인 문장의 첫 어절 앞부분을 먼저 한 번 더 말하고 시작하는지 본다(`오랜만에`를 쓰는 중인데
+     * `오 오랜만에 …`로 온 경우). 첫 어절이 쓰는 중인 첫 어절보다 짧은 앞부분이고, 바로 다음 어절이 그 조각으로
+     * 다시 시작하면 말더듬이다. `몇시에시작해여`를 `몇 시에 시작해요`로 띄어 쓴 것은 다음 어절이 `시`로 시작하므로 아니다.
+     */
+    private fun stutters(typed: String, replacement: String): Boolean {
+        val typedHead = typed.trim().split(whitespaceRun).first()
+        val words = replacement.trim().split(whitespaceRun)
+        val head = words.first()
+        return words.size > 1 && head.length < typedHead.length && typedHead.startsWith(head) &&
+            words[1].startsWith(head)
     }
 
     /**

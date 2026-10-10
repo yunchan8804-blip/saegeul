@@ -20,6 +20,7 @@ internal object TypoRestatement {
     const val MAX_NORMALIZED_DISTANCE = 0.25
     const val LENGTH_WINDOW = 3
     const val MIN_TYPED_SYLLABLES = 2
+    const val MAX_PREVIOUS_DISTANCE = 0.3
 
     fun isRestatement(typed: String, reply: String): Boolean {
         val typedLetters = typed.filterNot(Char::isWhitespace)
@@ -34,6 +35,18 @@ internal object TypoRestatement {
         return (shortest..longest).any { length ->
             editDistance(typedJamo, HangulSyllable.decomposeToJamo(replyLetters.substring(0, length))) <= allowedDistance
         }
+    }
+
+    /**
+     * [sentence]가 앞 내용의 문장 [previous]를 말투나 낱말만 바꿔 되풀이한 것인지 본다. 공백을 지우고 자모 단위
+     * 편집거리를 구해, [previous] 자모 수의 [MAX_PREVIOUS_DISTANCE] 이하면 되풀이다.
+     */
+    fun isRewordingOf(previous: String, sentence: String): Boolean {
+        val previousLetters = previous.filterNot(Char::isWhitespace)
+        if (previousLetters.count(HangulSyllable::isSyllable) < MIN_TYPED_SYLLABLES) return false
+        val previousJamo = HangulSyllable.decomposeToJamo(previousLetters)
+        val sentenceJamo = HangulSyllable.decomposeToJamo(sentence.filterNot(Char::isWhitespace))
+        return editDistance(previousJamo, sentenceJamo) <= previousJamo.length * MAX_PREVIOUS_DISTANCE
     }
 
     private fun editDistance(a: String, b: String): Int {

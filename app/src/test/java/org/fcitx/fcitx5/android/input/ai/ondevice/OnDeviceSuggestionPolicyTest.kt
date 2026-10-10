@@ -876,6 +876,68 @@ class OnDeviceSuggestionPolicyTest {
         assertEquals("GATE_SPACING", stored.sentenceRejection)
     }
 
+    @Test
+    fun `a reply that first rewords the previous sentence loses that sentence and continues with the rest`() {
+        val request = input(text = "감기 걸려서 오늘 출근 못 할 것 같아요. 병원 들렀다가")
+        val reply = "감기 걸려서 오늘 출근을 못 할 것 같습니다. 병원 들렀다가 푹 쉬고 내일은 꼭 출근하겠습니다."
+
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(request, reply)
+
+        assertEquals(" 푹 쉬고 내일은 꼭 출근하겠습니다.", stored.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, stored.mode)
+        assertNull(stored.replaces)
+        assertEquals(" 푹 쉬고 내일은 꼭 출근하겠습니다.", OnDeviceSuggestionPolicy.parseSuffix(request, reply))
+    }
+
+    @Test
+    fun `a reply that only rewords the previous sentence is rejected as repeating it`() {
+        val request = input(text = "감기 걸려서 오늘 출근 못 할 것 같아요. 병원 들렀다가")
+
+        assertEquals(
+            "REPEATS_PREV",
+            OnDeviceSuggestionPolicy.rejectionReason(request, "감기 걸려서 오늘 출근을 못 할 것 같습니다.")
+        )
+        assertNull(OnDeviceSuggestionPolicy.parseForStorage(request, "감기 걸려서 오늘 출근을 못 할 것 같습니다.").suffix)
+    }
+
+    @Test
+    fun `a first sentence unlike the previous sentence is kept`() {
+        val request = input(text = "감기 걸려서 오늘 출근 못 할 것 같아요. 병원 들렀다가")
+
+        assertEquals(
+            " 푹 쉬고 내일은 꼭 출근하겠습니다.",
+            OnDeviceSuggestionPolicy.parseSuffix(request, "병원 들렀다가 푹 쉬고 내일은 꼭 출근하겠습니다.")
+        )
+    }
+
+    @Test
+    fun `without previous text nothing is stripped from the reply start`() {
+        assertEquals(
+            " 이어서 씁니다.",
+            OnDeviceSuggestionPolicy.parseSuffix(input(text = "회의 자료를"), "회의 자료를 이어서 씁니다.")
+        )
+    }
+
+    @Test
+    fun `a replacement that starts with a stutter of the typed first eojeol is rejected`() {
+        val request = input(text = "오늘 저녁에 시간 돼? 오랜만에 ")
+
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(request, "오 오랜만에 만나서 못 본 사람들을 만나고 싶다.")
+
+        assertNull(stored.suffix)
+        assertNull(stored.replaces)
+        assertEquals("STUTTER", stored.sentenceRejection)
+        assertEquals("RESTATES_TYPED", stored.wordRejection)
+    }
+
+    @Test
+    fun `a replacement that only respaces the typed first eojeol is not a stutter`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "몇시에시작해여"), "몇 시에 시작해요?")
+
+        assertEquals("몇 시에 시작해요?", stored.suffix)
+        assertEquals("몇시에시작해여", stored.replaces)
+    }
+
     private fun input(
         text: String,
         packageName: String = "com.example.app",
