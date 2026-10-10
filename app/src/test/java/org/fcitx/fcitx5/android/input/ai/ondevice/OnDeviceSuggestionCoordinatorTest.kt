@@ -564,7 +564,7 @@ class OnDeviceSuggestionCoordinatorTest {
 
     @Test
     fun `typo restatement becomes a replacement chip showing the whole sentence`() = runBlocking {
-        val fixture = Fixture(coroutineContext)
+        val fixture = Fixture(coroutineContext, typoEvidenceOf("안녕하세여" to "안녕하세요"))
         val snapshot = fixture.snapshot(revision = 1L, text = "안녕하세여")
 
         fixture.coordinator.setEnabled(true)
@@ -581,8 +581,22 @@ class OnDeviceSuggestionCoordinatorTest {
     }
 
     @Test
-    fun `replacement chip is dropped as soon as the typed text changes`() = runBlocking {
+    fun `rewritten sentence without typo evidence publishes no chip`() = runBlocking {
         val fixture = Fixture(coroutineContext)
+
+        fixture.coordinator.setEnabled(true)
+        fixture.observe(fixture.snapshot(revision = 1L, text = "회의록 정리해서 공유드릴게"))
+        fixture.backend.awaitRequest(0).complete("회의록을 정리해서 공유드리겠습니다.")
+        OnDeviceSuggestionCoordinatorTest.awaitCondition {
+            fixture.coordinator.status.state == OnDeviceSuggestionCoordinator.State.NO_CANDIDATE
+        }
+
+        assertTrue(fixture.coordinator.candidates.isEmpty())
+    }
+
+    @Test
+    fun `replacement chip is dropped as soon as the typed text changes`() = runBlocking {
+        val fixture = Fixture(coroutineContext, typoEvidenceOf("안녕하세여" to "안녕하세요"))
 
         fixture.coordinator.setEnabled(true)
         fixture.observe(fixture.snapshot(revision = 1L, text = "안녕하세여"))
@@ -610,7 +624,7 @@ class OnDeviceSuggestionCoordinatorTest {
         assertNull(chip.replaces)
     }
 
-    private class Fixture(context: CoroutineContext) {
+    private class Fixture(context: CoroutineContext, typoEvidence: TypoEvidence = NO_TYPO_EVIDENCE) {
         var nowMs = 0L
         val owner = SupervisorJob()
         val backend = DeferredBackend()
@@ -619,6 +633,7 @@ class OnDeviceSuggestionCoordinatorTest {
             scope = CoroutineScope(context.minusKey(kotlinx.coroutines.Job) + owner),
             session = OnDeviceSuggestionSession(),
             backend = backend,
+            typoEvidence = typoEvidence,
             clockMs = { nowMs },
             isCurrent = { snapshot -> current.lastOrNull() == snapshot },
             onChanged = {}

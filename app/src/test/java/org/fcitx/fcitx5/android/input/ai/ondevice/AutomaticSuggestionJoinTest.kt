@@ -55,7 +55,7 @@ class AutomaticSuggestionJoinTest {
             imeAction = 0,
             mode = OnDeviceSuggestionPolicy.Mode.SENTENCE
         )
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(input, "배송 조회를 해 보니, 현재는 배송이…")
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input, "배송 조회를 해 보니, 현재는 배송이…", NO_TYPO_EVIDENCE)
 
         assertEquals(", 현재는 배송이…", stored.suffix)
         assertEquals(

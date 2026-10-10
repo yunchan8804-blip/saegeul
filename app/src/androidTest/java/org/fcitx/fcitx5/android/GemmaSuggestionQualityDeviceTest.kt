@@ -15,9 +15,11 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.input.ai.ondevice.AutomaticSuggestionJoin
+import org.fcitx.fcitx5.android.input.ai.ondevice.KeyboardTypoJudge
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionEngine
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
+import org.fcitx.fcitx5.android.input.ai.ondevice.TypoEvidence
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaAccumulationScheduler
 import org.json.JSONArray
 import org.json.JSONObject
@@ -39,6 +41,16 @@ class GemmaSuggestionQualityDeviceTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val arguments = InstrumentationRegistry.getArguments()
+
+    private val typoEvidence: TypoEvidence by lazy {
+        val application = FcitxApplication.getInstance()
+        val judge = KeyboardTypoJudge(
+            typoCorrector = { application.typoCorrector },
+            baseVocabulary = { application.baseKoreanVocabulary },
+            personalUnigramCount = application.personalNgramModel::unigramCount
+        )
+        TypoEvidence(judge::correctionFor, judge::isWordPrefix)
+    }
 
     @Before
     fun pauseAccumulationForInstrumentation() {
@@ -185,7 +197,7 @@ class GemmaSuggestionQualityDeviceTest {
             prompt = builtPrompt
             val result = withTimeout(GENERATION_BUDGET_MS) { engine.suggest(builtPrompt) }
             val suffix = OnDeviceSuggestionPolicy.parseSuffix(input, result.text)
-            val stored = OnDeviceSuggestionPolicy.parseForStorage(input, result.text)
+            val stored = OnDeviceSuggestionPolicy.parseForStorage(input, result.text, typoEvidence)
             return sample
                 .put("promptChars", builtPrompt.length)
                 .put("prompt", builtPrompt)

@@ -97,10 +97,15 @@ class AutomaticSuggestionController(
             text: String,
             restore: EditorSelection
         ) -> Boolean,
-        val predictSelection: (position: Int) -> Unit
+        val predictSelection: (position: Int) -> Unit,
+        /** 어절이 오타일 때의 교정어. 기본 어휘·개인 단어에 있거나 교정어가 없으면 null이다. 대체 후보는 이 증거가 있는 어절에서만 만든다. */
+        val typoCorrectionFor: (token: String) -> String?,
+        /** 어절이 어떤 사전 단어의 앞부분인지. 아직 치는 중인 마지막 어절을 오타로 보지 않는 데 쓴다. */
+        val isWordPrefix: (token: String) -> Boolean
     )
 
     private val prefs = AppPrefs.getInstance()
+    private val typoEvidence = TypoEvidence(host.typoCorrectionFor, host.isWordPrefix)
 
     private var automaticSuggestionInvalidationListener: (() -> Unit)? = null
     private var activeAutomaticSuggestionExtractedTextToken: Int? = null
@@ -368,6 +373,15 @@ class AutomaticSuggestionController(
         return coordinator.candidates
     }
 
+    /**
+     * 지금 쓰는 어절(끝이 공백이면 방금 끝낸 어절)이 오타라는 증거가 있는지. 자동 추천 단어 칩보다 ✏️ 교정 후보를
+     * 앞에 둘지 정하는 데 쓴다. 자동 추천 스냅샷이 없으면 거짓이다.
+     */
+    fun typingWordHasTypoEvidence(): Boolean {
+        val text = latestAutomaticSuggestionSnapshot?.session?.textBeforeCursor ?: return false
+        return typoEvidence.correctionForTypingWord(text) != null
+    }
+
     fun commitAutomaticSuggestionCandidate(
         candidate: OnDeviceSuggestionCoordinator.Candidate
     ): AiSuggestionApplyResult {
@@ -398,6 +412,7 @@ class AutomaticSuggestionController(
             scope = host.lifecycleScope(),
             session = session,
             backend = runtime,
+            typoEvidence = typoEvidence,
             clockMs = SystemClock::elapsedRealtime,
             isCurrent = { sessionSnapshot ->
                 latestAutomaticSuggestionSnapshot?.let { snapshot ->

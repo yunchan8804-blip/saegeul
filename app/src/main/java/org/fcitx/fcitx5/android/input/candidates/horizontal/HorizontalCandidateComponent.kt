@@ -889,7 +889,9 @@ class HorizontalCandidateComponent :
         val automatic: AutomaticCandidates,
         val displayNative: List<CandidateWord>,
         val contextualWords: List<CandidateWord>,
-        val contextualSentences: List<CandidateWord>
+        val contextualSentences: List<CandidateWord>,
+        /** The word being typed has typo evidence, so ✏️ corrections go ahead of the automatic word chips. */
+        val typoCorrectionFirst: Boolean
     ) {
         val hasSentences: Boolean
             get() = automatic.sentences.isNotEmpty() || contextualSentences.isNotEmpty()
@@ -897,17 +899,23 @@ class HorizontalCandidateComponent :
         /** Word row of the two-row bar and of the landscape single row. */
         fun wordRow(addressField: Boolean): Array<CandidateWord> = HorizontalCandidateMerger.prependAutomatic(
             automatic.words,
-            HorizontalCandidateMerger.merge(displayNative, contextualWords, emptyList(), addressField)
+            HorizontalCandidateMerger.merge(displayNative, contextualWords, emptyList(), addressField),
+            typoCorrectionFirst
         )
 
         /** Sentence row of the two-row bar; its first item is the landscape single row's sentence chip. */
         fun sentenceRow(): Array<CandidateWord> =
-            HorizontalCandidateMerger.prependAutomatic(automatic.sentences, contextualSentences.toTypedArray())
+            HorizontalCandidateMerger.prependAutomatic(
+                automatic.sentences,
+                contextualSentences.toTypedArray(),
+                typoCorrectionFirst = false
+            )
 
         /** The one-row bar shows words and sentences together. */
         fun oneRow(addressField: Boolean): Array<CandidateWord> = HorizontalCandidateMerger.prependAutomatic(
             automatic.words + automatic.sentences,
-            HorizontalCandidateMerger.merge(displayNative, contextualWords, contextualSentences, addressField)
+            HorizontalCandidateMerger.merge(displayNative, contextualWords, contextualSentences, addressField),
+            typoCorrectionFirst
         )
     }
 
@@ -961,7 +969,14 @@ class HorizontalCandidateComponent :
             }
             .map { it.word }
         rememberContextualCommitSnapshots(contextualSnapshot.words + contextualSnapshot.sentences, automaticTexts)
-        return CandidateSources(automaticCandidates, displayNativeCandidates, contextualWords, contextualSentences)
+        val typoCorrectionFirst = automaticCandidates.words.isNotEmpty() && service.typingWordHasTypoEvidence()
+        return CandidateSources(
+            automaticCandidates,
+            displayNativeCandidates,
+            contextualWords,
+            contextualSentences,
+            typoCorrectionFirst
+        )
     }
 
     /**

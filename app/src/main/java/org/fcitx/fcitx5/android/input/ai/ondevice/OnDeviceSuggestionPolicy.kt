@@ -185,10 +185,10 @@ object OnDeviceSuggestionPolicy {
         character.isWhitespace() || character in trailingMarks || character.category in punctuationCategories
 
     /** 쓰는 중인 문장 뒤에 이어 붙일 접미부. 오타를 고쳐 다시 쓴 응답은 접미부가 아니므로 null이다([parseForStorage] 참고). */
-    fun parseSuffix(input: Input, raw: String): String? = parse(input, raw, allowReplacement = false).suffix
+    fun parseSuffix(input: Input, raw: String): String? = parse(input, raw).suffix
 
     /** Returns a short reason code when [raw] is rejected, or null when it yields a suffix. Never contains text. */
-    fun rejectionReason(input: Input, raw: String): String? = parse(input, raw, allowReplacement = false).reason
+    fun rejectionReason(input: Input, raw: String): String? = parse(input, raw).reason
 
     /**
      * 저장할 접미부와 그 종류. [mode]가 [Mode.WORD]면 문장으로는 못 써서 첫 어절만 남긴 것이다.
@@ -206,11 +206,11 @@ object OnDeviceSuggestionPolicy {
     /**
      * 자동 추천이 응답을 저장하기 전에 하는 판정 하나. 문장으로 파싱해 [SuggestionQualityGate]를 통과하면 문장으로
      * 저장하고, 아니면 단어로 파싱해 같은 게이트를 통과할 때만 단어로 저장한다. [Input.mode]는 쓰지 않는다.
-     * 응답이 쓰는 중인 문장을 오타만 고쳐 다시 쓴 것이면 문장 대체([StoredParse.replaces])로만 저장하고,
-     * 실패해도 단어로 바꿔 이어 붙이지 않는다.
+     * 응답이 쓰는 중인 문장을 다시 쓴 것이면, [typoEvidence]가 오타라고 한 어절만 응답에서 받아 온 문장 대체
+     * ([StoredParse.replaces])로만 저장한다. 오타 증거가 없거나 실패해도 단어로 바꿔 이어 붙이지 않는다.
      */
-    fun parseForStorage(input: Input, raw: String): StoredParse {
-        val sentence = parse(input.withMode(Mode.SENTENCE), raw, allowReplacement = true)
+    fun parseForStorage(input: Input, raw: String, typoEvidence: TypoEvidence): StoredParse {
+        val sentence = parse(input.withMode(Mode.SENTENCE), raw, typoEvidence)
         if (sentence.restatesTyped) {
             val replacementRejection = sentence.reason ?: gateRejection(
                 sentence.suffix,
@@ -270,7 +270,8 @@ object OnDeviceSuggestionPolicy {
 
     private class EchoRemoval(val found: Boolean, val text: String?)
 
-    private fun parse(input: Input, raw: String, allowReplacement: Boolean = false): Parsed {
+    /** [typoEvidence]가 있어야 쓰는 중인 문장을 다시 쓴 응답을 대체 문장으로 받아들인다. 없으면 거부한다. */
+    private fun parse(input: Input, raw: String, typoEvidence: TypoEvidence? = null): Parsed {
         if (!isValidInput(input)) return reject("INVALID_INPUT")
         if (raw.length > MAX_RAW_RESPONSE_CHARS) return reject("RAW_TOO_LONG")
         val line = firstNonBlankLine(raw)
@@ -285,8 +286,8 @@ object OnDeviceSuggestionPolicy {
         val echo = removeEchoedContext(input.textBeforeCursor, split.current, withoutPrevRewording)
         val withoutEcho = echo.text ?: return reject("ECHO_ONLY")
         if (!echo.found && restatesTypedSentence(split.current, withoutPrevRewording)) {
-            return if (allowReplacement && input.mode == Mode.SENTENCE) {
-                parseReplacement(input, split, withoutPrevRewording)
+            return if (typoEvidence != null && input.mode == Mode.SENTENCE) {
+                parseReplacement(input, split, withoutPrevRewording, typoEvidence)
             } else {
                 Parsed(null, RESTATES_TYPED, restatesTyped = true)
             }
@@ -339,17 +340,23 @@ object OnDeviceSuggestionPolicy {
     private fun restatesTypedSentence(typed: String, reply: String): Boolean =
         typed.isNotBlank() && typed.none(Char::isISOControl) && TypoRestatement.isRestatement(typed, reply.trim())
 
-    /** 응답 전체를 쓰는 중인 문장의 대체 문장으로 본다. 첫 문장 자르기와 거부 기준은 이어 붙이는 문장과 같다. */
-    private fun parseReplacement(input: Input, split: SentenceSplit, normalized: String): Parsed {
+    /**
+     * 응답의 첫 문장에서 [TypoEvidence]가 오타라고 한 어절만 받아 쓰는 중인 문장의 대체 문장을 만든다([TypoReplacement]).
+     * 응답의 거부 기준은 이어 붙이는 문장과 같고, 문장 끝과 길이는 만든 대체 문장으로 본다. 오타 증거가 없거나
+     * 바뀐 것이 없으면 [RESTATES_TYPED]로 거부한다.
+     */
+    private fun parseReplacement(input: Input, split: SentenceSplit, normalized: String, typoEvidence: TypoEvidence): Parsed {
         fun fail(reason: String) = Parsed(null, reason, restatesTyped = true)
-        val sentence = truncateAfterFirstSentence(stripWrapPairs(normalized).trim()).trim()
-        if (sentence.isBlank()) return fail("BLANK")
+        val reply = truncateAfterFirstSentence(stripWrapPairs(normalized).trim()).trim()
+        if (reply.isBlank()) return fail("BLANK")
+        if (reply.length > MAX_SUFFIX_CHARS) return fail("SUFFIX_TOO_LONG")
+        if (reply.any(disallowedReplyCharacters::contains)) return fail("DISALLOWED_CHAR")
+        if (hasForeignScript(reply, input.textBeforeCursor)) return fail("FOREIGN_SCRIPT")
+        if (repeatsPrevious(reply, split.completed)) return fail("REPEATS_PREV")
+        if (stutters(split.current, reply)) return fail("STUTTER")
+        if (hasReplyMarker(reply)) return fail("REPLY_MARKER")
+        val sentence = TypoReplacement.compose(split.current, reply, typoEvidence) ?: return fail(RESTATES_TYPED)
         if (sentence.length > MAX_SUFFIX_CHARS) return fail("SUFFIX_TOO_LONG")
-        if (sentence.any(disallowedReplyCharacters::contains)) return fail("DISALLOWED_CHAR")
-        if (hasForeignScript(sentence, input.textBeforeCursor)) return fail("FOREIGN_SCRIPT")
-        if (repeatsPrevious(sentence, split.completed)) return fail("REPEATS_PREV")
-        if (stutters(split.current, sentence)) return fail("STUTTER")
-        if (hasReplyMarker(sentence)) return fail("REPLY_MARKER")
         if (!endsSentence(sentence)) return fail("NOT_SINGLE_SENTENCE")
         if (isTooShortSentence("", sentence)) return fail("TOO_SHORT")
         return Parsed(sentence, null, restatesTyped = true, replaces = split.current)

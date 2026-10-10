@@ -589,12 +589,12 @@ class OnDeviceSuggestionPolicyTest {
     fun `a violation in the typed text does not reject a sound suffix but one in the suffix does`() {
         val typed = input(text = "공부하했어요. 내일 회의 자료는 ")
 
-        val sound = OnDeviceSuggestionPolicy.parseForStorage(typed, "내일 회의 자료는 오후에 공유드릴게요.")
+        val sound = OnDeviceSuggestionPolicy.parseForStorage(typed, "내일 회의 자료는 오후에 공유드릴게요.", NO_TYPO_EVIDENCE)
         assertEquals("오후에 공유드릴게요.", sound.suffix)
         assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, sound.mode)
         assertNull(sound.sentenceRejection)
 
-        val broken = OnDeviceSuggestionPolicy.parseForStorage(typed, "내일 회의 자료는 오후에 준비하했어요.")
+        val broken = OnDeviceSuggestionPolicy.parseForStorage(typed, "내일 회의 자료는 오후에 준비하했어요.", NO_TYPO_EVIDENCE)
         assertEquals("GATE_UNGRAMMATICAL", broken.sentenceRejection)
         assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, broken.mode)
     }
@@ -728,7 +728,7 @@ class OnDeviceSuggestionPolicyTest {
 
     @Test
     fun `parseForStorage stores a sentence that passes the quality gate`() {
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 회의는"), " 오전에 시작합니다.")
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 회의는"), " 오전에 시작합니다.", NO_TYPO_EVIDENCE)
 
         assertEquals(" 오전에 시작합니다.", stored.suffix)
         assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, stored.mode)
@@ -738,17 +738,17 @@ class OnDeviceSuggestionPolicyTest {
 
     @Test
     fun `parseForStorage records a word when the sentence cannot be used`() {
-        val notSentence = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일"), " 오전에 시작하고,")
+        val notSentence = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일"), " 오전에 시작하고,", NO_TYPO_EVIDENCE)
         assertEquals(" 오전에", notSentence.suffix)
         assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, notSentence.mode)
         assertEquals("NOT_SINGLE_SENTENCE", notSentence.sentenceRejection)
 
-        val tooShort = OnDeviceSuggestionPolicy.parseForStorage(input(text = "알겠습니다. "), "네~")
+        val tooShort = OnDeviceSuggestionPolicy.parseForStorage(input(text = "알겠습니다. "), "네~", NO_TYPO_EVIDENCE)
         assertEquals("네~", tooShort.suffix)
         assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, tooShort.mode)
         assertEquals("TOO_SHORT", tooShort.sentenceRejection)
 
-        val gate = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의는"), " 오늘 할수있어요.")
+        val gate = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의는"), " 오늘 할수있어요.", NO_TYPO_EVIDENCE)
         assertEquals(" 오늘", gate.suffix)
         assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, gate.mode)
         assertEquals("GATE_SPACING", gate.sentenceRejection)
@@ -756,7 +756,7 @@ class OnDeviceSuggestionPolicyTest {
 
     @Test
     fun `parseForStorage stores nothing when the gate rejects both forms`() {
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을"), " 할수있어요.")
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을"), " 할수있어요.", NO_TYPO_EVIDENCE)
 
         assertNull(stored.suffix)
         assertNull(stored.mode)
@@ -768,7 +768,8 @@ class OnDeviceSuggestionPolicyTest {
     fun `parseForStorage stores a short casual sentence after a context that contains a celebration verb`() {
         val stored = OnDeviceSuggestionPolicy.parseForStorage(
             input(text = "생일 축하해! 올 한 해도 "),
-            "올 한 해도 잘 보내!"
+            "올 한 해도 잘 보내!",
+            NO_TYPO_EVIDENCE
         )
 
         assertEquals("잘 보내!", stored.suffix)
@@ -779,21 +780,21 @@ class OnDeviceSuggestionPolicyTest {
 
     @Test
     fun `parseForStorage does not keep a one syllable head of a rejected sentence as a word`() {
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을 "), "잘 할수있어요.")
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을 "), "잘 할수있어요.", NO_TYPO_EVIDENCE)
 
         assertNull(stored.suffix)
         assertNull(stored.mode)
         assertEquals("GATE_SPACING", stored.sentenceRejection)
         assertEquals("WORD_TOO_SHORT", stored.wordRejection)
 
-        val spaced = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을"), " 꼭 할수있어요.")
+        val spaced = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을"), " 꼭 할수있어요.", NO_TYPO_EVIDENCE)
         assertNull(spaced.suffix)
         assertEquals("WORD_TOO_SHORT", spaced.wordRejection)
     }
 
     @Test
     fun `parseForStorage keeps a one syllable ending that attaches to the typed word`() {
-        val particle = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의 자료"), "를 할수있어요.")
+        val particle = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의 자료"), "를 할수있어요.", NO_TYPO_EVIDENCE)
 
         assertEquals("를", particle.suffix)
         assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, particle.mode)
@@ -804,13 +805,18 @@ class OnDeviceSuggestionPolicyTest {
     fun `a typo restatement is stored as a replacement of the typed sentence`() {
         val garbled = OnDeviceSuggestionPolicy.parseForStorage(
             input(text = "오늘 회으ㅣ 몇시에"),
-            "오늘 회의 몇 시에 시작해요?"
+            "오늘 회의 몇 시에 시작해요?",
+            typoEvidenceOf("회으ㅣ" to "회의", "몇시에" to "몇시에")
         )
         assertEquals("오늘 회의 몇 시에 시작해요?", garbled.suffix)
         assertEquals("오늘 회으ㅣ 몇시에", garbled.replaces)
         assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, garbled.mode)
 
-        val ending = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세여"), "안녕하세요.")
+        val ending = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "안녕하세여"),
+            "안녕하세요.",
+            typoEvidenceOf("안녕하세여" to "안녕하세요")
+        )
         assertEquals("안녕하세요.", ending.suffix)
         assertEquals("안녕하세여", ending.replaces)
     }
@@ -819,11 +825,83 @@ class OnDeviceSuggestionPolicyTest {
     fun `a replacement keeps only the first sentence and the whole typed sentence including its trailing space`() {
         val stored = OnDeviceSuggestionPolicy.parseForStorage(
             input(text = "지난번 애기하신 자료 "),
-            "지난번 얘기하신 자료 보내드릴게요. 감사합니다."
+            "지난번 얘기하신 자료 보내드릴게요. 감사합니다.",
+            typoEvidenceOf("애기하신" to "얘기하신")
         )
 
         assertEquals("지난번 얘기하신 자료 보내드릴게요.", stored.suffix)
         assertEquals("지난번 애기하신 자료 ", stored.replaces)
+    }
+
+    @Test
+    fun `a rewritten sentence without typo evidence yields no replacement`() {
+        val request = input(text = "회의록 정리해서 공유드릴게")
+
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(
+            request,
+            "회의록을 정리해서 공유드리겠습니다.",
+            NO_TYPO_EVIDENCE
+        )
+
+        assertNull(stored.suffix)
+        assertNull(stored.replaces)
+        assertNull(stored.mode)
+        assertEquals("RESTATES_TYPED", stored.sentenceRejection)
+        assertEquals("RESTATES_TYPED", stored.wordRejection)
+    }
+
+    @Test
+    fun `only the typo word is taken from the rewritten sentence and a particle added to a correct word is dropped`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "오늘 날씨 좋네여"),
+            "오늘 날씨가 좋네요.",
+            typoEvidenceOf("좋네여" to "좋네요")
+        )
+
+        assertEquals("오늘 날씨 좋네요.", stored.suffix)
+        assertEquals("오늘 날씨 좋네여", stored.replaces)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, stored.mode)
+    }
+
+    @Test
+    fun `a one word typo is replaced by the rewritten word`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "안녕하세여"),
+            "안녕하세요",
+            typoEvidenceOf("안녕하세여" to "안녕하세요")
+        )
+
+        assertEquals("안녕하세요", stored.suffix)
+        assertEquals("안녕하세여", stored.replaces)
+    }
+
+    @Test
+    fun `the respacing of a typo word and a rewritten ending follow the evidence`() {
+        val typed = input(text = "내일 몇시에 만나여")
+        val reply = "내일 몇 시에 만날까요?"
+
+        val both = OnDeviceSuggestionPolicy.parseForStorage(
+            typed,
+            reply,
+            typoEvidenceOf("몇시에" to "몇시에", "만나여" to "만나요")
+        )
+        assertEquals("내일 몇 시에 만날까요?", both.suffix)
+
+        val endingOnly = OnDeviceSuggestionPolicy.parseForStorage(typed, reply, typoEvidenceOf("만나여" to "만나요"))
+        assertEquals("내일 몇시에 만날까요?", endingOnly.suffix)
+        assertEquals("내일 몇시에 만나여", endingOnly.replaces)
+    }
+
+    @Test
+    fun `a rewrite that leaves the evidence word as typed is not a replacement`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "오늘 날씨 좋네여"),
+            "오늘 날씨가 좋네여.",
+            typoEvidenceOf("좋네여" to "좋네요")
+        )
+
+        assertNull(stored.suffix)
+        assertEquals("RESTATES_TYPED", stored.wordRejection)
     }
 
     @Test
@@ -838,39 +916,43 @@ class OnDeviceSuggestionPolicyTest {
 
     @Test
     fun `an unrelated sentence is still appended and an exact echo still strips the typed part`() {
-        val unrelated = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세여"), "내일 회의 일정을 공유할게요.")
+        val unrelated = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세여"), "내일 회의 일정을 공유할게요.", NO_TYPO_EVIDENCE)
         assertEquals("내일 회의 일정을 공유할게요.", unrelated.suffix)
         assertNull(unrelated.replaces)
 
-        val echoed = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의 자료를"), "회의 자료를 공유합니다.")
+        val echoed = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의 자료를"), "회의 자료를 공유합니다.", NO_TYPO_EVIDENCE)
         assertEquals(" 공유합니다.", echoed.suffix)
         assertNull(echoed.replaces)
     }
 
     @Test
     fun `a restatement that fails the sentence checks is rejected without a word fallback`() {
-        val tooShort = OnDeviceSuggestionPolicy.parseForStorage(input(text = "네에"), "네요.")
+        val tooShort = OnDeviceSuggestionPolicy.parseForStorage(input(text = "네에"), "네요.", typoEvidenceOf("네에" to "네요"))
         assertNull(tooShort.suffix)
         assertEquals("TOO_SHORT", tooShort.sentenceRejection)
         assertEquals("RESTATES_TYPED", tooShort.wordRejection)
 
-        val noEnd = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세여"), "안녕하세요,")
+        val noEnd = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세여"), "안녕하세요,", typoEvidenceOf("안녕하세여" to "안녕하세요"))
         assertNull(noEnd.suffix)
         assertEquals("NOT_SINGLE_SENTENCE", noEnd.sentenceRejection)
     }
 
     @Test
     fun `no replacement is considered for the next sentence or a single syllable`() {
-        val next = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세요. "), "안녕하세요 반갑습니다.")
+        val next = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하세요. "), "안녕하세요 반갑습니다.", NO_TYPO_EVIDENCE)
         assertNull(next.replaces)
 
-        val single = OnDeviceSuggestionPolicy.parseForStorage(input(text = "네"), "네 알겠습니다.")
+        val single = OnDeviceSuggestionPolicy.parseForStorage(input(text = "네"), "네 알겠습니다.", NO_TYPO_EVIDENCE)
         assertNull(single.replaces)
     }
 
     @Test
     fun `a replacement that fails the quality gate is not stored`() {
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "이거 할수잇어요"), "이거 할수있어요.")
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "이거 할수잇어요"),
+            "이거 할수있어요.",
+            typoEvidenceOf("할수잇어요" to "할수있어요")
+        )
 
         assertNull(stored.suffix)
         assertEquals("GATE_SPACING", stored.sentenceRejection)
@@ -881,7 +963,7 @@ class OnDeviceSuggestionPolicyTest {
         val request = input(text = "감기 걸려서 오늘 출근 못 할 것 같아요. 병원 들렀다가")
         val reply = "감기 걸려서 오늘 출근을 못 할 것 같습니다. 병원 들렀다가 푹 쉬고 내일은 꼭 출근하겠습니다."
 
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(request, reply)
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(request, reply, NO_TYPO_EVIDENCE)
 
         assertEquals(" 푹 쉬고 내일은 꼭 출근하겠습니다.", stored.suffix)
         assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, stored.mode)
@@ -897,7 +979,7 @@ class OnDeviceSuggestionPolicyTest {
             "REPEATS_PREV",
             OnDeviceSuggestionPolicy.rejectionReason(request, "감기 걸려서 오늘 출근을 못 할 것 같습니다.")
         )
-        assertNull(OnDeviceSuggestionPolicy.parseForStorage(request, "감기 걸려서 오늘 출근을 못 할 것 같습니다.").suffix)
+        assertNull(OnDeviceSuggestionPolicy.parseForStorage(request, "감기 걸려서 오늘 출근을 못 할 것 같습니다.", NO_TYPO_EVIDENCE).suffix)
     }
 
     @Test
@@ -922,7 +1004,7 @@ class OnDeviceSuggestionPolicyTest {
     fun `a replacement that starts with a stutter of the typed first eojeol is rejected`() {
         val request = input(text = "오늘 저녁에 시간 돼? 오랜만에 ")
 
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(request, "오 오랜만에 만나서 못 본 사람들을 만나고 싶다.")
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(request, "오 오랜만에 만나서 못 본 사람들을 만나고 싶다.", NO_TYPO_EVIDENCE)
 
         assertNull(stored.suffix)
         assertNull(stored.replaces)
@@ -932,7 +1014,11 @@ class OnDeviceSuggestionPolicyTest {
 
     @Test
     fun `a replacement that only respaces the typed first eojeol is not a stutter`() {
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "몇시에시작해여"), "몇 시에 시작해요?")
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "몇시에시작해여"),
+            "몇 시에 시작해요?",
+            typoEvidenceOf("몇시에시작해여" to "몇시에시작해요")
+        )
 
         assertEquals("몇 시에 시작해요?", stored.suffix)
         assertEquals("몇시에시작해여", stored.replaces)

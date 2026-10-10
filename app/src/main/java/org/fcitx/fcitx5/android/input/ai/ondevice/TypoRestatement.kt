@@ -49,6 +49,18 @@ internal object TypoRestatement {
         return editDistance(previousJamo, sentenceJamo) <= previousJamo.length * MAX_PREVIOUS_DISTANCE
     }
 
+    /**
+     * 두 어절의 글자·숫자만 남기고 자모로 풀어 편집거리를 더 긴 쪽 자모 수로 나눈 값(0이면 같고 1이면 완전히 다르다).
+     * 한쪽만 비면 1이고, 둘 다 비면 0이다.
+     */
+    fun normalizedDistance(a: String, b: String): Double {
+        val first = HangulSyllable.decomposeToJamo(a.filter(Char::isLetterOrDigit))
+        val second = HangulSyllable.decomposeToJamo(b.filter(Char::isLetterOrDigit))
+        val longest = maxOf(first.length, second.length)
+        if (longest == 0) return 0.0
+        return editDistance(first, second).toDouble() / longest
+    }
+
     private fun editDistance(a: String, b: String): Int {
         var previous = IntArray(b.length + 1) { it }
         var current = IntArray(b.length + 1)

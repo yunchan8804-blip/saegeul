@@ -24,6 +24,7 @@ class OnDeviceSuggestionCoordinator(
     private val scope: CoroutineScope,
     private val session: OnDeviceSuggestionSession,
     private val backend: Backend,
+    private val typoEvidence: TypoEvidence,
     private val clockMs: () -> Long,
     private val isCurrent: (OnDeviceSuggestionSession.Snapshot) -> Boolean,
     private val onChanged: () -> Unit
@@ -270,7 +271,7 @@ class OnDeviceSuggestionCoordinator(
         input: OnDeviceSuggestionPolicy.Input,
         raw: String
     ): OnDeviceSuggestionPolicy.StoredParse {
-        val stored = OnDeviceSuggestionPolicy.parseForStorage(input, raw)
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input, raw, typoEvidence)
         if (stored.suffix == null) {
             Timber.i(
                 "Automatic suggestion rejected sentence=%s word=%s",

@@ -105,6 +105,7 @@ import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.fcitx.fcitx5.android.input.ai.ondevice.AiRuntimeStatusStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.AutomaticSuggestionController
 import org.fcitx.fcitx5.android.input.ai.ondevice.ExtractedTextTokens
+import org.fcitx.fcitx5.android.input.ai.ondevice.KeyboardTypoJudge
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceContextCompletionController
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAutomaticSuggestionRuntime
@@ -284,6 +285,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
     )
 
+    private val keyboardTypoJudge = KeyboardTypoJudge(
+        typoCorrector = { personalLearning.typoCorrector },
+        baseVocabulary = { personalLearning.baseKoreanVocabulary },
+        personalUnigramCount = { word -> personalLearning.personalNgramModel.unigramCount(word) }
+    )
+
     private val automaticSuggestion: AutomaticSuggestionController = AutomaticSuggestionController(
         tokens = extractedTextTokens,
         host = AutomaticSuggestionController.Host(
@@ -315,7 +322,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             finishCompositionForDirectAction = ::finishCompositionForDirectAction,
             replaceAiRange = ::replaceAiRange,
             commitAiTextAtCursor = ::commitAiTextAtCursor,
-            predictSelection = { position -> selection.predict(position) }
+            predictSelection = { position -> selection.predict(position) },
+            typoCorrectionFor = keyboardTypoJudge::correctionFor,
+            isWordPrefix = keyboardTypoJudge::isWordPrefix
         )
     )
 
@@ -1445,6 +1454,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     fun getAutomaticSuggestionCandidates(): List<OnDeviceSuggestionCoordinator.Candidate> =
         automaticSuggestion.getAutomaticSuggestionCandidates()
+
+    fun typingWordHasTypoEvidence(): Boolean = automaticSuggestion.typingWordHasTypoEvidence()
 
     fun commitAutomaticSuggestionCandidate(
         candidate: OnDeviceSuggestionCoordinator.Candidate
