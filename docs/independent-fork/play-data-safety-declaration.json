@@ -189,6 +189,7 @@
     "Diagnostics other than the Google Mobile Ads SDK performance information classified above",
     "Personal language vault (learned style, recorded sentences, relationship graph) processed only by the on-device Gemma model",
     "On-device AI prompts and generated suggestions",
+    "Per-key touch offset averages used for typo correction (key averages and counts only, kept encrypted on the device; raw touch positions are not stored)",
     "Encrypted vault backup files, created only when the user exports them to a location they choose"
   ],
   "submissionRules": [
