@@ -582,7 +582,7 @@ class OnDeviceSuggestionPolicyTest {
         assertTrue(value.contains("recentSentences=<redacted:2>"))
     }
 
-    private val COMPLETE_INSTRUCTION = "쓰는 중인 문장을 앞 내용에 맞게 완성한 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
+    private val COMPLETE_INSTRUCTION = "쓰는 중인 문장을 오타는 고쳐 앞 내용에 맞게 완성한 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
     private val NEXT_INSTRUCTION = "앞 내용에 자연스럽게 이어질 다음 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
 
     @Test
