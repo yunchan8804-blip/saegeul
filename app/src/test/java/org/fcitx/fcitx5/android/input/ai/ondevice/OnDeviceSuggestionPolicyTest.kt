@@ -1024,6 +1024,69 @@ class OnDeviceSuggestionPolicyTest {
         assertEquals("몇시에시작해여", stored.replaces)
     }
 
+    @Test
+    fun `a reply that restarts the typed sentence from its first eojeol is never appended`() {
+        val request = input(text = "내일 몇시에 만나여")
+        val reply = "내일 몇 시 몇 분대에 만나여?"
+
+        val withEvidence = OnDeviceSuggestionPolicy.parseForStorage(
+            request,
+            reply,
+            typoEvidenceOf("몇시에" to "몇시에", "만나여" to "만나요")
+        )
+        assertTrue(withEvidence.suffix == null || withEvidence.replaces != null)
+        withEvidence.suffix?.let { assertEquals(1, Regex("내일").findAll(it).count()) }
+
+        val withoutEvidence = OnDeviceSuggestionPolicy.parseForStorage(request, reply, NO_TYPO_EVIDENCE)
+        assertNull(withoutEvidence.suffix)
+        assertNull(withoutEvidence.replaces)
+        assertEquals("RESTATES_TYPED", withoutEvidence.sentenceRejection)
+        assertEquals("RESTATES_TYPED", withoutEvidence.wordRejection)
+        assertEquals("RESTATES_TYPED", OnDeviceSuggestionPolicy.rejectionReason(request, reply))
+    }
+
+    @Test
+    fun `a reply that restarts the typed sentence with an added particle is never appended`() {
+        val request = input(text = "오늘 날씨 좋네여")
+        val reply = "오늘은 날씨가 좋네요."
+
+        assertNull(OnDeviceSuggestionPolicy.parseSuffix(request, reply))
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(request, reply, NO_TYPO_EVIDENCE)
+        assertNull(stored.suffix)
+        assertEquals("RESTATES_TYPED", stored.sentenceRejection)
+    }
+
+    @Test
+    fun `a continuation that does not restart the typed first eojeol is still appended`() {
+        val trailingSpace = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의록 정리해서 "), "공유드릴게요.", NO_TYPO_EVIDENCE)
+        assertEquals("공유드릴게요.", trailingSpace.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, trailingSpace.mode)
+        assertNull(trailingSpace.replaces)
+
+        val echoedHead = OnDeviceSuggestionPolicy.parseForStorage(input(text = "안녕하"), "안녕하세요.", NO_TYPO_EVIDENCE)
+        assertEquals("세요.", echoedHead.suffix)
+        assertNull(echoedHead.replaces)
+    }
+
+    @Test
+    fun `a reply that only shares the typed first eojeol and then continues is still appended`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의 끝나면 "), "회의록 보내드릴게요.", NO_TYPO_EVIDENCE)
+
+        assertEquals("회의록 보내드릴게요.", stored.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, stored.mode)
+        assertNull(stored.replaces)
+    }
+
+    @Test
+    fun `a one syllable typed first eojeol does not make a reply a restart`() {
+        val request = input(text = "나 오늘 ")
+
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(request, "나도 갈게.", NO_TYPO_EVIDENCE)
+
+        assertEquals("나도 갈게.", stored.suffix)
+        assertNull(stored.replaces)
+    }
+
     private fun input(
         text: String,
         packageName: String = "com.example.app",

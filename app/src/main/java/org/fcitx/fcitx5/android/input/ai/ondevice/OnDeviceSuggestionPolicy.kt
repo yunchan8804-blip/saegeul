@@ -206,7 +206,7 @@ object OnDeviceSuggestionPolicy {
     /**
      * 자동 추천이 응답을 저장하기 전에 하는 판정 하나. 문장으로 파싱해 [SuggestionQualityGate]를 통과하면 문장으로
      * 저장하고, 아니면 단어로 파싱해 같은 게이트를 통과할 때만 단어로 저장한다. [Input.mode]는 쓰지 않는다.
-     * 응답이 쓰는 중인 문장을 다시 쓴 것이면, [typoEvidence]가 오타라고 한 어절만 응답에서 받아 온 문장 대체
+     * 응답이 쓰는 중인 문장을 다시 쓴 것이거나 처음부터 다시 시작한 것이면, [typoEvidence]가 오타라고 한 어절만 응답에서 받아 온 문장 대체
      * ([StoredParse.replaces])로만 저장한다. 오타 증거가 없거나 실패해도 단어로 바꿔 이어 붙이지 않는다.
      */
     fun parseForStorage(input: Input, raw: String, typoEvidence: TypoEvidence): StoredParse {
@@ -285,7 +285,9 @@ object OnDeviceSuggestionPolicy {
         val withoutPrevRewording = removeRewordedPrevious(split.prev, normalized) ?: return reject("REPEATS_PREV")
         val echo = removeEchoedContext(input.textBeforeCursor, split.current, withoutPrevRewording)
         val withoutEcho = echo.text ?: return reject("ECHO_ONLY")
-        if (!echo.found && restatesTypedSentence(split.current, withoutPrevRewording)) {
+        if (!echo.found && (restatesTypedSentence(split.current, withoutPrevRewording) ||
+                restartsTypedSentence(split.current, withoutPrevRewording))
+        ) {
             return if (typoEvidence != null && input.mode == Mode.SENTENCE) {
                 parseReplacement(input, split, withoutPrevRewording, typoEvidence)
             } else {
@@ -339,6 +341,36 @@ object OnDeviceSuggestionPolicy {
 
     private fun restatesTypedSentence(typed: String, reply: String): Boolean =
         typed.isNotBlank() && typed.none(Char::isISOControl) && TypoRestatement.isRestatement(typed, reply.trim())
+
+    /**
+     * 쓰는 중인 문장의 첫 어절로 응답이 다시 시작하고, 쓰는 중인 문장 글자(공백 제외)의 [RESTART_COVERAGE_PERCENT]퍼센트
+     * 이상을 순서대로 다시 담으면 이어 쓸 글이 아니라 문장을 처음부터 다시 쓴 것이다
+     * (`내일 몇시에 만나여` → `내일 몇 시 몇 분대에 만나여?`). 첫 어절만 같고 뒷내용이 새로우면
+     * (`회의 끝나면 ` → `회의록 보내드릴게요.`) 이어 쓰기다.
+     */
+    private fun restartsTypedSentence(typed: String, reply: String): Boolean {
+        if (typed.isBlank() || typed.any(Char::isISOControl)) return false
+        val typedHead = typed.trim().split(whitespaceRun).first()
+        val replyHead = reply.trim().split(whitespaceRun).first()
+        if (typedHead.length < 2 || !replyHead.startsWith(typedHead)) return false
+        val typedLetters = typed.filterNot(Char::isWhitespace)
+        val replyLetters = reply.filterNot(Char::isWhitespace)
+        return longestCommonSubsequence(typedLetters, replyLetters) * 100 >= typedLetters.length * RESTART_COVERAGE_PERCENT
+    }
+
+    private fun longestCommonSubsequence(a: String, b: String): Int {
+        var previous = IntArray(b.length + 1)
+        var current = IntArray(b.length + 1)
+        for (x in a) {
+            for (j in b.indices) {
+                current[j + 1] = if (x == b[j]) previous[j] + 1 else maxOf(previous[j + 1], current[j])
+            }
+            val swap = previous
+            previous = current
+            current = swap
+        }
+        return previous[b.length]
+    }
 
     /**
      * 응답의 첫 문장에서 [TypoEvidence]가 오타라고 한 어절만 받아 쓰는 중인 문장의 대체 문장을 만든다([TypoReplacement]).
@@ -667,6 +699,7 @@ object OnDeviceSuggestionPolicy {
     private const val MIN_REPEATED_PREV_CHARS = 4
     private const val MIN_REPEATED_PREV_RUN = 5
     private const val REPEATED_PREV_RUN_PERCENT = 60
+    private const val RESTART_COVERAGE_PERCENT = 60
     private const val MAX_CURRENT_CHARS = 60
     private const val MIN_CUT_PREV_TAIL_CHARS = 10
 
