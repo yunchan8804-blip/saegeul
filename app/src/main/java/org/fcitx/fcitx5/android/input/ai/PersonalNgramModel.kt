@@ -61,7 +61,7 @@ class PersonalNgramModel(
         private const val LAMBDA_1 = 0.1f
 
         /**
-         * 개인 n-gram에서 관찰된 감쇠 카운트를 [org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector]
+         * 개인 n-gram에서 관찰된 감쇠 카운트를 [org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector]
          * 트라이에 넣을 prior 가중치로 변환한다. 개인 어휘가 항상 기본 어휘(0..1 범위)보다
          * 우선하도록 1.0f 이상에서 시작해 로그 스케일로 증가하고 3.0f에서 상한선을 둔다.
          */

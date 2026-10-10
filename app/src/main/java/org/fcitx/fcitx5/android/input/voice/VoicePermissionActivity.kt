@@ -15,6 +15,7 @@ import android.os.Bundle
 import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
 import java.util.concurrent.atomic.AtomicLong
+import org.fcitx.fcitx5.android.utils.finishWithoutTransition
 
 /** Process-memory callback bridge for the IME service, which cannot request runtime permissions. */
 object VoicePermissionCoordinator {
@@ -156,7 +157,7 @@ class VoicePermissionActivity : Activity() {
             data?.data?.takeIf { resultCode == RESULT_OK }
         )
         completed = true
-        finishBoundary()
+        finishWithoutTransition()
     }
 
     private fun beginMicrophoneFlow() {
@@ -197,7 +198,7 @@ class VoicePermissionActivity : Activity() {
                 onDeclined = {
                     VoiceAudioDocumentCoordinator.deliver(requestId, null)
                     completed = true
-                    finishBoundary()
+                    finishWithoutTransition()
                 },
                 onAccepted = ::continueAudioDocumentFlow
             )
@@ -239,12 +240,7 @@ class VoicePermissionActivity : Activity() {
         if (completed) return
         completed = true
         VoicePermissionCoordinator.deliver(requestId, granted)
-        finishBoundary()
-    }
-
-    private fun finishBoundary() {
-        finish()
-        overridePendingTransition(0, 0)
+        finishWithoutTransition()
     }
 
     companion object {

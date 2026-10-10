@@ -24,8 +24,8 @@ import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.InputFeatureBlock
-import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
-import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
+import org.fcitx.fcitx5.android.input.policy.AiFeatureEntryGate
+import org.fcitx.fcitx5.android.input.policy.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme

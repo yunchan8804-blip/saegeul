@@ -394,8 +394,8 @@ class GemmaVaultUiDeviceTest {
                     automatic != null && automatic.isEnabled && automatic.isClickable &&
                     status?.text?.isNotBlank() == true &&
                     count?.text?.isNotBlank() == true &&
-                    generate?.isEnabled == true && generate?.isClickable == true &&
-                    model?.isEnabled == true && model?.isClickable == true &&
+                    generate?.isEnabled == true && generate.isClickable &&
+                    model?.isEnabled == true && model.isClickable &&
                     root.findViewById<View>(R.id.gemma_vault_stop) != null
             }
         }

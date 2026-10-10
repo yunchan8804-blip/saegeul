@@ -10,7 +10,7 @@ import com.googlecode.tesseract.android.TessBaseAPI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 import kotlin.coroutines.coroutineContext
 
 interface KoreanOcrEngine {

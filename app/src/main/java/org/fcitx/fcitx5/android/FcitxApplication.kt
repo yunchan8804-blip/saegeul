@@ -46,9 +46,9 @@ import org.fcitx.fcitx5.android.data.points.LevelRewardStore
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.VaultHabitStore
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
-import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
-import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.ui.main.LogActivity
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.BackgroundProgressNotifier

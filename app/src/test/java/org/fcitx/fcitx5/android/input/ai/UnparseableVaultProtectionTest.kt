@@ -36,7 +36,7 @@ class UnparseableVaultProtectionTest {
     }
 
     private fun preserved(base: File) =
-        base.parentFile.listFiles { _, name -> name.startsWith("${base.name}.unreadable-") }.orEmpty().toList()
+        base.parentFile!!.listFiles { _, name -> name.startsWith("${base.name}.unreadable-") }.orEmpty().toList()
 
     @Test
     fun personalizedSentenceStoreLoadsAllRecordsOrNoneAndKeepsTheFile() {

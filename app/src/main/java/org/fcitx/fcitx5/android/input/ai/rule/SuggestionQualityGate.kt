@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.rule
 
 import org.fcitx.fcitx5.android.input.ai.KoreanTypoCorrectionEngine
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 /**
  * 정본 최종 추천 품질 게이트: [org.fcitx.fcitx5.android.input.ai.AiContextualPredictor]와

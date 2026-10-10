@@ -426,8 +426,7 @@ class GemmaManualBackgroundDeviceTest {
                     "수동 강화가 정상 종료되었지만 최소 $MINIMUM_SEQUENCE_DELTA 회에 도달하지 못했습니다: " +
                         "sequenceDelta=$sequenceDelta, countDelta=${count - beforeCount}, " +
                         "status=${state.status}, unproductive=${state.consecutiveUnproductive}, " +
-                        "thermal=${eligibility.thermalStatus}, battery=${eligibility.batteryPercent}, " +
-                        "errorPresent=${state.error != null}"
+                        "thermal=${eligibility.thermalStatus}, battery=${eligibility.batteryPercent}"
                 )
             }
             if (SystemClock.elapsedRealtime() >= nextDiagnosticAt) {

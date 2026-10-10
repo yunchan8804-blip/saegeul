@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.input.ai.hangul
+package org.fcitx.fcitx5.android.input.hangul
 
 /**
  * 유니코드 한글 음절(U+AC00..U+D7A3)과 호환 자모(U+3131..U+318E)의 범위·자모 테이블·분해·받침 판정.

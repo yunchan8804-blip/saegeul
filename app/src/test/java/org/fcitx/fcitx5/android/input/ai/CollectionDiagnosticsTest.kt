@@ -99,7 +99,7 @@ class CollectionDiagnosticsTest {
             values[key] as? String ?: defValue
 
         override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
-            (values[key] as? Set<String>)?.toMutableSet() ?: defValues
+            (values[key] as? Set<*>)?.filterIsInstance<String>()?.toMutableSet() ?: defValues
 
         override fun getInt(key: String?, defValue: Int): Int = values[key] as? Int ?: defValue
 

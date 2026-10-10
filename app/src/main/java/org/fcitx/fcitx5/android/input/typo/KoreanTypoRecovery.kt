@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.typo
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
-import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 enum class TypoRecoveryDirection {
     EnglishToHangul,

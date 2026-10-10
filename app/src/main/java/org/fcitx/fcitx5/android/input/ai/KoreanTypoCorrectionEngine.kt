@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
-import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.typo.DubeolsikKeyMap
 import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import kotlin.math.min
 

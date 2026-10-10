@@ -85,6 +85,8 @@ internal class CredentialInputDialog private constructor(
     private fun show() {
         dialog.setOnShowListener {
             // Keep the save button reachable while the soft keyboard is up.
+            // WindowInsets 방식으로 바꾸면 대화상자 배치가 달라질 수 있어 기존 resize를 유지한다.
+            @Suppress("DEPRECATION")
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { onSave(this) }
         }

@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.phonology
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 /**
  * Phonological Korean Josa (Particle) Bitmask Engine.

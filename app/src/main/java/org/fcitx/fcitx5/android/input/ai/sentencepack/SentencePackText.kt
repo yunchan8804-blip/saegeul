@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.sentencepack
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 internal object SentencePackText {
     private val whitespace = Regex("\\s+")

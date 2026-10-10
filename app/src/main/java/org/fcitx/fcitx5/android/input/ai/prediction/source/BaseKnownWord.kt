@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.prediction.source
 
-import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
 
 /**
  * Whether [word], less the punctuation around it, is an ordinary word the base vocabulary knows

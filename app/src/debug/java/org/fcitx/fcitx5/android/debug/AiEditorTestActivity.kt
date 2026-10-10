@@ -49,6 +49,8 @@ class AiEditorTestActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // WindowInsets 방식으로 바꾸면 테스트 호스트 배치가 달라질 수 있어 기존 resize를 유지한다.
+        @Suppress("DEPRECATION")
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(createContent())

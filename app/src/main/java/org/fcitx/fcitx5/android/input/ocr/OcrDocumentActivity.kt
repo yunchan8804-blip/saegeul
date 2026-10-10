@@ -10,6 +10,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import java.util.concurrent.atomic.AtomicLong
+import org.fcitx.fcitx5.android.utils.finishWithoutTransition
 
 /** Process-memory-only bridge for a user-confirmed, one-shot image document selection. */
 object OcrDocumentCoordinator {
@@ -85,12 +86,7 @@ class OcrDocumentActivity : Activity() {
             requestId,
             data?.data?.takeIf { resultCode == RESULT_OK }
         )
-        finishBoundary()
-    }
-
-    private fun finishBoundary() {
-        finish()
-        overridePendingTransition(0, 0)
+        finishWithoutTransition()
     }
 
     companion object {

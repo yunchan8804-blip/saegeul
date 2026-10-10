@@ -12,7 +12,7 @@ import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaInstantSync
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaProfile
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaRepository
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.vault.ImmediateReadRetryRule
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.SwitchableVaultCipher
@@ -42,7 +42,7 @@ class UnreadableVaultProtectionTest {
     private fun file(name: String) = File(tempFolder.root, name)
 
     private fun unreadable(base: File) =
-        base.parentFile.listFiles { _, name -> name.startsWith("${base.name}.unreadable-") }.orEmpty().toList()
+        base.parentFile!!.listFiles { _, name -> name.startsWith("${base.name}.unreadable-") }.orEmpty().toList()
 
     private fun persona(category: String = "messenger") = PersonaDna(
         category = category,

@@ -38,9 +38,9 @@ import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
-import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
-import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import timber.log.Timber

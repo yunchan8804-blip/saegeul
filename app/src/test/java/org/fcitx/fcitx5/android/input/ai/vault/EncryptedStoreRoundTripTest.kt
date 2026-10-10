@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.input.ai.KoreanTone
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceRecord
 import org.fcitx.fcitx5.android.input.ai.PersonalizedSentenceStore
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule

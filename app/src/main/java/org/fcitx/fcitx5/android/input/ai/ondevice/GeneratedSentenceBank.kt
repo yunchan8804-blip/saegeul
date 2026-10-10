@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.ai.ondevice
 
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSpacingLint
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
 import org.fcitx.fcitx5.android.input.ai.sentencepack.MatchEvidence

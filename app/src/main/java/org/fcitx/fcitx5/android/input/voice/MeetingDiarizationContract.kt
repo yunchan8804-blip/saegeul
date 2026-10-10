@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.voice
 
 import android.content.Context
 import org.fcitx.fcitx5.android.input.EditorResumeQueue
-import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
+import org.fcitx.fcitx5.android.input.policy.AiFeatureEntryGate
 import java.util.Locale
 
 data class MeetingSpeakerSegment(

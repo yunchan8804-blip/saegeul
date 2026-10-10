@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.personaldictionary
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.text.Normalizer

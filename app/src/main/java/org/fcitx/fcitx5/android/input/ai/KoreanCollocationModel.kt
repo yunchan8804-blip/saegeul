@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 /**
  * High-speed On-Device Korean Collocation & Next-Word Transition Model.

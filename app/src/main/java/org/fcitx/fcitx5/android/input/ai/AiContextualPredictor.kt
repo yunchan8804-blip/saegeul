@@ -25,9 +25,9 @@ import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.rule.SuggestionQualityGate
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
-import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
-import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
 
 data class AiPrediction(
     val text: String,

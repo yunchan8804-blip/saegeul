@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.input.ai.typo
+package org.fcitx.fcitx5.android.input.typo
 
 /**
  * 사용자가 백스페이스로 방금 입력한 어절을 지우고 다시 쓰는 흐름을 추적한다.

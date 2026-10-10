@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 /**
  * Tokenizes committed Korean sentences into learnable words for [PersonalNgramModel],

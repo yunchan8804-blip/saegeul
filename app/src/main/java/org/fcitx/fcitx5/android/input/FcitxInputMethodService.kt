@@ -2717,6 +2717,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        // API 35 이상은 이 단계들을 더 보내지 않지만 minSdk 23까지는 시스템이 계속 보내므로 상수를 그대로 쓴다.
+        @Suppress("DEPRECATION")
         val pressure = level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
             level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
             level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE

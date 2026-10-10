@@ -7,11 +7,11 @@ package org.fcitx.fcitx5.android.input.ai
 import org.fcitx.fcitx5.android.input.ai.prediction.source.KeyboardTypoCorrectionSource
 import org.fcitx.fcitx5.android.input.ai.prediction.source.PredictionInput
 import org.fcitx.fcitx5.android.input.ai.rule.SuggestionQualityGate
-import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
-import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
-import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
-import org.fcitx.fcitx5.android.input.ai.typo.SingleEditTypoProbe
+import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.DubeolsikKeyMap
+import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.SingleEditTypoProbe
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test

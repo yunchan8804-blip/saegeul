@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DynamicPhraseProfileSto
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.SensitivePhraseVault
 import org.fcitx.fcitx5.android.data.quickphrase.dynamic.DEFAULT_UNLOCK_TTL_MILLIS
 import java.util.concurrent.atomic.AtomicLong
+import org.fcitx.fcitx5.android.utils.finishWithoutTransition
 
 /** Keeps the CryptoObject and decrypted vault in process memory for one editor-bound round trip. */
 internal object SensitivePhraseAuthCoordinator {
@@ -102,7 +103,7 @@ class SensitivePhraseAuthActivity : Activity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val expiry = Runnable {
         cancelPendingAuthentication()
-        finishBoundary()
+        finishWithoutTransition()
     }
     private var completed = false
     private var authenticationStarted = false
@@ -156,7 +157,7 @@ class SensitivePhraseAuthActivity : Activity() {
 
     private fun failClosed() {
         cancelPendingAuthentication()
-        finishBoundary()
+        finishWithoutTransition()
     }
 
     private fun finishWith(vault: SensitivePhraseVault?) {
@@ -165,7 +166,7 @@ class SensitivePhraseAuthActivity : Activity() {
         unlockRequest = null
         mainHandler.removeCallbacks(expiry)
         SensitivePhraseAuthCoordinator.deliver(requestId, vault)
-        finishBoundary()
+        finishWithoutTransition()
     }
 
     private fun cancelPendingAuthentication() {
@@ -175,11 +176,6 @@ class SensitivePhraseAuthActivity : Activity() {
         mainHandler.removeCallbacks(expiry)
         if (requestId != INVALID_REQUEST_ID) SensitivePhraseAuthCoordinator.cancel(requestId)
         cancellation?.cancel()
-    }
-
-    private fun finishBoundary() {
-        finish()
-        overridePendingTransition(0, 0)
     }
 
     companion object {

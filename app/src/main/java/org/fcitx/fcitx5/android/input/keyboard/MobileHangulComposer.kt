@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
-import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.typo.DubeolsikKeyMap
 
 /** Which vowel-combination table a mobile Hangul surface's directional/dot primitives use. */
 enum class MobileHangulFamily {

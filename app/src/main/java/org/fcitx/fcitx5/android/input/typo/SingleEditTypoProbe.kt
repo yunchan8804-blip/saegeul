@@ -2,10 +2,10 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.input.ai.typo
+package org.fcitx.fcitx5.android.input.typo
 
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 /**
  * 흔한 오타 한 번을 되돌린 변형을 만들어 어휘에서 정확 일치로 찾는 탐색기.

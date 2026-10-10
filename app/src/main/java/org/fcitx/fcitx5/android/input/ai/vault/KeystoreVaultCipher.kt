@@ -138,6 +138,7 @@ class KeystoreVaultCipher(
     }
 
     /** Pre-API-31 fallback where only [KeyInfo.isInsideSecureHardware] is available. */
+    @Suppress("DEPRECATION") // API 31 미만에서는 이 값만 있고, 31 이상은 securityLevelOf가 먼저 답한다.
     private fun legacyInsideSecureHardware(key: SecretKey): Boolean = runCatching {
         val factory = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE)
         val info = factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo

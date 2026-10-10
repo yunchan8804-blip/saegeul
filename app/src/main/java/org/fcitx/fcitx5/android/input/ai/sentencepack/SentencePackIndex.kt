@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.sentencepack
 
 import org.fcitx.fcitx5.android.input.ai.ContextualAppend
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 
 enum class MatchEvidence {

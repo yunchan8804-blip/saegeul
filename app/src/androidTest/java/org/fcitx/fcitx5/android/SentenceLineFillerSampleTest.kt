@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
-import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Test
@@ -58,7 +58,7 @@ class SentenceLineFillerSampleTest {
         val morphology = ChoseongMorphologyEngine()
         app.baseKoreanVocabulary.load()
         val typoCorrector = KeyboardAwareTypoCorrector()
-        app.baseKoreanVocabulary.forEachWord(org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) { word, prior -> typoCorrector.addWord(word, prior) }
+        app.baseKoreanVocabulary.forEachWord(org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) { word, prior -> typoCorrector.addWord(word, prior) }
         app.sentencePacks.prepare()
 
         val predictor = AiContextualPredictor(

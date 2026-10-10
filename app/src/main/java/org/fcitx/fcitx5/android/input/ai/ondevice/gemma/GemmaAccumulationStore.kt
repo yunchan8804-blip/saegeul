@@ -351,7 +351,7 @@ class GemmaAccumulationStore private constructor(context: Context) {
         applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
 
     private fun SharedPreferences.readState(): GemmaAccumulationState {
-        val objectValue = JSONObject(getString(KEY_ATTEMPTS, "{}"))
+        val objectValue = JSONObject(checkNotNull(getString(KEY_ATTEMPTS, "{}")) { "Gemma 축적 시도 기록을 읽을 수 없습니다." })
         val attempts = GeneratedMaterialPolicy.PREFIXES.mapNotNull { prefix ->
             objectValue.optInt(prefix, 0).takeIf { it > 0 }?.let { prefix to it }
         }.toMap()

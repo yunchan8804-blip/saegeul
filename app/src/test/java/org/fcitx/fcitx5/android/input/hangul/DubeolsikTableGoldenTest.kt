@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 YunChan
  */
-package org.fcitx.fcitx5.android.input.ai.hangul
+package org.fcitx.fcitx5.android.input.hangul
 
 import org.fcitx.fcitx5.android.input.ai.KoreanTypoCorrectionEngine
 import org.fcitx.fcitx5.android.input.typo.KoreanTypoRecovery

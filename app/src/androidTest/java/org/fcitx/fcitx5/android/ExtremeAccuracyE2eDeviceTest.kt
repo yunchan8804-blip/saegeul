@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android
 
 import androidx.test.filters.MediumTest
-import androidx.test.runner.AndroidJUnit4
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
 import org.fcitx.fcitx5.android.input.ai.SentenceRelevanceReranker
 import org.fcitx.fcitx5.android.input.ai.phonology.KoreanJosaBitmaskEngine
@@ -17,7 +16,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
 
 /**
  * On-Device E2E Instrumental Tests for Extreme Accuracy & Syntax/Phonology Verification.
@@ -28,7 +26,6 @@ import org.junit.runner.RunWith
  * 3. SentenceRelevanceReranker filtering ungrammatical/mismatched continuation candidates.
  * 4. Deterministic automatic correction of Josa mismatches.
  */
-@RunWith(AndroidJUnit4::class)
 @MediumTest
 class ExtremeAccuracyE2eDeviceTest {
 

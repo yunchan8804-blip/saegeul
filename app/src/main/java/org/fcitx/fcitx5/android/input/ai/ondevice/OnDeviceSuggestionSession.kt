@@ -39,6 +39,7 @@ class OnDeviceSuggestionSession {
         CONTINUATION_CACHE
     }
 
+    @ConsistentCopyVisibility
     data class Proposal internal constructor(
         private var trackedSnapshot: Snapshot,
         val suffix: String,

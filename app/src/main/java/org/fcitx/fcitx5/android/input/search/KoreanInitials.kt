@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.search
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 object KoreanInitials {
     private val initialSet = HangulSyllable.CHOSEONG.toSet()

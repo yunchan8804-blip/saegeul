@@ -82,7 +82,7 @@ internal class GemmaGenerationMetricsRecorder(
         ) {
             firstThermalLimitedMs = SystemClock.elapsedRealtime() - startedAt
         }
-        val pssKb = Debug.getPss().toLong()
+        val pssKb = Debug.getPss()
         peakSampledPssKb = maxOf(peakSampledPssKb ?: pssKb, pssKb)
         val memory = ActivityManager.MemoryInfo().also(requireNotNull(activityManager)::getMemoryInfo)
         val availableMemoryBytes = memory.availMem

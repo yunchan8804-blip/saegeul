@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android
 
-import androidx.test.runner.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import org.fcitx.fcitx5.android.input.ai.KoreanSentenceEndingExtractor
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaProfiler
@@ -16,13 +15,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
 
 /**
  * Android E2E Device & Instrumentation Test for B22 (0 ending collection rate)
  * and B23 (cross-session buffer leak) regression verification.
  */
-@RunWith(AndroidJUnit4::class)
 @MediumTest
 class B22B23E2eDeviceTest {
 

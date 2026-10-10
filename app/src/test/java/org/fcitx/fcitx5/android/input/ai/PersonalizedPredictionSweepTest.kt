@@ -15,9 +15,9 @@ import org.fcitx.fcitx5.android.input.ai.rule.KoreanSpacingLint
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSyntaxRuleFilter
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackIndex
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackText
-import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
-import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.json.JSONArray
 import org.json.JSONObject
@@ -207,7 +207,7 @@ class PersonalizedPredictionSweepTest {
         @JvmStatic
         fun setUp() {
             val vocabFile = findVocabFile()
-            appDir = vocabFile.parentFile.parentFile.parentFile.parentFile
+            appDir = vocabFile.parentFile!!.parentFile!!.parentFile!!.parentFile!!
             tempDir = File(appDir, "build/tmp/personalized-prediction-sweep-${System.nanoTime()}").apply { mkdirs() }
 
             val ngramFile = findAsset(

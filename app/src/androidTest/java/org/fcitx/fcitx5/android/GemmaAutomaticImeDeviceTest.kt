@@ -792,7 +792,10 @@ class GemmaAutomaticImeDeviceTest {
 
     private fun networkSnapshot(context: Context): NetworkSnapshot {
         val manager = requireNotNull(context.getSystemService(ConnectivityManager::class.java)) { "ConnectivityManager가 없습니다." }
-        return NetworkSnapshot(manager.allNetworks.map { network ->
+        // 활성 네트워크 하나가 아니라 연결된 전부를 기록해야 해서 대체 API가 없다.
+        @Suppress("DEPRECATION")
+        val allNetworks = manager.allNetworks
+        return NetworkSnapshot(allNetworks.map { network ->
             val capabilities = manager.getNetworkCapabilities(network)
             NetworkEntry(
                 capabilitiesAvailable = capabilities != null,

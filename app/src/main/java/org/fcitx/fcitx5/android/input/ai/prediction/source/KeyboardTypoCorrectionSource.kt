@@ -7,11 +7,11 @@ package org.fcitx.fcitx5.android.input.ai.prediction.source
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
 import org.fcitx.fcitx5.android.input.ai.BundledKoreanNgram
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
-import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
-import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
-import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
-import org.fcitx.fcitx5.android.input.ai.typo.SingleEditTypoProbe
+import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.DubeolsikKeyMap
+import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.SingleEditTypoProbe
 
 /**
  * Keyboard-aware corrections for the typed fragment, plus [handledFragment]: the fragment these

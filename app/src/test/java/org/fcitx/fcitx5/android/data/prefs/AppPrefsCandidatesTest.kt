@@ -13,7 +13,7 @@ class AppPrefsCandidatesTest {
         override fun getInt(key: String?, defValue: Int): Int = defValue
         override fun getLong(key: String?, defValue: Long): Long = defValue
         override fun getFloat(key: String?, defValue: Float): Float = defValue
-        override fun getBoolean(key: String?, defValue: Boolean): Boolean = defValue ?: true
+        override fun getBoolean(key: String?, defValue: Boolean): Boolean = defValue
         override fun contains(key: String?): Boolean = false
         override fun edit(): SharedPreferences.Editor = DummyEditor()
         override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}

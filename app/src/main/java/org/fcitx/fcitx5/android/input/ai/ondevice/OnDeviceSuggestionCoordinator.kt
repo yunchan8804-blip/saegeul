@@ -63,6 +63,7 @@ class OnDeviceSuggestionCoordinator(
         ERROR
     }
 
+    @ConsistentCopyVisibility
     data class Status internal constructor(
         val state: State,
         val errorCode: String? = null

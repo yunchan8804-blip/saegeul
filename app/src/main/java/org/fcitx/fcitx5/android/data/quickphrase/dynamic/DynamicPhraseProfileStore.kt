@@ -250,11 +250,13 @@ class DynamicPhraseProfileStore(context: Context) {
         const val TRANSFORMATION = "AES/GCM/NoPadding"
     }
 
+    @ConsistentCopyVisibility
     data class VaultUnlockRequest internal constructor(
         val cipher: Cipher,
         internal val encryptedPayload: ByteArray?
     )
 
+    @ConsistentCopyVisibility
     data class VaultWriteRequest internal constructor(val cipher: Cipher)
 }
 

@@ -9,7 +9,7 @@ import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.InputFeatureBlock
-import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
+import org.fcitx.fcitx5.android.input.policy.AiSettingsNavigator
 import org.fcitx.fcitx5.android.utils.AppUtil
 
 /**

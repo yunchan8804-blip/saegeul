@@ -113,7 +113,7 @@ class GemmaMaterialDeviceTest {
             Log.i(TAG, report)
             InstrumentationRegistry.getInstrumentation().sendStatus(
                 0,
-                Bundle().apply { putString("gemmaMaterialJson", report.toString()) }
+                Bundle().apply { putString("gemmaMaterialJson", report) }
             )
         } finally {
             temporaryFile.delete()

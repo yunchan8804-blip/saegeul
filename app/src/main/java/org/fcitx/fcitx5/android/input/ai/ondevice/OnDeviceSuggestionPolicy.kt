@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import kotlin.text.CharCategory.CONTROL
 import kotlin.text.CharCategory.FORMAT

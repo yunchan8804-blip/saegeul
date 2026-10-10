@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.morphology
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 /**
  * Korean Morphological Ending Analyzer (EAI-03 / B22).

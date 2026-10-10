@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.input.ai.vault
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
-import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
+import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue

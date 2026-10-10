@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.ai.prediction.source
 
 import org.fcitx.fcitx5.android.input.ai.AiPrediction
 import org.fcitx.fcitx5.android.input.ai.KoreanTypoCorrectionEngine
-import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
+import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
 
 /**
  * Word-level typo correction (`typo_correction`) by the legacy [KoreanTypoCorrectionEngine] for the

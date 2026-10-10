@@ -248,7 +248,7 @@ class OnDeviceSuggestionEngine(
                 try {
                     closeWarmLocked(discardSharedEngine = failure?.let(::isEngineFault) == true)
                 } catch (error: Throwable) {
-                    if (failure == null) failure = error else failure?.addSuppressed(error)
+                    if (failure == null) failure = error else failure.addSuppressed(error)
                 }
             } else {
                 scheduleIdleClose()
@@ -259,7 +259,7 @@ class OnDeviceSuggestionEngine(
             try {
                 closeWarmLocked()
             } catch (error: Throwable) {
-                failure?.addSuppressed(error)
+                failure.addSuppressed(error)
             }
         }
         failure?.let { throw normalizeFailure(it, request) }
@@ -352,7 +352,7 @@ class OnDeviceSuggestionEngine(
                             failure?.let(::isEngineFault) == true
                     )
                 } catch (error: Throwable) {
-                    if (failure == null) failure = error else failure?.addSuppressed(error)
+                    if (failure == null) failure = error else failure.addSuppressed(error)
                 }
             } else {
                 scheduleIdleClose()
@@ -363,7 +363,7 @@ class OnDeviceSuggestionEngine(
             try {
                 closeWarmLocked()
             } catch (error: Throwable) {
-                failure?.addSuppressed(error)
+                failure.addSuppressed(error)
             }
         }
         failure?.let { throw normalizeFailure(it, request) }

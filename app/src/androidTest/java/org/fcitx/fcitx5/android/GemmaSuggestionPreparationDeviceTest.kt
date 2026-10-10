@@ -139,12 +139,8 @@ class GemmaSuggestionPreparationDeviceTest {
             evidence.put("hideStopMs", SystemClock.elapsedRealtime() - hideStartedAt)
                 .put(
                     "actualSafeFailureCode",
-                    (stopFailure as? OnDeviceSuggestionEngine.OnDeviceSuggestionException)?.code ?: JSONObject.NULL
+                    stopFailure.code
                 )
-            assertTrue(
-                "키보드 hide 뒤 OnDeviceSuggestionException 취소가 필요합니다: ${stopFailure.javaClass.name}",
-                stopFailure is OnDeviceSuggestionEngine.OnDeviceSuggestionException
-            )
             assertFalse("키보드 hide 뒤 Engine 실행이 남아 있습니다.", createdEngine.isRunning)
             assertFalse("키보드 hide 뒤 Engine 추론이 남아 있습니다.", createdEngine.isInferring)
             assertFalse("키보드 hide 뒤 warm Engine이 남아 있습니다.", createdEngine.isWarm)

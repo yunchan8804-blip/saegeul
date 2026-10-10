@@ -14,7 +14,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.input.ai.AiSettingsNavigator
+import org.fcitx.fcitx5.android.input.policy.AiSettingsNavigator
 import org.fcitx.fcitx5.android.input.ai.ondevice.gemma.GemmaModelInstaller
 
 /**

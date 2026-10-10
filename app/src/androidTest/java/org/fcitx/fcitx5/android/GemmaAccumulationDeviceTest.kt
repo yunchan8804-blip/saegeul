@@ -167,7 +167,7 @@ class GemmaAccumulationDeviceTest {
                 .put("workConstraintsAfterEnable", workConstraintsJson(workAfterEnable))
             reportEvidence(evidence)
 
-            launchedActivity?.let { activity ->
+            launchedActivity.let { activity ->
                 instrumentation.runOnMainSync { activity.finish() }
             }
             val screenshotActivity = launchGemmaActivity()

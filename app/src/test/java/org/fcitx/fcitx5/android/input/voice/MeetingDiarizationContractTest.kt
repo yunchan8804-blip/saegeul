@@ -9,7 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.fcitx.fcitx5.android.input.ai.AiFeatureEntryGate
+import org.fcitx.fcitx5.android.input.policy.AiFeatureEntryGate
 
 class MeetingDiarizationContractTest {
     @Test

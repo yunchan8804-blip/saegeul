@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.context
 
-import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
 
 enum class KoreanParticleKind {
     Topic,

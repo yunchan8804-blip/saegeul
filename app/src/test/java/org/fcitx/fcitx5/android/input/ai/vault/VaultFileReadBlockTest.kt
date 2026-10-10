@@ -30,7 +30,7 @@ class VaultFileReadBlockTest {
     private fun vault(name: String = "vault.dat") = File(tempFolder.root, name)
 
     private fun unreadableCopies(base: File) =
-        base.parentFile.listFiles { _, name -> name.startsWith("${base.name}.unreadable-") }.orEmpty().toList()
+        base.parentFile!!.listFiles { _, name -> name.startsWith("${base.name}.unreadable-") }.orEmpty().toList()
 
     private fun assertThrowsIo(block: () -> Unit) {
         try {
