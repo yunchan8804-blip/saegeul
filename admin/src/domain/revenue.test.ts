@@ -29,7 +29,9 @@ describe("three-ledger revenue reconciliation", () => {
       currencyCode: "USD",
       reporting: { valueMicros: 1_700_000_000, currencyCode: "KRW" },
     });
+
     const inserted = insertImpressions([], [event]);
+
     const reconciliation = reconcileLedgers({
       connection: "demo",
       impressions: inserted.items,
@@ -82,6 +84,7 @@ describe("three-ledger revenue reconciliation", () => {
   it("computes estimated vs confirmed vs deposited totals and per-source deltas", () => {
     const fixture = demoLedgerFixture();
     const reconciliation = reconcileLedgers(fixture);
+
     const bySource = Object.fromEntries(
       reconciliation.perSource.map((row) => [row.source, row]),
     );
@@ -120,6 +123,7 @@ describe("three-ledger revenue reconciliation", () => {
     const replay = impression({ eventId: "evt-dup", valueMicros: 99_999 });
     const afterFirst = insertImpressions([], [first]);
     const afterReplay = insertImpressions(afterFirst.items, [replay]);
+
     const reconciliation = reconcileLedgers({
       connection: "demo",
       impressions: [...afterReplay.items, replay],
@@ -149,6 +153,7 @@ describe("three-ledger revenue reconciliation", () => {
         }),
       ],
     });
+
     const emptyDemo = reconcileLedgers({
       connection: "demo",
       impressions: [],

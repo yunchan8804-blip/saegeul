@@ -27,6 +27,7 @@ describe("AVENUE policy engine", () => {
       trigger: "사용자가 보상형 광고 버튼을 직접 선택",
       format: "rewarded" as const,
     };
+
     expect(canPublish(avenue)).toBe(false);
     expect(evaluateAvenue(avenue).map((item) => item.code)).toContain(
       "DESTINATION_INTERRUPT",

@@ -40,6 +40,7 @@ describe("campaign dispatch guard", () => {
       ...context,
       storeProduction: false,
     });
+
     expect(gates.map((item) => item.code)).toContain("STORE_NOT_PRODUCTION");
   });
 
@@ -48,6 +49,7 @@ describe("campaign dispatch guard", () => {
       ...context,
       approverId: "operator",
     });
+
     expect(gates.map((item) => item.code)).toContain("SEPARATION_OF_DUTIES");
   });
 
@@ -67,6 +69,7 @@ describe("campaign dispatch guard", () => {
       d7RetainedUsers: 0,
       attributedRevenueWon: 0,
     });
+
     expect(metrics.cpiWon).toBeNull();
     expect(metrics.cacWon).toBeNull();
     expect(metrics.d7RetentionRate).toBeNull();

@@ -49,6 +49,7 @@ describe("fail-closed AVENUE serving", () => {
       nowMs,
       venueId: "support-rewarded",
     });
+
     expect(decision.allow).toBe(false);
     expect(decision.reason).toBe("CONFIG_MISSING");
   });
@@ -60,6 +61,7 @@ describe("fail-closed AVENUE serving", () => {
       nowMs,
       venueId: "support-rewarded",
     });
+
     expect(decision.allow).toBe(false);
     expect(decision.reason).toBe("CONFIG_UNSIGNED");
     expect(canPublishSignedConfig(config({ signature: "" }), 0, nowMs)).toBe(false);
@@ -72,6 +74,7 @@ describe("fail-closed AVENUE serving", () => {
       nowMs,
       venueId: "support-rewarded",
     });
+
     expect(decision.allow).toBe(false);
     expect(decision.reason).toBe("CONFIG_EXPIRED");
   });
@@ -83,6 +86,7 @@ describe("fail-closed AVENUE serving", () => {
       nowMs,
       venueId: "support-rewarded",
     });
+
     expect(decision.allow).toBe(false);
     expect(decision.reason).toBe("CONFIG_NON_MONOTONIC");
     expect(canPublishSignedConfig(config({ version: 3 }), 3, nowMs)).toBe(false);
@@ -95,6 +99,7 @@ describe("fail-closed AVENUE serving", () => {
       nowMs,
       venueId: "support-rewarded",
     });
+
     expect(decision.allow).toBe(false);
     expect(decision.reason).toBe("GLOBAL_KILL_SWITCH");
     expect(canPublish(seedAvenues[0])).toBe(true);
@@ -117,7 +122,9 @@ describe("fail-closed AVENUE serving", () => {
       screen: "정보 > 개발자 응원",
       format: "interstitial",
     });
+
     const signed = config({ version: 2 }, [...seedAvenues.filter((item) => item.id !== "settings-entry"), renamed]);
+
     const decision = evaluateServing({
       config: signed,
       lastAcceptedVersion: 1,
@@ -158,12 +165,14 @@ describe("fail-closed AVENUE serving", () => {
 
     for (const avenue of placements) {
       const signed = config({ version: 2 }, [avenue, seedAvenues[0]]);
+
       const decision = evaluateServing({
         config: signed,
         lastAcceptedVersion: 1,
         nowMs,
         venueId: avenue.id,
       });
+
       expect(canPublish(avenue)).toBe(false);
       expect(decision.allow).toBe(false);
       expect(decision.reason).not.toBeNull();
@@ -172,10 +181,12 @@ describe("fail-closed AVENUE serving", () => {
 
   it("allows an opt-in rewarded support placement with a valid signed config", () => {
     const rewarded = seedAvenues.find((item) => item.id === "support-rewarded")!;
+
     const signed = config(
       { version: 2 },
       seedAvenues.filter((item) => canPublish(item)),
     );
+
     const decision = evaluateServing({
       config: signed,
       lastAcceptedVersion: 1,

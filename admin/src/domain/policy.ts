@@ -15,12 +15,12 @@ export interface PolicyFinding {
   message: string;
 }
 
-const blockedVenueIds: Record<string, PolicyCode> = {
-  "settings-entry": "DESTINATION_INTERRUPT",
-  "ime-surface": "IME_SURFACE",
-  "first-launch": "FIRST_LAUNCH_INTERRUPT",
-  "permission-interstitial": "PERMISSION_INTERRUPT",
-};
+const blockedVenueIds = new Map<string, PolicyCode>([
+  ["settings-entry", "DESTINATION_INTERRUPT"],
+  ["ime-surface", "IME_SURFACE"],
+  ["first-launch", "FIRST_LAUNCH_INTERRUPT"],
+  ["permission-interstitial", "PERMISSION_INTERRUPT"],
+]);
 
 function pushBlock(
   findings: PolicyFinding[],
@@ -34,7 +34,7 @@ function pushBlock(
 export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
   const target = `${avenue.screen} ${avenue.trigger}`.toLowerCase();
   const findings: PolicyFinding[] = [];
-  const blockedById = blockedVenueIds[avenue.id];
+  const blockedById = blockedVenueIds.get(avenue.id);
 
   if (blockedById === "DESTINATION_INTERRUPT") {
     pushBlock(
@@ -43,6 +43,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       "사용자가 요청한 목적지보다 먼저 전면 광고를 표시할 수 없어.",
     );
   }
+
   if (blockedById === "IME_SURFACE") {
     pushBlock(
       findings,
@@ -50,6 +51,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       "IME 입력 표면에는 광고를 배치할 수 없어.",
     );
   }
+
   if (blockedById === "PERMISSION_INTERRUPT") {
     pushBlock(
       findings,
@@ -57,6 +59,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       "권한 요청 전후에 광고를 끼워 넣을 수 없어.",
     );
   }
+
   if (blockedById === "FIRST_LAUNCH_INTERRUPT") {
     pushBlock(
       findings,
@@ -75,6 +78,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       "사용자가 요청한 목적지보다 먼저 전면 광고를 표시할 수 없어.",
     );
   }
+
   if (/(키보드 입력|ime|composition)/i.test(target)) {
     pushBlock(
       findings,
@@ -82,6 +86,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       "IME 입력 표면에는 광고를 배치할 수 없어.",
     );
   }
+
   if (/(권한|permission)/i.test(target)) {
     pushBlock(
       findings,
@@ -89,6 +94,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       "권한 요청 전후에 광고를 끼워 넣을 수 없어.",
     );
   }
+
   if (
     /(첫 실행|first launch)/i.test(target) &&
     avenue.format === "interstitial"
@@ -99,6 +105,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       "첫 실행 콘텐츠보다 먼저 전면 광고를 표시할 수 없어.",
     );
   }
+
   if (!avenue.requiresConsent) {
     findings.push({
       code: "CONSENT_REQUIRED",
@@ -106,6 +113,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       message: "동의 상태를 확인하지 않는 AVENUE는 발행할 수 없어.",
     });
   }
+
   if (avenue.format === "interstitial" && avenue.dailyCap > 1) {
     findings.push({
       code: "CAP_TOO_HIGH",
@@ -113,6 +121,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       message: "전면 광고의 일일 상한은 1회를 권장해.",
     });
   }
+
   if (avenue.format === "interstitial" && avenue.cooldownMinutes < 1440) {
     findings.push({
       code: "COOLDOWN_TOO_SHORT",
@@ -120,6 +129,7 @@ export function evaluateAvenue(avenue: Avenue): PolicyFinding[] {
       message: "전면 광고 사이에는 최소 24시간을 권장해.",
     });
   }
+
   return findings;
 }
 

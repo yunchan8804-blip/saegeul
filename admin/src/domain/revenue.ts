@@ -135,10 +135,12 @@ function insertByKey<T>(
   for (const item of incoming) {
     validate(item);
     const key = keyOf(item);
+
     if (seen.has(key)) {
       duplicateIds.push(key);
       continue;
     }
+
     seen.add(key);
     items.push(item);
     insertedIds.push(key);
@@ -155,6 +157,7 @@ export function insertImpressions(
     requireId(item.eventId, "eventId");
     requireIntegerMicros(item.valueMicros, "valueMicros");
     requireCurrency(item.currencyCode);
+
     if (item.reporting) {
       requireIntegerMicros(item.reporting.valueMicros, "reporting.valueMicros");
       requireCurrency(item.reporting.currencyCode);
@@ -215,6 +218,7 @@ function moneyOrNull(
   field: keyof Omit<CurrencyTotal, "currencyCode">,
 ): MoneyMicros | null {
   if (totals.length !== 1) return null;
+
   return {
     valueMicros: totals[0][field],
     currencyCode: totals[0].currencyCode,
@@ -223,9 +227,11 @@ function moneyOrNull(
 
 function addInteger(left: number, right: number): number {
   const sum = left + right;
+
   if (!Number.isInteger(sum)) {
     throw new Error("micros overflow");
   }
+
   return sum;
 }
 
@@ -359,9 +365,11 @@ export function reconcileLedgers(input: LedgerInput): Reconciliation {
   for (const event of impressions.items) {
     add(estimated, event.source, event.currencyCode, event.valueMicros);
   }
+
   for (const report of reports.items) {
     add(confirmed, report.source, report.currencyCode, report.valueMicros);
   }
+
   for (const deposit of deposits.items) {
     add(deposited, deposit.source, deposit.currencyCode, deposit.valueMicros);
   }
@@ -376,6 +384,7 @@ export function reconcileLedgers(input: LedgerInput): Reconciliation {
       const confirmedMicros = confirmed.get(key) ?? 0;
       const depositedMicros = deposited.get(key) ?? 0;
       let status: SourceRowStatus = "ok";
+
       if (depositedMicros > 0 && confirmedMicros === 0 && estimatedMicros === 0) {
         status = "unmatched";
       } else if (
@@ -384,6 +393,7 @@ export function reconcileLedgers(input: LedgerInput): Reconciliation {
       ) {
         status = "pending";
       }
+
       return {
         source,
         currencyCode,
@@ -396,18 +406,23 @@ export function reconcileLedgers(input: LedgerInput): Reconciliation {
       };
     });
 
-  const unmatched: UnmatchedRow[] = perSource
-    .filter((row) => row.status === "unmatched")
-    .map((row) => ({
-      kind: "deposit" as const,
-      id: row.source,
-      source: row.source,
-      valueMicros: row.depositedMicros,
-      currencyCode: row.currencyCode,
-    }));
+  const unmatched: UnmatchedRow[] = perSource.flatMap((row) =>
+    row.status === "unmatched"
+      ? [
+          {
+            kind: "deposit" as const,
+            id: row.source,
+            source: row.source,
+            valueMicros: row.depositedMicros,
+            currencyCode: row.currencyCode,
+          },
+        ]
+      : [],
+  );
 
   const pending: PendingRow[] = perSource.flatMap((row) => {
     const rows: PendingRow[] = [];
+
     if (row.estimatedMicros > 0 && row.confirmedMicros === 0) {
       rows.push({
         kind: "confirmation",
@@ -416,6 +431,7 @@ export function reconcileLedgers(input: LedgerInput): Reconciliation {
         valueMicros: row.estimatedMicros,
       });
     }
+
     if (row.confirmedMicros > 0 && row.depositedMicros === 0) {
       rows.push({
         kind: "deposit",
@@ -424,10 +440,12 @@ export function reconcileLedgers(input: LedgerInput): Reconciliation {
         valueMicros: row.confirmedMicros,
       });
     }
+
     return rows;
   });
 
   const totalsByCurrencyMap = new Map<string, CurrencyTotal>();
+
   for (const row of perSource) {
     const current = totalsByCurrencyMap.get(row.currencyCode) ?? {
       currencyCode: row.currencyCode,
@@ -435,6 +453,7 @@ export function reconcileLedgers(input: LedgerInput): Reconciliation {
       confirmedMicros: 0,
       depositedMicros: 0,
     };
+
     current.estimatedMicros = addInteger(
       current.estimatedMicros,
       row.estimatedMicros,
@@ -449,6 +468,7 @@ export function reconcileLedgers(input: LedgerInput): Reconciliation {
     );
     totalsByCurrencyMap.set(row.currencyCode, current);
   }
+
   const totalsByCurrency = [...totalsByCurrencyMap.values()].sort((a, b) =>
     a.currencyCode.localeCompare(b.currencyCode),
   );

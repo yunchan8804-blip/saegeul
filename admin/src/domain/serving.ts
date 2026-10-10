@@ -45,15 +45,21 @@ export function evaluateConfigValidity(
   nowMs: number,
 ): ServingDenyReason | null {
   if (!config) return "CONFIG_MISSING";
+
   if (!Number.isInteger(config.version) || config.version <= 0) {
     return "CONFIG_NON_MONOTONIC";
   }
+
   if (!config.signature?.trim()) return "CONFIG_UNSIGNED";
   const expiresAt = Date.parse(config.expiresAt);
+
   if (!Number.isFinite(expiresAt) || nowMs >= expiresAt) return "CONFIG_EXPIRED";
   const issuedAt = Date.parse(config.issuedAt);
+
   if (!Number.isFinite(issuedAt)) return "CONFIG_EXPIRED";
+
   if (config.version <= (lastAcceptedVersion ?? 0)) return "CONFIG_NON_MONOTONIC";
+
   return null;
 }
 
@@ -63,21 +69,25 @@ export function evaluateServing(request: ServingRequest): ServingDecision {
     request.lastAcceptedVersion,
     request.nowMs,
   );
+
   if (validity) {
     return deny(validity, request.config?.version ?? null);
   }
 
   const config = request.config!;
+
   if (config.globalKillSwitch) {
     return deny("GLOBAL_KILL_SWITCH", config.version);
   }
 
   const avenue = config.avenues.find((item) => item.id === request.venueId);
+
   if (!avenue) {
     return deny("VENUE_NOT_FOUND", config.version);
   }
 
   const block = evaluateAvenue(avenue).find((finding) => finding.level === "block");
+
   if (block) {
     return deny(block.code, config.version);
   }
@@ -91,6 +101,7 @@ export function canPublishSignedConfig(
   nowMs: number,
 ): boolean {
   if (evaluateConfigValidity(config, lastAcceptedVersion, nowMs)) return false;
+
   return config.avenues.every((avenue) => canPublish(avenue));
 }
 
@@ -105,6 +116,7 @@ export function localDemoSignedConfig(
   },
 ): SignedAvenueConfig {
   const ttlMs = options.ttlMs ?? 86_400_000;
+
   return {
     version: options.version ?? 1,
     issuedAt: new Date(options.nowMs).toISOString(),

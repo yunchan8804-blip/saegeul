@@ -1,5 +1,7 @@
 export type AvenueFormat = "rewarded" | "native" | "interstitial";
+
 export type AvenueStatus = "active" | "experiment" | "paused";
+
 export type PolicyRisk = "low" | "medium" | "high";
 
 export interface Avenue {

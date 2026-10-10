@@ -111,6 +111,8 @@ function usePersistentAvenues() {
   const [{ initialAvenues, initialError }] = useState(() => {
     try {
       const saved = localStorage.getItem("saegeul-avenues-v1");
+
+      // SAFETY: 이 키는 아래 effect가 JSON.stringify(Avenue[])로만 쓰므로 저장된 값은 Avenue[] 모양이다.
       return {
         initialAvenues: saved ? (JSON.parse(saved) as Avenue[]) : seedAvenues,
         initialError: false,
@@ -119,6 +121,7 @@ function usePersistentAvenues() {
       return { initialAvenues: seedAvenues, initialError: true };
     }
   });
+
   const [storageError, setStorageError] = useState(initialError);
   const [avenues, setAvenues] = useState<Avenue[]>(initialAvenues);
 
@@ -145,6 +148,7 @@ function formatMoneyMicros(valueMicros: number, currencyCode: string) {
   const negative = valueMicros < 0;
   const major = Math.trunc(Math.abs(valueMicros) / 1_000_000);
   let formatted: string;
+
   try {
     formatted = new Intl.NumberFormat("ko-KR", {
       style: "currency",
@@ -154,6 +158,7 @@ function formatMoneyMicros(valueMicros: number, currencyCode: string) {
   } catch {
     formatted = `${major} ${currencyCode}`;
   }
+
   return negative ? `-${formatted}` : formatted;
 }
 
@@ -163,15 +168,19 @@ function ledgerFieldLabel(
 ) {
   if (reconciliation.connection === "unconnected") return "미연결";
   const amount = reconciliation[field];
+
   if (!amount) return "-";
+
   return formatMoneyMicros(amount.valueMicros, amount.currencyCode);
 }
 
 function sourceStatusLabel(row: SourceVariance) {
   if (row.status === "unmatched") return "미대사";
+
   if (row.status === "pending") {
     return row.confirmedMicros === 0 ? "보고 대기" : "입금 대기";
   }
+
   return "차이 확인";
 }
 
@@ -228,16 +237,19 @@ function App() {
 
   useEffect(() => {
     if (eventsPaused) return;
+
     const tick = window.setInterval(() => {
       if (!document.hidden)
         setEventIndex((current) => (current + 1) % liveEvents.length);
     }, 4800);
+
     return () => window.clearInterval(tick);
   }, [eventsPaused]);
 
   function saveAvenue(next: Avenue) {
     setAvenues((current) => {
       const exists = current.some((item) => item.id === next.id);
+
       return exists
         ? current.map((item) => (item.id === next.id ? next : item))
         : [next, ...current];
@@ -272,6 +284,7 @@ function App() {
         <nav className="nav-list">
           {navItems.map((item) => {
             const Icon = item.icon;
+
             return (
               <button
                 key={item.id}
@@ -363,6 +376,7 @@ function App() {
           >
             {navItems.map((item) => {
               const Icon = item.icon;
+
               return (
                 <button
                   key={item.id}
@@ -463,6 +477,7 @@ function Dashboard({
   const blocked = avenues.filter((avenue) => !canPublish(avenue));
   const liveRevenue = useMemo(() => reconcileLedgers(unconnectedLedger()), []);
   const liveEstimated = ledgerFieldLabel(liveRevenue, "estimated");
+
   return (
     <>
       <section className="hero-grid" aria-label="운영 요약">
@@ -639,12 +654,14 @@ function RevenueChart() {
   const height = 170;
   const min = Math.min(...revenuePoints) - 10;
   const max = Math.max(...revenuePoints) + 8;
+
   const points = revenuePoints
     .map(
       (value, index) =>
         `${(index / (revenuePoints.length - 1)) * width},${height - ((value - min) / (max - min)) * height}`,
     )
     .join(" ");
+
   return (
     <div
       className="chart-wrap"
@@ -686,6 +703,7 @@ function RevenueChart() {
 
 function AvenueCompact({ avenue }: { avenue: Avenue }) {
   const publishable = canPublish(avenue);
+
   return (
     <article
       className="avenue-compact"
@@ -721,10 +739,12 @@ function AvenueList({
   setEditor: (value: Avenue | "new") => void;
 }) {
   const [filter, setFilter] = useState<"all" | AvenueStatus>("all");
+
   const visible =
     filter === "all"
       ? avenues
       : avenues.filter((avenue) => avenue.status === filter);
+
   return (
     <section>
       <div className="page-intro">
@@ -773,6 +793,7 @@ function AvenueList({
           visible.map((avenue) => {
             const findings = evaluateAvenue(avenue);
             const blocked = findings.some((item) => item.level === "block");
+
             return (
               <button
                 className="data-row"
@@ -858,6 +879,7 @@ function Networks() {
       health: 0,
     },
   ];
+
   return (
     <section>
       <div className="page-intro">
@@ -925,6 +947,7 @@ function Networks() {
 function Revenue() {
   const live = useMemo(() => reconcileLedgers(unconnectedLedger()), []);
   const demo = useMemo(() => reconcileLedgers(demoLedgerFixture()), []);
+
   return (
     <section data-ledger-connection={live.connection}>
       <div className="page-intro">
@@ -1030,6 +1053,7 @@ function LedgerTable({ reconciliation }: { reconciliation: Reconciliation }) {
       </div>
       {reconciliation.perSource.map((row) => {
         const status = sourceStatusLabel(row);
+
         return (
           <div className="ledger-row" key={`${row.source}-${row.currencyCode}`}>
             <span>
@@ -1082,6 +1106,7 @@ const initialCampaignCommand: CampaignCommand = {
 function Campaigns() {
   const [command, setCommand] = useState(initialCampaignCommand);
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
+
   const dispatchContext = useMemo(
     () => ({
       storeProduction: false,
@@ -1099,7 +1124,9 @@ function Campaigns() {
     () => planCampaign(command, dispatchContext),
     [command, dispatchContext],
   );
+
   const visiblePlan = plan ?? preview;
+
   const blockingCount = visiblePlan.gates.filter(
     (item) => item.level === "block",
   ).length;
@@ -1115,6 +1142,7 @@ function Campaigns() {
       const selected = current.selectedPlatforms.includes(platform)
         ? current.selectedPlatforms.filter((item) => item !== platform)
         : [...current.selectedPlatforms, platform];
+
       return {
         ...current,
         selectedPlatforms: selected.length ? selected : [platform],
@@ -1176,6 +1204,7 @@ function Campaigns() {
                 value={command.goal}
                 onChange={(event) => {
                   setPlan(null);
+                  // SAFETY: 이 select의 option 값은 CampaignCommand["goal"]의 두 값(activated_users, installs)뿐이다.
                   setCommand((current) => ({
                     ...current,
                     goal: event.target.value as CampaignCommand["goal"],
@@ -1365,11 +1394,13 @@ function AcquisitionAnalytics() {
     d7RetainedUsers: 0,
     attributedRevenueWon: 0,
   });
+
   const channels = [
     ["Google Ads", "계정·Firebase 미연결", "-", "-", "-"],
     ["Meta Ads", "Meta 앱·Events 미연결", "-", "-", "-"],
     ["TikTok Ads", "앱·MMP SAN 미연결", "-", "-", "-"],
   ];
+
   const measurementSteps = [
     ["01", "광고 노출·클릭", "플랫폼 보고서"],
     ["02", "Play 설치 출처", "Install Referrer"],
@@ -1378,6 +1409,7 @@ function AcquisitionAnalytics() {
     ["05", "첫 실제 입력", "first_real_input"],
     ["06", "7일 재사용", "d7_active"],
   ];
+
   return (
     <section>
       <div className="page-intro">
@@ -1496,11 +1528,13 @@ function Guardrails({
     killSwitch,
     "support-rewarded",
   );
+
   const settingsServing = evaluateDemoServing(
     avenues,
     killSwitch,
     "settings-entry",
   );
+
   const checks = [
     [
       "설정 진입 전면 광고",
@@ -1512,6 +1546,7 @@ function Guardrails({
     ["아동 대상 연령", "Play Console 목표 연령이 아직 확정되지 않음", "warn"],
     ["Data Safety", "현재 개인정보 문서는 광고 SDK 없음으로 명시", "warn"],
   ] as const;
+
   return (
     <section>
       <div className="page-intro">
@@ -1636,6 +1671,7 @@ function Audit() {
       "experiment.create",
     ],
   ];
+
   return (
     <section>
       <div className="page-intro">
@@ -1685,6 +1721,7 @@ function LiveRail({
     (_, offset) =>
       liveEvents[(eventIndex - offset + liveEvents.length) % liveEvents.length],
   );
+
   return (
     <aside className="live-rail" aria-label="실시간 데모 이벤트">
       <header>
@@ -1811,9 +1848,10 @@ function AvenueEditor({
                 <Field label="상태">
                   <select
                     value={draft.status}
-                    onChange={(e) =>
-                      update("status", e.target.value as AvenueStatus)
-                    }
+                    onChange={(e) => {
+                      // SAFETY: 이 select의 option 값은 AvenueStatus의 세 값(active, experiment, paused)뿐이다.
+                      update("status", e.target.value as AvenueStatus);
+                    }}
                   >
                     <option value="active">운영</option>
                     <option value="experiment">실험</option>
@@ -1830,9 +1868,10 @@ function AvenueEditor({
                 <Field label="광고 형식">
                   <select
                     value={draft.format}
-                    onChange={(e) =>
-                      update("format", e.target.value as AvenueFormat)
-                    }
+                    onChange={(e) => {
+                      // SAFETY: 이 select의 option 값은 AvenueFormat의 세 값(rewarded, native, interstitial)뿐이다.
+                      update("format", e.target.value as AvenueFormat);
+                    }}
                   >
                     <option value="rewarded">보상형</option>
                     <option value="native">네이티브</option>

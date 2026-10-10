@@ -192,12 +192,16 @@ export function evaluateCampaignDispatch(
   const gates: CampaignGate[] = [];
 
   if (!context.storeProduction) gates.push(gate("STORE_NOT_PRODUCTION"));
+
   if (!context.privacyContractPassed)
     gates.push(gate("PRIVACY_CONTRACT_FAILED"));
+
   if (!context.policyReviewed) gates.push(gate("POLICY_REVIEW_REQUIRED"));
+
   if (!command.dailyBudgetWon || command.dailyBudgetWon <= 0)
     gates.push(gate("BUDGET_MISSING"));
   else if (!context.budgetApproved) gates.push(gate("BUDGET_NOT_APPROVED"));
+
   if (
     context.approverId &&
     context.operatorId.trim().toLowerCase() ===
@@ -208,12 +212,16 @@ export function evaluateCampaignDispatch(
   const selected = context.platforms.filter((platform) =>
     command.selectedPlatforms.includes(platform.id),
   );
+
   if (selected.some((platform) => !platform.accountConnected))
     gates.push(gate("ACCOUNT_NOT_CONNECTED"));
+
   if (selected.some((platform) => !platform.apiApproved))
     gates.push(gate("PLATFORM_API_NOT_APPROVED"));
+
   if (selected.some((platform) => !platform.creativeReady))
     gates.push(gate("CREATIVE_MISSING"));
+
   if (selected.some((platform) => !platform.measurementReady))
     gates.push(gate("MEASUREMENT_NOT_READY"));
 
@@ -225,9 +233,11 @@ export function planCampaign(
   context: DispatchContext,
 ): CampaignPlan {
   const gates = evaluateCampaignDispatch(command, context);
+
   const selected = context.platforms.filter((platform) =>
     command.selectedPlatforms.includes(platform.id),
   );
+
   const eligible = selected.filter(
     (platform) =>
       platform.accountConnected &&
@@ -235,16 +245,20 @@ export function planCampaign(
       platform.creativeReady &&
       platform.measurementReady,
   );
+
   const share = eligible.length ? 1 / eligible.length : 0;
 
   const allocations = selected.map((platform) => {
+    // SAFETY: 배열 원소는 false 또는 비어 있지 않은 문자열 리터럴뿐이라 filter(Boolean) 뒤에는 문자열만 남는다.
     const reasons = [
       !platform.accountConnected && "계정",
       !platform.apiApproved && "API 권한",
       !platform.creativeReady && "소재",
       !platform.measurementReady && "측정",
     ].filter(Boolean) as string[];
+
     const ready = reasons.length === 0;
+
     return {
       platform: platform.id,
       label: platform.label,
@@ -260,6 +274,7 @@ export function planCampaign(
 
   const hasBlock = gates.some((item) => item.level === "block");
   const hasApproval = gates.some((item) => item.level === "approval");
+
   return {
     state: hasBlock ? "blocked" : hasApproval ? "awaiting_approval" : "ready",
     gates,
