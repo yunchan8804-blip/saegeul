@@ -56,14 +56,11 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.FoldKeyboardProfileResolver
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardViewportReader
 import org.fcitx.fcitx5.android.input.keyboard.ThumbSplitPreferences
-import org.fcitx.fcitx5.android.input.ai.prediction.ContextualAppendSnapshot
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidate
-import org.fcitx.fcitx5.android.input.ai.prediction.ContextualReplacementSnapshot
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceFailureText
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionCoordinator
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionSession
-import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsSession
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.fcitx.fcitx5.android.input.ai.learning.CollectionFeedbackEvent
 import org.fcitx.fcitx5.android.input.context.KoreanParticleKind
@@ -176,9 +173,7 @@ class HorizontalCandidateComponent :
     private var activeCollectionFeedbackEvent: CollectionFeedbackEvent? = null
     private var collectionFeedbackHideRunnable: Runnable? = null
     private var lastObservedCoordinatorState: OnDeviceSuggestionCoordinator.State? = null
-    private val contextualMetricsCandidates = IdentityHashMap<CandidateWord, PredictionMetricsSession.Candidate?>()
-    private val contextualAppendSnapshots = IdentityHashMap<CandidateWord, ContextualAppendSnapshot?>()
-    private val contextualReplacementSnapshots = IdentityHashMap<CandidateWord, ContextualReplacementSnapshot?>()
+    private val contextualCommitSnapshots = IdentityHashMap<CandidateWord, ContextualCandidate>()
     private val automaticSuggestionCandidates =
         IdentityHashMap<CandidateWord, OnDeviceSuggestionCoordinator.Candidate>()
     private var metricsVisibilityPosted = false
@@ -271,7 +266,7 @@ class HorizontalCandidateComponent :
                     if (holder.candidate !== boundCandidateWord) return@setOnClickListener
                     val offeredLegacySentences = sentenceAdapter.candidates
                         .filter { candidate ->
-                            contextualMetricsCandidates.containsKey(candidate) &&
+                            contextualCommitSnapshots.containsKey(candidate) &&
                                 !automaticSuggestionCandidates.containsKey(candidate)
                         }
                         .map { it.text }
@@ -279,14 +274,13 @@ class HorizontalCandidateComponent :
                     if (nativeIdx >= 0) {
                         service.selectCandidate(nativeIdx)
                     } else {
-                        if (!contextualMetricsCandidates.containsKey(boundCandidateWord)) {
-                            return@setOnClickListener
-                        }
+                        val contextual = contextualCommitSnapshots[boundCandidateWord]
+                            ?: return@setOnClickListener
                         service.commitContextualSentence(
                             boundCandidateWord.text,
-                            contextualMetricsCandidates[boundCandidateWord],
-                            contextualAppendSnapshots[boundCandidateWord],
-                            contextualReplacementSnapshots[boundCandidateWord]
+                            contextual.metricsCandidate,
+                            contextual.appendSnapshot,
+                            contextual.replacementSnapshot
                         )
                     }
                     // Feedback loop: If sentence candidates were offered on bottom row, record ignore decay
@@ -337,16 +331,14 @@ class HorizontalCandidateComponent :
                         }
                         return@setOnClickListener
                     }
-                    if (holder.candidate !== boundCandidateWord ||
-                        !contextualMetricsCandidates.containsKey(boundCandidateWord)
-                    ) {
-                        return@setOnClickListener
-                    }
+                    if (holder.candidate !== boundCandidateWord) return@setOnClickListener
+                    val contextual = contextualCommitSnapshots[boundCandidateWord]
+                        ?: return@setOnClickListener
                     service.commitContextualSentence(
                         boundCandidateWord.text,
-                        contextualMetricsCandidates[boundCandidateWord],
-                        contextualAppendSnapshots[boundCandidateWord],
-                        contextualReplacementSnapshots[boundCandidateWord]
+                        contextual.metricsCandidate,
+                        contextual.appendSnapshot,
+                        contextual.replacementSnapshot
                     )
                     view.post {
                         refreshContextualCandidatesIfNeeded()
@@ -751,7 +743,7 @@ class HorizontalCandidateComponent :
             val child = recyclerView.getChildAt(index) ?: continue
             if (!child.isShown || !child.getGlobalVisibleRect(Rect())) continue
             val holder = recyclerView.getChildViewHolder(child) as? CandidateViewHolder ?: continue
-            service.recordContextualCandidateShown(contextualMetricsCandidates[holder.candidate])
+            service.recordContextualCandidateShown(contextualCommitSnapshots[holder.candidate]?.metricsCandidate)
         }
     }
 
@@ -978,16 +970,12 @@ class HorizontalCandidateComponent :
      * offered, so they get none.
      */
     private fun rememberContextualCommitSnapshots(candidates: List<ContextualCandidate>, automaticTexts: Set<String>) {
-        contextualMetricsCandidates.clear()
-        contextualAppendSnapshots.clear()
-        contextualReplacementSnapshots.clear()
+        contextualCommitSnapshots.clear()
         candidates.forEach { candidate ->
             if (candidate.word.text !in automaticTexts &&
                 nativeCandidates.none { it.text == candidate.word.text }
             ) {
-                contextualMetricsCandidates[candidate.word] = candidate.metricsCandidate
-                contextualAppendSnapshots[candidate.word] = candidate.appendSnapshot
-                contextualReplacementSnapshots[candidate.word] = candidate.replacementSnapshot
+                contextualCommitSnapshots[candidate.word] = candidate
             }
         }
     }
@@ -1282,12 +1270,12 @@ class HorizontalCandidateComponent :
                 view.post { refreshContextualCandidatesIfNeeded() }
                 return@setOnClickListener
             }
-            if (!contextualMetricsCandidates.containsKey(candidate)) return@setOnClickListener
+            val contextual = contextualCommitSnapshots[candidate] ?: return@setOnClickListener
             service.commitContextualSentence(
                 candidate.text,
-                contextualMetricsCandidates[candidate],
-                contextualAppendSnapshots[candidate],
-                contextualReplacementSnapshots[candidate]
+                contextual.metricsCandidate,
+                contextual.appendSnapshot,
+                contextual.replacementSnapshot
             )
             view.post { refreshContextualCandidatesIfNeeded() }
         }
@@ -1376,9 +1364,7 @@ class HorizontalCandidateComponent :
         nativeCandidates = emptyList()
         nativeTotal = 0
         nativeExpandedStart = 0
-        contextualMetricsCandidates.clear()
-        contextualAppendSnapshots.clear()
-        contextualReplacementSnapshots.clear()
+        contextualCommitSnapshots.clear()
         automaticSuggestionCandidates.clear()
         bar.hasAutomaticCandidates = false
         cancelStatusRowNoCandidateHide()

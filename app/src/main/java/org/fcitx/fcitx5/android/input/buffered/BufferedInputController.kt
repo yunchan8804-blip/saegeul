@@ -58,8 +58,15 @@ class BufferedInputController {
 
     private val committed = StringBuilder()
 
-    var state: BufferedSessionState = BufferedSessionState.Idle
+    /** Counts the changes of [state], which every edit of the buffered text ends with. */
+    var revision = 0L
         private set
+
+    var state: BufferedSessionState = BufferedSessionState.Idle
+        private set(value) {
+            field = value
+            revision++
+        }
 
     private var terminationListener: ((BufferTerminationEvent) -> Unit)? = null
 

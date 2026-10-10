@@ -84,6 +84,7 @@ class ContextualPredictionController(private val host: Host) {
         val inputConnection: () -> InputConnection?,
         val selection: () -> CursorRange,
         val inputSessionEpoch: () -> Long,
+        val editorStateRevision: () -> Long,
         val activePreedit: () -> String,
         val editorComposingText: () -> String,
         val finishCompositionForDirectAction: () -> Boolean,
@@ -153,9 +154,11 @@ class ContextualPredictionController(private val host: Host) {
         }
     }
 
+    /** [isComplete] is false when the editor did not return the text before the cursor. */
     private data class ResolvedContextualPredictions(
         val predictions: List<AiPrediction>,
-        val generation: Long?
+        val generation: Long?,
+        val isComplete: Boolean = true
     )
 
     private fun mergeGeneratedSentencePredictions(
@@ -172,6 +175,8 @@ class ContextualPredictionController(private val host: Host) {
 
     @Volatile
     private var contextualResultCache: CachedContextualPredictions? = null
+
+    private val snapshotCache = ContextualSnapshotCache<ResolvedContextualPredictions>()
 
     private var contextualPredictKey: ContextualPredictionMemoKey? = null
     private var contextualPredictJob: Job? = null
@@ -327,7 +332,30 @@ class ContextualPredictionController(private val host: Host) {
         return results
     }
 
+    /**
+     * The predictions for the editor as it is now. One refresh asks for them several times, so the
+     * answer is reused while nothing that feeds it has changed; the editor and its composition are
+     * not read again until [ContextualSnapshotKey] differs.
+     */
     private fun getRawContextualPredictions(limit: Int): ResolvedContextualPredictions {
+        val application = FcitxApplication.getInstance()
+        val selection = host.selection()
+        val key = ContextualSnapshotKey(
+            editorStateRevision = host.editorStateRevision(),
+            predictionEpoch = predictionEpoch,
+            sentencePackRevision = application.sentencePacks.revision,
+            generatedSentenceRevision = if (OnDeviceAiSupport.isSupported) application.generatedSentenceBank.revision else 0L,
+            allowsTextInspection = host.allowsTextInspection(),
+            selectionStart = selection.start,
+            selectionEnd = selection.end,
+            limit = limit
+        )
+        return snapshotCache.resolve(key, isReusable = { it.isComplete }) {
+            computeRawContextualPredictions(limit)
+        }
+    }
+
+    private fun computeRawContextualPredictions(limit: Int): ResolvedContextualPredictions {
         if (!host.allowsTextInspection() || host.selection().isNotEmpty()) {
             predictionMetricsSession.reset()
             return ResolvedContextualPredictions(emptyList(), null)
@@ -351,6 +379,8 @@ class ContextualPredictionController(private val host: Host) {
         }
         val readBeforeCursor = ic.getTextBeforeCursor(128, 0)?.toString()
         val isContextKnown = readBeforeCursor != null
+        fun result(predictions: List<AiPrediction>, generation: Long?) =
+            ResolvedContextualPredictions(predictions, generation, isContextKnown)
         val beforeCursor = ContextualPredictionInput.committedTextBeforeCursor(
             readBeforeCursor.orEmpty(),
             host.editorComposingText()
@@ -361,19 +391,19 @@ class ContextualPredictionController(private val host: Host) {
         // 2. Email field -> smart email domain suggestions, zero sentence completions
         if (isEmail) {
             predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(getEmailDomainPredictions(beforeCursor, activePreedit, limit), null)
+            return result(getEmailDomainPredictions(beforeCursor, activePreedit, limit), null)
         }
 
         // 3. URL field -> web domain suggestions, zero sentence completions
         if (isUrl) {
             predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(getUrlDomainPredictions(beforeCursor, activePreedit, limit), null)
+            return result(getUrlDomainPredictions(beforeCursor, activePreedit, limit), null)
         }
 
         // 4. Non-conversational text field (e.g. search filter with NO_SUGGESTIONS) -> emptyList()
         if (!isConversational) {
             predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
+            return result(emptyList(), null)
         }
 
         val pkgName = currentInputEditorInfo.packageName
@@ -384,7 +414,7 @@ class ContextualPredictionController(private val host: Host) {
         // 계속 제시한다.
         if (resolved.stroke.isBlank() && resolved.context.isBlank()) {
             predictionMetricsSession.reset()
-            return ResolvedContextualPredictions(emptyList(), null)
+            return result(emptyList(), null)
         }
 
         val application = FcitxApplication.getInstance()
@@ -400,7 +430,7 @@ class ContextualPredictionController(private val host: Host) {
         val inputSessionEpoch = host.inputSessionEpoch()
         contextualResultCache?.let { cached ->
             if (cached.key == memoKey) {
-                return ResolvedContextualPredictions(cached.predictions, cached.generation)
+                return result(cached.predictions, cached.generation)
             }
         }
         predictionMetricsSession.reset()
@@ -466,35 +496,32 @@ class ContextualPredictionController(private val host: Host) {
                             generation = ++nextContextualPredictionGeneration,
                             predictions = publishedResults
                         )
+                        snapshotCache.invalidate()
                         host.inputView()?.refreshContextualCandidates()
                     }
                 }
             }
         }
-        return ResolvedContextualPredictions(immediateResults, immediateGeneration)
+        return result(immediateResults, immediateGeneration)
     }
 
-    fun getContextualSentencePredictions(limit: Int = 2): List<CandidateWord> {
-        val predictions = getRawContextualPredictions(limit = 10).predictions
-        return predictions.filter { it.isSentenceCompletion }.take(limit).mapIndexed { index, pred ->
-            CandidateWord(
-                label = (index + 1).toString(),
-                text = pred.text,
-                comment = pred.badge
-            )
-        }
-    }
+    fun getContextualSentencePredictions(limit: Int = 2): List<CandidateWord> =
+        contextualPredictionWords(limit) { it.isSentenceCompletion }
 
-    fun getContextualWordPredictions(limit: Int = 4): List<CandidateWord> {
-        val predictions = getRawContextualPredictions(limit = 10).predictions
-        return predictions.filter { !it.isSentenceCompletion }.take(limit).mapIndexed { index, pred ->
-            CandidateWord(
-                label = (index + 1).toString(),
-                text = pred.text,
-                comment = pred.badge
-            )
-        }
-    }
+    fun getContextualWordPredictions(limit: Int = 4): List<CandidateWord> =
+        contextualPredictionWords(limit) { !it.isSentenceCompletion }
+
+    private fun contextualPredictionWords(limit: Int, include: (AiPrediction) -> Boolean): List<CandidateWord> =
+        getRawContextualPredictions(limit = 10).predictions
+            .filter(include)
+            .take(limit)
+            .mapIndexed { index, pred ->
+                CandidateWord(
+                    label = (index + 1).toString(),
+                    text = pred.text,
+                    comment = pred.badge
+                )
+            }
 
     /**
      * Provides one immutable cache generation to the candidate UI so metrics preserve the source

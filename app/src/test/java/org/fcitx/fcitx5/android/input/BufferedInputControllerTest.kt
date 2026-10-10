@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input
 
 import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
+import org.fcitx.fcitx5.android.input.buffered.BufferedInputTransport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -65,6 +66,43 @@ class BufferedInputControllerTest {
         assertEquals("가😀", controller.prefix)
         assertTrue(controller.deleteLastCharacter())
         assertEquals("가", controller.prefix)
+    }
+
+    @Test
+    fun everyEditOfTheBufferedTextChangesTheRevision() {
+        val controller = BufferedInputController()
+        val edits = listOf<(BufferedInputController) -> Unit>(
+            { it.capture("한글") },
+            { it.deleteLastCharacter() },
+            { it.capture("입력") },
+            { it.deleteLastCodePoints(1) },
+            { it.markSubmitted(BufferedInputTransport.DirectCommit) },
+            { it.capture("다시") },
+            { it.markDeliveryFailed(BufferedInputTransport.DirectCommit) },
+            { it.cancel() },
+            { it.capture("끝") },
+            { it.clear() }
+        )
+
+        edits.forEachIndexed { index, edit ->
+            val before = controller.revision
+            edit(controller)
+            assertTrue("edit $index", controller.revision > before)
+        }
+    }
+
+    @Test
+    fun readingTheBufferedTextKeepsTheRevision() {
+        val controller = BufferedInputController()
+        controller.capture("한")
+        val before = controller.revision
+
+        controller.snapshot("글")
+        controller.prefix
+        controller.extractForCopy()
+        controller.prepareRetry()
+
+        assertEquals(before, controller.revision)
     }
 
     @Test

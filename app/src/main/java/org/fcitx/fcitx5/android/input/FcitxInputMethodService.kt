@@ -223,6 +223,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private val composing = CursorRange()
     private var composingText = FormattedText.Empty
+        set(value) {
+            field = value
+            markEditorStateChanged()
+        }
 
     private fun resetComposingState() {
         composing.clear()
@@ -309,8 +313,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private val bufferedHangul = BufferedInputController()
     private var bufferedHangulSessionActive = false
+        set(value) {
+            field = value
+            markEditorStateChanged()
+        }
     @Volatile
     private var bufferedHangulEngineResetPending = false
+        set(value) {
+            field = value
+            markEditorStateChanged()
+        }
     private val consumedPhysicalKeysDown = mutableSetOf<Int>()
 
     @Volatile
@@ -339,6 +351,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
     )
     private var inputSessionEpoch = 0L
+
+    @Volatile
+    private var editorRevision = 0L
+
+    /**
+     * Changes whenever the text, composition, cursor or buffered Hangul that contextual
+     * predictions are built from may have changed, so a prediction made at one value is still
+     * right while it stays the same. Spurious changes only cost a recomputation; a missed one
+     * would show a stale prediction, so every editor write and engine event marks it.
+     */
+    val editorStateRevision: Long
+        get() = editorRevision + bufferedHangul.revision
+
+    private fun markEditorStateChanged() {
+        editorRevision++
+    }
 
     private val personalLearning: PersonalLearningController = PersonalLearningController(
         PersonalLearningController.Host(
@@ -377,6 +405,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             inputConnection = { currentInputConnection },
             selection = { currentInputSelection },
             inputSessionEpoch = { inputSessionEpoch },
+            editorStateRevision = { editorStateRevision },
             activePreedit = ::activePreeditForContextualInput,
             editorComposingText = ::editorComposingTextForContextualInput,
             finishCompositionForDirectAction = ::finishCompositionForDirectAction,
@@ -774,6 +803,25 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
+        when (event) {
+            is FcitxEvent.CommitStringEvent,
+            is FcitxEvent.KeyEvent,
+            is FcitxEvent.ClientPreeditEvent,
+            is FcitxEvent.DeleteSurroundingEvent,
+            is FcitxEvent.InputPanelEvent,
+            is FcitxEvent.IMChangeEvent -> {
+                markEditorStateChanged()
+                try {
+                    dispatchFcitxEvent(event)
+                } finally {
+                    markEditorStateChanged()
+                }
+            }
+            else -> dispatchFcitxEvent(event)
+        }
+    }
+
+    private fun dispatchFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.InternalPromptStartBarrier -> {
                 internalPrompt.deliverInternalPromptStartFence(event.data)
@@ -1503,41 +1551,47 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         end: Int,
         replacement: String,
         restore: EditorSelection
-    ): Boolean = AiEditorTransaction.replaceRange(
-        start = start,
-        end = end,
-        replacement = replacement,
-        restore = restore,
-        setSelection = connection::setSelection,
-        commitText = { text -> connection.commitText(text, 1) },
-        confirmCommit = { text ->
-            confirmsAiTextCommit(
-                connection = connection,
-                expectedText = text,
-                expectedCursor = start + text.length
-            )
-        }
-    )
+    ): Boolean {
+        markEditorStateChanged()
+        return AiEditorTransaction.replaceRange(
+            start = start,
+            end = end,
+            replacement = replacement,
+            restore = restore,
+            setSelection = connection::setSelection,
+            commitText = { text -> connection.commitText(text, 1) },
+            confirmCommit = { text ->
+                confirmsAiTextCommit(
+                    connection = connection,
+                    expectedText = text,
+                    expectedCursor = start + text.length
+                )
+            }
+        )
+    }
 
     private fun commitAiTextAtCursor(
         connection: android.view.inputmethod.InputConnection,
         cursor: Int,
         text: String,
         restore: EditorSelection
-    ): Boolean = AiEditorTransaction.commitAtCursor(
-        cursor = cursor,
-        text = text,
-        restore = restore,
-        setSelection = connection::setSelection,
-        commitText = { committed -> connection.commitText(committed, 1) },
-        confirmCommit = { committed ->
-            confirmsAiTextCommit(
-                connection = connection,
-                expectedText = committed,
-                expectedCursor = cursor + committed.length
-            )
-        }
-    )
+    ): Boolean {
+        markEditorStateChanged()
+        return AiEditorTransaction.commitAtCursor(
+            cursor = cursor,
+            text = text,
+            restore = restore,
+            setSelection = connection::setSelection,
+            commitText = { committed -> connection.commitText(committed, 1) },
+            confirmCommit = { committed ->
+                confirmsAiTextCommit(
+                    connection = connection,
+                    expectedText = committed,
+                    expectedCursor = cursor + committed.length
+                )
+            }
+        )
+    }
 
     /**
      * Confirms that the asynchronous editor command changed the currently visible input before
@@ -1619,6 +1673,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (!DictationErasePolicy.canErase(ic.getTextBeforeCursor(expected.length, 0), expected)) {
             return false
         }
+        markEditorStateChanged()
         val deleted = ic.deleteSurroundingText(expected.length, 0)
         if (deleted) {
             selection.predictOffset(-expected.length)
@@ -1829,6 +1884,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val ic = currentInputConnection ?: return false
         if (ic.getTextBeforeCursor(expected.length, 0)?.toString() != expected) return false
         val previousCursor = currentInputSelection.start
+        markEditorStateChanged()
         var dispatched = true
         ic.withBatchEdit {
             dispatched = deleteSurroundingText(expected.length, 0) && dispatched
@@ -1862,6 +1918,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     ): Boolean {
         if (isInternalPromptInputOwned && !allowPromptStart) return false
         val ic = currentInputConnection ?: return false
+        markEditorStateChanged()
         personalLearning.captureCorrectionBoundarySnapshot()
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
@@ -2111,6 +2168,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             BufferedInputTransport.SystemPaste -> {
                 if (!setBufferedClipboard(text)) return false
+                markEditorStateChanged()
                 try {
                     // The Boolean only acknowledges dispatch across RemoteInputConnection; it is
                     // not the target editor's paste result and must not drive an auto fallback.
@@ -2180,7 +2238,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         eventTime: Long,
         keyEventCode: Int,
         metaState: Int = 0
-    ): Boolean = currentInputConnection?.sendKeyEvent(
+    ): Boolean {
+        markEditorStateChanged()
+        return currentInputConnection?.sendKeyEvent(
             KeyEvent(
                 eventTime,
                 eventTime,
@@ -2193,12 +2253,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
             )
         ) == true
+    }
 
     private fun sendUpKeyEvent(
         eventTime: Long,
         keyEventCode: Int,
         metaState: Int = 0
-    ): Boolean = currentInputConnection?.sendKeyEvent(
+    ): Boolean {
+        markEditorStateChanged()
+        return currentInputConnection?.sendKeyEvent(
             KeyEvent(
                 eventTime,
                 SystemClock.uptimeMillis(),
@@ -2211,12 +2274,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
             )
         ) == true
+    }
 
     fun deleteSelection() {
         if (isInternalPromptInputOwned) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         selection.predict(lastSelection.start)
+        markEditorStateChanged()
         currentInputConnection?.commitText("", 1)
     }
 
@@ -2256,6 +2321,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** Sends an editor-directed key pair only while no internal prompt owns the input target. */
     fun sendEditorKeyEvents(keyEventCode: Int): Boolean {
         if (isInternalPromptInputOwned) return false
+        markEditorStateChanged()
         sendDownUpKeyEvents(keyEventCode)
         return true
     }
@@ -2263,6 +2329,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** Performs an editor context-menu action without bypassing the prompt isolation gate. */
     fun performEditorContextMenuAction(action: Int): Boolean {
         if (isInternalPromptInputOwned) return false
+        markEditorStateChanged()
         return currentInputConnection?.performContextMenuAction(action) == true
     }
 
@@ -2274,6 +2341,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             val end = max(lastSelection.end + offsetEnd, 0)
             if (start > end) return
             selection.predict(start, end)
+            markEditorStateChanged()
             it.setSelection(start, end)
         }
     }
@@ -2284,6 +2352,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (lastSelection.isEmpty()) return
         val end = lastSelection.end
         selection.predict(end)
+        markEditorStateChanged()
         currentInputConnection?.setSelection(end, end)
     }
 
@@ -2493,6 +2562,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        markEditorStateChanged()
         // Android can reuse identical EditorInfo metadata for a different text field. An internal
         // prompt therefore never survives a new input-session boundary, even for a same-app
         // restart: dropping a draft is safer than sending a later GIF/AI action to the wrong field.
@@ -2582,10 +2652,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 focus(true)
             }
         }
+        markEditorStateChanged()
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
+        markEditorStateChanged()
         if (allowsCredentialProtectedFeatures) {
             automaticSuggestion.cancelAutomaticSuggestionHideClose()
         }
@@ -2630,6 +2702,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (allowsCredentialProtectedFeatures) {
             automaticSuggestion.onStartInputView(info, viewCapabilityFlags)
         }
+        markEditorStateChanged()
     }
 
     override fun onUpdateSelection(
@@ -2641,6 +2714,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesEnd: Int
     ) {
         lastEditorActivityAtMs = SystemClock.elapsedRealtime()
+        markEditorStateChanged()
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         currentInputEditorInfo.let { info ->
             SensitivePhraseSession.onEditorChanged(
@@ -2663,6 +2737,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             candidatesEnd,
             cursorUpdateIndex
         )
+        markEditorStateChanged()
         inputView?.updateSelection(newSelStart, newSelEnd)
         if (allowsCredentialProtectedFeatures) {
             personalLearning.flushTypingDnaIfEditorEmptied(newSelStart, newSelEnd)
@@ -2670,6 +2745,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUpdateExtractedText(token: Int, text: ExtractedText?) {
+        markEditorStateChanged()
         if (onDeviceContextCompletion.activeExtractedTextToken == token) {
             onDeviceContextCompletion.onExtractedTextUpdated()
             return
@@ -2976,6 +3052,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        markEditorStateChanged()
         inputView?.finishInlineDictation()
         // 재료 생성의 경계는 입력 뷰 가시성이다. 자동 추천의 웜 유예(onKeyboardVisibilityChanged)와
         // 분리되어 숨김 즉시 배경 축적이 가능해진다.
@@ -3008,10 +3085,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         hideStatusIcon()
         showingDialog?.dismiss()
+        markEditorStateChanged()
     }
 
     override fun onFinishInput() {
         Timber.d("onFinishInput")
+        markEditorStateChanged()
         OnDeviceGenerationControl.onInputViewVisibilityChanged(false)
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         if (allowsCredentialProtectedFeatures) {
@@ -3037,9 +3116,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             focus(false)
         }
         capabilityFlags = CapabilityFlags.DefaultFlags
+        markEditorStateChanged()
     }
 
     override fun onUnbindInput() {
+        markEditorStateChanged()
         onDeviceContextCompletion.notifyOnDeviceContextSnapshotInvalidated()
         engineRestartEditorRehydrationGate.onUnbindInput()
         internalPrompt.cancelInternalPromptCapture(discardPreStartCallbacks = true)
