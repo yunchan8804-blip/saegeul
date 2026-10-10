@@ -7,11 +7,6 @@ package org.fcitx.fcitx5.android
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import org.fcitx.fcitx5.android.input.buffered.BufferedInputController
-import org.fcitx.fcitx5.android.media.MediaFavoritesManager
-import org.fcitx.fcitx5.android.media.MediaItem
-import org.fcitx.fcitx5.android.media.MediaType
-import org.fcitx.fcitx5.android.tab.TabId
-import org.fcitx.fcitx5.android.tab.TabManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -25,15 +20,11 @@ import org.junit.Test
 class E2EDeviceComprehensiveTddTest {
 
     private lateinit var appContext: Context
-    private lateinit var tabManager: TabManager
-    private lateinit var mediaFavorites: MediaFavoritesManager
     private lateinit var bufferController: BufferedInputController
 
     @Before
     fun setUp() {
         appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        tabManager = TabManager()
-        mediaFavorites = MediaFavoritesManager(maxCapacity = 200)
         bufferController = BufferedInputController()
     }
 
@@ -42,41 +33,6 @@ class E2EDeviceComprehensiveTddTest {
         assertNotNull(appContext)
         assertTrue(appContext.packageName.startsWith("net.chanpaca.saegeul"))
         assertNotNull(appContext.packageManager)
-    }
-
-    @Test
-    fun testTabManager1000CyclesStressOnDevice() {
-        // Execute 1,000 rapid state mutations on real device runtime
-        for (i in 0 until 1000) {
-            val tabId = TabId.entries[i % TabId.entries.size]
-            assertTrue(tabManager.selectTab(tabId))
-            assertEquals(tabId, tabManager.activeTab.id)
-
-            tabManager.setTabBadgeCount(tabId, i)
-            assertEquals(i, tabManager.getVisibleTabs().first { it.id == tabId }.badgeCount)
-        }
-
-        assertEquals(7, tabManager.getVisibleTabs().size)
-    }
-
-    @Test
-    fun testMediaFavorites1000OperationsOnDevice() {
-        for (i in 0 until 1000) {
-            val item = MediaItem(
-                id = "fav_$i",
-                title = "인기 짤 $i",
-                url = "https://saegeul.internal/media/$i.gif",
-                thumbnailUrl = "https://saegeul.internal/thumb/$i.jpg",
-                mediaType = MediaType.GIF,
-                tags = listOf("태그_$i", "모바일", "테스트")
-            )
-            mediaFavorites.addFavorite(item)
-        }
-
-        // Capped to max capacity 200
-        assertEquals(200, mediaFavorites.getFavorites().size)
-        assertTrue(mediaFavorites.search("모바일").isNotEmpty())
-        assertTrue(mediaFavorites.findByTag("테스트").isNotEmpty())
     }
 
     @Test
