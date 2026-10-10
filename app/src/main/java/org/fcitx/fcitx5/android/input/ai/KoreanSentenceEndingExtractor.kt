@@ -4,15 +4,15 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
+
 /** Extracts observed Korean sentence-final expressions without claiming morphological analysis. */
 object KoreanSentenceEndingExtractor {
 
-    private val sentenceBoundary = Regex("[.!?\\n\\r。！？]+")
     private val trailingPunctuation = setOf('.', ',', '!', '?', '…', '。', '！', '？', ':', ';', '·')
     private val closingMarks = setOf('"', '\'', '”', '’', ')', ']', '}', '〉', '》', '」', '』', '】')
 
-    fun sentenceFragments(text: String): List<String> = text
-        .split(sentenceBoundary)
+    fun sentenceFragments(text: String): List<String> = SentenceBoundary.splitSentences(text)
         .map(::normalizeFragment)
         .filter { it.isNotBlank() }
 

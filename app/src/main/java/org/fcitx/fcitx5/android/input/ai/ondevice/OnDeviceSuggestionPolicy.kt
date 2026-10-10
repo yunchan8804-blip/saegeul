@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import kotlin.text.CharCategory.CONTROL
 import kotlin.text.CharCategory.FORMAT
 
@@ -117,20 +118,9 @@ object OnDeviceSuggestionPolicy {
 
     /** Shared by [promptFor] and [parse] so the model is asked about, and the reply is judged against, the same split. */
     private fun splitSentences(text: String): SentenceSplit {
-        var completedEnd = 0
-        var currentStart = 0
-        for (index in text.indices) {
-            val character = text[index]
-            if (character == '\n' || character == '\r') {
-                completedEnd = index
-                currentStart = index + 1
-            } else if (character in terminalPunctuation && index + 1 < text.length && text[index + 1].isWhitespace()) {
-                completedEnd = index + 1
-                currentStart = index + 1
-            }
-        }
-        val completed = text.substring(0, completedEnd).trim()
-        val current = text.substring(currentStart).trimStart()
+        val sentenceEnd = SentenceBoundary.boundaryEnds(text).lastOrNull() ?: 0
+        val completed = text.substring(0, sentenceEnd).trim()
+        val current = text.substring(sentenceEnd).trimStart()
         if (current.length <= MAX_CURRENT_CHARS) return SentenceSplit(completed, completed, current)
         val cut = wordBoundaryCut(current, MAX_CURRENT_CHARS) ?: when {
             current.length <= MAX_SHOWN_CURRENT_CHARS -> return SentenceSplit(completed, completed, current)
@@ -161,7 +151,7 @@ object OnDeviceSuggestionPolicy {
     private fun detectTone(split: SentenceSplit, input: Input): Tone? {
         var polite = 0
         var casual = 0
-        val sentences = split.completed.split(sentenceBreak).filter { it.isNotBlank() } +
+        val sentences = SentenceBoundary.splitSentences(split.completed) +
             input.recentSentences.map(::oneLine)
         for (sentence in sentences) {
             when (endingTone(sentence)) {
@@ -318,13 +308,11 @@ object OnDeviceSuggestionPolicy {
         return suffix.substring(0, endExclusive).takeIf { endExclusive > contentStart }
     }
 
-    /** Keeps only the first sentence when a terminal mark is followed by whitespace and more text. */
+    /** Keeps only the first sentence when a sentence boundary is followed by more text. */
     private fun truncateAfterFirstSentence(suffix: String): String {
-        for (index in 0 until suffix.lastIndex) {
-            if (suffix[index] in terminalPunctuation && suffix[index + 1].isWhitespace() &&
-                (index + 1..suffix.lastIndex).any { !suffix[it].isWhitespace() }
-            ) {
-                return suffix.substring(0, index + 1)
+        for (end in SentenceBoundary.boundaryEnds(suffix)) {
+            if (end < suffix.length && (end until suffix.length).any { !suffix[it].isWhitespace() }) {
+                return suffix.substring(0, end)
             }
         }
         return suffix
@@ -339,8 +327,9 @@ object OnDeviceSuggestionPolicy {
             if (Character.getType(codePoint) != Character.OTHER_SYMBOL.toInt() && !Character.isWhitespace(codePoint)) break
             end -= Character.charCount(codePoint)
         }
-        val last = suffix.substring(0, end).lastOrNull() ?: return false
-        return last in terminalPunctuation || HangulSyllable.isSyllable(last)
+        val body = suffix.substring(0, end)
+        val last = body.lastOrNull() ?: return false
+        return SentenceBoundary.endsSentence(body) || HangulSyllable.isSyllable(last)
     }
 
     /**
@@ -435,7 +424,6 @@ object OnDeviceSuggestionPolicy {
     private fun isUnsafeOutputCharacter(character: Char): Boolean =
         character == '\uFFFD' || character.category == CONTROL || character.category == FORMAT
 
-    private val terminalPunctuation = setOf('.', '?', '!', '。', '！', '？')
     private val disallowedReplyCharacters = setOf('"', '\'', '“', '”', '‘', '’', '{', '}', '[', ']', '(', ')', '（', '）', '`', '*')
     private val replyMarkers = setOf("답변:", "설명:", "출력:", "json:", "markdown:")
     private val allowedInputControls = setOf('\n', '\r', '\t')
@@ -448,7 +436,6 @@ object OnDeviceSuggestionPolicy {
     private val unresolvedLabel = Regex("^[A-Z_]{2,16}$")
     private val whitespaceRun = Regex("\\s+")
     private val lineBreakOrControlRun = Regex("[\\p{Cc}\\p{Cf}\\u2028\\u2029]+")
-    private val sentenceBreak = Regex("(?<=[.?!。！？])\\s+|[\\r\\n]+")
     private val politeMarkers = Regex("하신|드리|드릴|드렸|드립|께서|십시")
     private val politeEndings = listOf("요", "니다", "니까", "세요", "시오")
     private val casualEndings =

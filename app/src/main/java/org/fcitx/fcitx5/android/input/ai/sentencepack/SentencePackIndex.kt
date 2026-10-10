@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.ai.sentencepack
 
 import org.fcitx.fcitx5.android.input.ai.ContextualAppend
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 
 enum class MatchEvidence {
     PREFIX,
@@ -27,8 +28,8 @@ internal class SentencePackIndex private constructor(
 ) {
     fun complete(rawContext: String, limit: Int): List<SentencePackMatch> {
         if (limit <= 0 || rawContext.isBlank() || !SentencePackText.isQuerySafe(rawContext)) return emptyList()
-        val tail = rawContext.substring(lastSentenceStart(rawContext))
-        if (tail.isBlank() || tail.trimEnd().lastOrNull().let(::isSentenceTerminal)) return emptyList()
+        val tail = SentenceBoundary.currentSentence(rawContext)
+        if (tail.isBlank()) return emptyList()
         val endsAtBoundary = tail.last().isWhitespace()
         val normalized = SentencePackText.normalize(tail)
         if (normalized.isBlank()) return emptyList()
@@ -85,7 +86,7 @@ internal class SentencePackIndex private constructor(
             }
             if (endsAtBoundary && joinMode == ContextualAppend.JoinMode.ATTACH) continue
             if (maxSuffixTokens != null && suffix.split(' ').size > maxSuffixTokens) continue
-            if (requiresTerminalSuffix && !isSentenceTerminal(suffix.lastOrNull())) continue
+            if (requiresTerminalSuffix && !SentenceBoundary.endsSentence(suffix)) continue
             results.putIfAbsent(
                 suffix to joinMode,
                 SentencePackMatch(suffix, joinMode, matchedTokens, evidence)
@@ -97,11 +98,6 @@ internal class SentencePackIndex private constructor(
 
     private fun isEligibleLastWord(token: String): Boolean = token.length >= 2 &&
         token !in excludedLastWords && token.all(HangulSyllable::isSyllable)
-
-    private fun lastSentenceStart(context: String): Int {
-        val index = context.indexOfLast { isSentenceTerminal(it) || it == '\n' || it == '\r' }
-        return index + 1
-    }
 
     private fun lowerBound(entries: List<Entry>, key: String): Int {
         var low = 0
@@ -135,7 +131,5 @@ internal class SentencePackIndex private constructor(
             }.distinctBy(Entry::text).sortedBy(Entry::text)
             return SentencePackIndex(roots, suffixes, normalized.size)
         }
-
-        private fun isSentenceTerminal(character: Char?): Boolean = character == '.' || character == '?' || character == '!'
     }
 }

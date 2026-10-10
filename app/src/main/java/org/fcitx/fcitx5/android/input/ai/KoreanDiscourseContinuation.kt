@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 
 internal object KoreanDiscourseContinuation {
     private val connectiveSuffixes = listOf("는데", "은데")
@@ -12,8 +13,6 @@ internal object KoreanDiscourseContinuation {
     private val contrastWords = listOf("그래도", "아직")
     private val nextSentenceWords = listOf("그리고", "그런데", "이제")
     private val whitespace = Regex("\\s+")
-    private val sentenceBoundary = Regex("[.!?\\n\\r]")
-    private val sentenceTerminals = setOf('.', '!', '?')
 
     fun suggest(rawContext: String): List<String> {
         if (!isSafeContext(rawContext)) return emptyList()
@@ -34,9 +33,9 @@ internal object KoreanDiscourseContinuation {
 
     private fun nextSentenceSuggestion(rawContext: String): List<String> {
         val terminalContext = rawContext.trimEnd(' ')
-        if (terminalContext.lastOrNull() !in sentenceTerminals) return emptyList()
-        if (terminalContext.dropLast(1).lastOrNull()?.isDigit() == true) return emptyList()
-        val lastSentence = terminalContext.dropLast(1).split(sentenceBoundary).lastOrNull().orEmpty()
+        if (!SentenceBoundary.endsSentence(terminalContext)) return emptyList()
+        val body = terminalContext.trimEnd { SentenceBoundary.isTerminal(it) || it in SentenceBoundary.CLOSERS }
+        val lastSentence = SentenceBoundary.currentSentence(body)
         if (lastSentence.any { it in '\u1100'..'\u11FF' || it in '\u3130'..'\u318F' }) return emptyList()
         return if (lastSentence.any(HangulSyllable::isSyllable)) nextSentenceWords else emptyList()
     }

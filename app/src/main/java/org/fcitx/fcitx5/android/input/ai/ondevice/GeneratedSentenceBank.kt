@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 import org.fcitx.fcitx5.android.input.ai.rule.KoreanSpacingLint
@@ -14,6 +15,7 @@ import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackMatch
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackText
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultFile
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -48,6 +50,7 @@ class GeneratedSentenceBank(
         return snapshot.entries.count { it.text.startsWith(prefix) }
     }
 
+    @VisibleForTesting
     fun addGeneratedForPrefix(response: String, prefix: String, modelId: String, modelSha256: String): IngestionReport {
         require(prefix in GeneratedMaterialPolicy.PREFIXES) { "Unknown generated-material prefix" }
         val source = Source(modelId.requireModelId(), modelSha256.requireSha256())
@@ -97,7 +100,7 @@ class GeneratedSentenceBank(
                 rejectionReasons.increment(IngestionRejectionReason.INVALID_SENTENCE)
                 continue
             }
-            if (!isTerminal(candidate)) {
+            if (!SentenceBoundary.endsSentence(candidate)) {
                 rejectionReasons.increment(IngestionRejectionReason.MISSING_TERMINAL)
                 continue
             }
@@ -230,7 +233,7 @@ class GeneratedSentenceBank(
             }
             val normalized = SentencePackText.normalizeAccepted(value)
                 ?: throw GeneratedSentenceBankFormatException("Generated response entry $index is not an accepted sentence")
-            if (!isTerminal(normalized)) {
+            if (!SentenceBoundary.endsSentence(normalized)) {
                 throw GeneratedSentenceBankFormatException("Generated response entry $index must end with a sentence terminal")
             }
             if (KoreanSpacingLint.hasSpacingIssue(normalized)) {
@@ -285,7 +288,7 @@ class GeneratedSentenceBank(
         if (KoreanPiiScrubber.containsPii(text)) {
             throw GeneratedSentenceBankFormatException("Generated sentence bank entry $index contains PII")
         }
-        if (SentencePackText.normalizeAccepted(text) != text || !isTerminal(text)) {
+        if (SentencePackText.normalizeAccepted(text) != text || !SentenceBoundary.endsSentence(text)) {
             throw GeneratedSentenceBankFormatException("Generated sentence bank entry $index is not an accepted terminal sentence")
         }
     }
@@ -318,7 +321,7 @@ class GeneratedSentenceBank(
             if (continuation.isEmpty()) return IngestionRejectionReason.EMPTY_CONTINUATION
             if (continuation.startsWith(prefix.trim())) return IngestionRejectionReason.REPEATED_PREFIX
         }
-        if (text.dropLast(1).any { it == '.' || it == '?' || it == '!' }) {
+        if (SentenceBoundary.splitSentences(text).size > 1) {
             return IngestionRejectionReason.MULTIPLE_SENTENCES
         }
         val words = text.split(' ').filter(String::isNotBlank)
@@ -365,8 +368,6 @@ class GeneratedSentenceBank(
         return trimmed.substring(firstLineEnd + 1, trimmed.length - 3).trim()
     }
 
-    private fun isTerminal(text: String): Boolean = text.lastOrNull()?.let(TERMINALS::contains) == true
-
     private fun String.requireModelId(): String {
         if (any(Character::isISOControl)) throw GeneratedSentenceBankFormatException("modelId is invalid")
         val value = trim()
@@ -401,7 +402,6 @@ class GeneratedSentenceBank(
         const val MAX_MODEL_ID_LENGTH = 128
         const val MAX_PUBLIC_START_LENGTH = 64
         val SHA256 = Regex("^[0-9a-fA-F]{64}$")
-        val TERMINALS = setOf('.', '?', '!')
     }
 }
 

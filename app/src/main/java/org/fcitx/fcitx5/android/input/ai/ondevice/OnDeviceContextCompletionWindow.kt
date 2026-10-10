@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.input.panel.panelButton
 import org.fcitx.fcitx5.android.input.panel.panelColumn
 import org.fcitx.fcitx5.android.input.panel.panelScrollRoot
 import org.fcitx.fcitx5.android.input.panel.panelSurface
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.ui.main.ai.install.GemmaInstallUiState
@@ -372,12 +373,10 @@ class OnDeviceContextCompletionWindow :
 
     private fun isCurrentWindow(): Boolean = !detached && windowManager.isAttached(this)
 
-    private fun isTerminalContext(text: String): Boolean =
-        text.trimEnd().lastOrNull() in TERMINAL_PUNCTUATION
+    private fun isTerminalContext(text: String): Boolean = SentenceBoundary.endsSentence(text)
 
     private companion object {
         const val CURRENT_CHECK_MILLIS = 100L
-        val TERMINAL_PUNCTUATION = setOf('.', '?', '!', '。', '！', '？')
     }
 }
 

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 
 /**
  * Resolves the raw text before the cursor and any in-progress composing text into the
@@ -16,8 +17,6 @@ import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 internal object ContextualPredictionInput {
 
     data class Resolved(val stroke: String, val context: String)
-
-    private val SENTENCE_MARKS = charArrayOf('.', '?', '!', '…')
 
     fun rawFullContext(currentStroke: String, contextBeforeCursor: String): String = when {
         currentStroke.isBlank() -> contextBeforeCursor
@@ -71,8 +70,8 @@ internal object ContextualPredictionInput {
         val token = if (lastWs >= 0) textBeforeCursor.substring(lastWs + 1) else textBeforeCursor
         val context = if (lastWs >= 0) textBeforeCursor.substring(0, lastWs + 1) else ""
 
-        // 공백 없이 이어진 어절 안 문장 끝 부호(. ? ! …)의 마지막 연속 구간이 끝나는 위치.
-        val markEnd = token.indexOfLast { it in SENTENCE_MARKS } + 1
+        // 공백 없이 이어진 어절 안 문장 끝 부호([SentenceBoundary.TERMINALS])의 마지막 연속 구간이 끝나는 위치.
+        val markEnd = token.indexOfLast(SentenceBoundary::isTerminal) + 1
         if (markEnd > 0) {
             val rest = token.substring(markEnd) + composingText
             if (rest.isNotEmpty() && isHangul(rest[0])) {

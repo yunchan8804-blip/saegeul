@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai.prediction.source
 
 import org.fcitx.fcitx5.android.input.ai.ContextualPredictionInput
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 
 /**
  * Fragment handed to keyboard-aware typo correction, with how many characters before the cursor
@@ -27,11 +28,6 @@ internal class PredictionInput(
     val isContextKnown: Boolean = true
 ) {
 
-    companion object {
-        // Characters that end a sentence; the text after the last one is the sentence being typed.
-        private val SENTENCE_TERMINATORS = charArrayOf('.', '?', '!', '\n')
-    }
-
     val cleanStroke: String = currentStroke.trim()
 
     val cleanContext: String = contextBeforeCursor.trim()
@@ -40,14 +36,11 @@ internal class PredictionInput(
 
     val lastWordInContext: String = lastWordOf(cleanContext)
 
-    private val lastTerminatorIndex = contextBeforeCursor.lastIndexOfAny(SENTENCE_TERMINATORS)
-
     /**
-     * True when only whitespace follows the last sentence terminator, so the words before the
-     * cursor belong to a sentence that already ended and are no longer typo-corrected.
+     * True when the context ends at a sentence boundary, so the words before the cursor belong to
+     * a sentence that already ended and are no longer typo-corrected.
      */
-    val contextEndsSentence: Boolean =
-        lastTerminatorIndex >= 0 && contextBeforeCursor.substring(lastTerminatorIndex + 1).isBlank()
+    val contextEndsSentence: Boolean = SentenceBoundary.endsSentence(contextBeforeCursor)
 
     val typoTarget: TypoTarget? = when {
         cleanStroke.isNotBlank() -> TypoTarget(cleanStroke, cleanStroke.length)
@@ -58,9 +51,9 @@ internal class PredictionInput(
         else -> null
     }
 
-    /** The sentence being typed: the context after its last terminator, joined with the stroke. */
+    /** The sentence being typed: the context after its last sentence boundary, joined with the stroke. */
     val currentSentence: String = run {
-        val baseSentence = contextBeforeCursor.substring(lastTerminatorIndex + 1).trim()
+        val baseSentence = SentenceBoundary.currentSentence(contextBeforeCursor).trim()
         if (cleanStroke.isNotBlank()) {
             if (baseSentence.isNotBlank()) {
                 if (baseSentence.endsWith(cleanStroke)) {

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import java.io.IOException
 import java.io.InputStream
 import java.nio.ByteBuffer
@@ -199,7 +200,6 @@ class BundledKoreanNgram private constructor(
         private const val MAX_BYTES = 32 * 1024 * 1024
 
         private val HANGUL_WORD = Regex("^[가-힣]{1,12}$")
-        private val SENTENCE_END = charArrayOf('.', '?', '!', '…', '\n', '\r')
         private val INLINE_WHITESPACE_RUN = Regex("[\\s\\p{Z}]+")
 
         fun read(input: InputStream): BundledKoreanNgram {
@@ -259,8 +259,8 @@ class BundledKoreanNgram private constructor(
         fun contextWords(textBeforeCursor: String): Pair<String?, String>? {
             if (textBeforeCursor.isBlank()) return null
             val trimmed = textBeforeCursor.trimEnd(::isInlineWhitespace)
-            if (trimmed.isEmpty() || trimmed.last() in SENTENCE_END) return null
-            val sentence = trimmed.substring(trimmed.lastIndexOfAny(SENTENCE_END) + 1)
+            if (trimmed.isEmpty() || SentenceBoundary.endsSentence(trimmed)) return null
+            val sentence = SentenceBoundary.currentSentence(trimmed)
             val raw = sentence.split(INLINE_WHITESPACE_RUN).filter { it.isNotEmpty() }
             if (raw.isEmpty()) return null
             val prev1 = cleanWord(raw.last()) ?: return null
@@ -274,7 +274,7 @@ class BundledKoreanNgram private constructor(
          */
         fun isSentenceStart(textBeforeCursor: String): Boolean {
             val trimmed = textBeforeCursor.trimEnd(::isInlineWhitespace)
-            return trimmed.isEmpty() || trimmed.last() in SENTENCE_END
+            return trimmed.isEmpty() || SentenceBoundary.endsSentence(trimmed)
         }
 
         // 줄바꿈은 문장 경계라 걷어내지 않는다.

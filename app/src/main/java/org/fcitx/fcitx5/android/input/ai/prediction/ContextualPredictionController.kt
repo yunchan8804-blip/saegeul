@@ -42,6 +42,7 @@ import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import timber.log.Timber
 
 data class ContextualAppendSnapshot(
@@ -842,12 +843,7 @@ class ContextualPredictionController(private val host: Host) {
         }
 
         if (!sentence.contains(" ")) {
-            val lastSentence = beforeCursor
-                .substringAfterLast('.')
-                .substringAfterLast('?')
-                .substringAfterLast('!')
-                .substringAfterLast('\n')
-                .trim()
+            val lastSentence = SentenceBoundary.currentSentence(beforeCursor).trim()
             if (lastSentence.isNotEmpty()) {
                 val typoPairs = contextualPredictor.typoEngine.findTypoCorrectionsInSentence(lastSentence)
                 val matchingPair = typoPairs.firstOrNull { it.second == sentence }

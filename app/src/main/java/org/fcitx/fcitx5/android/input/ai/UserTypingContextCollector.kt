@@ -1,5 +1,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
+
 /**
  * Collects recent typing context within a sliding window per application package.
  * Triggers augmentation callback when contextual sentence boundaries are met.
@@ -18,7 +20,6 @@ class UserTypingContextCollector(
     private var currentEditorSession: Pair<String, Int>? = null
 
     companion object {
-        private val SENTENCE_TERMINATORS = setOf('.', '?', '!', '\n', '。', '？', '！')
         private val KOREAN_ENDINGS = listOf(
             "습니다", "드립니다", "니다", "세요", "할까요", "인가요", "네요", "죠",
             "해요", "이요", "요",
@@ -54,15 +55,16 @@ class UserTypingContextCollector(
         // (c) Latin/CJK punctuation splits immediately. A long chunk (dictation, paste) can hold
         // several sentences, so every boundary is emitted in order; whatever follows the last
         // boundary stays buffered and still goes through the Korean-ending check below.
-        // The one exception is a '.' run that a single-character commit just left at the very end
-        // of the buffer: the next keystroke may extend it ("...") or glue to it ("naver.com"), so
-        // that boundary only waits, like a Korean ending, and step (a) confirms it on whitespace.
-        val boundaries = findPunctuationBoundaries(buffer.toString())
+        // The one exception is a terminator run that a single-character commit just left at the very
+        // end of the buffer: the next keystroke may extend it ("...") or glue to it ("naver.com",
+        // "1~2"), so that boundary only waits, like a Korean ending, and step (a) confirms it on
+        // whitespace.
+        val boundaries = SentenceBoundary.boundaryEnds(buffer)
         if (boundaries.isNotEmpty()) {
             val currentText = buffer.toString()
             val deferLast = text.length == 1 &&
                 boundaries.last() == currentText.length &&
-                currentText.last() == '.'
+                SentenceBoundary.isTerminal(currentText.last())
             val emitBoundaries = if (deferLast) boundaries.dropLast(1) else boundaries
             var start = 0
             val completedSentences = emitBoundaries.map { boundary ->
@@ -267,7 +269,7 @@ class UserTypingContextCollector(
     private fun confirmWaitingPunctuationBoundary(packageName: String) {
         val boundary = pendingEndingBoundaryMap[packageName] ?: return
         val buffer = pendingBufferMap[packageName] ?: return
-        if (boundary <= 0 || boundary > buffer.length || buffer[boundary - 1] !in SENTENCE_TERMINATORS) return
+        if (boundary <= 0 || boundary > buffer.length || !SentenceBoundary.endsSentence(buffer.subSequence(0, boundary))) return
         val sentence = buffer.substring(0, boundary).trim()
         buffer.delete(0, boundary)
         pendingEndingBoundaryMap.remove(packageName)
@@ -275,7 +277,7 @@ class UserTypingContextCollector(
     }
 
     private fun emitSentence(packageName: String, sentence: String) {
-        if (sentence.all { it.isWhitespace() || it in SENTENCE_TERMINATORS }) {
+        if (sentence.all { it.isWhitespace() || SentenceBoundary.isTerminal(it) || it in SentenceBoundary.CLOSERS }) {
             diagnostics?.dropped("blank")
             return
         }
@@ -285,29 +287,6 @@ class UserTypingContextCollector(
         while (deque.size > maxSentencesPerPackage) {
             deque.removeFirst()
         }
-    }
-
-    /**
-     * Returns the end offset of every sentence boundary: a run of terminators (`...`, `?!`, `.\n`)
-     * followed by whitespace or the end of [text]. A run ending in a newline is always a boundary.
-     * A terminator glued to the next character (`naver.com`, `3.5km`) is not.
-     */
-    private fun findPunctuationBoundaries(text: String): List<Int> {
-        val boundaries = mutableListOf<Int>()
-        var i = 0
-        while (i < text.length) {
-            if (text[i] !in SENTENCE_TERMINATORS) {
-                i++
-                continue
-            }
-            var end = i + 1
-            while (end < text.length && text[end] in SENTENCE_TERMINATORS) end++
-            if (end == text.length || text[end].isWhitespace() || text[end - 1] == '\n') {
-                boundaries.add(end)
-            }
-            i = end
-        }
-        return boundaries
     }
 
     /** Drops the last whitespace-separated token; an empty result means the buffer had only one. */

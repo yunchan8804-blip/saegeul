@@ -22,7 +22,8 @@ class KoreanDiscourseContinuationTest {
     fun `completed Korean sentence receives a next sentence start with or without a space`() {
         assertEquals(listOf("그리고", "그런데", "이제"), KoreanDiscourseContinuation.suggest("밥 먹었어."))
         assertEquals(listOf("그리고", "그런데", "이제"), KoreanDiscourseContinuation.suggest("밥 먹었어. "))
-        assertTrue(KoreanDiscourseContinuation.suggest("버전 1.").isEmpty())
+        assertEquals(listOf("그리고", "그런데", "이제"), KoreanDiscourseContinuation.suggest("버전 1."))
+        assertTrue(KoreanDiscourseContinuation.suggest("버전 1.5").isEmpty())
     }
 
     @Test

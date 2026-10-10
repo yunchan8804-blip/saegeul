@@ -4,18 +4,18 @@
  */
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import kotlin.text.CharCategory.CONTROL
 import kotlin.text.CharCategory.FORMAT
 
 object OnDeviceContextCompletionPolicy {
 
-    private val terminalPunctuation = setOf('.', '?', '!', '。', '！', '？')
     private val disallowedReplyMarkers = setOf('"', '\'', '“', '”', '‘', '’', '{', '}', '[', ']')
 
     fun isIncompleteContext(context: String): Boolean {
         if (context.isBlank() || context.first().isWhitespace()) return false
         if (context.length > MAX_CONTEXT_CHARS || context.any(::isUnsafeCharacter)) return false
-        return context.trimEnd().lastOrNull() !in terminalPunctuation
+        return !SentenceBoundary.endsSentence(context)
     }
 
     fun promptFor(context: String): String {
@@ -46,7 +46,7 @@ object OnDeviceContextCompletionPolicy {
         if (suffix.any(::isUnsafeCharacter)) return false
         if (suffix.any(disallowedReplyMarkers::contains)) return false
         if (suffix.trimStart().startsWith(context)) return false
-        return suffix.trimEnd().lastOrNull() in terminalPunctuation
+        return SentenceBoundary.endsSentence(suffix)
     }
 
     private fun isUnsafeCharacter(character: Char): Boolean =

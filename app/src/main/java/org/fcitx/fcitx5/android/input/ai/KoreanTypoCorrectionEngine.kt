@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
 import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import kotlin.math.min
 
 /**
@@ -431,12 +432,7 @@ class KoreanTypoCorrectionEngine(
             return trimmedBefore.length + trailingSpaces
         }
 
-        val lastClause = trimmedBefore
-            .substringAfterLast('.')
-            .substringAfterLast('?')
-            .substringAfterLast('!')
-            .substringAfterLast('\n')
-            .trim()
+        val lastClause = SentenceBoundary.currentSentence(trimmedBefore).trim()
         if (lastClause.isNotEmpty() && lastClause != trimmedBefore) {
             val correctedClause = correctSentence(lastClause)
             if (correctedClause != null && (normalizedCandidate == correctedClause || normalizedCandidate.startsWith(correctedClause))) {

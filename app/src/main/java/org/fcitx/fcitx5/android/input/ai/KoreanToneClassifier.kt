@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 
 /**
  * 존댓말/반말/업무체 톤 판정의 정본(single source of truth).
@@ -55,9 +56,7 @@ object KoreanToneClassifier {
 
     // '까'는 이 목록이 아니라 별도로 앞 음절 ㄹ 받침 여부로 판단한다("할까"/"갈까"/"않을까").
 
-    private val STRONG_TERMINALS = setOf('.', '?', '!', '~')
-
-    val SENTENCE_SPLIT_REGEX = Regex("[,.!?;~\\n]+")
+    private val CLAUSE_SEPARATORS = charArrayOf(',', ';')
 
     private data class Segment(val text: String, val hasStrongTerminal: Boolean)
 
@@ -122,31 +121,27 @@ object KoreanToneClassifier {
                 val trimmed = raw.trim()
                 if (trimmed.isBlank()) return@mapNotNull null
                 Segment(
-                    text = trimmed.trimEnd('.', '?', '!', '~', '…', ',', ';'),
-                    hasStrongTerminal = trimmed.last() in STRONG_TERMINALS || trimmed.endsWith("…")
+                    text = stripTail(trimmed),
+                    hasStrongTerminal = SentenceBoundary.endsSentence(trimmed)
                 )
             }
         }
         return segmentSentences(clean)
     }
 
-    /** [SENTENCE_SPLIT_REGEX]로 나누되, 각 조각이 강한 종결부호(. ? ! ~ …)로 끝났는지도 함께 가져간다. */
-    private fun segmentSentences(clean: String): List<Segment> {
-        val segments = mutableListOf<Segment>()
-        var cursor = 0
-        for (match in SENTENCE_SPLIT_REGEX.findAll(clean)) {
-            val piece = clean.substring(cursor, match.range.first).trim()
-            if (piece.isNotBlank()) {
-                segments += Segment(piece, match.value.any { it in STRONG_TERMINALS })
-            }
-            cursor = match.range.last + 1
+    /**
+     * [SentenceBoundary]로 문장을 나눈 뒤 각 문장을 쉼표·세미콜론 절로 나눈다. 문장의 마지막 절만,
+     * 문장이 강한 종결부호([SentenceBoundary.TERMINALS])로 끝났을 때 강한 종결로 가져간다.
+     */
+    private fun segmentSentences(clean: String): List<Segment> =
+        SentenceBoundary.splitSentences(clean).flatMap { sentence ->
+            val strong = SentenceBoundary.endsSentence(sentence)
+            val clauses = stripTail(sentence).split(*CLAUSE_SEPARATORS).map { it.trim() }.filter { it.isNotBlank() }
+            clauses.mapIndexed { index, clause -> Segment(clause, strong && index == clauses.lastIndex) }
         }
-        // '…'는 SENTENCE_SPLIT_REGEX의 구분자가 아니라서 마지막 조각에 그대로 남아있다.
-        val tail = clean.substring(cursor).trim()
-        if (tail.isNotBlank()) {
-            segments += Segment(tail, tail.endsWith("…"))
-        }
-        return segments
+
+    private fun stripTail(text: String): String = text.trimEnd {
+        SentenceBoundary.isTerminal(it) || it in SentenceBoundary.CLOSERS || it in CLAUSE_SEPARATORS || it.isWhitespace()
     }
 
     /** 한 문장(조각)의 (존댓말 점수, 반말 점수)를 계산한다. */

@@ -45,6 +45,7 @@ import org.fcitx.fcitx5.android.input.ai.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.ai.typo.CorrectionSessionTracker
 import org.fcitx.fcitx5.android.input.ai.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import timber.log.Timber
 import java.io.File
 
@@ -205,7 +206,6 @@ class PersonalLearningController(private val host: Host) {
         get() = FcitxApplication.getInstance().correctionPatternStore
 
     val correctionSessionTracker = CorrectionSessionTracker()
-    private val correctionSentenceTerminators = charArrayOf('.', '?', '!', '\n')
 
     private var personalLearningTail: Job? = null
 
@@ -389,7 +389,7 @@ class PersonalLearningController(private val host: Host) {
     /** 공백/문장 종결 부호로 끝나는 커밋을 어절 경계로 보고, 지운-다시쓴 쌍이 있으면 학습한다. */
     private fun handleCorrectionWordBoundary(text: String) {
         if (text.isEmpty() || !correctionSessionTracker.isActive()) return
-        val isBoundary = text.first().isWhitespace() || text.last() in correctionSentenceTerminators
+        val isBoundary = text.first().isWhitespace() || SentenceBoundary.endsSentence(text)
         if (!isBoundary) return
         recordCorrectionPairIfPresent(correctionSessionTracker.onWordBoundary(correctionBoundarySnapshot))
     }

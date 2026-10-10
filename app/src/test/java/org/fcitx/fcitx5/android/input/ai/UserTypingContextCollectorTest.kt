@@ -136,10 +136,12 @@ class UserTypingContextCollectorTest {
     }
 
     @Test
-    fun punctuationStillSplitsImmediately() {
+    fun punctuationSplitsOnceWhitespaceFollows() {
         listOf("오", "늘", " ", "뭐", "해", "?").forEach {
             collector.recordCommittedText("com.kakao.talk", it)
         }
+        assertTrue(committedSentences.isEmpty())
+        collector.recordCommittedText("com.kakao.talk", " ")
         assertEquals(1, committedSentences.size)
         assertEquals("오늘 뭐해?", committedSentences[0].second)
     }
@@ -336,10 +338,47 @@ class UserTypingContextCollectorTest {
     }
 
     @Test
-    fun perCharacterPeriodGluedToNextSyllableIsNotABoundary() {
+    fun perCharacterPeriodGluedToNextSyllableIsABoundary() {
         "고마워요.그렇군요 ".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
 
-        assertTrue(committedSentences.none { it.second == "고마워요." })
+        assertEquals(listOf("고마워요.", "그렇군요"), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterTildeBetweenDigitsIsNotABoundary() {
+        "1~2명 왔다".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertTrue(committedSentences.isEmpty())
+        collector.flushPending("com.kakao.talk")
+        assertEquals(listOf("1~2명 왔다"), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterTildeWaitsForFollowingWhitespace() {
+        "알았어~".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertTrue(committedSentences.isEmpty())
+        assertTrue(collector.hasPending("com.kakao.talk"))
+        collector.recordCommittedText("com.kakao.talk", " ")
+        assertEquals(listOf("알았어~"), committedSentences.map { it.second })
+        assertFalse(collector.hasPending("com.kakao.talk"))
+    }
+
+    @Test
+    fun perCharacterQuestionAndExclamationWaitForFollowingWhitespace() {
+        "뭐해?!".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertTrue(committedSentences.isEmpty())
+        collector.recordCommittedText("com.kakao.talk", " ")
+        assertEquals(listOf("뭐해?!"), committedSentences.map { it.second })
+    }
+
+    @Test
+    fun perCharacterTildeGluedToNextSyllableIsABoundary() {
+        "알았어~내일 ".forEach { collector.recordCommittedText("com.kakao.talk", it.toString()) }
+
+        assertEquals(listOf("알았어~"), committedSentences.map { it.second })
+        assertTrue(collector.hasPending("com.kakao.talk"))
     }
 
     @Test

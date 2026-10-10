@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
+
 /**
  * Allows personal sentence retrieval only when it extends the sentence currently being written.
  */
@@ -29,8 +31,7 @@ object PersonalSentenceCompletionGate {
     }
 
     private fun lastSentence(text: String): String {
-        val boundary = text.lastIndexOfAny(charArrayOf('.', '?', '!', '\n', '~', '。', '！', '？'))
-        return text.substring(boundary + 1).trim()
+        return SentenceBoundary.currentSentence(text).trim()
     }
 
     private fun normalize(text: String): String = text.trim().split(WHITESPACE)

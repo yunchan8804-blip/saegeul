@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rule
 
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
+
 /**
  * Stage 1 Lightweight Korean Syntax Rule Filter.
  *
@@ -139,9 +141,6 @@ class KoreanSyntaxRuleFilter {
             """(?:[가-힣]*(?:었어|았어|했어|먹었어|봤어|갈게|할게|올게|있어|없어|어디야|뭐해|어때|하자|보자|먹자|가자|했지|맞지|그렇지|있지|없지|좋지|해줘|알려줘|줘|봐|해|냐|으니|니|어라|아라|군|마)|안녕|고마워|미안해|잘 가|내일 봐)[\s.?!]*${'$'}"""
         )
 
-        // Sentence delimiters: punctuation followed by space or newline
-        private val SENTENCE_DELIMITERS = Regex("""(?<=[.?!])\s+|\n+""")
-
         // ==========================================
         // ACC-05 Patterns: Stem Duplication (하 + 해/했/하여)
         // ==========================================
@@ -217,17 +216,6 @@ class KoreanSyntaxRuleFilter {
      * Returns true if the text complies with all syntax rules.
      */
     fun isValid(text: String): Boolean = check(text) is RuleResult.Valid
-
-    /**
-     * Filters candidate continuations that violate any syntax rule when appended to [context].
-     */
-    fun filterCandidates(candidates: List<String>, context: String = ""): List<String> {
-        val trimmedContext = context.trim()
-        return candidates.filter { candidate ->
-            val fullText = if (trimmedContext.isNotEmpty()) "$trimmedContext $candidate".trim() else candidate
-            isValid(fullText) && isValid(candidate)
-        }
-    }
 
     /**
      * ACC-01: Rejects sentences where a causal clause (a state/emotion/circumstance predicate's
@@ -322,7 +310,7 @@ class KoreanSyntaxRuleFilter {
         }
 
         // Split multi-sentence text
-        val sentences = SENTENCE_DELIMITERS.split(trimmed).map { it.trim() }.filter { it.isNotEmpty() }
+        val sentences = SentenceBoundary.splitSentences(trimmed)
         if (sentences.size < 2) return RuleResult.Valid
 
         var hasFormal = false

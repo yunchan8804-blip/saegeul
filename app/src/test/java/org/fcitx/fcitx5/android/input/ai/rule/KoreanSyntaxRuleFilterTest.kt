@@ -234,25 +234,6 @@ class KoreanSyntaxRuleFilterTest {
     }
 
     @Test
-    fun testFilterCandidatesWithContext() {
-        // ACC-01 filtering with prefix context: a question after a state-verb causal clause is no
-        // longer rejected, only an explicit imperative/propositive ending is.
-        val cands1 = listOf("무슨 일인가요?", "죄송합니다", "우산을 쓰세요", "내일 뵙겠습니다")
-        val filtered1 = filter.filterCandidates(cands1, context = "답장이 늦어서")
-        assertEquals(listOf("무슨 일인가요?", "죄송합니다", "내일 뵙겠습니다"), filtered1)
-
-        // ACC-02 filtering with prefix context
-        val cands2 = listOf("정말 감사해요", "전합니다", "보냅니다", "너무 고마워요")
-        val filtered2 = filter.filterCandidates(cands2, context = "고마운 마음을")
-        assertEquals(listOf("전합니다", "보냅니다"), filtered2)
-
-        // ACC-04 filtering with formal prefix
-        val cands3 = listOf("밥 먹었어?", "오늘 회의 참석합니다", "내일 봐", "잘 부탁드립니다")
-        val filtered3 = filter.filterCandidates(cands3, context = "안녕하세요.")
-        assertEquals(listOf("오늘 회의 참석합니다", "잘 부탁드립니다"), filtered3)
-    }
-
-    @Test
     fun testStage1FilterLatencyConstraint() {
         // Benchmark 10,000 checks to verify latency is <= 0.05ms (50,000ns)
         val sentences = listOf(

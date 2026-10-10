@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.ai.ondevice
 
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 
 class GeneratedSpacingIndex private constructor(
     private val targetsByUnspacedSentence: Map<String, String?>
@@ -34,7 +35,7 @@ class GeneratedSpacingIndex private constructor(
 
         private fun isAcceptedSentence(sentence: String): Boolean =
             sentence.length in MIN_SENTENCE_LENGTH..MAX_SENTENCE_LENGTH &&
-                sentence.lastOrNull() in TERMINALS &&
+                SentenceBoundary.endsSentence(sentence) &&
                 sentence.any(HangulSyllable::isSyllable) &&
                 sentence.none(::isNonAsciiWhitespace) &&
                 !KoreanPiiScrubber.containsPii(sentence)
@@ -46,6 +47,5 @@ class GeneratedSpacingIndex private constructor(
 
         private const val MIN_SENTENCE_LENGTH = 8
         private const val MAX_SENTENCE_LENGTH = 160
-        private val TERMINALS = setOf('.', '?', '!')
     }
 }
