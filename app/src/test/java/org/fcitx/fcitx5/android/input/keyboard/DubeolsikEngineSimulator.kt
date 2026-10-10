@@ -121,7 +121,7 @@ class DubeolsikEngineSimulator {
     private fun pressVowel(v: Char) {
         if (jongseongKeys.isNotEmpty()) {
             // 도깨비불: the jongseong's last consonant moves to become the next syllable's onset.
-            val moved = jongseongKeys.removeLast()
+            val moved = jongseongKeys.removeAt(jongseongKeys.lastIndex)
             flush()
             choseongKey = moved
             jungseongKeys.add(v)
