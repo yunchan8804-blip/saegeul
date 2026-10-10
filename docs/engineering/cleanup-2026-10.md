@@ -25,16 +25,16 @@
 | G2 | 문서·폴더 정리 | 제거된 기능 문서 삭제·보관, 2026-09 로그 보관, 낡은 서술·옛 경로·깨진 링크 수정, 참조 0 스크립트 정리, GitHub 전용 파일 정리, 결정 기록 시작 | 낮음 | 없음 | 완료(1fcf6c27) |
 | G3 | 한글 판정 단일화 | 음절 범위·자모 테이블·분해·받침 판정을 한 객체로, 형태소 엔진 단일 인스턴스, 호출마다 만드는 정규식을 상수로 | 낮음~중간 | G1 | 진행 중 |
 | G4 | 예측 조회 단일화 | 후보 갱신 한 번에 예측 스냅샷 하나만 계산, 후보 바 커밋 스냅샷 맵 3개를 하나로 | 중간 | G3 | 대기 |
-| G5 | 오타 엔진 중복 제거 | 키 입력→한글 오토마타 두 벌 통일, 인접 키 맵 출처 통일, 교정 한 번 순회 | 높음 | G3, 골든 테스트 | 보류 |
-| G6 | 텍스트 경계 상수 | 문장 끝 부호 집합 13가지를 이름 붙인 몇 개로 | 높음(동작 차이) | 정책 결정 | 보류 |
-| G7 | 서비스·컨트롤러 분할 | `FcitxInputMethodService`(3154줄)·`ContextualPredictionController`·`HorizontalCandidateComponent`의 책임 분리, Host 람다 묶음 정리 | 높음 | G4 | 보류 |
+| G5 | 오타 엔진 중복 제거 | 키 입력→한글 오토마타 두 벌 통일, 인접 키 맵 출처 통일, 교정 한 번 순회 | 높음 | G3, 골든 테스트 | 진행 중(대청소 1차: 한글 대응표 통합) |
+| G6 | 텍스트 경계 상수 | 문장 끝 부호 집합 13가지를 이름 붙인 몇 개로 | 높음(동작 차이) | 정책 결정(통일로 확정) | 대기(대청소 2차) |
+| G7 | 서비스·컨트롤러 분할 | `FcitxInputMethodService`(3154줄)·`ContextualPredictionController`·`HorizontalCandidateComponent`의 책임 분리, Host 람다 묶음 정리 | 높음 | G4 | 진행 중(대청소 1차: 서비스 분해) |
 | G8 | 화면 규칙 적용 | `app/design.md` "검증 규칙" 절을 기준으로 설정·대시보드 점검 | 중간 | 없음 | 일부 완료(ea5e4818). 키보드 위 창 48dp·키보드 높이 상한·설정 화면 나누기는 결정 대기 |
 
 ### 보류 이유
 
 - G5: 두 오토마타의 겹받침 분리 규칙이 다를 수 있다. 차이를 골든 테스트로 먼저 고정해야 한다.
-- G6: 같은 "문장 끝"이 곳마다 다르다(예: `…` 뒤에서 `ContextualPredictionInput.resolve`는 끊고 `PredictionInput.currentSentence`는 끊지 않는다). 어느 쪽이 맞는지 먼저 정한다.
-- G7: 프롬프트 격리 불변식이 걸려 있다. G4로 조회 경로를 먼저 줄인 뒤 한다.
+- G6: 같은 "문장 끝"이 곳마다 다르다(예: `…` 뒤에서 `ContextualPredictionInput.resolve`는 끊고 `PredictionInput.currentSentence`는 끊지 않는다). 사용자가 하나로 통일하기로 정했고, 어느 쪽 규칙으로 맞출지는 대청소 2차에서 정한다.
+- G7: 프롬프트 격리 불변식이 걸려 있다. 대청소 1차에서 불변식을 지키며 나누는 중이다.
 
 ### 지우지 않고 남기는 것
 
@@ -59,7 +59,7 @@
 - `docs/ai/ai-personalization-backlog.md` → `docs/archive/ai/`
 - `docs/korean-input/korean-contextual-prediction-quality-plan.md` → `docs/archive/korean-input/`
 - `docs/independent-fork/archive/` 안의 `refactor-pack.md`, `baseline.json` → `docs/archive/independent-fork/` (보관소를 `docs/archive/` 하나로 합쳤다. `baseline.json`은 JSON이라 안내 줄을 넣지 않았다.)
-- 링크는 `refactor-pack.md`가 가리키던 `../README.md`를 `../../independent-fork/README.md`로 고쳤다. 나머지 두 문서의 상대 링크는 같이 옮겨져 그대로 열린다.
+- 링크는 `refactor-pack.md`가 가리키던 `../README.md`를 `../../independent-fork/README.md`로 고쳤다. 나머지 두 문서의 상대 링크가 "그대로 열린다"고 적었는데 틀렸다. 옮긴 문서를 가리키던 `docs/archive/logs/2026-09/korean-contextual-prediction-resume-2026-09-08.md`의 링크 11개가 끊어져 있었고, 같은 파일에서 무시되는 `.artifacts/`를 가리키는 링크 28개도 폴더 깊이가 틀려 있었다. 대청소 1차에서 고쳤다.
 
 ### 코드 정리 (다른 작업자 담당, 진행 중)
 
@@ -75,12 +75,29 @@
 - upstream(fcitx5-android)에서 온 쓰지 않는 코드: upstream과 차이를 키우지 않으려고 남긴다.
 - `VaultHabitTracker`: 앱에서는 안 쓰지만 `RedTeam*` 테스트가 쓴다. 회귀를 막는 테스트라 지우지 않는다.
 - 테스트에서만 쓰는 멤버 목록: 다음 라운드에서 하나씩 판단한다.
-- 아주 큰 파일 나누기, 한글 대응표 합치기(G5), 문장 끝 판정 합치기(G6): 동작이 달라질 수 있어 보류한다.
+- 아주 큰 파일 나누기 중 서비스 분해(G7) 밖의 것: 동작이 달라질 수 있어 보류한다.
+
+### 대청소 1차 (진행 중)
+
+- 서비스 분해(G7): `FcitxInputMethodService` 등의 책임 나누기
+- 한글 대응표 통합(G5)
+- 통합 탭 시제품 삭제: `tab/`·`media/` 아래 시제품 코드와 그 테스트를 지운다. 예시 데이터만 있고 사용자에게 보이던 창이다.
+- 이 작업(Kotlin 밖의 정리):
+  - 루트의 `flake.nix`·`flake.lock`·`shell.nix`(upstream Nix 환경)와 옛 배포 메타데이터 파일 `app/net.chanpaca.saegeul.yml` 삭제(사용자 결정)
+  - 한글 플러그인 APK의 Play 등록 자료 `plugin/hangul/src/main/play/listings/` 삭제
+  - 앱 라이선스 고지에 libhangul·fcitx5-hangul·국립국어원 어휘(KOGL 제1유형) 항목 추가, 링크되지 않는 libime 항목 삭제
+  - 기기 테스트 정리: 2026-09-09 일회성 비교 실험 테스트 2개와 쓰지 않는 평가 파일 삭제
+  - `scripts/` 정리: 참조 0이 된 Play 리스팅 스크립트, 이어쓰기 표면화 모듈과 그 테스트, 일회성 기기 측정 스크립트 삭제
+  - `site/` 정리: 쓰지 않는 CSS 삭제, 클래스 이름 `ondevice-arch-card`로 변경, 캐시 값 갱신
+  - 문서: 끊긴 상대 링크 정리, `hangul-buffered-input-handoff.md` 보관, 읽는 곳 없는 `ios-port-backlog.json` 삭제
+
+### 이어서 할 일
+
+- 2차: 문장 끝 판정 통일(G6, 사용자가 통일을 결정함), 테스트에서만 쓰는 멤버 정리
+- 3차: 컴파일 경고 정리, 패키지 정리
 
 ## 결정이 필요한 것
 
-- 툴바 길게 누르기로 열리는 통합 탭 창(`tab/UnifiedTabExtensionWindow.kt`)의 즐겨찾기·미디어·검색 탭은 예시 데이터(`https://example.com/*.gif`)와 빈 클릭 처리만 있다. 릴리스에서 사용자에게 보인다. 지울지, 기능을 채울지.
 - `admin/` 운영 데모(Vite+React, 실제 SDK와 연결 안 됨)를 남길지.
-- `flake.nix`·`shell.nix`(upstream Nix 환경)를 남길지.
 - `docs/wiki/`를 GitHub Wiki로 내보내는 `scripts/publish-wiki.py`를 Forgejo 기준으로 바꿀지.
 - origin 원격과 `release-contract.yml`의 `-ExpectedRepositoryUrl`(지금 GitHub 주소)을 Forgejo 주소로 바꾸는 일. 주소를 받으면 한다.

@@ -692,8 +692,8 @@ x86_64 `libtesseract.so`·`libleptonica.so`·`libjpeg.so`·`libpngx.so`가 모�
 NDK `27.2.12479018`, CMake 3.22.1로 `:tesseract4android:assembleStandardRelease`를 실행해
 arm64-v8a·armeabi-v7a·x86·x86_64 네 ABI AAR source build가 성공했다. 로컬 source-build AAR은
 native build-id 등의 차이로 JitPack AAR과 byte-identical하지 않았으므로 재현성을 과장하지 않는다.
-다만 F-Droid 공식 inclusion policy는 자유 소프트웨어이며 공개 source가 있는 JitPack prebuilt를 trusted
-Maven dependency로 허용한다. 따라서 완료 기준은 공개 tag source build·license·현재 artifact 식별·APK
+공개 source가 있는 JitPack prebuilt는 신뢰할 수 있는 Maven 의존성으로 본다.
+따라서 완료 기준은 공개 tag source build·license·현재 artifact 식별·APK
 패키징으로 고정한다.
 
 JitPack POM에 license 선언이 없어 기존 오픈 소스 라이선스 화면에서 Tesseract4Android가 빈 라이선스로

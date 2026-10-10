@@ -14,4 +14,4 @@
 ## 결과
 
 - 구현 커밋 `c1a94a70`(버퍼 모드 삭제 요청 처리와 서비스 연결).
-- 근거: `docs/korean-input/hangul-buffered-input-handoff.md`(미해결 항목 9번 설명).
+- 근거: `docs/archive/korean-input/hangul-buffered-input-handoff.md`(미해결 항목 9번 설명).

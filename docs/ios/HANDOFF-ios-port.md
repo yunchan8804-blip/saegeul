@@ -7,19 +7,18 @@
 
 1. 이 파일
 2. [ios-dual-platform-plan.md](ios-dual-platform-plan.md) — 잠근 설계 D1–D8, 제품 결정 P1–P5
-3. [ios-port-backlog.md](ios-port-backlog.md) — 사람용 상세 백로그
-4. [ios-port-backlog.json](ios-port-backlog.json) — 기계용 TODO 정본 (`status` 필드)
-5. [korean-smart-input-ssot.md](../korean-input/korean-smart-input-ssot.md) 3절 iOS 단락
+3. [ios-port-backlog.md](ios-port-backlog.md) — TODO 정본 (상태 표의 `상태` 열)
+4. [korean-smart-input-ssot.md](../korean-input/korean-smart-input-ssot.md) 3절 iOS 단락
 
 ## 다음 할 일 고르는 법
 
-`ios-port-backlog.json`에서 다음을 만족하는 항목 중 `id` 오름차순 1~3개:
+`ios-port-backlog.md`의 상태 표에서 다음을 만족하는 항목 중 `id` 오름차순 1~3개:
 
-- `status` ∈ `pending` | `in_progress`
-- `blocked_by`의 모든 id가 `done` 또는 `cancelled` 또는 `blocked`(영구 제외가 아님) — 실제로는 blocked_by가 전부 `done`일 때만 착수
-- `phase`가 가장 작은 것 우선
+- `상태` ∈ `pending` | `in_progress`
+- `의존`의 모든 id가 `done` 또는 `cancelled` 또는 `blocked`(영구 제외가 아님) — 실제로는 의존 항목이 전부 `done`일 때만 착수
+- Phase가 가장 작은 것 우선
 
-완료하면 **json과 md 표를 같이** 갱신한다. json만 고치면 안 된다.
+완료하면 md 표와 항목 본문을 같이 갱신한다.
 
 ## 잠금 (위반하면 폐기)
 

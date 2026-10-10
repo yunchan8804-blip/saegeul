@@ -187,10 +187,10 @@ Also verify Backspace at every Hangul composition stage, one-shot Shift and Caps
 - Focus and selection behavior still requires validation on real problem apps. A failed delivery during focus loss is cleared to prevent cross-editor text leakage.
 - Moving the target cursor during an internal composition intentionally discards the unsent segment; preserving the old anchor would require a target-visible composing marker or editor-specific selection choreography.
 - Physical-keyboard handling is implemented for forwarded text/navigation keys but has not yet been exercised on a device.
-- Lifecycle, shortcut ordering, numeric-password privacy, and physical key down/up behavior currently have code review coverage but still need Android instrumentation tests with a recording `InputConnection`.
-- Add instrumentation tests with a recording `InputConnection`, plus an explicit user-visible submit/retry control if real-app testing shows that delimiter-based submission is insufficient.
+- Shortcut ordering and physical key down/up behavior currently have code review coverage only. `RecordingInputConnectionE2ETest` (a JVM test with a recording `InputConnection`) covers the controller-level lifecycle and sensitive-field paths.
+- Add an explicit user-visible submit/retry control if real-app testing shows that delimiter-based submission is insufficient.
 
 ## Project continuation
 
-- [Detailed implementation handoff](hangul-buffered-input-handoff.md) records the exact branch state, implementation map, verified build and device results, operational risks, debugging procedures, and resume checklist.
+- [Detailed implementation handoff](../archive/korean-input/hangul-buffered-input-handoff.md) records the exact branch state, implementation map, verified build and device results, operational risks, debugging procedures, and resume checklist.
 - [Prioritized implementation backlog](hangul-buffered-input-backlog.md) turns the remaining compatibility, transport, layout, test, privacy, and upstreaming work into acceptance-driven follow-up items.

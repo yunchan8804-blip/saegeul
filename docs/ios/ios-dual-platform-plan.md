@@ -4,7 +4,7 @@
 조사 기준일: 2026-09-13
 제품 결정일: 2026-09-13
 SSOT 포인터: [korean-smart-input-ssot.md](../korean-input/korean-smart-input-ssot.md) 3절
-실행 백로그(정본 TODO): [ios-port-backlog.md](ios-port-backlog.md) / [ios-port-backlog.json](ios-port-backlog.json)
+실행 백로그(정본 TODO): [ios-port-backlog.md](ios-port-backlog.md)
 인수인계: [HANDOFF-ios-port.md](HANDOFF-ios-port.md)
 
 이 문서는 Android 새글을 아이폰에서도 쓰게 만들 때의 **가능성 판단, 확정 설계, 단계**의 정본이다. 구현 워커는 여기 잠근 경계를 바꾸지 않는다.

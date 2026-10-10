@@ -1,0 +1,11 @@
+{
+    "uniqueId": "nikl/korean-learning-vocabulary",
+    "artifactVersion": "2017-03-20",
+    "description": "Frequency-ranked Korean learning vocabulary used for local word completion",
+    "name": "National Institute of Korean Language Korean learning vocabulary list",
+    "website": "https://www.korean.go.kr/front/etcData/etcDataView.do?etc_seq=70&mn_id=46&pageIndex=44",
+    "tag": "data",
+    "licenses": [
+        "KOGL-Type-1"
+    ]
+}

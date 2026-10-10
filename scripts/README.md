@@ -56,33 +56,15 @@ CI(`.github/workflows/release-contract.yml`, `user-release.yml`)가 실행하는
   `python scripts/generate-korean-dictionary.py`
 - `generate-hangul-keyboard-tables.ps1` — libhangul의 자모 배열 헤더를 받아 코틀린 생성 파일로 변환한다.
   `.\scripts\generate-hangul-keyboard-tables.ps1`
-- `korean_continuation_surface.py` — 검증된 접미사만 이어쓰기 결과로 표면화하는 어댑터 모듈. 단독 실행용이 아니라 다른 코드/테스트가 import한다.
-- `test_ko_doc_quality.py` / `test_korean_continuation_surface.py` — 위 두 모듈의 단위 테스트. `AGENTS.md`가 지정한 검증 명령이다.
-  `python scripts/test_ko_doc_quality.py`, `python scripts/test_korean_continuation_surface.py`
+- `test_ko_doc_quality.py` — 위 모듈의 단위 테스트. `AGENTS.md`가 지정한 검증 명령이다.
+  `python scripts/test_ko_doc_quality.py`
 
-## Play 등록 자료
+## 기기
 
-Google Play 콘솔에 붙여넣거나 올릴 리스팅 자료를 만들고 점검한다.
+에뮬레이터에 붙어 동작을 확인한다.
 
-- `generate-play-listing-assets.py` — 새글 브랜드 마크에서 Play 리스팅 그래픽(아이콘·피처 그래픽 등)을 생성한다.
-  `python scripts/generate-play-listing-assets.py`
-- `copy-emu-play-screenshots.py` — 에뮬레이터로 찍은 캡처를 Play 리스팅 스크린샷 규격(24비트 PNG)으로 변환해 복사한다.
-  `python scripts/copy-emu-play-screenshots.py`
-- `inspect-play-listing-assets.py` — 리스팅 PNG들의 크기·모드·알파 채널 유무를 점검한다.
-  `python scripts/inspect-play-listing-assets.py`
-- `play-listing-copy.py` — 로케일별 리스팅 제목·짧은 설명·전체 설명을 콘솔에 출력해 Play 콘솔에 붙여넣기 쉽게 한다.
-  `python scripts/play-listing-copy.py`
-
-## 기기·레드팀
-
-실기기/에뮬레이터에 붙어 동작을 측정하거나 회귀를 공격적으로 재현한다.
-
-- `redteam-extreme-accuracy.ps1` — 에뮬레이터·기기에서 한글 조합 정확도를 반복 입력으로 공격적으로 재현·점검한다.
-  `.\scripts\redteam-extreme-accuracy.ps1 -Serial emulator-5554 -Iterations 5`
 - `verify-bfu-keyboard.ps1` — 에뮬레이터에 화면 잠금을 걸고 재부팅한 뒤, Direct Boot 잠금 화면에서 키보드가 실제로 뜨고 대상 패키지에 FATAL EXCEPTION이 없는지 확인한다. 실기기 serial은 거부한다.
   `.\scripts\verify-bfu-keyboard.ps1 -Serial emulator-5554 -AppApk <apk> -PluginApk <apk>`
-- `measure-gemma-utility.ps1` — 실기기에서 온디바이스 Gemma 추천의 유용성(수용률 등)을 베이스라인과 비교 측정한다.
-  `.\scripts\measure-gemma-utility.ps1 -DeviceSerial <adb serial> -OutputDirectory <dir> -BaselineDirectory <dir>`
 
 ## 기타
 

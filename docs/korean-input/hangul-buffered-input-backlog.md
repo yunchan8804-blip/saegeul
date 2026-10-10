@@ -15,7 +15,7 @@
 
 이 기능은 모든 앱에서 입력을 보장하는 범용 접근성 자동화가 아니다. Android 표준 붙여넣기, Ctrl+V 키 전달, InputConnection.commitText 중 대상 앱이 실제로 지원하는 경로를 명시적으로 선택하는 호환 모드다.
 
-관련 문서: [기능·빌드 개요](hangul-buffered-input.md), [상세 인수인계](hangul-buffered-input-handoff.md)
+관련 문서: [기능·빌드 개요](hangul-buffered-input.md), [상세 인수인계](../archive/korean-input/hangul-buffered-input-handoff.md)
 
 ## 2. 기준선
 
@@ -228,7 +228,7 @@ plugin assembly와 plugin lint를 같은 Gradle invocation에 넣으면 당시 t
 
 - 기능 전용 JVM 테스트 10개는 PASS다.
 - 실제 기기에서 한 번의 hide/show 및 Space 제출은 PASS다.
-- Recording InputConnection 테스트 파일과 자동 lifecycle 증거는 현재 없다.
+- Recording InputConnection JVM 테스트(`RecordingInputConnectionE2ETest`)는 있다. 서비스 제출 경로를 기기에서 자동으로 확인하는 lifecycle 증거는 아직 없다.
 
 ### P0-03. 실패 및 폐기 시 무음 데이터 유실 제거
 

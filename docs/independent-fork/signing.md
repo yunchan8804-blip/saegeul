@@ -9,7 +9,7 @@
 기준일: 2026-08-25
 
 첫 독립 릴리스는 기존 Fcitx5 for Android 또는 개발용 키를 재사용하지 않는다.
-GitHub/F-Droid 직접 배포 APK와 Google Play 업로드에는 다음 새 업로드 키를 사용한다.
+GitHub 릴리스 직접 배포 APK와 Google Play 업로드에는 다음 새 업로드 키를 사용한다.
 
 | 역할 | 값 |
 | --- | --- |

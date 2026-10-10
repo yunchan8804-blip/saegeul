@@ -266,8 +266,7 @@ button {
   max-width: 900px;
 }
 
-.eyebrow,
-.scene-kicker {
+.eyebrow {
   margin: 0 0 16px;
   color: var(--jade-bright);
   font: 760 11.5px/1.3 ui-monospace, "SFMono-Regular", Consolas, "JetBrains Mono", monospace;
@@ -1067,10 +1066,6 @@ h1 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.bento-2col {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .bento-4col {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -1271,7 +1266,7 @@ h1 {
 /* ==========================================================================
    Architectural Connectivity Card (On-Device AI)
    ========================================================================== */
-.companion-arch-card {
+.ondevice-arch-card {
   margin-block: 20px 48px;
   padding: clamp(28px, 3.5vw, 44px);
   border: 1px solid rgb(235 247 255 / 14%);
@@ -1839,7 +1834,6 @@ h1 {
   }
 
   .bento-3col,
-  .bento-2col,
   .bento-4col {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -154,7 +154,7 @@
 | Android 단위 테스트 (전체) | `./gradlew :app:testDebugUnitTest` |
 | Android 빌드 | `./gradlew :app:assembleDebug :plugin:hangul:assembleDebug` |
 | 관제 UI (`admin/`) | `npm run test`, `npm run check`, `npm run build` (모두 `admin/`에서 실행) |
-| 한국어 데이터 스크립트 | `python scripts/test_ko_doc_quality.py`, `python scripts/test_korean_continuation_surface.py` |
+| 한국어 데이터 스크립트 | `python scripts/test_ko_doc_quality.py` |
 | 릴리스 게이트 | `scripts/verify-release-licenses.ps1`, `verify-release-identity.ps1`, `verify-release-bundle.ps1`. 인자는 `docs/wiki/09-Developer-and-Build-Guide.md` 4절 |
 
 - 단위 테스트 중 `RedTeam*Test`는 회귀 방어선이다. 통과시키기 위해 테스트를 고치거나 지우지 않는다. 테스트가 잘못됐다고 보이면 그대로 두고 보고한다.

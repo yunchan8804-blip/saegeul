@@ -8,20 +8,20 @@
 
 이 문서는 현재 구현을 다시 역추적하지 않고도 바로 이어서 작업할 수 있도록 만든 상세 인수인계다. 간단한 사용자 설명과 공개용 빌드 절차는 `docs/korean-input/hangul-buffered-input.md`를 보고, 구현 의도·상태 전이·검증 근거·디버깅 절차는 이 문서를 기준으로 삼아라.
 
-관련 문서: [기능·빌드 개요](hangul-buffered-input.md), [우선순위 백로그](hangul-buffered-input-backlog.md)
+관련 문서: [기능·빌드 개요](../../korean-input/hangul-buffered-input.md), [우선순위 백로그](../../korean-input/hangul-buffered-input-backlog.md)
 
 > **현재 상태(2026-09-28)**: 이 문서는 2026-07-25 옛 로컬 저장소 기준 기록이다.
 > 구현 커밋 `5338d80a`는 현재 저장소(`D:\workspace\Saegul`, `origin` = `yunchan8804-blip/saegeul`)의
 > `main` 이력에 들어와 있고 HEAD의 조상이다. 옛 저장소와 로컬 기능 브랜치를 보존하라는 안내(1절, 9.2절,
 > 18절, 20절)는 보관용 기록이며 더 따를 필요가 없다. 이후 바뀐 사실은
-> [백로그](hangul-buffered-input-backlog.md) 2.5절이 기준이다.
+> [백로그](../../korean-input/hangul-buffered-input-backlog.md) 2.5절이 기준이다.
 
 ## 1. 한눈에 보는 현재 상태
 
 > 이 표는 2026-07-25 작성 시점의 Git 원격 모델(단일 `origin` = `fcitx5-android/fcitx5-android`)을
 > 기준으로 한 기록이다. 이후 독립 포크 전환으로 `origin` = `yunchan8804-blip/saegeul`,
 > `upstream` = `fcitx5-android/fcitx5-android`로 재편됐다. 현재 Git 소유권 계약은
-> [`docs/independent-fork/README.md`](../independent-fork/README.md) §2를 따른다.
+> [`docs/independent-fork/README.md`](../../independent-fork/README.md) §2를 따른다.
 
 | 항목 | 현재 값 |
 | --- | --- |
@@ -388,7 +388,7 @@ Caps Lock을 normal label로 두는 이유는 앞서 설명한 것처럼 fcitx5-
 | `app/src/test/java/org/fcitx/fcitx5/android/input/BufferedInputControllerLongInputTest.kt` | 1만 글자 입력의 추가·추출·한 글자씩 삭제·제출·실패 보존, surrogate 경계 |
 | `app/src/test/java/org/fcitx/fcitx5/android/input/keyboard/HangulKeyLegendsTest.kt` | 두벌식 normal/Shift mapping, unsupported fallback, 언어·addon 판별 |
 | `docs/korean-input/hangul-buffered-input.md` | 사용자·개발자용 요약, 빌드 절차, test matrix, 알려진 위험 |
-| `docs/korean-input/hangul-buffered-input-handoff.md` | 현재 파일. 다음 작업자를 위한 상세 SSOT |
+| `docs/archive/korean-input/hangul-buffered-input-handoff.md` | 현재 파일. 다음 작업자를 위한 상세 SSOT |
 
 ### 8.3 수정하지 않은 중요 영역
 
@@ -1080,7 +1080,7 @@ git branch -vv
 10. 실제 목표 앱에서 transport별 결과 기록
 11. clipboard overwrite와 experimental 성격을 사용자에게 고지
 
-Debug APK는 개발·검증용이다. release 배포에는 release signing, update compatibility, 앱·플러그인 배포 조합, 개인정보 안내, Play/F-Droid 정책을 별도로 검토해야 한다.
+Debug APK는 개발·검증용이다. release 배포에는 release signing, update compatibility, 앱·플러그인 배포 조합, 개인정보 안내, Play 정책을 별도로 검토해야 한다.
 
 ## 19. 다음 작업 우선순위
 

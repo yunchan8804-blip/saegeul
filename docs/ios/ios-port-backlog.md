@@ -1,6 +1,6 @@
 # 새글 iOS 포팅 실행 백로그
 
-정본 TODO. 기계 판독 쌍은 [ios-port-backlog.json](ios-port-backlog.json).
+정본 TODO.
 설계 정본은 [ios-dual-platform-plan.md](ios-dual-platform-plan.md).
 다음 세션은 [HANDOFF-ios-port.md](HANDOFF-ios-port.md).
 
@@ -58,7 +58,7 @@ P5 AI/컴패니언(2026-09-24 제거)/Gemma는 1차 밖.
 ### IOS-0-00 백로그 문서
 
 목표: 다음 에이전트가 이 파일만으로 착수 가능하게 한다.
-완료: `HANDOFF-ios-port.md`, `ios-port-backlog.md`, `ios-port-backlog.json`, SSOT·위키 포인터.
+완료: `HANDOFF-ios-port.md`, `ios-port-backlog.md`, SSOT·위키 포인터.
 
 ### IOS-0-01 환경
 
