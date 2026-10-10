@@ -772,6 +772,42 @@ class OnDeviceSuggestionPolicyTest {
     }
 
     @Test
+    fun `parseForStorage stores a short casual sentence after a context that contains a celebration verb`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(
+            input(text = "생일 축하해! 올 한 해도 "),
+            "올 한 해도 잘 보내!"
+        )
+
+        assertEquals("잘 보내!", stored.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, stored.mode)
+        assertNull(stored.sentenceRejection)
+        assertNull(stored.wordRejection)
+    }
+
+    @Test
+    fun `parseForStorage does not keep a one syllable head of a rejected sentence as a word`() {
+        val stored = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을 "), "잘 할수있어요.")
+
+        assertNull(stored.suffix)
+        assertNull(stored.mode)
+        assertEquals("GATE_SPACING", stored.sentenceRejection)
+        assertEquals("WORD_TOO_SHORT", stored.wordRejection)
+
+        val spaced = OnDeviceSuggestionPolicy.parseForStorage(input(text = "내일 이 일을"), " 꼭 할수있어요.")
+        assertNull(spaced.suffix)
+        assertEquals("WORD_TOO_SHORT", spaced.wordRejection)
+    }
+
+    @Test
+    fun `parseForStorage keeps a one syllable ending that attaches to the typed word`() {
+        val particle = OnDeviceSuggestionPolicy.parseForStorage(input(text = "회의 자료"), "를 할수있어요.")
+
+        assertEquals("를", particle.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, particle.mode)
+        assertEquals("GATE_SPACING", particle.sentenceRejection)
+    }
+
+    @Test
     fun `a typo restatement is stored as a replacement of the typed sentence`() {
         val garbled = OnDeviceSuggestionPolicy.parseForStorage(
             input(text = "오늘 회으ㅣ 몇시에"),

@@ -32,7 +32,8 @@ import org.fcitx.fcitx5.android.input.text.SentenceBoundary
  * 4. ACC-05 (Stem Duplication):
  *    Rejects an eojeol where a `하` verb stem is immediately followed by another `해/했/하여`
  *    stem (e.g. `안녕하해요`, `공부하했어`), while allowing an eojeol that itself starts with
- *    `하` (e.g. the noun `하해(河海)` used on its own).
+ *    `하` (e.g. the noun `하해(河海)` used on its own) and an eojeol that starts with a
+ *    one-syllable noun ending in `하` conjugated with `하다` (`축하해`, `낙하했다`, `인하했다`).
  */
 class KoreanSyntaxRuleFilter {
 
@@ -148,8 +149,14 @@ class KoreanSyntaxRuleFilter {
         // 하해(河海) used on its own) is never flagged - only a "하" glued onto an earlier
         // stem within the same eojeol (안녕+하해요, 공부+하했어) is a duplication error.
         // "하해서" is also covered since it contains the "하해" substring.
+        //
+        // 한 음절 명사 + 하 + 해/했/하여는 어간 중복이 아니라 '하'로 끝나는 한자어 명사의 하다 활용이다
+        // (축하해, 낙하했다, 저하했다, 투하했다, 강하했다, 출하했다, 입하했다, 인하했다, 비하했다, 폄하했다,
+        // 격하했다, 치하했다). 이 명사들은 어절 첫머리에 있을 때만 예외로 둔다. 준비하했어처럼 다른 말
+        // 뒤에 붙은 같은 음절은 여전히 중복이다.
+        private const val HA_ENDING_NOUN_SYLLABLES = "축낙저투강출입인비폄격치"
         private val ACC05_STEM_DUPLICATION_PATTERN = Regex(
-            """(?<=[가-힣])하(?:해|했|하여)"""
+            """(?<=[가-힣])(?<!(?:^|[^가-힣])[$HA_ENDING_NOUN_SYLLABLES])하(?:해|했|하여)"""
         )
 
         // Formal start / Informal start without punctuation (e.g. "안녕하세요 밥 먹었어?")

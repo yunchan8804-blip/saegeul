@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.fcitx.fcitx5.android.input.ai.ondevice.AutomaticSuggestionJoin
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionEngine
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceSuggestionPolicy
@@ -226,7 +227,7 @@ class GemmaSuggestionQualityDeviceTest {
     /** 저장 결과를 편집기에 적용했을 때의 글. 대체 문장이면 쓰던 문장을 바꾸고, 아니면 접미부를 이어 붙인다. */
     private fun joined(text: String, stored: OnDeviceSuggestionPolicy.StoredParse): String? {
         val suffix = stored.suffix ?: return null
-        return stored.replaces?.let { text.removeSuffix(it) + suffix } ?: (text + suffix)
+        return stored.replaces?.let { text.removeSuffix(it) + suffix } ?: AutomaticSuggestionJoin.joined(text, suffix)
     }
 
     private fun renderTemplate(template: String, scenario: Scenario): String {

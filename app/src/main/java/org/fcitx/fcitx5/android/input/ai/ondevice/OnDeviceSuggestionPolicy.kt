@@ -247,7 +247,9 @@ object OnDeviceSuggestionPolicy {
             return StoredParse(sentence.suffix, Mode.SENTENCE, null, null)
         }
         val word = parse(input.withMode(Mode.WORD), raw)
-        val wordRejection = word.reason ?: gateRejection(word.suffix, input.textBeforeCursor, false)
+        val wordRejection = word.reason
+            ?: gateRejection(word.suffix, input.textBeforeCursor, false)
+            ?: tooShortWordHead(input, word)
         if (word.suffix != null && wordRejection == null) {
             return StoredParse(word.suffix, Mode.WORD, sentenceRejection, null)
         }
@@ -257,12 +259,28 @@ object OnDeviceSuggestionPolicy {
     private fun gateRejection(suffix: String?, context: String, isSentenceCompletion: Boolean): String? =
         suffix?.let { SuggestionQualityGate.evaluate(it, context, isSentenceCompletion) }?.let { "GATE_${it.name}" }
 
+    /**
+     * 문장으로 못 쓴 응답에서 첫 어절만 단어로 남길 때, 그 어절이 한글 한 음절뿐인 새 어절(`잘`, `꼭`)이면
+     * 쓸모 있는 단어 후보가 아니다. 응답 전체가 한 어절인 짧은 답(`네~`)과, 쓰던 어절에 붙는 조사·어미(`를`)는
+     * 그대로 둔다.
+     */
+    private fun tooShortWordHead(input: Input, word: Parsed): String? {
+        val suffix = word.suffix ?: return null
+        if (!word.truncatedToFirstEojeol) return null
+        val startsNewEojeol = suffix.startsWith(' ') || input.textBeforeCursor.lastOrNull()?.isWhitespace() != false
+        if (!startsNewEojeol) return null
+        val letters = suffix.filter(Char::isLetterOrDigit)
+        return if (letters.length == 1 && HangulSyllable.isSyllable(letters[0])) WORD_TOO_SHORT else null
+    }
+
     private class Parsed(
         val suffix: String?,
         val reason: String?,
         /** 쓰는 중인 문장을 오타만 고쳐 다시 쓴 응답이다. 받아들였으면 [suffix]가 대체 문장이고 [replaces]가 바꿀 원문이다. */
         val restatesTyped: Boolean = false,
-        val replaces: String? = null
+        val replaces: String? = null,
+        /** 단어 모드에서 응답의 첫 어절만 남기고 뒤를 버렸다. */
+        val truncatedToFirstEojeol: Boolean = false
     )
 
     private fun accept(suffix: String) = Parsed(suffix, null)
@@ -311,7 +329,9 @@ object OnDeviceSuggestionPolicy {
         }
 
         return when (input.mode) {
-            Mode.WORD -> firstEojeolProjection(suffix)?.let(::accept) ?: reject("WORD_EMPTY")
+            Mode.WORD -> firstEojeolProjection(suffix)
+                ?.let { Parsed(it, null, truncatedToFirstEojeol = it.length < suffix.length) }
+                ?: reject("WORD_EMPTY")
             Mode.SENTENCE -> when {
                 !endsSentence(suffix) -> reject("NOT_SINGLE_SENTENCE")
                 isTooShortSentence(split.current, suffix) -> reject("TOO_SHORT")
@@ -644,6 +664,7 @@ object OnDeviceSuggestionPolicy {
     private const val PROMPT_CHAR_BUDGET = 190
 
     private const val RESTATES_TYPED = "RESTATES_TYPED"
+    private const val WORD_TOO_SHORT = "WORD_TOO_SHORT"
     private const val GENERAL_APP_LABEL = "일반"
     private const val ELLIPSIS = "…"
     private const val APP_LINE_PREFIX = "앱: "

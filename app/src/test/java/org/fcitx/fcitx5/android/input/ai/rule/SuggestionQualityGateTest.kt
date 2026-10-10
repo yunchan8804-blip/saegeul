@@ -30,6 +30,48 @@ class SuggestionQualityGateTest {
     }
 
     @Test
+    fun acceptsShortCasualSentenceAfterAContextThatContainsCelebrationVerb() {
+        // 문맥의 "축하해"는 '축하' + '하다'의 활용이지 '하' 어간 중복이 아니다.
+        assertTrue(
+            SuggestionQualityGate.accepts("잘 보내!", context = "생일 축하해! 올 한 해도 ", isSentenceCompletion = true)
+        )
+        assertNull(
+            SuggestionQualityGate.evaluate("잘 보내!", context = "생일 축하해! 올 한 해도 ", isSentenceCompletion = true)
+        )
+    }
+
+    @Test
+    fun acceptsShortCasualCommandAndGreetingSentences() {
+        val cases = listOf(
+            "잘 보내!" to "생일 축하해! 올 한 해도 ",
+            "조심히 와!" to "집에 도착하면 연락해. ",
+            "푹 쉬어." to "오늘 고생 많았어. ",
+            "맛있게 먹어~" to "점심 뭐 먹을 거야? ",
+            "잘 자!" to "내일 아침에 보자. ",
+            "수고했어." to "오늘 일 다 끝났어. "
+        )
+        for ((candidate, context) in cases) {
+            assertNull(
+                "'$context' + '$candidate'",
+                SuggestionQualityGate.evaluate(candidate, context, isSentenceCompletion = true)
+            )
+            assertNull(candidate, SuggestionQualityGate.evaluate(candidate, "", isSentenceCompletion = true))
+        }
+    }
+
+    @Test
+    fun stillRejectsStemDuplicationThatLooksLikeCelebrationVerb() {
+        assertEquals(
+            SuggestionQualityGate.RejectionReason.UNGRAMMATICAL,
+            SuggestionQualityGate.evaluate("안녕하해요.", context = "생일 축하해! ", isSentenceCompletion = true)
+        )
+        assertEquals(
+            SuggestionQualityGate.RejectionReason.UNGRAMMATICAL,
+            SuggestionQualityGate.evaluate("준비하했어.", context = "", isSentenceCompletion = true)
+        )
+    }
+
+    @Test
     fun rejectsKnownSpacingIssuesRegardlessOfSentenceFlag() {
         assertEquals(SuggestionQualityGate.RejectionReason.SPACING, SuggestionQualityGate.evaluate("할수있어요"))
         assertEquals(

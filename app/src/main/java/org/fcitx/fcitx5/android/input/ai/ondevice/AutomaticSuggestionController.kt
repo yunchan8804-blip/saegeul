@@ -902,10 +902,20 @@ class AutomaticSuggestionController(
         }
         val connection = host.inputConnection() ?: return AiSuggestionApplyResult.NotApplied
         val cursor = host.selection().start
-        if (!host.commitAiTextAtCursor(connection, cursor, suffix, EditorSelection.collapsed(cursor))) {
-            return AiSuggestionApplyResult.NotApplied
+        val removedSpaces = " ".repeat(
+            AutomaticSuggestionJoin.trailingSpacesToRemove(snapshot.session.textBeforeCursor, suffix)
+        )
+        val start = cursor - removedSpaces.length
+        val committed = if (removedSpaces.isEmpty()) {
+            host.commitAiTextAtCursor(connection, cursor, suffix, EditorSelection.collapsed(cursor))
+        } else {
+            if (connection.getTextBeforeCursor(removedSpaces.length, 0)?.toString() != removedSpaces) {
+                return AiSuggestionApplyResult.EditorChanged
+            }
+            host.replaceAiRange(connection, start, cursor, suffix, EditorSelection.collapsed(cursor))
         }
-        val end = cursor + suffix.length
+        if (!committed) return AiSuggestionApplyResult.NotApplied
+        val end = start + suffix.length
         host.predictSelection(end)
         notifyAutomaticSuggestionSnapshotInvalidated()
         return AiSuggestionApplyResult.Applied(
@@ -919,7 +929,7 @@ class AutomaticSuggestionController(
                     inputSessionEpoch = snapshot.session.scope.editorSessionId
                 ),
                 inserted = suffix,
-                restore = ""
+                restore = removedSpaces
             )
         )
     }
