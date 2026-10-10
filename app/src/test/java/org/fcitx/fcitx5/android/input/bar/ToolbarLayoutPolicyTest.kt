@@ -32,8 +32,9 @@ class ToolbarLayoutPolicyTest {
 
     @Test
     fun fixedExpansionControlPlusTwelveToolsUsesExactlyTwoRows() {
-        assertEquals(624, ToolbarLayoutPolicy.totalWidthDp(toolItemCount = 12, visibleRows = 1))
-        assertEquals(336, ToolbarLayoutPolicy.totalWidthDp(toolItemCount = 12, visibleRows = 2))
+        val expansionControlDp = ToolbarLayoutPolicy.TOUCH_TARGET_DP
+        assertEquals(624, expansionControlDp + ToolbarLayoutPolicy.contentWidthDp(itemCount = 12, visibleRows = 1))
+        assertEquals(336, expansionControlDp + ToolbarLayoutPolicy.contentWidthDp(itemCount = 12, visibleRows = 2))
     }
 
 }

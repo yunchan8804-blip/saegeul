@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
-import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
+import org.fcitx.fcitx5.android.input.candidates.CandidateBadge
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,28 +18,28 @@ class MinimalistIconBadgeTest {
 
     @Test
     fun `category icon mapping should produce clean single icons instead of text labels`() {
-        val workIcon = CandidateItemUi.resolveBadgeIcon("업무/보고")
+        val workIcon = CandidateBadge.iconFor("업무/보고") ?: ""
         assertEquals("💼", workIcon)
 
-        val scheduleIcon = CandidateItemUi.resolveBadgeIcon("일정")
+        val scheduleIcon = CandidateBadge.iconFor("일정") ?: ""
         assertEquals("📅", scheduleIcon)
 
-        val delayIcon = CandidateItemUi.resolveBadgeIcon("양해/안심")
+        val delayIcon = CandidateBadge.iconFor("양해/안심") ?: ""
         assertEquals("⏳", delayIcon)
 
-        val thanksIcon = CandidateItemUi.resolveBadgeIcon("감사")
+        val thanksIcon = CandidateBadge.iconFor("감사") ?: ""
         assertEquals("🙏", thanksIcon)
 
-        val proposalIcon = CandidateItemUi.resolveBadgeIcon("제안")
+        val proposalIcon = CandidateBadge.iconFor("제안") ?: ""
         assertEquals("💡", proposalIcon)
 
-        val aiIcon = CandidateItemUi.resolveBadgeIcon("✨ 맞춤AI")
+        val aiIcon = CandidateBadge.iconFor("✨ 맞춤AI") ?: ""
         assertEquals("✨", aiIcon)
 
-        val myStyleIcon = CandidateItemUi.resolveBadgeIcon("✨ 내스타일")
+        val myStyleIcon = CandidateBadge.iconFor("✨ 내스타일") ?: ""
         assertEquals("✨", myStyleIcon)
 
-        val chatIcon = CandidateItemUi.resolveBadgeIcon("답변")
+        val chatIcon = CandidateBadge.iconFor("답변") ?: ""
         assertEquals("💬", chatIcon)
     }
 
@@ -51,7 +51,7 @@ class MinimalistIconBadgeTest {
         )
 
         testLabels.forEach { label ->
-            val icon = CandidateItemUi.resolveBadgeIcon(label)
+            val icon = CandidateBadge.iconFor(label) ?: ""
             val hasKorean = icon.any { it in '\uAC00'..'\uD7A3' }
             assertFalse("Badge icon for '$label' must not contain Korean letters, was '$icon'", hasKorean)
             assertTrue("Badge icon must not be blank", icon.isNotBlank())

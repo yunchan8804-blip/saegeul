@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
 import org.fcitx.fcitx5.android.input.ai.vault.PlainVaultCipher
 import org.fcitx.fcitx5.android.input.ai.vault.VaultCipher
@@ -126,6 +127,7 @@ class PersonalNgramModel(
         prune()
     }
 
+    @VisibleForTesting
     @Synchronized
     fun learnBigram(prev: String, next: String, weight: Float, packageName: String) {
         val category = TypingDnaVault.categorizePackage(packageName)

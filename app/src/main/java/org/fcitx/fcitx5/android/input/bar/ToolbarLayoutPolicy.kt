@@ -25,7 +25,4 @@ internal object ToolbarLayoutPolicy {
     fun contentWidthDp(itemCount: Int, visibleRows: Int): Int =
         TOUCH_TARGET_DP * contentColumns(itemCount, visibleRows)
 
-    fun totalWidthDp(toolItemCount: Int, visibleRows: Int): Int =
-        TOUCH_TARGET_DP + contentWidthDp(toolItemCount, visibleRows)
-
 }

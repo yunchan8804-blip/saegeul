@@ -34,7 +34,7 @@ import org.fcitx.fcitx5.android.input.EditorIdentity
 import org.fcitx.fcitx5.android.input.EditorSelection
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.ai.prediction.ContextualCandidate
-import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
+import org.fcitx.fcitx5.android.input.candidates.CandidateBadge
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -454,7 +454,7 @@ class HangulInitialAndDiscourseContinuationDeviceTest {
             candidate.comment != "추천" &&
             !candidate.comment.contains("추천") &&
             !candidate.comment.contains("🌐")
-        return if (CandidateItemUi.resolveBadgeIcon(candidate.comment).isNotEmpty()) {
+        return if (!CandidateBadge.iconFor(candidate.comment).isNullOrEmpty()) {
             CandidateDisplayTarget(
                 visibleText = candidate.text,
                 contentDescription = "${candidate.comment.trim()}: ${candidate.text}",

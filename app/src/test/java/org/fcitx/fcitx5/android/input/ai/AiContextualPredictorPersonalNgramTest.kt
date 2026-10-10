@@ -5,13 +5,14 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /**
  * Verifies AiContextualPredictor wires the on-device [PersonalNgramModel] into real word
- * predictions, and that user-authored phrases outrank synthetic LLM ones at equal score.
+ * predictions, and that the sentence line keeps user-authored phrases while excluding synthetic LLM ones.
  */
 class AiContextualPredictorPersonalNgramTest {
 
@@ -63,9 +64,8 @@ class AiContextualPredictorPersonalNgramTest {
         assertEquals("참석합니다", wordCandidates.first().text)
     }
 
-    @org.junit.Ignore("synthetic 개인 문장은 문장 줄에서 제외(사용자 데이터만). user_phrase 우선순위는 다른 소스와의 관계로만 의미")
     @Test
-    fun userPhraseSourceScoresHigherThanSyntheticLlmAtSameScore() {
+    fun sentenceLineKeepsUserPhraseAndExcludesSyntheticLlmRecords() {
         val store = PersonalizedSentenceStore()
         store.upsert(
             PersonalizedSentenceRecord(
@@ -94,8 +94,8 @@ class AiContextualPredictorPersonalNgramTest {
             limit = 10
         )
 
-        val syntheticMatch = results.first { it.text == "오늘 회의 참석합니다." }
-        val userPhraseMatch = results.first { it.text == "오늘 회의 참석하겠습니다." }
-        assertTrue(userPhraseMatch.confidenceScore > syntheticMatch.confidenceScore)
+        val personalizedTexts = results.filter { it.source == "personalized_style" }.map { it.text }
+        assertTrue(personalizedTexts.contains("오늘 회의 참석하겠습니다."))
+        assertFalse(results.any { it.text == "오늘 회의 참석합니다." })
     }
 }

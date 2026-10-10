@@ -42,11 +42,6 @@ class TypingDnaRepository(
         }
     }
 
-    @Synchronized
-    fun invalidateCache() {
-        clearCaches()
-    }
-
     /**
      * Counter that [clear] raises. A caller that builds a persona from the stored profile or from a
      * pending batch reads it first and passes it back to [updatePersona], so work that was already

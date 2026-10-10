@@ -58,10 +58,6 @@ class TypingDnaCommitSink(
         collector.recordCommittedText(pkg, text)
     }
 
-    fun onEditorSubmit(packageName: String?, inspectionAllowed: Boolean) {
-        onEditorFinished(packageName, inspectionAllowed)
-    }
-
     fun onEditorFinished(packageName: String?, inspectionAllowed: Boolean) {
         if (!inspectionAllowed) return
         val pkg = packageName?.takeIf { it.isNotBlank() } ?: return

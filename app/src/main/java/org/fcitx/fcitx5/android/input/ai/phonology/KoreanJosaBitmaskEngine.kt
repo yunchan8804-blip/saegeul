@@ -397,37 +397,6 @@ object KoreanJosaBitmaskEngine {
         return (flags and reqMask) != 0
     }
 
-    fun filterCandidates(prefix: String, candidates: List<String>): List<String> {
-        val flags = getPhonologicalFlags(prefix)
-
-        return candidates.filter { candidate ->
-            val trimmed = candidate.trimStart()
-            if (trimmed.isEmpty()) return@filter true
-
-            if (flags != FLAG_NONE) {
-                // Check if candidate starts with a particle token
-                // Check longer josas first (e.g. "으로" before "로")
-                val matchedJosa = JOSA_REQUIRED_MASK.keys
-                    .sortedByDescending { it.length }
-                    .firstOrNull { josa ->
-                        if (trimmed.startsWith(josa)) {
-                            val nextIdx = josa.length
-                            nextIdx == trimmed.length || trimmed[nextIdx].isWhitespace() ||
-                                trimmed[nextIdx] in ".,!?:;~()[]"
-                        } else false
-                    }
-                if (matchedJosa != null) {
-                    if (!isValidAttachment(prefix, matchedJosa)) {
-                        return@filter false
-                    }
-                }
-            }
-
-            // Also reject candidate if it has internal josa mismatch
-            !hasJosaMismatch(candidate)
-        }
-    }
-
     data class Mismatch(
         val index: Int,
         val precedingChar: Char,

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.rag
 
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.input.ai.HalfLifeDecay
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramTokenizer
@@ -249,6 +250,7 @@ class PersonalSentenceVault(
     }
 
     /** Every stored sentence text (already PII-scrubbed), in no particular order. Read-only. */
+    @VisibleForTesting
     @Synchronized
     fun allSentences(): List<String> = docs.values.map { it.text }
 

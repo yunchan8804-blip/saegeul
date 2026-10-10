@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.vault
 
+import androidx.annotation.VisibleForTesting
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -132,6 +133,7 @@ class VaultFile internal constructor(
     internal fun version(): VaultFileVersion = locked { versionLocked() }
 
     /** True when the committed file exists but has no `SGV1` header. */
+    @VisibleForTesting
     fun isLegacyPlaintext(): Boolean = locked {
         val raw = readCommittedRawOrNullLocked() ?: return@locked false
         !hasMagic(raw)

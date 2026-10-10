@@ -49,7 +49,7 @@ class TypingDnaInstantSyncTest {
             vault.totalBufferedCount()
         )
 
-        sink.onEditorSubmit(packageName = "com.kakao.talk", inspectionAllowed = true)
+        sink.onEditorFinished(packageName = "com.kakao.talk", inspectionAllowed = true)
         assertEquals(1, vault.totalBufferedCount())
         assertTrue("Staging file must survive IME destruction", staging.length() > 2)
 
@@ -94,7 +94,7 @@ class TypingDnaInstantSyncTest {
             )
         )
         sink.onEditorTextCommitted("com.kakao.talk", "비밀 메시지입니다", inspectionAllowed = false)
-        sink.onEditorSubmit("com.kakao.talk", inspectionAllowed = false)
+        sink.onEditorFinished("com.kakao.talk", inspectionAllowed = false)
         sink.onEditorTextCommitted("com.kakao.talk", "   ", inspectionAllowed = true)
         sink.onEditorTextCommitted(null, "오늘 저녁에 만나자", inspectionAllowed = true)
         assertTrue(collectorSentences.isEmpty())

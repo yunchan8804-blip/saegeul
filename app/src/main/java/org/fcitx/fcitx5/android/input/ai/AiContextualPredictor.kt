@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai
 
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.input.ai.prediction.source.BaseLexiconSource
 import org.fcitx.fcitx5.android.input.ai.prediction.source.BaseVocabularySource
 import org.fcitx.fcitx5.android.input.ai.prediction.source.CandidateRequest
@@ -190,6 +191,7 @@ class AiContextualPredictor(
         return (words + sentences).sortedByDescending { it.confidenceScore }
     }
 
+    @VisibleForTesting
     fun learnSentence(sentence: String, packageName: String) {
         ngram.learn(sentence, packageName)
     }

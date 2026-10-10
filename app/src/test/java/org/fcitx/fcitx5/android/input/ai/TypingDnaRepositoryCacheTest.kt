@@ -62,7 +62,7 @@ class TypingDnaRepositoryCacheTest {
     }
 
     @Test
-    fun invalidateAndForceReloadReadCommittedProfileAgain() {
+    fun forceReloadReadsCommittedProfileAgain() {
         val file = file("reload.json")
         TypingDnaRepository(file).save(profile(updatedAt = 11L, totalSentences = 10))
         val cipher = CountingCipher()
@@ -70,11 +70,8 @@ class TypingDnaRepositoryCacheTest {
 
         repository.getStats()
         assertEquals(1, cipher.decryptCount)
-        repository.invalidateCache()
-        repository.getStats()
-        assertEquals(2, cipher.decryptCount)
         repository.getStats(forceReload = true)
-        assertEquals(3, cipher.decryptCount)
+        assertEquals(2, cipher.decryptCount)
     }
 
     @Test

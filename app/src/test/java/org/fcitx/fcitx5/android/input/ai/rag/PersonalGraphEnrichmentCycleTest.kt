@@ -13,16 +13,8 @@ class PersonalGraphEnrichmentCycleTest {
 
     @Test
     fun firstEverCycleOnlyNeedsThirtySentences() {
-        assertFalse(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = false, newSentenceCount = 9, msSinceLastBuild = 0L, manual = false
-            )
-        )
-        assertTrue(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = false, newSentenceCount = 10, msSinceLastBuild = 0L, manual = false
-            )
-        )
+        assertFalse(startsAutomatically(hasExistingGraph = false, newSentenceCount = 9, msSinceLastBuild = 0L))
+        assertTrue(startsAutomatically(hasExistingGraph = false, newSentenceCount = 10, msSinceLastBuild = 0L))
     }
 
     @Test
@@ -30,40 +22,9 @@ class PersonalGraphEnrichmentCycleTest {
         val justUnderInterval = PersonalGraphEnrichmentCycle.MIN_INTERVAL_MS - 1
         val exactlyInterval = PersonalGraphEnrichmentCycle.MIN_INTERVAL_MS
 
-        assertFalse(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = true, newSentenceCount = 10, msSinceLastBuild = justUnderInterval, manual = false
-            )
-        )
-        assertFalse(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = true, newSentenceCount = 9, msSinceLastBuild = exactlyInterval, manual = false
-            )
-        )
-        assertTrue(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = true, newSentenceCount = 10, msSinceLastBuild = exactlyInterval, manual = false
-            )
-        )
-    }
-
-    @Test
-    fun manualBypassesBothThresholdsRegardlessOfGraphHistory() {
-        assertTrue(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = false, newSentenceCount = 0, msSinceLastBuild = 0L, manual = true
-            )
-        )
-        assertTrue(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = true, newSentenceCount = 0, msSinceLastBuild = 0L, manual = true
-            )
-        )
-        assertTrue(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = true, newSentenceCount = 9, msSinceLastBuild = 1L, manual = true
-            )
-        )
+        assertFalse(startsAutomatically(hasExistingGraph = true, newSentenceCount = 10, msSinceLastBuild = justUnderInterval))
+        assertFalse(startsAutomatically(hasExistingGraph = true, newSentenceCount = 9, msSinceLastBuild = exactlyInterval))
+        assertTrue(startsAutomatically(hasExistingGraph = true, newSentenceCount = 10, msSinceLastBuild = exactlyInterval))
     }
 
     @Test
@@ -82,29 +43,21 @@ class PersonalGraphEnrichmentCycleTest {
         val sizeDifference = (vault.stats().sentences - graphSourceSentenceCount).coerceAtLeast(0)
         assertFalse(
             "a size difference can never see new sentences once the vault is full",
-            PersonalGraphEnrichmentCycle.shouldStart(true, sizeDifference, now - graphBuiltMs, manual = false)
+            startsAutomatically(true, sizeDifference, now - graphBuiltMs)
         )
 
         val newSentences = PersonalGraphEnrichmentCycle.newSentenceCount(vault, graphBuiltMs)
         assertEquals(PersonalGraphEnrichmentCycle.MIN_NEW_SENTENCES, newSentences)
         assertTrue(
-            PersonalGraphEnrichmentCycle.shouldStart(true, newSentences, now - graphBuiltMs, manual = false)
+            startsAutomatically(true, newSentences, now - graphBuiltMs)
         )
     }
 
     @Test
     fun aBacklogOfOneCycleOrMoreStartsWithoutWaitingForTheInterval() {
         val backlog = PersonalGraphEnrichmentCycle.MAX_INCREMENTAL_SENTENCES
-        assertTrue(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = true, newSentenceCount = backlog, msSinceLastBuild = 0L, manual = false
-            )
-        )
-        assertFalse(
-            PersonalGraphEnrichmentCycle.shouldStart(
-                hasExistingGraph = true, newSentenceCount = backlog - 1, msSinceLastBuild = 0L, manual = false
-            )
-        )
+        assertTrue(startsAutomatically(hasExistingGraph = true, newSentenceCount = backlog, msSinceLastBuild = 0L))
+        assertFalse(startsAutomatically(hasExistingGraph = true, newSentenceCount = backlog - 1, msSinceLastBuild = 0L))
         assertEquals(
             GraphEnrichmentSkipReason.TOO_SOON,
             PersonalGraphEnrichmentCycle.automaticSkipReason(true, backlog - 1, msSinceLastBuild = 0L)
@@ -134,6 +87,14 @@ class PersonalGraphEnrichmentCycleTest {
 
         assertEquals(12, PersonalGraphEnrichmentCycle.newSentenceCount(vault, enrichedThroughMs = 0L))
     }
+
+    private fun startsAutomatically(
+        hasExistingGraph: Boolean,
+        newSentenceCount: Int,
+        msSinceLastBuild: Long
+    ): Boolean = PersonalGraphEnrichmentCycle.automaticSkipReason(
+        hasExistingGraph, newSentenceCount, msSinceLastBuild
+    ) == GraphEnrichmentSkipReason.NONE
 
     private fun sentence(index: Int): String = "하루 ${(0xAC00 + index).toChar()}다 기록"
 

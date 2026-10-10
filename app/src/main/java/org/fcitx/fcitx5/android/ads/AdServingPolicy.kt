@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.ads
 
+import androidx.annotation.VisibleForTesting
+
 /**
  * Fail-closed serving and publish evaluation for AVENUE configs.
  *
@@ -98,6 +100,7 @@ internal object AdServingPolicy {
         return AdDecision(true, null, config.version)
     }
 
+    @VisibleForTesting
     fun canPublish(venue: AdVenue): Boolean = placementBlock(venue) == null
 
     private fun configValidity(

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.typo
 
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.input.ai.ChoseongMorphologyEngine
 import java.io.BufferedReader
 import java.io.Reader
@@ -93,6 +94,7 @@ class BaseKoreanVocabulary(private val source: () -> Reader) {
     @Volatile
     private var loadedFlag = false
 
+    @VisibleForTesting
     val isLoaded: Boolean
         get() = loadedFlag
 

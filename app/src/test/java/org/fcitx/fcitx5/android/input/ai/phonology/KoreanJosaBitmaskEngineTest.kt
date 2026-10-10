@@ -168,29 +168,6 @@ class KoreanJosaBitmaskEngineTest {
     }
 
     @Test
-    fun testFilterCandidates() {
-        // Prefix: "선생님" (batchim 'ㅁ')
-        val cands1 = listOf("는 어디 가세요?", "은 어디 가세요?", "을 뵈었습니다", "를 뵈었습니다")
-        val filtered1 = KoreanJosaBitmaskEngine.filterCandidates("선생님", cands1)
-        assertEquals(listOf("은 어디 가세요?", "을 뵈었습니다"), filtered1)
-
-        // Prefix: "사과" (no batchim)
-        val cands2 = listOf("을 먹었다", "를 먹었다", "는 맛있다", "은 맛있다")
-        val filtered2 = KoreanJosaBitmaskEngine.filterCandidates("사과", cands2)
-        assertEquals(listOf("를 먹었다", "는 맛있다"), filtered2)
-
-        // Prefix: "서울" ('ㄹ' batchim)
-        val cands3 = listOf("으로 가자", "로 가자")
-        val filtered3 = KoreanJosaBitmaskEngine.filterCandidates("서울", cands3)
-        assertEquals(listOf("로 가자"), filtered3)
-
-        // Prefix: "집" (non-'ㄹ' batchim)
-        val cands4 = listOf("로 가자", "으로 가자")
-        val filtered4 = KoreanJosaBitmaskEngine.filterCandidates("집", cands4)
-        assertEquals(listOf("으로 가자"), filtered4)
-    }
-
-    @Test
     fun testFindAndCorrectMismatches() {
         val wrongSentence = "선생님는 사과을 먹었고 친구이 서울으로 갔다"
         assertTrue(KoreanJosaBitmaskEngine.hasJosaMismatch(wrongSentence))

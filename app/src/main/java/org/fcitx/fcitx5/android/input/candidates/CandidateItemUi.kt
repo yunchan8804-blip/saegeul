@@ -139,12 +139,6 @@ class CandidateItemUi(
 
     companion object {
         /**
-         * Kept for callers outside this packet's scope (e.g. `input/ai` and `androidTest`
-         * helpers) that still depend on the old signature. Delegates to [CandidateBadge.iconFor].
-         */
-        fun resolveBadgeIcon(badgeText: String): String = CandidateBadge.iconFor(badgeText) ?: ""
-
-        /**
          * Sentence-row automatic candidates (SENTENCE mode, AI badge) render as a pill chip; word
          * row candidates and sentence-row candidates without a badge keep the flat borderless
          * style. Exposed standalone so it can be unit tested without an Android/Theme dependency.
@@ -159,7 +153,7 @@ class CandidateItemUi(
 
         val icon = CandidateBadge.iconFor(candidate.comment)
         val isAiBadge = icon != null
-        val showPill = isSentenceRow && isAiBadge
+        val showPill = shouldRenderPill(isSentenceRow, candidate.comment)
 
         if (showPill) {
             // Pill chip: bordered, rounded, floating within the row's fixed height. The ripple is

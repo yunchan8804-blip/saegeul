@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.ai.typingdna
 
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.input.ai.CollectionDiagnostics
 import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
@@ -132,6 +133,7 @@ class TypingDnaVault(
     /**
      * Returns sentences for a specific category.
      */
+    @VisibleForTesting
     @Synchronized
     fun getSentences(category: String): List<String> {
         return categoryBuffers[category]?.toList() ?: emptyList()
@@ -184,6 +186,7 @@ class TypingDnaVault(
      * Flushes all staged sentences immediately across all categories,
      * dispatches the batch callbacks, and purges the staging buffer.
      */
+    @VisibleForTesting
     @Synchronized
     fun flushAll(): Map<String, List<String>> {
         val snapshot = snapshot()

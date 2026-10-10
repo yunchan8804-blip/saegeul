@@ -16,9 +16,6 @@ enum class AiFeatureEntryGate {
     NetworkPolicyBlocked,
     SetupRequired;
 
-    val offersSetupAction: Boolean
-        get() = this == SetupRequired
-
     companion object {
         fun evaluate(
             allowsTextInspection: Boolean,

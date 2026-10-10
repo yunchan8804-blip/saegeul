@@ -5,13 +5,11 @@
 package org.fcitx.fcitx5.android.input.ai
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AiFeatureEntryGateTest {
     @Test
-    fun onlyMissingSetupOffersSettingsAction() {
+    fun missingProfileOnlyRequiresSetup() {
         val missing = AiFeatureEntryGate.evaluate(
             allowsTextInspection = true,
             allowsAiInput = true,
@@ -19,10 +17,6 @@ class AiFeatureEntryGateTest {
         )
 
         assertEquals(AiFeatureEntryGate.SetupRequired, missing)
-        assertTrue(missing.offersSetupAction)
-        assertFalse(AiFeatureEntryGate.PrivateEditor.offersSetupAction)
-        assertFalse(AiFeatureEntryGate.NetworkPolicyBlocked.offersSetupAction)
-        assertFalse(AiFeatureEntryGate.Ready.offersSetupAction)
     }
 
     @Test

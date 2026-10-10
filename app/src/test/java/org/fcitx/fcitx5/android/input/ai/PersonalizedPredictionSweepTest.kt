@@ -334,7 +334,7 @@ class PersonalizedPredictionSweepTest {
             combinedFeed.forEach { sentence ->
                 commitSink.onEditorTextCommitted(PACKAGE_NAME, sentence, inspectionAllowed = true)
             }
-            // 배치 문턱(10)에 못 미쳐 남은 꼬리도 실제 대시보드가 쓰는 TypingDnaVault.flushAll()로 반영한다.
+            // 배치 문턱(10)에 못 미쳐 남은 꼬리는 테스트 전용 TypingDnaVault.flushAll()로 밀어 넣어 반영한다.
             typingDnaVault.flushAll()
 
             personalizedStore.save()
@@ -541,7 +541,7 @@ class PersonalizedPredictionSweepTest {
             appendLine("   `TypingDnaCompiler.compilePersona(persona, persist=true)`가 `KoreanCollocationModel.injectDynamicBigrams`와")
             appendLine("   `PersonalizedSentenceStore.upsert`(문법적으로 온전하고 같은 배치 안에서 2회 이상 관측된 문장만, ")
             appendLine("   `TypingDnaProfiler.MIN_CANNED_PHRASE_FREQUENCY=2`)로 반영, `TypingDnaRepository.updatePersona`로 영속화.")
-            appendLine("4. 남은 꼬리(10문장 미달)는 `TypingDnaVault.flushAll()`로 마무리 반영(대시보드 강제 동기화와 동일 경로).")
+            appendLine("4. 남은 꼬리(10문장 미달)는 `TypingDnaVault.flushAll()`로 마무리 반영(실제 앱의 즉시 반영 경로인 `processPending`과는 별개의 테스트 전용 진입점).")
             appendLine("5. `AiContextualPredictor.predict()` + `ImmediateContextualPredictions.collect()`(실기기 병합 경로, ")
             appendLine("   sentencePackLookup/generatedSentenceLookup/generatedSpacingLookup 포함)를 합쳐 최종 추천 목록을 만든다.")
             appendLine()
