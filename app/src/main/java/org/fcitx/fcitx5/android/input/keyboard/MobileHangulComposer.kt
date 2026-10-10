@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
 
 /** Which vowel-combination table a mobile Hangul surface's directional/dot primitives use. */
 enum class MobileHangulFamily {
@@ -373,7 +374,7 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
         return if (batchim == null) {
             HangulSyllable.jongseongIndexOf(consonant) > HangulSyllable.NO_JONGSEONG
         } else {
-            doubleBatchim.containsKey(batchim to consonant)
+            HangulSyllable.COMPOUND_JONGSEONG_JOIN.containsKey(batchim to consonant)
         }
     }
 
@@ -384,7 +385,7 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
             null -> ""
             // A compound batchim has no key of its own in [dubeolsik]; split it back into the two
             // base consonants that formed it.
-            else -> doubleBatchimParts[jong]?.let { (a, b) -> encode(a.toString()) + encode(b.toString()) }
+            else -> HangulSyllable.COMPOUND_JONGSEONG_SPLIT[jong]?.let { (a, b) -> encode(a.toString()) + encode(b.toString()) }
                 ?: encode(jong.toString())
         }
         return encode(cho.toString()) + encode(jung.toString()) + jongKeys
@@ -426,25 +427,13 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
         const val PHONEPAD_MULTITAP_TIMEOUT_MS = 1_500L
         const val SINGLE_VOWEL_MULTITAP_TIMEOUT_MS = 300L
 
-        /** The 11 standard Dubeolsik compound batchim (K21), base consonants -> the compound. */
-        private val doubleBatchim = mapOf(
-            ('ㄱ' to 'ㅅ') to 'ㄳ',
-            ('ㄴ' to 'ㅈ') to 'ㄵ', ('ㄴ' to 'ㅎ') to 'ㄶ',
-            ('ㄹ' to 'ㄱ') to 'ㄺ', ('ㄹ' to 'ㅁ') to 'ㄻ', ('ㄹ' to 'ㅂ') to 'ㄼ',
-            ('ㄹ' to 'ㅅ') to 'ㄽ', ('ㄹ' to 'ㅌ') to 'ㄾ', ('ㄹ' to 'ㅍ') to 'ㄿ',
-            ('ㄹ' to 'ㅎ') to 'ㅀ',
-            ('ㅂ' to 'ㅅ') to 'ㅄ'
-        )
-
-        /** Reverse of [doubleBatchim]: a compound batchim -> the two base consonants that made it. */
-        private val doubleBatchimParts = doubleBatchim.entries.associate { (parts, compound) -> compound to parts }
-
         private val chunjiinICombinations = mapOf(
             "ㅏ" to "ㅐ", "ㅑ" to "ㅒ", "ㅓ" to "ㅔ", "ㅕ" to "ㅖ",
             "ㅗ" to "ㅚ", "ㅜ" to "ㅟ", "ㅡ" to "ㅢ",
             "ㅠ" to "ㅝ", "ㅘ" to "ㅙ", "ㅝ" to "ㅞ"
         )
 
+        // 모바일만 ㅏ+ㅣ→ㅐ 같은 단모음 결합까지 13개를 받는다. 엔진 7개, 복구 9개와 모으면 결과가 바뀐다.
         private val vowelCombinations = mapOf(
             ("ㅏ" to 'ㅣ') to "ㅐ", ("ㅑ" to 'ㅣ') to "ㅒ",
             ("ㅓ" to 'ㅣ') to "ㅔ", ("ㅕ" to 'ㅣ') to "ㅖ",
@@ -467,16 +456,8 @@ class MobileHangulComposer(private val family: MobileHangulFamily = MobileHangul
             'ㅈ' to 'ㅉ', 'ㅉ' to 'ㅈ'
         )
 
-        private val dubeolsik = mapOf(
-            'ㄱ' to "r", 'ㄲ' to "R", 'ㄴ' to "s", 'ㄷ' to "e", 'ㄸ' to "E",
-            'ㄹ' to "f", 'ㅁ' to "a", 'ㅂ' to "q", 'ㅃ' to "Q", 'ㅅ' to "t",
-            'ㅆ' to "T", 'ㅇ' to "d", 'ㅈ' to "w", 'ㅉ' to "W", 'ㅊ' to "c",
-            'ㅋ' to "z", 'ㅌ' to "x", 'ㅍ' to "v", 'ㅎ' to "g",
-            'ㅏ' to "k", 'ㅐ' to "o", 'ㅑ' to "i", 'ㅒ' to "O", 'ㅓ' to "j",
-            'ㅔ' to "p", 'ㅕ' to "u", 'ㅖ' to "P", 'ㅗ' to "h", 'ㅘ' to "hk",
-            'ㅙ' to "ho", 'ㅚ' to "hl", 'ㅛ' to "y", 'ㅜ' to "n", 'ㅝ' to "nj",
-            'ㅞ' to "np", 'ㅟ' to "nl", 'ㅠ' to "b", 'ㅡ' to "m", 'ㅢ' to "ml",
-            'ㅣ' to "l"
-        )
+        // 낱자모·복합 모음 키만 둔다. 겹받침 11개는 키가 하나가 아니므로 뺀다(keysForSyllable이 따로 쪼갠다).
+        private val dubeolsik: Map<Char, String> =
+            DubeolsikKeyMap.JAMO_TO_KEYS.filterKeys { it !in HangulSyllable.COMPOUND_JONGSEONG_SPLIT }
     }
 }

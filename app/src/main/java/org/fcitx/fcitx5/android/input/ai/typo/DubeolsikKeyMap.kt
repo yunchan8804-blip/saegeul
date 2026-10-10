@@ -14,33 +14,48 @@ import kotlin.math.sqrt
  */
 object DubeolsikKeyMap {
 
-    // 두벌식 33키 매핑 (자음·모음 27 + 시프트 6)
-    private val JAMO_TO_KEY: Map<Char, Char> = mapOf(
-        'ㅂ' to 'q', 'ㅈ' to 'w', 'ㄷ' to 'e', 'ㄱ' to 'r', 'ㅅ' to 't',
-        'ㅛ' to 'y', 'ㅕ' to 'u', 'ㅑ' to 'i', 'ㅐ' to 'o', 'ㅔ' to 'p',
-        'ㅁ' to 'a', 'ㄴ' to 's', 'ㅇ' to 'd', 'ㄹ' to 'f', 'ㅎ' to 'g',
-        'ㅗ' to 'h', 'ㅓ' to 'j', 'ㅏ' to 'k', 'ㅣ' to 'l',
-        'ㅋ' to 'z', 'ㅌ' to 'x', 'ㅊ' to 'c', 'ㅍ' to 'v', 'ㅠ' to 'b', 'ㅜ' to 'n', 'ㅡ' to 'm',
-        'ㅃ' to 'Q', 'ㅉ' to 'W', 'ㄸ' to 'E', 'ㄲ' to 'R', 'ㅆ' to 'T', 'ㅒ' to 'O', 'ㅖ' to 'P'
+    /**
+     * 두벌식 33키 매핑 (자음·모음 27 + 시프트 6). 키 -> 자모 표가 정본이고, 나머지 표는 여기서 계산한다.
+     * 대소문자 정책은 호출부마다 다르다. 이 표는 대소문자를 구분해 정확히 일치하는 키만 받는다.
+     */
+    val KEY_TO_JAMO: Map<Char, Char> = mapOf(
+        'q' to 'ㅂ', 'w' to 'ㅈ', 'e' to 'ㄷ', 'r' to 'ㄱ', 't' to 'ㅅ',
+        'y' to 'ㅛ', 'u' to 'ㅕ', 'i' to 'ㅑ', 'o' to 'ㅐ', 'p' to 'ㅔ',
+        'a' to 'ㅁ', 's' to 'ㄴ', 'd' to 'ㅇ', 'f' to 'ㄹ', 'g' to 'ㅎ',
+        'h' to 'ㅗ', 'j' to 'ㅓ', 'k' to 'ㅏ', 'l' to 'ㅣ',
+        'z' to 'ㅋ', 'x' to 'ㅌ', 'c' to 'ㅊ', 'v' to 'ㅍ', 'b' to 'ㅠ', 'n' to 'ㅜ', 'm' to 'ㅡ',
+        'Q' to 'ㅃ', 'W' to 'ㅉ', 'E' to 'ㄸ', 'R' to 'ㄲ', 'T' to 'ㅆ', 'O' to 'ㅒ', 'P' to 'ㅖ'
     )
 
+    private val JAMO_TO_KEY: Map<Char, Char> = KEY_TO_JAMO.entries.associate { (key, jamo) -> jamo to key }
+
     // 시프트를 함께 눌러야 하는 키. 한글이 아닌 문자는 keySequence에서 소문자가 되므로 섞이지 않는다.
-    private val SHIFTED_KEYS: Set<Char> = JAMO_TO_KEY.values.filter { it.isUpperCase() }.toSet()
+    val SHIFTED_KEYS: Set<Char> = KEY_TO_JAMO.keys.filter { it.isUpperCase() }.toSet()
 
     // 복합 모음은 두 개의 단모음 키 입력으로 조합된다.
-    private val COMPOUND_VOWEL_SPLIT: Map<Char, String> = mapOf(
+    val COMPOUND_VOWEL_SPLIT: Map<Char, String> = mapOf(
         'ㅘ' to "ㅗㅏ", 'ㅙ' to "ㅗㅐ", 'ㅚ' to "ㅗㅣ",
         'ㅝ' to "ㅜㅓ", 'ㅞ' to "ㅜㅔ", 'ㅟ' to "ㅜㅣ",
         'ㅢ' to "ㅡㅣ"
     )
 
+    /** [COMPOUND_VOWEL_SPLIT]의 정확한 역: (앞 모음, 뒤 모음) -> 복합 모음. */
+    val COMPOUND_VOWEL_JOIN: Map<Pair<Char, Char>, Char> =
+        COMPOUND_VOWEL_SPLIT.entries.associate { (compound, parts) -> (parts[0] to parts[1]) to compound }
+
     // 겹받침도 두 개의 낱자음 키 입력으로 조합된다.
-    private val COMPOUND_JONGSEONG_SPLIT: Map<Char, String> = mapOf(
-        'ㄳ' to "ㄱㅅ", 'ㄵ' to "ㄴㅈ", 'ㄶ' to "ㄴㅎ",
-        'ㄺ' to "ㄹㄱ", 'ㄻ' to "ㄹㅁ", 'ㄼ' to "ㄹㅂ",
-        'ㄽ' to "ㄹㅅ", 'ㄾ' to "ㄹㅌ", 'ㄿ' to "ㄹㅍ",
-        'ㅀ' to "ㄹㅎ", 'ㅄ' to "ㅂㅅ"
-    )
+    private val COMPOUND_JONGSEONG_SPLIT: Map<Char, String> =
+        HangulSyllable.COMPOUND_JONGSEONG_SPLIT.mapValues { (_, parts) -> "${parts.first}${parts.second}" }
+
+    /**
+     * 자모(낱자모·복합 모음·겹받침 51개 포함 전부) -> 두벌식으로 칠 때 누르는 키 순서.
+     * 복합 모음·겹받침은 낱자모 키를 이어 붙인 문자열이다.
+     */
+    val JAMO_TO_KEYS: Map<Char, String> = buildMap {
+        for ((jamo, key) in JAMO_TO_KEY) put(jamo, key.toString())
+        for ((compound, parts) in COMPOUND_VOWEL_SPLIT) put(compound, parts.map { JAMO_TO_KEY.getValue(it) }.joinToString(""))
+        for ((compound, parts) in COMPOUND_JONGSEONG_SPLIT) put(compound, parts.map { JAMO_TO_KEY.getValue(it) }.joinToString(""))
+    }
 
     private const val ROW0 = "qwertyuiop"
     private const val ROW1 = "asdfghjkl"

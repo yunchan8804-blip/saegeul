@@ -540,35 +540,15 @@ class KoreanTypoCorrectionEngine(
 
         private val WHITESPACE = Regex("\\s+")
 
-        private val qwertyToJamoMap = mapOf(
-            'r' to 'ㄱ', 'R' to 'ㄲ', 's' to 'ㄴ', 'e' to 'ㄷ', 'E' to 'ㄸ',
-            'f' to 'ㄹ', 'a' to 'ㅁ', 'q' to 'ㅂ', 'Q' to 'ㅃ', 't' to 'ㅅ',
-            'T' to 'ㅆ', 'd' to 'ㅇ', 'w' to 'ㅈ', 'W' to 'ㅉ', 'c' to 'ㅊ',
-            'z' to 'ㅋ', 'x' to 'ㅌ', 'v' to 'ㅍ', 'g' to 'ㅎ',
-            'k' to 'ㅏ', 'o' to 'ㅐ', 'i' to 'ㅑ', 'O' to 'ㅒ', 'j' to 'ㅓ',
-            'p' to 'ㅔ', 'u' to 'ㅕ', 'P' to 'ㅖ', 'h' to 'ㅗ', 'y' to 'ㅛ',
-            'n' to 'ㅜ', 'b' to 'ㅠ', 'm' to 'ㅡ', 'l' to 'ㅣ'
-        )
+        // 이 엔진은 정확히 일치하는 키만 받는다. 대소문자를 합치는 쪽은 KoreanTypoRecovery다.
+        private val qwertyToJamoMap = DubeolsikKeyMap.KEY_TO_JAMO
 
-        private val doubleVowelMap = mapOf(
-            ('ㅗ' to 'ㅏ') to 'ㅘ', ('ㅗ' to 'ㅐ') to 'ㅙ', ('ㅗ' to 'ㅣ') to 'ㅚ',
-            ('ㅜ' to 'ㅓ') to 'ㅝ', ('ㅜ' to 'ㅔ') to 'ㅞ', ('ㅜ' to 'ㅣ') to 'ㅟ',
-            ('ㅡ' to 'ㅣ') to 'ㅢ'
-        )
+        // 복구와 달리 엔진은 ㅘ+ㅣ→ㅙ, ㅝ+ㅣ→ㅞ를 받지 않는다. 모으면 결과가 바뀐다.
+        private val doubleVowelMap = DubeolsikKeyMap.COMPOUND_VOWEL_JOIN
 
-        private val doubleJongseongMap = mapOf(
-            ('ㄱ' to 'ㅅ') to 'ㄳ', ('ㄴ' to 'ㅈ') to 'ㄵ', ('ㄴ' to 'ㅎ') to 'ㄶ',
-            ('ㄹ' to 'ㄱ') to 'ㄺ', ('ㄹ' to 'ㅁ') to 'ㄻ', ('ㄹ' to 'ㅂ') to 'ㄼ',
-            ('ㄹ' to 'ㅅ') to 'ㄽ', ('ㄹ' to 'ㅌ') to 'ㄾ', ('ㄹ' to 'ㅍ') to 'ㄿ',
-            ('ㄹ' to 'ㅎ') to 'ㅀ', ('ㅂ' to 'ㅅ') to 'ㅄ'
-        )
+        private val doubleJongseongMap = HangulSyllable.COMPOUND_JONGSEONG_JOIN
 
-        private val splitJongseongMap = mapOf(
-            'ㄳ' to ('ㄱ' to 'ㅅ'), 'ㄵ' to ('ㄴ' to 'ㅈ'), 'ㄶ' to ('ㄴ' to 'ㅎ'),
-            'ㄺ' to ('ㄹ' to 'ㄱ'), 'ㄻ' to ('ㄹ' to 'ㅁ'), 'ㄼ' to ('ㄹ' to 'ㅂ'),
-            'ㄽ' to ('ㄹ' to 'ㅅ'), 'ㄾ' to ('ㄹ' to 'ㅌ'), 'ㄿ' to ('ㄹ' to 'ㅍ'),
-            'ㅀ' to ('ㄹ' to 'ㅎ'), 'ㅄ' to ('ㅂ' to 'ㅅ')
-        )
+        private val splitJongseongMap = HangulSyllable.COMPOUND_JONGSEONG_SPLIT
 
         fun qwertyToHangul(qwerty: String): String {
             val sb = StringBuilder()

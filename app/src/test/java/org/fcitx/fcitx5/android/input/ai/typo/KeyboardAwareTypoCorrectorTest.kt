@@ -90,14 +90,6 @@ class KeyboardAwareTypoCorrectorTest {
     }
 
     @Test
-    fun completeFuzzyMatchesPrefixSubtree() {
-        val corrector = buildCorrector()
-        val words = corrector.completeFuzzy("감ㅅ").map { it.word }
-        assertTrue(words.contains("감사합니다"))
-        assertTrue(words.contains("감사"))
-    }
-
-    @Test
     fun contextBoostChangesRanking() {
         val corrector = buildCorrector()
         val default = corrector.correct("판고", limit = 2)

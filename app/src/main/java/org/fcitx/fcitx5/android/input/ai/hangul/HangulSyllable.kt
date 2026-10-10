@@ -46,6 +46,18 @@ object HangulSyllable {
         'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
     )
 
+    /** 표준 겹받침 11개. (앞 자음, 뒤 자음) -> 겹받침. 두벌식에서 두 자음 키를 이어 치면 만들어진다. */
+    val COMPOUND_JONGSEONG_JOIN: Map<Pair<Char, Char>, Char> = mapOf(
+        ('ㄱ' to 'ㅅ') to 'ㄳ', ('ㄴ' to 'ㅈ') to 'ㄵ', ('ㄴ' to 'ㅎ') to 'ㄶ',
+        ('ㄹ' to 'ㄱ') to 'ㄺ', ('ㄹ' to 'ㅁ') to 'ㄻ', ('ㄹ' to 'ㅂ') to 'ㄼ',
+        ('ㄹ' to 'ㅅ') to 'ㄽ', ('ㄹ' to 'ㅌ') to 'ㄾ', ('ㄹ' to 'ㅍ') to 'ㄿ',
+        ('ㄹ' to 'ㅎ') to 'ㅀ', ('ㅂ' to 'ㅅ') to 'ㅄ'
+    )
+
+    /** [COMPOUND_JONGSEONG_JOIN]의 역: 겹받침 -> (앞 자음, 뒤 자음). */
+    val COMPOUND_JONGSEONG_SPLIT: Map<Char, Pair<Char, Char>> =
+        COMPOUND_JONGSEONG_JOIN.entries.associate { (parts, compound) -> compound to parts }
+
     fun isSyllable(c: Char): Boolean = c.code in BASE..END
 
     fun isCompatJamo(c: Char): Boolean = c.code in COMPAT_JAMO_START..COMPAT_JAMO_END

@@ -23,7 +23,6 @@ class KeyboardAwareTypoCorrector(
     private class Node {
         val children = HashMap<Char, Node>()
         val words = mutableListOf<Pair<String, Float>>()
-        var maxPriorInSubtree: Float = 0f
     }
 
     private val root = Node()
@@ -34,10 +33,8 @@ class KeyboardAwareTypoCorrector(
         if (word.isEmpty()) return
         val keySeq = DubeolsikKeyMap.keySequence(word)
         var node = root
-        node.maxPriorInSubtree = maxOf(node.maxPriorInSubtree, prior)
         for (c in keySeq) {
             node = node.children.getOrPut(c) { Node() }
-            node.maxPriorInSubtree = maxOf(node.maxPriorInSubtree, prior)
         }
         val existingIdx = node.words.indexOfFirst { it.first == word }
         if (existingIdx >= 0) {
@@ -66,22 +63,6 @@ class KeyboardAwareTypoCorrector(
         val dp0 = FloatArray(target.length + 1) { j -> j * insertCost }
         val dummyPrev = FloatArray(target.length + 1)
         dfsCorrect(root, 0, dp0, dummyPrev, ' ', target, maxCost, typed, contextBoost, out)
-        return out.sortedWith(compareByDescending<Correction> { it.score }.thenBy { it.cost }).take(limit)
-    }
-
-    @Synchronized
-    fun completeFuzzy(
-        typedPrefix: String,
-        limit: Int = 5,
-        maxPrefixCost: Float = 0.8f,
-        contextBoost: (String) -> Float = { 0f }
-    ): List<Correction> {
-        val target = DubeolsikKeyMap.keySequence(typedPrefix)
-        val out = mutableListOf<Correction>()
-        val counter = intArrayOf(0)
-        val dp0 = FloatArray(target.length + 1) { j -> j * insertCost }
-        val dummyPrev = FloatArray(target.length + 1)
-        dfsPrefix(root, 0, dp0, dummyPrev, ' ', target, maxPrefixCost, typedPrefix, contextBoost, out, counter)
         return out.sortedWith(compareByDescending<Correction> { it.score }.thenBy { it.cost }).take(limit)
     }
 
@@ -144,60 +125,7 @@ class KeyboardAwareTypoCorrector(
         }
     }
 
-    private fun dfsPrefix(
-        node: Node,
-        depth: Int,
-        row: FloatArray,
-        prevRow: FloatArray,
-        lastChar: Char,
-        target: String,
-        maxPrefixCost: Float,
-        typed: String,
-        contextBoost: (String) -> Float,
-        out: MutableList<Correction>,
-        counter: IntArray
-    ) {
-        if (counter[0] >= MAX_FUZZY_CANDIDATES) return
-        val cost = row[target.length]
-        if (cost <= maxPrefixCost) {
-            collectSubtree(node, cost, typed, contextBoost, out, counter)
-            return
-        }
-        if (rowMin(row) > maxPrefixCost) return
-        for ((c, child) in node.children) {
-            if (counter[0] >= MAX_FUZZY_CANDIDATES) return
-            val newRow = childRow(c, depth, row, prevRow, lastChar, target)
-            dfsPrefix(child, depth + 1, newRow, row, c, target, maxPrefixCost, typed, contextBoost, out, counter)
-        }
-    }
-
-    private fun collectSubtree(
-        node: Node,
-        cost: Float,
-        typed: String,
-        contextBoost: (String) -> Float,
-        out: MutableList<Correction>,
-        counter: IntArray
-    ) {
-        if (counter[0] >= MAX_FUZZY_CANDIDATES) return
-        for ((word, prior) in node.words) {
-            if (counter[0] >= MAX_FUZZY_CANDIDATES) return
-            if (word == typed) continue
-            val score = prior + contextBoost(word) - 2.0f * cost
-            out.add(Correction(word, cost, prior, score))
-            counter[0]++
-        }
-        if (node.children.isEmpty()) return
-        val sortedChildren = node.children.values.sortedByDescending { it.maxPriorInSubtree }
-        for (child in sortedChildren) {
-            if (counter[0] >= MAX_FUZZY_CANDIDATES) return
-            collectSubtree(child, cost, typed, contextBoost, out, counter)
-        }
-    }
-
     companion object {
-        private const val MAX_FUZZY_CANDIDATES = 64
-
         fun defaultMaxCost(typed: String): Float {
             val len = DubeolsikKeyMap.keySequence(typed).length
             return min(2.4f, 0.6f + 0.15f * len)

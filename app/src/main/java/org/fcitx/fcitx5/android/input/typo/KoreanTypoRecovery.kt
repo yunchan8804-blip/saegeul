@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.typo
 
 import org.fcitx.fcitx5.android.input.ai.hangul.HangulSyllable
+import org.fcitx.fcitx5.android.input.ai.typo.DubeolsikKeyMap
 
 enum class TypoRecoveryDirection {
     EnglishToHangul,
@@ -191,16 +192,13 @@ object KoreanTypoRecovery {
         }
     }
 
-    private fun englishKeyToJamo(character: Char): Char? = when (character) {
-        'Q' -> 'ㅃ'
-        'W' -> 'ㅉ'
-        'E' -> 'ㄸ'
-        'R' -> 'ㄲ'
-        'T' -> 'ㅆ'
-        'O' -> 'ㅒ'
-        'P' -> 'ㅖ'
-        else -> ENGLISH_TO_JAMO[character.lowercaseChar()]
-    }
+    // Shift 7개(Q W E R T O P)만 대문자 그대로 찾고, 나머지는 소문자로 바꿔 찾는다.
+    private fun englishKeyToJamo(character: Char): Char? =
+        if (character in DubeolsikKeyMap.SHIFTED_KEYS) {
+            DubeolsikKeyMap.KEY_TO_JAMO[character]
+        } else {
+            DubeolsikKeyMap.KEY_TO_JAMO[character.lowercaseChar()]
+        }
 
     private fun Char.isAsciiLetter() = this in 'a'..'z' || this in 'A'..'Z'
 
@@ -213,41 +211,14 @@ object KoreanTypoRecovery {
     private val VOWELS = HangulSyllable.JUNGSEONG.toList()
     private val FINALS: List<Char?> = listOf<Char?>(null) + HangulSyllable.JONGSEONG_TAIL.toList()
 
-    private val ENGLISH_TO_JAMO = mapOf(
-        'q' to 'ㅂ', 'w' to 'ㅈ', 'e' to 'ㄷ', 'r' to 'ㄱ', 't' to 'ㅅ',
-        'y' to 'ㅛ', 'u' to 'ㅕ', 'i' to 'ㅑ', 'o' to 'ㅐ', 'p' to 'ㅔ',
-        'a' to 'ㅁ', 's' to 'ㄴ', 'd' to 'ㅇ', 'f' to 'ㄹ', 'g' to 'ㅎ',
-        'h' to 'ㅗ', 'j' to 'ㅓ', 'k' to 'ㅏ', 'l' to 'ㅣ', 'z' to 'ㅋ',
-        'x' to 'ㅌ', 'c' to 'ㅊ', 'v' to 'ㅍ', 'b' to 'ㅠ', 'n' to 'ㅜ',
-        'm' to 'ㅡ'
-    )
+    private val JAMO_TO_KEYS = DubeolsikKeyMap.JAMO_TO_KEYS
 
-    private val JAMO_TO_KEYS = mapOf(
-        'ㄱ' to "r", 'ㄲ' to "R", 'ㄳ' to "rt", 'ㄴ' to "s", 'ㄵ' to "sw",
-        'ㄶ' to "sg", 'ㄷ' to "e", 'ㄸ' to "E", 'ㄹ' to "f", 'ㄺ' to "fr",
-        'ㄻ' to "fa", 'ㄼ' to "fq", 'ㄽ' to "ft", 'ㄾ' to "fx", 'ㄿ' to "fv",
-        'ㅀ' to "fg", 'ㅁ' to "a", 'ㅂ' to "q", 'ㅃ' to "Q", 'ㅄ' to "qt",
-        'ㅅ' to "t", 'ㅆ' to "T", 'ㅇ' to "d", 'ㅈ' to "w", 'ㅉ' to "W",
-        'ㅊ' to "c", 'ㅋ' to "z", 'ㅌ' to "x", 'ㅍ' to "v", 'ㅎ' to "g",
-        'ㅏ' to "k", 'ㅐ' to "o", 'ㅑ' to "i", 'ㅒ' to "O", 'ㅓ' to "j",
-        'ㅔ' to "p", 'ㅕ' to "u", 'ㅖ' to "P", 'ㅗ' to "h", 'ㅘ' to "hk",
-        'ㅙ' to "ho", 'ㅚ' to "hl", 'ㅛ' to "y", 'ㅜ' to "n", 'ㅝ' to "nj",
-        'ㅞ' to "np", 'ㅟ' to "nl", 'ㅠ' to "b", 'ㅡ' to "m", 'ㅢ' to "ml",
-        'ㅣ' to "l"
-    )
-
+    // 엔진은 7개, 모바일은 13개만 받는다. 복구만 ㅘ+ㅣ→ㅙ, ㅝ+ㅣ→ㅞ를 받으므로 모으지 않는다.
     private val COMBINED_VOWELS = mapOf(
         ('ㅗ' to 'ㅏ') to 'ㅘ', ('ㅗ' to 'ㅐ') to 'ㅙ', ('ㅗ' to 'ㅣ') to 'ㅚ',
         ('ㅘ' to 'ㅣ') to 'ㅙ', ('ㅜ' to 'ㅓ') to 'ㅝ', ('ㅜ' to 'ㅔ') to 'ㅞ',
         ('ㅜ' to 'ㅣ') to 'ㅟ', ('ㅝ' to 'ㅣ') to 'ㅞ', ('ㅡ' to 'ㅣ') to 'ㅢ'
     )
-    private val COMBINED_FINALS = mapOf(
-        ('ㄱ' to 'ㅅ') to 'ㄳ', ('ㄴ' to 'ㅈ') to 'ㄵ', ('ㄴ' to 'ㅎ') to 'ㄶ',
-        ('ㄹ' to 'ㄱ') to 'ㄺ', ('ㄹ' to 'ㅁ') to 'ㄻ', ('ㄹ' to 'ㅂ') to 'ㄼ',
-        ('ㄹ' to 'ㅅ') to 'ㄽ', ('ㄹ' to 'ㅌ') to 'ㄾ', ('ㄹ' to 'ㅍ') to 'ㄿ',
-        ('ㄹ' to 'ㅎ') to 'ㅀ', ('ㅂ' to 'ㅅ') to 'ㅄ'
-    )
-    private val SPLIT_FINALS = COMBINED_FINALS.entries.associate { (pair, combined) ->
-        combined to pair
-    }
+    private val COMBINED_FINALS = HangulSyllable.COMPOUND_JONGSEONG_JOIN
+    private val SPLIT_FINALS = HangulSyllable.COMPOUND_JONGSEONG_SPLIT
 }
