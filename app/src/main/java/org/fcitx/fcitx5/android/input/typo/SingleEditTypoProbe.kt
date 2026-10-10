@@ -17,7 +17,8 @@ import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
  */
 class SingleEditTypoProbe(
     private val baseVocabulary: BaseKoreanVocabulary?,
-    private val ngram: PersonalNgramModel
+    private val ngram: PersonalNgramModel,
+    private val touchHabit: TouchHabit? = null
 ) {
 
     private class Alt(val index: Int, val cost: Float, val isShift: Boolean, val key: Char)
@@ -156,7 +157,7 @@ class SingleEditTypoProbe(
     /** 시프트 편집이 아닌 인접 키 편집이 흔적 있는 [keyPosition]에 놓이면 터치 지점으로 계산한 비용이다. */
     private fun altCost(alt: Alt, touches: List<KeyTouch>?, keyPosition: Int): Float {
         if (touches == null || alt.isShift) return alt.cost
-        return TouchSubstitutionCost.cost(touches[keyPosition], alt.key) ?: alt.cost
+        return TouchSubstitutionCost.cost(touches[keyPosition], alt.key, touchHabit) ?: alt.cost
     }
 
     private fun put(

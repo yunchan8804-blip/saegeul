@@ -423,7 +423,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             appPersona = { appProfileSession.effective?.source?.persona },
             isDestroyed = { lifecycle.currentState == Lifecycle.State.DESTROYED },
             lifecycleScope = { lifecycleScope },
-            inputView = { inputView }
+            inputView = { inputView },
+            touchTrace = { touchTraceRecorder.snapshot() }
         )
     )
 

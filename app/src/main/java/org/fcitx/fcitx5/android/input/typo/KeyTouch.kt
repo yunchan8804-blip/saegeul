@@ -24,7 +24,22 @@ class KeyLayoutSnapshot(private val cells: Map<Char, KeyCell>) {
  * (시프트가 의미 있는 7키만 대문자). [dx]·[dy]는 누른 키의 중심에서 터치 지점까지의 거리를
  * 그 키의 폭·높이로 나눈 값이라, 키 안쪽이면 -0.5..0.5 안이다.
  */
-class KeyTouch(val key: Char, val dx: Float, val dy: Float, val layout: KeyLayoutSnapshot)
+class KeyTouch(val key: Char, val dx: Float, val dy: Float, val layout: KeyLayoutSnapshot) {
+
+    /**
+     * 이 터치 지점이 [intended] 키의 중심에서 얼마나 떨어졌는지, 그 키의 폭·높이로 나눈 값. 같은 키면
+     * [dx]·[dy] 그대로다. 두 키 중 하나가 배치에 없으면 null이다.
+     */
+    fun offsetFrom(intended: Char): Pair<Float, Float>? {
+        if (key.lowercaseChar() == intended.lowercaseChar()) return dx to dy
+        val typedCell = layout.cell(key) ?: return null
+        val intendedCell = layout.cell(intended) ?: return null
+        val touchX = typedCell.centerX + dx * typedCell.width
+        val touchY = typedCell.centerY + dy * typedCell.height
+        return (touchX - intendedCell.centerX) / intendedCell.width to
+            (touchY - intendedCell.centerY) / intendedCell.height
+    }
+}
 
 /**
  * 가장 최근 터치 흔적들의 고정된 사본. 시간 순서이고 마지막이 가장 최근이다.
@@ -72,16 +87,22 @@ object TouchSubstitutionCost {
     /**
      * [touch]로 누른 키 대신 [intended]를 의도했을 때의 치환 비용. 계산할 수 없으면 null이다:
      * 두 키가 같은 자판 키(시프트 차이만 있음)이거나 둘 중 하나가 배치에 없을 때.
+     * [habit]이 있으면 두 키의 가우시안 중심을 각 키 중심에서 손버릇만큼 옮겨 계산한다.
      */
-    fun cost(touch: KeyTouch, intended: Char): Float? {
+    fun cost(touch: KeyTouch, intended: Char, habit: TouchHabit? = null): Float? {
         if (touch.key.lowercaseChar() == intended.lowercaseChar()) return null
         val typedCell = touch.layout.cell(touch.key) ?: return null
         val intendedCell = touch.layout.cell(intended) ?: return null
+        val typedBias = habit?.bias(touch.key)
+        val intendedBias = habit?.bias(intended)
         val touchX = typedCell.centerX + touch.dx * typedCell.width
         val touchY = typedCell.centerY + touch.dy * typedCell.height
-        val intendedDx = (touchX - intendedCell.centerX) / intendedCell.width
-        val intendedDy = (touchY - intendedCell.centerY) / intendedCell.height
-        val negLogRatio = (squaredZ(intendedDx, intendedDy) - squaredZ(touch.dx, touch.dy)) / 2f
+        val intendedDx = (touchX - intendedCell.centerX) / intendedCell.width - (intendedBias?.dx ?: 0f)
+        val intendedDy = (touchY - intendedCell.centerY) / intendedCell.height - (intendedBias?.dy ?: 0f)
+        val negLogRatio = (
+            squaredZ(intendedDx, intendedDy) -
+                squaredZ(touch.dx - (typedBias?.dx ?: 0f), touch.dy - (typedBias?.dy ?: 0f))
+            ) / 2f
         return min(MAX_COST, max(MIN_COST, COST_PER_NAT * negLogRatio))
     }
 
@@ -90,4 +111,13 @@ object TouchSubstitutionCost {
         val zy = dy / SIGMA_Y
         return zx * zx + zy * zy
     }
+}
+
+/** 키 중심에서 사용자의 터치가 평균적으로 치우치는 정도. 키의 폭·높이로 나눈 값이다. */
+class KeyBias(val dx: Float, val dy: Float)
+
+/** 사용자의 손버릇. 글자 키(소문자)별로 터치가 키 중심에서 치우치는 평균이며, 배운 값이 없으면 null이다. */
+fun interface TouchHabit {
+
+    fun bias(key: Char): KeyBias?
 }

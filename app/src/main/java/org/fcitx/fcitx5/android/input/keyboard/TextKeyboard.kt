@@ -104,10 +104,51 @@ class TextKeyboard(
             )
         )
 
+        /** The three letter rows, without the pinned number row above them and the bottom row below. */
+        private fun letterRows(numberRowPinned: Boolean): List<List<KeyDef>> =
+            listOf(topRow(numberRowPinned)) + LowerRows
+
+        private val secondaryCharKeysByPinned = mapOf(
+            false to buildSecondaryCharKeys(numberRowPinned = false),
+            true to buildSecondaryCharKeys(numberRowPinned = true)
+        )
+
+        private fun buildSecondaryCharKeys(numberRowPinned: Boolean): Map<Char, Char> {
+            val rows = letterRows(numberRowPinned)
+            val keys = LinkedHashMap<Char, Char>()
+            for (row in rows) {
+                for (def in row) {
+                    val appearance = def.appearance as? KeyDef.Appearance.AltText ?: continue
+                    val letter = appearance.displayText.singleOrNull()?.takeIf { it.isLetter() } ?: continue
+                    val secondary = appearance.altText.singleOrNull()?.takeIf { !it.isLetter() } ?: continue
+                    keys.putIfAbsent(secondary, letter.lowercaseChar())
+                }
+            }
+            if (numberRowPinned) {
+                val topLetters = rows.first().mapNotNull {
+                    (it.appearance as? KeyDef.Appearance.AltText)?.displayText?.singleOrNull()?.lowercaseChar()
+                }
+                PinnedNumberRow.Keys.forEachIndexed { column, def ->
+                    val digit = (def.appearance as KeyDef.Appearance.Text).displayText.single()
+                    keys.putIfAbsent(digit, topLetters[column])
+                }
+            }
+            return keys
+        }
+
+        /**
+         * Each character a letter key also types by a swipe (or, with the pinned number row, a digit key
+         * sitting above it) -> the letter key it belongs to, lowercase. Read from the key definitions
+         * themselves, so a change to the layout changes this too. A mistyped one of these is a letter
+         * key pressed slightly off.
+         */
+        fun secondaryCharKeys(numberRowPinned: Boolean): Map<Char, Char> =
+            secondaryCharKeysByPinned.getValue(numberRowPinned)
+
         private fun layout(): List<List<KeyDef>> {
             val pinned = PinnedNumberRow.isEnabled()
             val bottom = bottomRow(AppPrefs.getInstance().keyboard.showVoiceInputButton.getValue())
-            return PinnedNumberRow.prependTo(listOf(topRow(pinned)) + LowerRows + listOf(bottom), pinned)
+            return PinnedNumberRow.prependTo(letterRows(pinned) + listOf(bottom), pinned)
         }
     }
 

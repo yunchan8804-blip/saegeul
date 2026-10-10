@@ -49,6 +49,7 @@ import org.fcitx.fcitx5.android.input.ai.typingdna.TypingDnaVault
 import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.TouchHabitStore
 import org.fcitx.fcitx5.android.ui.main.LogActivity
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.BackgroundProgressNotifier
@@ -159,11 +160,18 @@ class FcitxApplication : Application(), WorkConfiguration.Provider {
         CorrectionPatternStore(storeFile = File(filesDir, "personal_corrections.json"), cipher = vaultCipher)
     }
 
+    /** 글자 키별 손버릇(터치가 키 중심에서 치우치는 평균). 기기 안에만 두고 백업 대상이 아니다. */
+    val touchHabitStore: TouchHabitStore by lazy {
+        requireCredentialStorage("touchHabitStore")
+        TouchHabitStore(storeFile = File(filesDir, "touch_habits.json"), cipher = vaultCipher)
+    }
+
     val typoCorrector: KeyboardAwareTypoCorrector by lazy {
         requireCredentialStorage("typoCorrector")
         KeyboardAwareTypoCorrector(
             substitutionCost = correctionPatternStore::personalizedSubstitutionCost,
-            personalDiscount = correctionPatternStore::substitutionDiscount
+            personalDiscount = correctionPatternStore::substitutionDiscount,
+            touchHabit = touchHabitStore
         )
     }
 

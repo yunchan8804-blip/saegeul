@@ -45,6 +45,8 @@ import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.typo.CorrectionSessionTracker
 import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
+import org.fcitx.fcitx5.android.input.typo.TouchHabitStore
+import org.fcitx.fcitx5.android.input.typo.TouchTrace
 import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import timber.log.Timber
 import java.io.File
@@ -115,7 +117,8 @@ class PersonalLearningController(private val host: Host) {
         val appPersona: () -> String?,
         val isDestroyed: () -> Boolean,
         val lifecycleScope: () -> CoroutineScope,
-        val inputView: () -> InputView?
+        val inputView: () -> InputView?,
+        val touchTrace: () -> TouchTrace?
     )
 
     /** Avoids logging a "privacy" collection drop on every keystroke of the same editor session. */
@@ -205,6 +208,9 @@ class PersonalLearningController(private val host: Host) {
     val correctionPatternStore: CorrectionPatternStore
         get() = FcitxApplication.getInstance().correctionPatternStore
 
+    val touchHabitStore: TouchHabitStore
+        get() = FcitxApplication.getInstance().touchHabitStore
+
     val correctionSessionTracker = CorrectionSessionTracker()
 
     private var personalLearningTail: Job? = null
@@ -212,6 +218,7 @@ class PersonalLearningController(private val host: Host) {
     private val ngramSaveHandler = Handler(Looper.getMainLooper())
     private var pendingNgramSaveRunnable: Runnable? = null
     private var pendingCorrectionSaveRunnable: Runnable? = null
+    private var pendingTouchHabitSaveRunnable: Runnable? = null
 
     /**
      * UI 경로용 비동기 즉시 동기화다. collector flush는 predictionEpoch·policy·handler에
@@ -281,6 +288,9 @@ class PersonalLearningController(private val host: Host) {
         pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
         pendingCorrectionSaveRunnable = null
         host.lifecycleScope().launch(Dispatchers.IO) { correctionPatternStore.save() }
+        pendingTouchHabitSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
+        pendingTouchHabitSaveRunnable = null
+        host.lifecycleScope().launch(Dispatchers.IO) { touchHabitStore.save() }
     }
 
     fun onDestroy() {
@@ -289,6 +299,8 @@ class PersonalLearningController(private val host: Host) {
         pendingNgramSaveRunnable = null
         pendingCorrectionSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
         pendingCorrectionSaveRunnable = null
+        pendingTouchHabitSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
+        pendingTouchHabitSaveRunnable = null
     }
 
     /** Text-inspection actions do not read password/private editors, even when fully offline. */
@@ -326,6 +338,7 @@ class PersonalLearningController(private val host: Host) {
             return
         }
         handleCorrectionWordBoundary(text)
+        if (text.isNotEmpty() && text.first().isWhitespace()) learnTouchHabitFromConfirmedWord()
         if (text.isEmpty()) return
         val pkg = host.editorInfo()?.packageName ?: return
         typingDnaCommitSink.onEditorTextCommitted(pkg, text, true)
@@ -393,6 +406,26 @@ class PersonalLearningController(private val host: Host) {
     fun recordTappedCorrection(typed: String, corrected: String) {
         if (!host.allowsTextInspection()) return
         recordCorrectionPairIfPresent(typed to corrected)
+        if (PersonalLearningInstrumentationGate.isPaused) return
+        val trace = host.touchTrace() ?: return
+        if (touchHabitStore.learnTappedCorrection(typed.trim { !it.isLetter() }, corrected.trim { !it.isLetter() }, trace)) {
+            scheduleTouchHabitSave()
+        }
+    }
+
+    /**
+     * 스페이스로 어절을 확정했을 때, 바로 앞 어절이 사전 단어이고 그 어절을 친 터치 흔적이 있으면 손버릇을
+     * 배운다. 흔적은 텍스트 검사가 허용된 편집기에서만 있다.
+     */
+    private fun learnTouchHabitFromConfirmedWord() {
+        if (PersonalLearningInstrumentationGate.isPaused) return
+        val trace = host.touchTrace() ?: return
+        val beforeCursor = host.inputConnection()?.getTextBeforeCursor(64, 0)?.toString() ?: return
+        val word = TouchHabitStore.confirmedWordBefore(beforeCursor) ?: return
+        val learned = touchHabitStore.learnConfirmedWord(word, trace) { candidate ->
+            baseKoreanVocabulary.contains(candidate) || personalNgramModel.unigramCount(candidate) >= 2f
+        }
+        if (learned) scheduleTouchHabitSave()
     }
 
     /** 공백/문장 종결 부호로 끝나는 커밋을 어절 경계로 보고, 지운-다시쓴 쌍이 있으면 학습한다. */
@@ -472,6 +505,15 @@ class PersonalLearningController(private val host: Host) {
             host.lifecycleScope().launch(Dispatchers.IO) { correctionPatternStore.save() }
         }
         pendingCorrectionSaveRunnable = runnable
+        ngramSaveHandler.postDelayed(runnable, 1500L)
+    }
+
+    private fun scheduleTouchHabitSave() {
+        pendingTouchHabitSaveRunnable?.let { ngramSaveHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            host.lifecycleScope().launch(Dispatchers.IO) { touchHabitStore.save() }
+        }
+        pendingTouchHabitSaveRunnable = runnable
         ngramSaveHandler.postDelayed(runnable, 1500L)
     }
 

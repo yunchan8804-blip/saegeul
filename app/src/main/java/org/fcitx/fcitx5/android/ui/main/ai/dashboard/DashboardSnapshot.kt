@@ -142,6 +142,7 @@ internal class DashboardSnapshotReader(context: Context) {
         app.typingDnaVault.purge()
         app.personalNgramModel.clear()
         app.correctionPatternStore.clear()
+        app.touchHabitStore.clear()
         app.predictionMetricsStore.clear()
         app.personalSentenceVault.clear()
         app.personalGraphStore.clear()

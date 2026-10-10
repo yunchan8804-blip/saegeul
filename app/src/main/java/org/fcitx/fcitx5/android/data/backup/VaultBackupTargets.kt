@@ -52,6 +52,10 @@ internal data class BackupTarget(
  *   hand-made backup feed sentences into the point-earning analysis. Backups written by older
  *   versions may still carry this entry; import ignores it ([LEGACY_IGNORED_ENTRY_NAMES]) and
  *   never touches the device's own pending file.
+ * - `touch_habits.json` — the per-key touch offsets of this device and hand. They depend on the
+ *   screen and the person's grip, not on the language data, so restoring them onto another device
+ *   would only mis-aim the correction; the keyboard relearns them. Android's cloud backup and
+ *   device transfer exclude the file too (`full_backup_content.xml`, `data_extraction_rules.xml`).
  * - `vault_habit` prefs (streak/freezes) — gamification state, not corpus or derived language
  *   data, and adjacent to the same anti-exploit concern as level rewards.
  */

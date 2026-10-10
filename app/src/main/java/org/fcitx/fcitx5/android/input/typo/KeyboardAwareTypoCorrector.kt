@@ -15,11 +15,13 @@ import kotlin.math.min
  * [substitutionCost]와 [personalDiscount]의 인자 순서는 (친 키, 의도한 키)다.
  * [CorrectionPatternStore]가 혼동을 기록하는 순서와 같다. [correct]에 [TouchTrace]가 있고
  * 어절의 키 순서와 흔적 끝부분이 정확히 같으면, 그 키 위치의 치환 비용은 격자 대신 실제 터치
- * 지점([TouchSubstitutionCost])으로 계산하고 [personalDiscount]를 곱한다.
+ * 지점([TouchSubstitutionCost])으로 계산하고 [personalDiscount]를 곱한다. [touchHabit]은 그 터치 비용의
+ * 키 중심을 사용자의 손버릇만큼 옮긴다.
  */
 class KeyboardAwareTypoCorrector(
     private val substitutionCost: (Char, Char) -> Float = DubeolsikKeyMap::substitutionCost,
     private val personalDiscount: (Char, Char) -> Float = { _, _ -> 1f },
+    private val touchHabit: TouchHabit? = null,
     private val insertCost: Float = 0.9f,
     private val deleteCost: Float = 0.9f,
     private val transposeCost: Float = 0.6f,
@@ -64,16 +66,17 @@ class KeyboardAwareTypoCorrector(
         limit: Int = 3,
         maxCost: Float = defaultMaxCost(typed),
         contextBoost: (String) -> Float = { 0f },
-        touchTrace: TouchTrace? = null
+        touchTrace: TouchTrace? = null,
+        reading: TypedKeyReading? = null
     ): List<Correction> {
-        val target = DubeolsikKeyMap.keySequence(typed)
+        val target = reading?.keys ?: DubeolsikKeyMap.keySequence(typed)
         // 흔적 끝부분이 이 어절의 키 순서와 정확히 같을 때만 위치별 터치를 쓴다. 다르면(좌표가 없는
         // 입력이 섞였거나 고쳐 쳤으면) 흔적 없이 격자 비용으로 계산한다.
         val touches = touchTrace?.alignedTo(target)
         val out = mutableListOf<Correction>()
         val dp0 = FloatArray(target.length + 1) { j -> j * insertCost }
         val dummyPrev = FloatArray(target.length + 1)
-        dfsCorrect(root, 0, dp0, dummyPrev, ' ', target, touches, maxCost, typed, contextBoost, out)
+        dfsCorrect(root, 0, dp0, dummyPrev, ' ', target, touches, reading, maxCost, typed, contextBoost, out)
         return out.sortedWith(compareByDescending<Correction> { it.score }.thenBy { it.cost }).take(limit)
     }
 
@@ -90,7 +93,8 @@ class KeyboardAwareTypoCorrector(
         prevRow: FloatArray,
         lastChar: Char,
         target: String,
-        touches: List<KeyTouch>?
+        touches: List<KeyTouch>?,
+        reading: TypedKeyReading?
     ): FloatArray {
         val m = target.length
         val newRow = FloatArray(m + 1)
@@ -98,10 +102,12 @@ class KeyboardAwareTypoCorrector(
         for (j in 1..m) {
             val del = row[j] + deleteCost
             val ins = newRow[j - 1] + insertCost
-            val sub = row[j - 1] + substitution(target[j - 1], c, touches?.get(j - 1))
+            val sub = row[j - 1] + substitution(target[j - 1], c, touches?.get(j - 1)) +
+                (reading?.extraCost(j - 1) ?: 0f)
             var best = min(del, min(ins, sub))
             if (depth >= 1 && j >= 2 && c == target[j - 2] && lastChar == target[j - 1]) {
-                best = min(best, prevRow[j - 2] + transposeCost)
+                val extra = if (reading == null) 0f else reading.extraCost(j - 1) + reading.extraCost(j - 2)
+                best = min(best, prevRow[j - 2] + transposeCost + extra)
             }
             newRow[j] = best
         }
@@ -110,7 +116,7 @@ class KeyboardAwareTypoCorrector(
 
     /** 친 키 [typedKey] 대신 [intendedKey]를 의도했을 때의 비용. 터치 흔적이 없거나 계산할 수 없으면 격자 비용이다. */
     private fun substitution(typedKey: Char, intendedKey: Char, touch: KeyTouch?): Float {
-        val touchCost = touch?.let { TouchSubstitutionCost.cost(it, intendedKey) }
+        val touchCost = touch?.let { TouchSubstitutionCost.cost(it, intendedKey, touchHabit) }
             ?: return substitutionCost(typedKey, intendedKey)
         return max(TouchSubstitutionCost.MIN_COST, touchCost * personalDiscount(typedKey, intendedKey))
     }
@@ -123,6 +129,7 @@ class KeyboardAwareTypoCorrector(
         lastChar: Char,
         target: String,
         touches: List<KeyTouch>?,
+        reading: TypedKeyReading?,
         maxCost: Float,
         typed: String,
         contextBoost: (String) -> Float,
@@ -140,16 +147,26 @@ class KeyboardAwareTypoCorrector(
         }
         if (rowMin(row) > maxCost) return
         for ((c, child) in node.children) {
-            val newRow = childRow(c, depth, row, prevRow, lastChar, target, touches)
-            dfsCorrect(child, depth + 1, newRow, row, c, target, touches, maxCost, typed, contextBoost, out)
+            val newRow = childRow(c, depth, row, prevRow, lastChar, target, touches, reading)
+            dfsCorrect(child, depth + 1, newRow, row, c, target, touches, reading, maxCost, typed, contextBoost, out)
         }
     }
 
     companion object {
-        fun defaultMaxCost(typed: String): Float {
-            val len = DubeolsikKeyMap.keySequence(typed).length
-            return min(2.4f, 0.6f + 0.15f * len)
-        }
+        fun defaultMaxCost(typed: String): Float = standardMaxCost(DubeolsikKeyMap.keySequence(typed).length)
+
+        /** 키가 [keyCount]개인 어절의 표준 비용 상한. */
+        fun standardMaxCost(keyCount: Int): Float = min(2.4f, 0.6f + 0.15f * keyCount)
+
+        /**
+         * 키보드 교정이 받아들이는 비용 상한. 키가 [LONG_WORD_KEYS]개 이상인 긴 어절은 `0.6 + 0.2 × 키 수`
+         * (최대 3.0)까지 넓힌다: 키가 많으면 한두 글자가 뭉개져도 나머지가 의도한 어절을 가리키기 때문이다.
+         * 짧은 어절은 [standardMaxCost]와 같다.
+         */
+        fun keyboardMaxCost(keyCount: Int): Float =
+            if (keyCount >= LONG_WORD_KEYS) min(3.0f, 0.6f + 0.2f * keyCount) else standardMaxCost(keyCount)
+
+        const val LONG_WORD_KEYS = 10
 
         /**
          * 두 어절의 키 시퀀스 사이 가중 Damerau-Levenshtein 거리.

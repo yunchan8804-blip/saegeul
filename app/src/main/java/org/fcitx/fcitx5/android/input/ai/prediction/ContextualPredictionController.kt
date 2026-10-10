@@ -38,10 +38,13 @@ import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalGraphStore
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
+import org.fcitx.fcitx5.android.input.keyboard.PinnedNumberRow
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.typo.BaseKoreanVocabulary
 import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.input.typo.TouchTrace
+import org.fcitx.fcitx5.android.input.typo.TypedKeyReader
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 import timber.log.Timber
@@ -250,7 +253,9 @@ class ContextualPredictionController(private val host: Host) {
             personalGraphStore = host.personalGraphStore(),
             sentencePackLookup = FcitxApplication.getInstance().sentencePacks::complete,
             bundledNgram = { FcitxApplication.getInstance().bundledKoreanNgram },
-            touchTrace = host.touchTrace
+            touchTrace = host.touchTrace,
+            typedKeyReader = TypedKeyReader { TextKeyboard.secondaryCharKeys(PinnedNumberRow.isEnabled()) },
+            touchHabit = FcitxApplication.getInstance().touchHabitStore
         )
     }
 

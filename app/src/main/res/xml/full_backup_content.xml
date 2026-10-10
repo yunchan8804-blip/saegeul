@@ -29,6 +29,9 @@
         path="personal_corrections.json" />
     <exclude
         domain="file"
+        path="touch_habits.json" />
+    <exclude
+        domain="file"
         path="personal_rag.json" />
     <exclude
         domain="file"

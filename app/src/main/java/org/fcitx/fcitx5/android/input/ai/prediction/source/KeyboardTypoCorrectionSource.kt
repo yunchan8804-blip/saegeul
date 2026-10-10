@@ -12,7 +12,9 @@ import org.fcitx.fcitx5.android.input.typo.CorrectionPatternStore
 import org.fcitx.fcitx5.android.input.typo.DubeolsikKeyMap
 import org.fcitx.fcitx5.android.input.typo.KeyboardAwareTypoCorrector
 import org.fcitx.fcitx5.android.input.typo.SingleEditTypoProbe
+import org.fcitx.fcitx5.android.input.typo.TouchHabit
 import org.fcitx.fcitx5.android.input.typo.TouchTrace
+import org.fcitx.fcitx5.android.input.typo.TypedKeyReader
 
 /**
  * Keyboard-aware corrections for the typed fragment, plus [handledFragment]: the fragment these
@@ -27,6 +29,11 @@ internal class KeyboardTypoCorrections(val candidates: List<AiPrediction>, val h
  * stem correction under a common bound ending. A word the trie knows is only replaced when the
  * probe finds a far more common word one Shift or compound-vowel edit away, and a rare word the
  * trie lacks but the base vocabulary has only takes corrections far more common than itself.
+ *
+ * The trie reads the fragment through [typedKeyReader], so a fragment with stray jamo, Latin letters
+ * or digits and symbols a letter key also types still reaches the word it was meant to be. A long
+ * fragment (ten keys or more) also gets a wider cost limit, used only when neither the standard limit
+ * nor the stem correction finds anything, so it never displaces a correction found without it.
  */
 internal class KeyboardTypoCorrectionSource(
     private val typoCorrector: KeyboardAwareTypoCorrector?,
@@ -34,16 +41,22 @@ internal class KeyboardTypoCorrectionSource(
     private val correctionStore: CorrectionPatternStore?,
     private val ngram: PersonalNgramModel,
     private val touchTrace: (() -> TouchTrace?)? = null,
+    private val typedKeyReader: TypedKeyReader = TypedKeyReader { emptyMap() },
+    touchHabit: TouchHabit? = null,
     private val bundledNgram: () -> BundledKoreanNgram?
 ) {
 
-    private val probe = SingleEditTypoProbe(baseVocabulary, ngram)
+    private val probe = SingleEditTypoProbe(baseVocabulary, ngram, touchHabit)
 
     companion object {
         private const val MAX_KEYBOARD_CORRECTIONS = 3
 
         // Trie and probe hits gathered before the ranking filter and the final cut.
         private const val CORRECTION_POOL = 10
+
+        // Trie hits gathered under the widened cost limit of a long fragment, before the split into
+        // hits within the standard limit and hits only the widened limit reaches.
+        private const val WIDENED_POOL = 40
 
         // An input outside the trie but inside the base vocabulary is an ordinary rare word: a
         // correction has to be this many times more frequent than it to be offered. A Shift
@@ -83,6 +96,7 @@ internal class KeyboardTypoCorrectionSource(
         val candidates = mutableListOf<AiPrediction>()
         var handledFragment: String? = null
         val trace = touchTrace?.invoke()
+        val reading = typedKeyReader.read(core)
         val personalHits = correctionStore?.lookup(core, 2).orEmpty()
         if (personalHits.isNotEmpty()) {
             handledFragment = typed
@@ -96,7 +110,7 @@ internal class KeyboardTypoCorrectionSource(
                     replaceLength = replaceLen
                 )
             }
-        } else if (core.any(Char::isLetter)) {
+        } else if (core.any(Char::isLetter) && reading != null) {
             val isBaseKnown = baseVocabulary?.containsWithinTop(core, BaseKoreanVocabulary.TYPO_VOCAB_LIMIT) == true
             if (!isBaseKnown) {
                 val isPersonalKnownOnly = ngram.unigramCount(core) >= 2f
@@ -113,27 +127,44 @@ internal class KeyboardTypoCorrectionSource(
                 val inputRank = baseVocabulary?.rankOf(core) ?: 0
                 val probeHits = probe.probe(core, limit = CORRECTION_POOL, contextBoost = contextBoost, touchTrace = trace)
                 val shiftWords = probeHits.filter { it.isShiftEdit }.map { it.correction.word }.toSet()
+                val accepts = { word: String -> inputRank == 0 || outranksRareWord(word, inputRank, word in shiftWords) }
+                // 긴 어절이 받아들이는 넓힌 상한까지의 트라이 후보. 표준 상한 안의 후보가 하나라도 있으면 늘 그것만 쓰고,
+                // 넓힌 상한에서만 닿는 후보는 표준 상한 후보도 어미를 뗀 교정도 없을 때만 쓴다.
+                val standardMaxCost = KeyboardAwareTypoCorrector.standardMaxCost(reading.keys.length)
+                val trieHits = typoCorrector.correct(
+                    core,
+                    limit = WIDENED_POOL,
+                    maxCost = KeyboardAwareTypoCorrector.keyboardMaxCost(reading.keys.length),
+                    contextBoost = contextBoost,
+                    touchTrace = trace,
+                    reading = reading
+                )
+                fun emitKeyboardCorrections(found: List<KeyboardAwareTypoCorrector.Correction>) {
+                    found.forEachIndexed { idx, correction ->
+                        var confidence = if (correction.cost <= 0.6f) 0.996f else 0.994f - idx * 0.002f
+                        if (isPersonalKnownOnly) confidence -= 0.006f
+                        candidates += AiPrediction(
+                            text = "$head${correction.word}$tail",
+                            confidenceScore = confidence,
+                            isSentenceCompletion = false,
+                            source = "typo_keyboard",
+                            badge = "✏️",
+                            replaceLength = replaceLen
+                        )
+                    }
+                }
                 val corrections = mergeCorrections(
-                    typoCorrector.correct(core, limit = CORRECTION_POOL, contextBoost = contextBoost, touchTrace = trace),
+                    trieHits.filter { it.cost <= standardMaxCost }.take(CORRECTION_POOL),
                     probeHits.map { it.correction },
-                    limit
-                ) { word -> inputRank == 0 || outranksRareWord(word, inputRank, word in shiftWords) }
+                    limit,
+                    accepts
+                )
                 if (corrections.isNotEmpty()) {
                     handledFragment = typed
                 }
-                corrections.forEachIndexed { idx, correction ->
-                    var confidence = if (correction.cost <= 0.6f) 0.996f else 0.994f - idx * 0.002f
-                    if (isPersonalKnownOnly) confidence -= 0.006f
-                    candidates += AiPrediction(
-                        text = "$head${correction.word}$tail",
-                        confidenceScore = confidence,
-                        isSentenceCompletion = false,
-                        source = "typo_keyboard",
-                        badge = "✏️",
-                        replaceLength = replaceLen
-                    )
-                }
+                emitKeyboardCorrections(corrections)
                 if (corrections.isEmpty()) {
+                    var stemFound = false
                     val ending = BOUND_ENDINGS.firstOrNull { core.endsWith(it) }
                     if (ending != null) {
                         val stem = core.dropLast(ending.length)
@@ -142,11 +173,14 @@ internal class KeyboardTypoCorrectionSource(
                         ) {
                             // 어미를 뗀 앞부분의 흔적: 어절 흔적에서 어미를 친 키들을 뺀다.
                             val stemTrace = trace?.withoutLast(DubeolsikKeyMap.keySequence(ending).length)
+                            val stemReading = typedKeyReader.read(stem)
                             val stemCorrection = typoCorrector.correct(
                                 stem,
                                 limit = 1,
+                                maxCost = KeyboardAwareTypoCorrector.defaultMaxCost(stem),
                                 contextBoost = contextBoost,
-                                touchTrace = stemTrace
+                                touchTrace = stemTrace,
+                                reading = stemReading
                             ).firstOrNull()?.takeIf { it.cost <= 1.0f }
                                 ?: probe.correct(
                                     stem,
@@ -155,6 +189,7 @@ internal class KeyboardTypoCorrectionSource(
                                     touchTrace = stemTrace
                                 ).firstOrNull()
                             if (stemCorrection != null && stemCorrection.cost <= 1.0f) {
+                                stemFound = true
                                 handledFragment = typed
                                 candidates += AiPrediction(
                                     text = "$head${stemCorrection.word}$ending$tail",
@@ -166,6 +201,18 @@ internal class KeyboardTypoCorrectionSource(
                                 )
                             }
                         }
+                    }
+                    if (!stemFound) {
+                        val widened = mergeCorrections(
+                            trieHits.filter { it.cost > standardMaxCost }.take(CORRECTION_POOL),
+                            emptyList(),
+                            limit,
+                            accepts
+                        )
+                        if (widened.isNotEmpty()) {
+                            handledFragment = typed
+                        }
+                        emitKeyboardCorrections(widened)
                     }
                 }
             } else {
