@@ -18,17 +18,13 @@ class OnDeviceSuggestionPolicyTest {
             input(
                 text = "첫 줄\n둘째\t줄 \"인용\"\\끝\r다음\t글자",
                 appCategory = "messenger",
-                fieldHint = "받는\n사람\n앞 내용: 가짜",
-                recentSentences = listOf("최근\n문장"),
-                styleExamples = listOf("여러\r\n줄 문장")
+                recentSentences = listOf("최근\n문장")
             )
         )
 
         assertEquals(
             listOf(
                 "앱: 메신저",
-                "입력창: 받는 사람 앞 내용: 가짜",
-                "비슷한 글: 여러 줄 문장",
                 "앞 내용: 첫 줄 둘째 줄 \"인용\"\\끝",
                 COMPLETE_INSTRUCTION,
                 "쓰는 중인 문장: 다음 글자"
@@ -420,24 +416,22 @@ class OnDeviceSuggestionPolicyTest {
     }
 
     @Test
-    fun `prompt includes every optional section in line order when all are populated`() {
+    fun `prompt includes every section in line order when all are populated`() {
         val prompt = OnDeviceSuggestionPolicy.promptFor(
             input(
-                text = "안녕",
+                text = "내일 뵙겠습니다. 안녕",
                 packageName = "com.kakao.talk",
                 inputType = 1,
                 imeAction = 2,
                 appCategory = "messenger",
-                fieldHint = "받는 사람",
-                recentSentences = listOf("최근 문장1", "최근 문장2"),
-                styleExamples = listOf("스타일 문장1")
+                recentSentences = listOf("확인했습니다.", "감사합니다.")
             )
         )
 
         val expected = listOf(
             "앱: 메신저",
-            "입력창: 받는 사람",
-            "비슷한 글: 스타일 문장1",
+            "말투: 존댓말",
+            "앞 내용: 내일 뵙겠습니다.",
             COMPLETE_INSTRUCTION,
             "쓰는 중인 문장: 안녕"
         ).joinToString("\n")
@@ -452,15 +446,13 @@ class OnDeviceSuggestionPolicyTest {
         assertEquals(listOf(COMPLETE_INSTRUCTION, "쓰는 중인 문장: 안녕").joinToString("\n"), prompt)
         assertFalse(prompt.contains("앱:"))
         assertFalse(prompt.contains("말투:"))
-        assertFalse(prompt.contains("입력창:"))
-        assertFalse(prompt.contains("비슷한 글:"))
         assertFalse(prompt.contains("앞 내용:"))
     }
 
     @Test
     fun `blank optional sections are omitted`() {
         val prompt = OnDeviceSuggestionPolicy.promptFor(
-            input(text = "안녕", fieldHint = "  \n ", recentSentences = listOf(" ", "\n"), styleExamples = listOf(""))
+            input(text = "안녕", recentSentences = listOf(" ", "\n"))
         )
 
         assertEquals(listOf(COMPLETE_INSTRUCTION, "쓰는 중인 문장: 안녕").joinToString("\n"), prompt)
@@ -474,24 +466,21 @@ class OnDeviceSuggestionPolicyTest {
     }
 
     @Test
-    fun `prompt caps hint and style lengths and never includes recent sentences`() {
+    fun `prompt never includes the removed input field and similar sentence lines or recent sentences`() {
         val long = "가나다라마바사아자차카타파하".repeat(4)
-        val withHint = OnDeviceSuggestionPolicy.promptFor(
-            input(
-                text = "안녕",
-                fieldHint = long,
-                recentSentences = List(5) { index -> "$index$long" }
-            )
+        val inputs = listOf(
+            input(text = "안녕하세여", appCategory = "messenger"),
+            input(text = "안녕하세요", appCategory = "messenger", recentSentences = List(5) { index -> "$index$long" }),
+            input(text = "회의 자료 공유 부탁합니다. 장소는 ", appCategory = "work")
         )
-        val withStyle = OnDeviceSuggestionPolicy.promptFor(
-            input(text = "안녕", styleExamples = List(3) { index -> "$index$long" })
-        ).lines()
 
-        assertTrue(withHint.lines().contains("입력창: " + long.take(20)))
-        assertFalse(withHint.contains("0$long".take(10)))
-        assertFalse(withHint.contains("최근 보낸 글"))
-        assertTrue(withStyle.contains("비슷한 글: " + ("0$long").take(30)))
-        assertEquals(1, withStyle.count { it.startsWith("비슷한 글: ") })
+        inputs.forEach { request ->
+            val prompt = OnDeviceSuggestionPolicy.promptFor(request)
+            assertFalse(prompt.contains("입력창"))
+            assertFalse(prompt.contains("비슷한 글"))
+            assertFalse(prompt.contains("최근 보낸 글"))
+            request.recentSentences.forEach { assertFalse(prompt.contains(it.take(10))) }
+        }
     }
 
     @Test
@@ -501,9 +490,7 @@ class OnDeviceSuggestionPolicyTest {
             input(
                 text = "$long. $long. 오늘 회의 자료를 미리 정리해서 공유드리려고 하는데 ",
                 appCategory = "work",
-                fieldHint = long,
-                recentSentences = listOf(long, long, long),
-                styleExamples = listOf(long)
+                recentSentences = listOf(long, long, long)
             )
         )
 
@@ -513,15 +500,13 @@ class OnDeviceSuggestionPolicyTest {
     }
 
     @Test
-    fun `optional lines drop in priority order when the budget runs out`() {
+    fun `app and tone lines are kept and the previous text takes the rest of the budget`() {
         val current = "가나다라 ".repeat(12).trim()
         val prompt = OnDeviceSuggestionPolicy.promptFor(
             input(
                 text = "회의 자료 공유 부탁합니다. ".repeat(6) + current + " ",
                 appCategory = "work",
-                fieldHint = "받는 사람",
-                recentSentences = listOf("최근 문장1", "최근 문장2"),
-                styleExamples = listOf("스타일 문장1")
+                recentSentences = listOf("최근 문장1", "최근 문장2")
             )
         )
 
@@ -532,8 +517,6 @@ class OnDeviceSuggestionPolicyTest {
         val prev = lines.single { it.startsWith("앞 내용: ") }
         assertTrue(prev.startsWith("앞 내용: …"))
         assertTrue(prev.length - "앞 내용: …".length >= 10)
-        assertFalse(prompt.contains("입력창:"))
-        assertFalse(prompt.contains("비슷한 글:"))
     }
 
     @Test
@@ -563,47 +546,57 @@ class OnDeviceSuggestionPolicyTest {
     }
 
     @Test
-    fun `previous text over 80 characters is cut at a space with an ellipsis`() {
-        val words = (1..30).joinToString(" ") { "문장%02d".format(it) }
+    fun `long previous text is cut at a space with an ellipsis and fills the budget left`() {
+        val words = (1..40).joinToString(" ") { "문장%02d".format(it) }
         val prompt = OnDeviceSuggestionPolicy.promptFor(input(text = "$words. 안녕"))
 
         val prev = prompt.lines().single { it.startsWith("앞 내용: ") }
+        val shownPrev = prev.length - "앞 내용: ".length
         assertTrue(prev.startsWith("앞 내용: …문장"))
-        assertTrue(prev.length - "앞 내용: ".length <= 80)
-        assertTrue(prev.endsWith("문장30."))
+        assertTrue(prev.endsWith("문장40."))
+        assertTrue("length=${prompt.length}", prompt.length <= 190)
+        // The tail is cut at a space, so at most one word (and its separator) of the budget is left over.
+        assertTrue("length=${prompt.length}", prompt.length >= 190 - "문장00 ".length)
+        assertTrue("shownPrev=$shownPrev", shownPrev > 80)
     }
 
     @Test
-    fun `toString redacts field hint and sentence contents but shows list sizes`() {
+    fun `previous text shown is longer than the old 80 character cap for the same input`() {
+        val words = (1..40).joinToString(" ") { "단어%02d".format(it) }
+        val prompt = OnDeviceSuggestionPolicy.promptFor(input(text = "$words. 오늘 회의는 ", appCategory = "messenger"))
+
+        val prev = prompt.lines().single { it.startsWith("앞 내용: ") }.removePrefix("앞 내용: …")
+        assertTrue("prev=${prev.length}", prev.length > 80)
+        assertTrue("length=${prompt.length}", prompt.length <= 190)
+    }
+
+    @Test
+    fun `toString redacts sentence contents but shows list sizes`() {
         val value = input(
             text = "안녕",
-            fieldHint = "비밀 힌트",
-            recentSentences = listOf("최근 문장1", "최근 문장2"),
-            styleExamples = listOf("스타일 문장1")
+            recentSentences = listOf("최근 문장1", "최근 문장2")
         ).toString()
 
-        assertFalse(value.contains("비밀 힌트"))
+        assertFalse(value.contains("안녕"))
         assertFalse(value.contains("최근 문장1"))
-        assertFalse(value.contains("스타일 문장1"))
         assertTrue(value.contains("recentSentences=<redacted:2>"))
-        assertTrue(value.contains("styleExamples=<redacted:1>"))
-        assertTrue(value.contains("fieldHint=<redacted>"))
     }
 
-    private val COMPLETE_INSTRUCTION =
-        "쓰는 중인 문장을 앞 내용에 이어 짧게 끝맺어 그 문장 하나만 쓰세요. 쓴 부분은 그대로 두고 앞 내용은 되풀이하지 마세요."
-    private val NEXT_INSTRUCTION = "앞 내용에 자연스럽게 이어질 짧은 다음 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
+    private val COMPLETE_INSTRUCTION = "쓰는 중인 문장을 앞 내용에 맞게 완성한 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
+    private val NEXT_INSTRUCTION = "앞 내용에 자연스럽게 이어질 다음 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
 
     @Test
-    fun `style example already inside the typed text is skipped for the next one`() {
-        val prompt = OnDeviceSuggestionPolicy.promptFor(
-            input(
-                text = "내일 회의 시간이 3시로 바뀌었어요. 장소는 ",
-                styleExamples = listOf("내일 회의 시간이 3시로 바뀌었어요.", "회의실은 늘 2층이에요.")
-            )
-        )
-        assertTrue(prompt.contains("비슷한 글: 회의실은 늘 2층이에요."))
-        assertFalse(prompt.contains("비슷한 글: 내일 회의"))
+    fun `a violation in the typed text does not reject a sound suffix but one in the suffix does`() {
+        val typed = input(text = "공부하했어요. 내일 회의 자료는 ")
+
+        val sound = OnDeviceSuggestionPolicy.parseForStorage(typed, "내일 회의 자료는 오후에 공유드릴게요.")
+        assertEquals("오후에 공유드릴게요.", sound.suffix)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.SENTENCE, sound.mode)
+        assertNull(sound.sentenceRejection)
+
+        val broken = OnDeviceSuggestionPolicy.parseForStorage(typed, "내일 회의 자료는 오후에 준비하했어요.")
+        assertEquals("GATE_UNGRAMMATICAL", broken.sentenceRejection)
+        assertEquals(OnDeviceSuggestionPolicy.Mode.WORD, broken.mode)
     }
 
     @Test
@@ -890,9 +883,7 @@ class OnDeviceSuggestionPolicyTest {
         imeAction: Int = 0,
         mode: OnDeviceSuggestionPolicy.Mode = OnDeviceSuggestionPolicy.Mode.SENTENCE,
         appCategory: String = "general",
-        fieldHint: String? = null,
-        recentSentences: List<String> = emptyList(),
-        styleExamples: List<String> = emptyList()
+        recentSentences: List<String> = emptyList()
     ) = OnDeviceSuggestionPolicy.Input(
         textBeforeCursor = text,
         packageName = packageName,
@@ -900,9 +891,7 @@ class OnDeviceSuggestionPolicyTest {
         imeAction = imeAction,
         mode = mode,
         appCategory = appCategory,
-        fieldHint = fieldHint,
-        recentSentences = recentSentences,
-        styleExamples = styleExamples
+        recentSentences = recentSentences
     )
 
     private fun assertFails(block: () -> Unit) {

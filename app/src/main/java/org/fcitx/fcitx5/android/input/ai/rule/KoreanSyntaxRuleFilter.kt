@@ -174,14 +174,31 @@ class KoreanSyntaxRuleFilter {
          */
         @JvmStatic
         @JvmOverloads
-        fun isGrammaticallySound(text: String, context: String = ""): Boolean {
+        fun isGrammaticallySound(text: String, context: String = ""): Boolean =
+            DEFAULT_INSTANCE.isValid(joinAfterContext(text, context))
+
+        /**
+         * [suffix]를 사용자가 이미 쓴 [typed] 뒤에 이어 붙인 글에서, 이어 붙인 [suffix] 탓인 위반이 없는지 본다.
+         * 이어 붙인 글 전체에서 걸린 규칙 가운데 [typed]만으로도 이미 걸리는 규칙은 사용자가 쓴 부분의 위반이라
+         * 치지 않는다. 단 [suffix]만으로도 걸리는 규칙은 [suffix]가 만든 위반이므로 그대로 센다. 이어 붙인 글
+         * 전체가 통과하면 언제나 통과이므로, [isGrammaticallySound]보다 엄격해지는 경우는 없다.
+         */
+        @JvmStatic
+        fun isSoundAfterTyped(suffix: String, typed: String): Boolean {
+            val whole = DEFAULT_INSTANCE.violations(joinAfterContext(suffix, typed))
+            if (whole.isEmpty()) return true
+            val inTyped = DEFAULT_INSTANCE.violations(typed.trim())
+            val inSuffix = DEFAULT_INSTANCE.violations(suffix.trim())
+            return whole.all { it in inTyped && it !in inSuffix }
+        }
+
+        private fun joinAfterContext(text: String, context: String): String {
             val trimmedContext = context.trim()
-            val fullText = when {
+            return when {
                 trimmedContext.isEmpty() -> text.trim()
                 text.trim().startsWith(trimmedContext) -> text.trim()
                 else -> "$trimmedContext $text".trim()
             }
-            return DEFAULT_INSTANCE.isValid(fullText)
         }
     }
 
@@ -223,6 +240,14 @@ class KoreanSyntaxRuleFilter {
      * Returns true if the text complies with all syntax rules.
      */
     fun isValid(text: String): Boolean = check(text) is RuleResult.Valid
+
+    /** [check]가 첫 위반에서 멈추는 것과 달리, [text]에서 걸리는 규칙을 모두 돌려준다. 같은 길이 제한을 따른다. */
+    fun violations(text: String): Set<ViolationType> {
+        if (text.isBlank() || text.length > MAX_SAFE_INPUT_LENGTH) return emptySet()
+        return listOf(checkAcc01(text), checkAcc02(text), checkAcc03(text), checkAcc04(text), checkAcc05(text))
+            .filterIsInstance<RuleResult.Invalid>()
+            .mapTo(HashSet()) { it.violationType }
+    }
 
     /**
      * ACC-01: Rejects sentences where a causal clause (a state/emotion/circumstance predicate's

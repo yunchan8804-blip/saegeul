@@ -25,16 +25,12 @@ object OnDeviceSuggestionPolicy {
         val mode: Mode,
         /** [org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry] category id for [packageName]. */
         val appCategory: String = "general",
-        /** The editor's hint text, already trimmed/length-capped/PII-checked by the caller. */
-        val fieldHint: String? = null,
         /**
          * Sentences this user recently sent in this same app, newest first. Used only to detect the tone;
          * their text is never put in the prompt, because the small model copies it verbatim and leaks
          * sentences from other conversations into the suggestion.
          */
-        val recentSentences: List<String> = emptyList(),
-        /** Similar past sentences from this user's personal store, for tone/style only. */
-        val styleExamples: List<String> = emptyList()
+        val recentSentences: List<String> = emptyList()
     ) {
         fun withMode(mode: Mode): Input = Input(
             textBeforeCursor = textBeforeCursor,
@@ -43,15 +39,13 @@ object OnDeviceSuggestionPolicy {
             imeAction = imeAction,
             mode = mode,
             appCategory = appCategory,
-            fieldHint = fieldHint,
-            recentSentences = recentSentences,
-            styleExamples = styleExamples
+            recentSentences = recentSentences
         )
 
         override fun toString(): String =
             "Input(textBeforeCursor=<redacted>, packageName=<redacted>, inputType=$inputType, " +
-                "imeAction=$imeAction, mode=$mode, appCategory=$appCategory, fieldHint=<redacted>, " +
-                "recentSentences=<redacted:${recentSentences.size}>, styleExamples=<redacted:${styleExamples.size}>)"
+                "imeAction=$imeAction, mode=$mode, appCategory=$appCategory, " +
+                "recentSentences=<redacted:${recentSentences.size}>)"
     }
 
     fun promptFor(input: Input): String {
@@ -75,21 +69,8 @@ object OnDeviceSuggestionPolicy {
             appTypeLabel(input.appCategory).takeIf { it != GENERAL_APP_LABEL }?.let { "$APP_LINE_PREFIX$it" }
         )
         val prevLine = reserve(prevTailLine(oneLine(split.prev), remaining))
-        val hintLine = reserve(
-            input.fieldHint?.let(::oneLine)?.take(MAX_HINT_CHARS)?.trim()?.takeIf { it.isNotEmpty() }
-                ?.let { "$HINT_LINE_PREFIX$it" }
-        )
-        val typedLetters = input.textBeforeCursor.filter(Char::isLetterOrDigit)
-        val styleLine = reserve(
-            // A sentence finished moments ago is already in the vault and comes back as the most
-            // similar one; it only repeats the typed text, so examples already inside it are skipped.
-            input.styleExamples.map(::oneLine).firstOrNull { example ->
-                example.isNotEmpty() && !typedLetters.contains(example.filter(Char::isLetterOrDigit))
-            }
-                ?.take(MAX_STYLE_EXAMPLE_CHARS)?.trim()?.let { "$STYLE_LINE_PREFIX$it" }
-        )
 
-        return listOfNotNull(appLine, toneLine, hintLine, styleLine, prevLine, instruction, currentLine)
+        return listOfNotNull(appLine, toneLine, prevLine, instruction, currentLine)
             .joinToString("\n")
     }
 
@@ -109,7 +90,7 @@ object OnDeviceSuggestionPolicy {
     private fun oneLine(value: String): String = value.replace(lineBreakOrControlRun, " ").trim()
 
     private fun prevTailLine(prev: String, remaining: Int): String? {
-        val available = minOf(MAX_PREV_TAIL_CHARS, remaining - 1 - PREV_LINE_PREFIX.length)
+        val available = remaining - 1 - PREV_LINE_PREFIX.length
         if (prev.isEmpty() || available <= 0) return null
         if (prev.length <= available) return "$PREV_LINE_PREFIX$prev"
         val tailMax = available - ELLIPSIS.length
@@ -256,8 +237,9 @@ object OnDeviceSuggestionPolicy {
         return StoredParse(null, null, sentenceRejection, wordRejection)
     }
 
-    private fun gateRejection(suffix: String?, context: String, isSentenceCompletion: Boolean): String? =
-        suffix?.let { SuggestionQualityGate.evaluate(it, context, isSentenceCompletion) }?.let { "GATE_${it.name}" }
+    /** 사용자가 이미 쓴 [typed]의 위반은 거부 사유로 치지 않고, 이어 붙는 [suffix] 탓인 위반만 친다. */
+    private fun gateRejection(suffix: String?, typed: String, isSentenceCompletion: Boolean): String? =
+        suffix?.let { SuggestionQualityGate.evaluateAppended(it, typed, isSentenceCompletion) }?.let { "GATE_${it.name}" }
 
     /**
      * 문장으로 못 쓴 응답에서 첫 어절만 단어로 남길 때, 그 어절이 한글 한 음절뿐인 새 어절(`잘`, `꼭`)이면
@@ -651,15 +633,19 @@ object OnDeviceSuggestionPolicy {
     private const val MIN_REPEATED_PREV_RUN = 5
     private const val REPEATED_PREV_RUN_PERCENT = 60
     private const val MAX_CURRENT_CHARS = 60
-    private const val MAX_PREV_TAIL_CHARS = 80
     private const val MIN_CUT_PREV_TAIL_CHARS = 10
-    private const val MAX_STYLE_EXAMPLE_CHARS = 30
-    private const val MAX_HINT_CHARS = 20
 
     /**
      * Longest prompt string, in characters. Emulator measurement: a prompt of about 207 characters or
      * fewer produced its first character in 0.3-0.4 s, while 226 or more took 2.5 s or longer
      * (a prefill threshold), so everything optional must fit under this budget.
+     *
+     * 2026-10-10 emulator measurement through the real IME path: the model copied the prompt's own lines
+     * into the suggestion, so the field hint line (`입력창: First name` came back as the suggestion for
+     * `안녕하세여`) and the similar-sentence line (`비슷한 글: ...` came back as a whole sentence from another
+     * conversation) are no longer sent. The budget is unchanged; what those two lines and the shorter
+     * instruction freed goes to the previous text, which takes everything that is left after the tone and
+     * app lines instead of the old 80-character cap.
      */
     private const val PROMPT_CHAR_BUDGET = 190
 
@@ -669,14 +655,12 @@ object OnDeviceSuggestionPolicy {
     private const val ELLIPSIS = "…"
     private const val APP_LINE_PREFIX = "앱: "
     private const val TONE_LINE_PREFIX = "말투: "
-    private const val HINT_LINE_PREFIX = "입력창: "
-    private const val STYLE_LINE_PREFIX = "비슷한 글: "
     private const val PREV_LINE_PREFIX = "앞 내용: "
     private const val CURRENT_LINE_PREFIX = "쓰는 중인 문장: "
     private const val COMPLETE_SENTENCE_INSTRUCTION =
-        "쓰는 중인 문장을 앞 내용에 이어 짧게 끝맺어 그 문장 하나만 쓰세요. 쓴 부분은 그대로 두고 앞 내용은 되풀이하지 마세요."
+        "쓰는 중인 문장을 앞 내용에 맞게 완성한 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
     private const val NEXT_SENTENCE_INSTRUCTION =
-        "앞 내용에 자연스럽게 이어질 짧은 다음 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
+        "앞 내용에 자연스럽게 이어질 다음 문장 하나만 쓰세요. 앞 내용은 되풀이하지 마세요."
 
     /**
      * Longest part of the sentence being typed that can be shown without the prompt passing

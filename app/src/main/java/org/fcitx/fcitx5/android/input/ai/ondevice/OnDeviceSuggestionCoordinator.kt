@@ -6,14 +6,12 @@ package org.fcitx.fcitx5.android.input.ai.ondevice
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
@@ -28,14 +26,7 @@ class OnDeviceSuggestionCoordinator(
     private val backend: Backend,
     private val clockMs: () -> Long,
     private val isCurrent: (OnDeviceSuggestionSession.Snapshot) -> Boolean,
-    private val onChanged: () -> Unit,
-    /**
-     * Optionally enriches the prompt input (e.g. with personal style examples) right before
-     * generation. Invoked off the main thread; a thrown exception is logged and the original,
-     * unenriched input is used instead, since a personalization failure must never block a
-     * suggestion.
-     */
-    private val promptContextEnricher: ((OnDeviceSuggestionPolicy.Input) -> OnDeviceSuggestionPolicy.Input)? = null
+    private val onChanged: () -> Unit
 ) {
 
     interface Backend {
@@ -233,11 +224,10 @@ class OnDeviceSuggestionCoordinator(
             update(State.GENERATING)
             var published = false
             try {
-                val enrichedInput = enrichInput(input)
                 val generateStartedMs = clockMs()
-                val raw = backend.generate(OnDeviceSuggestionPolicy.promptFor(enrichedInput))
+                val raw = backend.generate(OnDeviceSuggestionPolicy.promptFor(input))
                 val current = isRequestCurrent(requestEpoch, snapshot)
-                val stored = if (current) parseStoredSuffix(enrichedInput, raw) else null
+                val stored = if (current) parseStoredSuffix(input, raw) else null
                 Timber.i(
                     "Automatic suggestion generated elapsedMs=%d rawLength=%d current=%s parsed=%s",
                     clockMs() - generateStartedMs,
@@ -273,25 +263,6 @@ class OnDeviceSuggestionCoordinator(
             if (runningJob === kotlinx.coroutines.currentCoroutineContext()[Job]) {
                 runningJob = null
             }
-        }
-    }
-
-    /**
-     * Runs [promptContextEnricher] off the main thread. Its failure is not fatal to the request:
-     * only its error code is logged (never its message, which could otherwise leak user text),
-     * and generation proceeds with the original [input].
-     */
-    private suspend fun enrichInput(
-        input: OnDeviceSuggestionPolicy.Input
-    ): OnDeviceSuggestionPolicy.Input {
-        val enricher = promptContextEnricher ?: return input
-        return try {
-            withContext(Dispatchers.Default) { enricher(input) }
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Throwable) {
-            Timber.w("Automatic suggestion prompt enrichment failed code=%s", error.javaClass.simpleName)
-            input
         }
     }
 

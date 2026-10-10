@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.input.hangul.HangulSyllable
  *
  * 검사 순서(먼저 걸리는 사유가 최종 사유):
  * 1. [RejectionReason.UNGRAMMATICAL] — 문장 후보([KoreanSyntaxRuleFilter.isGrammaticallySound])만 검사.
+ *    사용자가 이미 쓴 글 뒤에 이어 붙는 접미부는 [evaluateAppended]로, 이미 쓴 부분의 위반은 접미부 탓으로 치지 않는다.
  * 2. [RejectionReason.SPACING] — [KoreanSpacingLint.hasSpacingIssue], 또는 후보를 문맥 뒤에 이어
  *    붙이면 '-드리다'가 앞 명사와 띄어지는 경우([KoreanSpacingLint.detachesDeurida]).
  * 3. [RejectionReason.DUPLICATED_WORD] — 공백으로 나눈 어절이 바로 이어서 같은 문자열로 반복.
@@ -36,10 +37,28 @@ object SuggestionQualityGate {
      * [context]는 문장 후보일 때 [KoreanSyntaxRuleFilter]에 넘겨 문맥 포함 문법 검사를 하고,
      * 모든 후보에 대해 문맥 뒤에 이어 붙였을 때의 띄어쓰기 검사에 쓴다.
      */
-    fun evaluate(candidate: String, context: String = "", isSentenceCompletion: Boolean = false): RejectionReason? {
+    fun evaluate(candidate: String, context: String = "", isSentenceCompletion: Boolean = false): RejectionReason? =
+        evaluateWith(candidate, context) {
+            isSentenceCompletion && !KoreanSyntaxRuleFilter.isGrammaticallySound(candidate, context)
+        }
+
+    /**
+     * [evaluate]와 같되, [candidate]가 사용자가 이미 쓴 [typed] 뒤에 이어 붙는 접미부일 때 쓴다. 문법 검사에서
+     * [typed]에 이미 있던 위반은 거부 사유로 치지 않는다([KoreanSyntaxRuleFilter.isSoundAfterTyped]).
+     */
+    fun evaluateAppended(candidate: String, typed: String, isSentenceCompletion: Boolean): RejectionReason? =
+        evaluateWith(candidate, typed) {
+            isSentenceCompletion && !KoreanSyntaxRuleFilter.isSoundAfterTyped(candidate, typed)
+        }
+
+    private inline fun evaluateWith(
+        candidate: String,
+        context: String,
+        isUngrammatical: () -> Boolean
+    ): RejectionReason? {
         if (candidate.isBlank()) return null
 
-        if (isSentenceCompletion && !KoreanSyntaxRuleFilter.isGrammaticallySound(candidate, context)) {
+        if (isUngrammatical()) {
             return RejectionReason.UNGRAMMATICAL
         }
 

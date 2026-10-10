@@ -143,4 +143,41 @@ class SuggestionQualityGateTest {
         assertTrue(SuggestionQualityGate.accepts("안녕하세요"))
         assertTrue(SuggestionQualityGate.accepts("오늘 회의 자료 준비해서 보내드릴게요.", isSentenceCompletion = true))
     }
+
+    @Test
+    fun appendedSuffixIsNotRejectedForAViolationAlreadyInTheTypedText() {
+        // 사용자가 쓴 "공부하했어요"는 ACC-05(어간 중복)지만 접미부 "오후에 공유드릴게요."에는 문제가 없다.
+        val typed = "공부하했어요. 내일 회의 자료는 "
+        val suffix = "오후에 공유드릴게요."
+
+        assertEquals(
+            SuggestionQualityGate.RejectionReason.UNGRAMMATICAL,
+            SuggestionQualityGate.evaluate(suffix, context = typed, isSentenceCompletion = true)
+        )
+        assertNull(SuggestionQualityGate.evaluateAppended(suffix, typed = typed, isSentenceCompletion = true))
+    }
+
+    @Test
+    fun appendedSuffixIsStillRejectedForAViolationItCreates() {
+        // 같은 규칙(ACC-05)이 사용자가 쓴 부분에 이미 있어도, 접미부 자기 안의 위반은 접미부 탓이다.
+        val typed = "공부하했어요. 내일 회의 자료는 "
+        assertEquals(
+            SuggestionQualityGate.RejectionReason.UNGRAMMATICAL,
+            SuggestionQualityGate.evaluateAppended("오후에 준비하했어요.", typed = typed, isSentenceCompletion = true)
+        )
+        // 사용자가 쓴 부분에는 없던 위반(ACC-02)이 접미부와 만나서 생기는 경우.
+        assertEquals(
+            SuggestionQualityGate.RejectionReason.UNGRAMMATICAL,
+            SuggestionQualityGate.evaluateAppended("정말 감사합니다.", typed = "회의 자료를 ", isSentenceCompletion = true)
+        )
+    }
+
+    @Test
+    fun appendedSuffixKeepsTheOtherChecksAndTheWordLineWithoutGrammar() {
+        assertEquals(
+            SuggestionQualityGate.RejectionReason.KNOWN_TYPO,
+            SuggestionQualityGate.evaluateAppended("지금 바로 출발할께요.", typed = "공부하했어요. ", isSentenceCompletion = true)
+        )
+        assertNull(SuggestionQualityGate.evaluateAppended("정말 감사합니다.", typed = "회의 자료를 ", isSentenceCompletion = false))
+    }
 }

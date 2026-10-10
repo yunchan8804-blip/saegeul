@@ -176,9 +176,7 @@ class GemmaSuggestionQualityDeviceTest {
             imeAction = IME_ACTION,
             mode = OnDeviceSuggestionPolicy.Mode.SENTENCE,
             appCategory = scenario.appCategory,
-            fieldHint = scenario.fieldHint,
-            recentSentences = scenario.recentSentences,
-            styleExamples = scenario.styleExamples
+            recentSentences = scenario.recentSentences
         )
         var prompt: String? = null
         try {

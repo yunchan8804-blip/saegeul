@@ -29,7 +29,6 @@ import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.ai.AiAppliedEdit
 import org.fcitx.fcitx5.android.input.ai.AiEditorTarget
 import org.fcitx.fcitx5.android.input.ai.AiSuggestionApplyResult
-import org.fcitx.fcitx5.android.input.ai.KoreanPiiScrubber
 import org.fcitx.fcitx5.android.input.ai.persona.PersonaRegistry
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
@@ -363,23 +362,10 @@ class AutomaticSuggestionController(
                 appCategory = PersonaRegistry.classify(
                     snapshot.session.scope.packageName
                 ),
-                fieldHint = automaticSuggestionFieldHint(),
                 recentSentences = host.recentSentSentences().recent(snapshot.session.scope.packageName, 3)
             )
         )
         return coordinator.candidates
-    }
-
-    /**
-     * The current editor's hint text, trimmed and capped at 40 characters, or null when empty or
-     * when it looks like it contains PII. This is sent to the on-device model as a hint about what
-     * the field is asking for (e.g. "받는 사람"), never as free-form user-authored text.
-     */
-    private fun automaticSuggestionFieldHint(): String? {
-        val trimmed = host.editorInfo()?.hintText?.toString()?.trim().orEmpty()
-        if (trimmed.isEmpty()) return null
-        val capped = if (trimmed.length > 40) trimmed.take(40) else trimmed
-        return capped.takeUnless { KoreanPiiScrubber.containsPii(it) }
     }
 
     fun commitAutomaticSuggestionCandidate(
@@ -418,8 +404,7 @@ class AutomaticSuggestionController(
                     snapshot.session == sessionSnapshot && isAutomaticSuggestionSnapshotCurrent(snapshot)
                 } == true
             },
-            onChanged = ::onAutomaticSuggestionCoordinatorChanged,
-            promptContextEnricher = ::enrichAutomaticSuggestionInputWithPersonalStyle
+            onChanged = ::onAutomaticSuggestionCoordinatorChanged
         )
         // A coordinator created here can be a mid-session replacement for a terminal instance
         // (see recoverAutomaticSuggestionStateIfTerminal), not only a first-time creation from
@@ -428,36 +413,6 @@ class AutomaticSuggestionController(
         // silently disabled (its own default is enabled=false).
         automaticSuggestionCoordinator?.setEnabled(automaticSuggestionsEnabledInternal)
         return true
-    }
-
-    /**
-     * Adds up to 3 similar past sentences from the personal sentence vault to [input] as style
-     * examples. Runs off the main thread (the coordinator dispatches this call on
-     * [kotlinx.coroutines.Dispatchers.Default]); this function itself does no dispatching.
-     */
-    private fun enrichAutomaticSuggestionInputWithPersonalStyle(
-        input: OnDeviceSuggestionPolicy.Input
-    ): OnDeviceSuggestionPolicy.Input {
-        val currentText = input.textBeforeCursor.trim()
-        val styleExamples = host.personalSentenceVault().retrieve(input.textBeforeCursor, input.packageName, limit = 5)
-            .map { it.sentence.trim() }
-            .filter {
-                it.isNotEmpty() && it != currentText && it.length <= 80 &&
-                    !KoreanPiiScrubber.containsPii(it)
-            }
-            .take(3)
-        if (styleExamples.isEmpty()) return input
-        return OnDeviceSuggestionPolicy.Input(
-            textBeforeCursor = input.textBeforeCursor,
-            packageName = input.packageName,
-            inputType = input.inputType,
-            imeAction = input.imeAction,
-            mode = input.mode,
-            appCategory = input.appCategory,
-            fieldHint = input.fieldHint,
-            recentSentences = input.recentSentences,
-            styleExamples = styleExamples
-        )
     }
 
     /**

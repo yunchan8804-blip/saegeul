@@ -495,48 +495,6 @@ class OnDeviceSuggestionCoordinatorTest {
     }
 
     @Test
-    fun `prompt context enricher adds style examples to the generated prompt off the calling thread`() = runBlocking {
-        val callingThread = Thread.currentThread()
-        var enricherThread: Thread? = null
-        val fixture = Fixture(coroutineContext, promptContextEnricher = { input ->
-            enricherThread = Thread.currentThread()
-            OnDeviceSuggestionPolicy.Input(
-                textBeforeCursor = input.textBeforeCursor,
-                packageName = input.packageName,
-                inputType = input.inputType,
-                imeAction = input.imeAction,
-                mode = input.mode,
-                styleExamples = listOf("전에 이렇게 썼었다")
-            )
-        })
-        val snapshot = fixture.snapshot()
-
-        fixture.coordinator.setEnabled(true)
-        fixture.observe(snapshot)
-        fixture.backend.awaitRequest(0).complete(" 일정입니다.")
-        fixture.awaitReady()
-
-        assertTrue(fixture.backend.prompts.single().contains("전에 이렇게 썼었다"))
-        assertTrue(enricherThread != null && enricherThread !== callingThread)
-    }
-
-    @Test
-    fun `prompt context enricher failure falls back to the original input instead of failing the request`() = runBlocking {
-        val fixture = Fixture(coroutineContext, promptContextEnricher = {
-            throw IllegalStateException("enrichment boom")
-        })
-        val snapshot = fixture.snapshot()
-
-        fixture.coordinator.setEnabled(true)
-        fixture.observe(snapshot)
-        fixture.backend.awaitRequest(0).complete(" 일정입니다.")
-        fixture.awaitReady()
-
-        assertEquals(OnDeviceSuggestionPolicy.promptFor(fixture.input(snapshot)), fixture.backend.prompts.single())
-        assertEquals(OnDeviceSuggestionCoordinator.State.READY, fixture.coordinator.status.state)
-    }
-
-    @Test
     fun `hard invalidate closes backend`() = runBlocking {
         val fixture = Fixture(coroutineContext)
         val snapshot = fixture.snapshot()
@@ -652,10 +610,7 @@ class OnDeviceSuggestionCoordinatorTest {
         assertNull(chip.replaces)
     }
 
-    private class Fixture(
-        context: CoroutineContext,
-        promptContextEnricher: ((OnDeviceSuggestionPolicy.Input) -> OnDeviceSuggestionPolicy.Input)? = null
-    ) {
+    private class Fixture(context: CoroutineContext) {
         var nowMs = 0L
         val owner = SupervisorJob()
         val backend = DeferredBackend()
@@ -666,8 +621,7 @@ class OnDeviceSuggestionCoordinatorTest {
             backend = backend,
             clockMs = { nowMs },
             isCurrent = { snapshot -> current.lastOrNull() == snapshot },
-            onChanged = {},
-            promptContextEnricher = promptContextEnricher
+            onChanged = {}
         )
 
         fun snapshot(
