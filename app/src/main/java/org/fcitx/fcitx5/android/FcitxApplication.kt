@@ -32,8 +32,12 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.ai.BundledKoreanNgram
 import org.fcitx.fcitx5.android.input.ai.PersonalNgramModel
 import org.fcitx.fcitx5.android.input.ai.metrics.PredictionMetricsStore
+import org.fcitx.fcitx5.android.input.ai.ondevice.AiRuntimeStatusStore
 import org.fcitx.fcitx5.android.input.ai.ondevice.GeneratedSentenceBank
+import org.fcitx.fcitx5.android.input.ai.ondevice.GemmaNativeBreadcrumbStore
+import org.fcitx.fcitx5.android.input.ai.ondevice.NativeCrashAttribution
 import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceAiSupport
+import org.fcitx.fcitx5.android.input.ai.ondevice.OnDeviceGenerationControl
 import org.fcitx.fcitx5.android.input.ai.rag.PersonalSentenceVault
 import org.fcitx.fcitx5.android.input.ai.sentencepack.SentencePackRepository
 import org.fcitx.fcitx5.android.input.ai.vault.KeystoreVaultCipher
@@ -330,6 +334,12 @@ class FcitxApplication : Application(), WorkConfiguration.Provider {
         )
         warmUpLanguageAssets()
         if (!isDirectBootMode) {
+            val breadcrumbStore = GemmaNativeBreadcrumbStore(ctx)
+            val previousBreadcrumb = breadcrumbStore.read()
+            OnDeviceGenerationControl.configureBreadcrumb(breadcrumbStore)
+            applicationScope.launch {
+                NativeCrashAttribution.checkOnStart(ctx, AiRuntimeStatusStore(ctx), breadcrumbStore, previousBreadcrumb)
+            }
             // A cloud/device-transfer restore can bring back automatic-learning's `enabled=true`
             // preference without the Gemma model itself (it lives under noBackupFilesDir and is
             // never restored). Force it back off in that case so the toggle never shows "on" with

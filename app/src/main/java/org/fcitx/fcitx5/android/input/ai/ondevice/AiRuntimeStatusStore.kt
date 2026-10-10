@@ -32,7 +32,11 @@ class AiRuntimeStatusStore private constructor(
         val recoveryCount: Int = 0,
         val lastRecoveryAtMs: Long = 0L,
         val lastFailureCode: String? = null,
-        val lastFailureAtMs: Long = 0L
+        val lastFailureAtMs: Long = 0L,
+        val lastNativeCrashMs: Long = 0L,
+        val lastNativeCrashPurpose: String? = null,
+        val nativeCrashCount: Int = 0,
+        val nativeCrashCheckedMs: Long = 0L
     )
 
     @Synchronized
@@ -46,7 +50,11 @@ class AiRuntimeStatusStore private constructor(
         recoveryCount = prefs.getInt(KEY_RECOVERY_COUNT, 0),
         lastRecoveryAtMs = prefs.getLong(KEY_LAST_RECOVERY_AT_MS, 0L),
         lastFailureCode = prefs.getString(KEY_LAST_FAILURE_CODE, null),
-        lastFailureAtMs = prefs.getLong(KEY_LAST_FAILURE_AT_MS, 0L)
+        lastFailureAtMs = prefs.getLong(KEY_LAST_FAILURE_AT_MS, 0L),
+        lastNativeCrashMs = prefs.getLong(KEY_LAST_NATIVE_CRASH_MS, 0L),
+        lastNativeCrashPurpose = prefs.getString(KEY_LAST_NATIVE_CRASH_PURPOSE, null),
+        nativeCrashCount = prefs.getInt(KEY_NATIVE_CRASH_COUNT, 0),
+        nativeCrashCheckedMs = prefs.getLong(KEY_NATIVE_CRASH_CHECKED_MS, 0L)
     )
 
     @Synchronized
@@ -85,6 +93,24 @@ class AiRuntimeStatusStore private constructor(
             .apply()
     }
 
+    /**
+     * Stores native crashes found at startup in one edit: the count grows by [crashes]'s size, the
+     * last crash is the one with the greatest timestamp, and [checkedMs] becomes the reference time
+     * the next check starts after.
+     */
+    @Synchronized
+    fun recordNativeCrashes(crashes: List<NativeCrashAttribution.Crash>, checkedMs: Long) {
+        val editor = prefs.edit()
+        val latest = crashes.maxByOrNull { it.timestampMs }
+        if (latest != null) {
+            editor
+                .putLong(KEY_LAST_NATIVE_CRASH_MS, latest.timestampMs)
+                .putString(KEY_LAST_NATIVE_CRASH_PURPOSE, latest.purpose)
+                .putInt(KEY_NATIVE_CRASH_COUNT, prefs.getInt(KEY_NATIVE_CRASH_COUNT, 0) + crashes.size)
+        }
+        editor.putLong(KEY_NATIVE_CRASH_CHECKED_MS, checkedMs).apply()
+    }
+
     @Synchronized
     fun clear() {
         prefs.edit().clear().apply()
@@ -102,5 +128,9 @@ class AiRuntimeStatusStore private constructor(
         const val KEY_LAST_RECOVERY_AT_MS = "last_recovery_at_ms"
         const val KEY_LAST_FAILURE_CODE = "last_failure_code"
         const val KEY_LAST_FAILURE_AT_MS = "last_failure_at_ms"
+        const val KEY_LAST_NATIVE_CRASH_MS = "last_native_crash_ms"
+        const val KEY_LAST_NATIVE_CRASH_PURPOSE = "last_native_crash_purpose"
+        const val KEY_NATIVE_CRASH_COUNT = "native_crash_count"
+        const val KEY_NATIVE_CRASH_CHECKED_MS = "native_crash_checked_ms"
     }
 }

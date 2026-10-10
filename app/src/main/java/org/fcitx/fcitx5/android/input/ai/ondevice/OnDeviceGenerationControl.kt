@@ -30,6 +30,24 @@ object OnDeviceGenerationControl {
     private var autoContextPreemptionHandler: (() -> Unit)? = null
     private var explicitContextFinishedCallback: (() -> Unit)? = null
 
+    private var breadcrumbSink: GemmaBreadcrumbSink? = null
+    private var breadcrumbPurpose: Purpose? = null
+
+    /** 네이티브 크래시 때 어떤 작업 중이었는지 남길 기록처를 붙인다. lease 보유자가 바뀔 때만 쓴다. */
+    fun configureBreadcrumb(sink: GemmaBreadcrumbSink?) {
+        synchronized(lock) {
+            breadcrumbSink = sink
+            breadcrumbPurpose = null
+        }
+    }
+
+    private fun recordBreadcrumb() {
+        val purpose = activePurpose
+        if (purpose == breadcrumbPurpose) return
+        breadcrumbPurpose = purpose
+        breadcrumbSink?.onHolderChanged(purpose?.name, clockMs())
+    }
+
     /** Test-only injection point; production code never reassigns this. */
     internal var clockMs: () -> Long = System::currentTimeMillis
 
@@ -173,6 +191,7 @@ object OnDeviceGenerationControl {
             activePurpose = purpose
             activeLease = newLease
             cancelCallback = cancel
+            recordBreadcrumb()
             Timber.i("Generation lease begin purpose=%s keyboardActive=%s", purpose, keyboardActive)
             newLease
         }
@@ -201,6 +220,7 @@ object OnDeviceGenerationControl {
                 activePurpose = null
                 activeLease = null
                 cancelCallback = null
+                recordBreadcrumb()
                 true
             }
         }

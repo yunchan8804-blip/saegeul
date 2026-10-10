@@ -72,10 +72,46 @@ class AiRuntimeStatusStoreTest {
     }
 
     @Test
+    fun `recordNativeCrashes stores the latest crash and accumulates the count`() {
+        val prefs = MemorySharedPreferences()
+        val store = AiRuntimeStatusStore(prefs, Unit)
+
+        store.recordNativeCrashes(
+            listOf(
+                NativeCrashAttribution.Crash(100L, "AUTO_CONTEXT"),
+                NativeCrashAttribution.Crash(300L, "PERSONAL_GRAPH")
+            ),
+            checkedMs = 300L
+        )
+        store.recordNativeCrashes(listOf(NativeCrashAttribution.Crash(500L, "NONE")), checkedMs = 500L)
+
+        val snapshot = AiRuntimeStatusStore(prefs, Unit).snapshot()
+        assertEquals(500L, snapshot.lastNativeCrashMs)
+        assertEquals("NONE", snapshot.lastNativeCrashPurpose)
+        assertEquals(3, snapshot.nativeCrashCount)
+        assertEquals(500L, snapshot.nativeCrashCheckedMs)
+    }
+
+    @Test
+    fun `recordNativeCrashes without crashes only moves the checked time`() {
+        val store = AiRuntimeStatusStore(MemorySharedPreferences(), Unit)
+        store.recordNativeCrashes(listOf(NativeCrashAttribution.Crash(100L, "AUTO_CONTEXT")), checkedMs = 100L)
+
+        store.recordNativeCrashes(emptyList(), checkedMs = 900L)
+
+        val snapshot = store.snapshot()
+        assertEquals(100L, snapshot.lastNativeCrashMs)
+        assertEquals("AUTO_CONTEXT", snapshot.lastNativeCrashPurpose)
+        assertEquals(1, snapshot.nativeCrashCount)
+        assertEquals(900L, snapshot.nativeCrashCheckedMs)
+    }
+
+    @Test
     fun `clear resets everything to defaults`() {
         val store = AiRuntimeStatusStore(MemorySharedPreferences(), Unit)
         store.recordWarmup(result = "OK", durationMs = 250L, backend = "gpu", nowMs = 1_000L)
         store.recordFailure("BUSY", 5L)
+        store.recordNativeCrashes(listOf(NativeCrashAttribution.Crash(7L, "AUTO_CONTEXT")), checkedMs = 7L)
 
         store.clear()
 
