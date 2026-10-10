@@ -42,8 +42,6 @@ private const val AUTOMATIC_SUGGESTION_WARMUP_BUSY_RETRY_MS = 500L
 
 // 이미 따뜻한 공유 엔진에 다시 붙는 워밍업도 타이핑이 잠시 멈춘 뒤에 한다.
 private const val AUTOMATIC_SUGGESTION_WARMUP_IDLE_MS = 1_500L
-// 차가운 엔진의 워밍업이 키보드가 숨겨지기를 기다리며 확인하는 간격.
-private const val AUTOMATIC_SUGGESTION_WARMUP_HIDDEN_POLL_MS = 500L
 
 /**
  * Owns automatic on-device sentence suggestions: the opt-in state, the runtime and coordinator
@@ -239,11 +237,34 @@ class AutomaticSuggestionController(
     fun onFinishInputView() {
         invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
         scheduleAutomaticSuggestionHideClose()
+        upgradeToGpuAfterHide()
     }
 
     fun onFinishInput() {
         invalidateAutomaticSuggestionsForClosedGate(closeBackend = false)
         scheduleAutomaticSuggestionHideClose()
+        upgradeToGpuAfterHide()
+    }
+
+    /**
+     * 키보드가 보이는 동안 CPU로 예열한 엔진 사용을 놓고 숨김 상태에서 GPU로 다시 예열한다. 저장된 GPU
+     * 설정은 건드리지 않는다. 다른 목적이 엔진을 쓰고 있으면 공유 엔진이 교체하지 않아 CPU로 계속 쓴다.
+     */
+    private fun upgradeToGpuAfterHide() {
+        if (!automaticSuggestionsUseGpuInternal) return
+        val runtime = automaticSuggestionRuntime ?: return
+        val info = host.editorInfo() ?: return
+        host.lifecycleScope().launch {
+            val released = try {
+                runtime.releaseCpuForGpu()
+            } catch (error: OnDeviceSuggestionCoordinator.BackendException) {
+                Timber.w("Automatic suggestion CPU release failed: %s", error.code)
+                false
+            }
+            if (released && automaticSuggestionRuntime === runtime) {
+                startAutomaticSuggestionWarmupIfAllowed(info, host.capabilityFlags())
+            }
+        }
     }
 
     fun onTrimMemory(level: Int) {
@@ -529,17 +550,11 @@ class AutomaticSuggestionController(
     }
 
     /**
-     * 워밍업을 시작해도 되는 때까지 기다린다. 공유 엔진이 이미 따뜻하면 GPU 초기화가 없으므로 입력이 잠시 멈추기만
-     * 기다린다. 차가우면 키보드가 숨겨질 때까지 기다린다: 키보드가 떠 있는 동안 GPU로 초기화하면 가중치 변환이
-     * 화면 그리기와 GPU를 다퉈 키보드가 1초 넘게 멈춘다.
+     * 워밍업을 시작해도 되는 때까지 기다린다. 키보드가 떠 있으면 입력이 잠시 멈추기를 기다린다. 차가운 엔진은
+     * [AutomaticSuggestionBackendPolicy]가 키보드가 보이는 동안 CPU로 초기화하므로 키보드가 숨겨지기를
+     * 기다리지 않는다.
      */
     private suspend fun awaitWarmupWindow(since: Long) {
-        // CPU 초기화는 GPU를 쓰지 않아 키보드 그리기를 멈추지 않으므로 숨겨질 때까지 기다리지 않는다.
-        while (automaticSuggestionsUseGpuInternal && !OnDeviceSharedEngine.isWarm &&
-            OnDeviceGenerationControl.isInputViewVisible
-        ) {
-            delay(AUTOMATIC_SUGGESTION_WARMUP_HIDDEN_POLL_MS)
-        }
         if (OnDeviceGenerationControl.isInputViewVisible) awaitEditorIdle(since)
     }
 
@@ -618,7 +633,7 @@ class AutomaticSuggestionController(
                 aiRuntimeStatusStore.recordWarmup(
                     result = "OK",
                     durationMs = warmupElapsedMs,
-                    backend = if (automaticSuggestionsUseGpuInternal) "gpu" else "cpu",
+                    backend = runtime.backendLabel,
                     nowMs = System.currentTimeMillis()
                 )
                 Timber.i(
@@ -633,7 +648,7 @@ class AutomaticSuggestionController(
                 val backendErrorCode = (error as? OnDeviceSuggestionCoordinator.BackendException)?.code
                 if (OnDeviceBackendFallbackPolicy.shouldFallbackToCpu(
                         errorCode = backendErrorCode,
-                        useGpu = automaticSuggestionsUseGpuInternal,
+                        useGpu = runtime.attemptedGpu,
                         fallbackAlreadyUsed = automaticSuggestionBackendFallbackUsed
                     )
                 ) {
@@ -656,7 +671,7 @@ class AutomaticSuggestionController(
                     aiRuntimeStatusStore.recordWarmup(
                         result = code,
                         durationMs = SystemClock.elapsedRealtime() - warmupStartedAt,
-                        backend = if (automaticSuggestionsUseGpuInternal) "gpu" else "cpu",
+                        backend = runtime.backendLabel,
                         nowMs = System.currentTimeMillis()
                     )
                     aiRuntimeStatusStore.recordFailure(code, System.currentTimeMillis())

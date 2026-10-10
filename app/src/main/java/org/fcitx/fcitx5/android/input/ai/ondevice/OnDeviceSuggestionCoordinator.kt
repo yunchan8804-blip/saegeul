@@ -38,8 +38,7 @@ class OnDeviceSuggestionCoordinator(
         suspend fun close()
 
         /**
-         * 지금 생성을 시작해도 되는지. 거짓이면 요청을 오류 없이 건너뛴다(후보 없음). 예: 엔진이 아직 차가운데
-         * 키보드가 떠 있어, 생성하려면 화면을 멈추게 하는 GPU 초기화부터 해야 하는 경우.
+         * 지금 생성을 시작해도 되는지. 거짓이면 요청을 오류 없이 건너뛴다(후보 없음).
          */
         fun isReadyToGenerate(): Boolean = true
     }

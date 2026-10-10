@@ -17,7 +17,13 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 
-/** Native backend for the automatic coordinator, gated per-device by [OnDeviceAiSupport]. */
+/**
+ * Native backend for the automatic coordinator, gated per-device by [OnDeviceAiSupport].
+ *
+ * [useGpu] is the saved GPU setting. The backend of each fresh shared-engine acquisition is chosen at
+ * that moment by [AutomaticSuggestionBackendPolicy]: a cold engine is warmed on CPU while the keyboard
+ * is visible and on GPU once it is hidden. The choice never changes the saved setting.
+ */
 class OnDeviceAutomaticSuggestionRuntime(
     context: Context,
     private val useGpu: Boolean = true
@@ -25,13 +31,12 @@ class OnDeviceAutomaticSuggestionRuntime(
 
     private val appContext = context.applicationContext
 
+    @Volatile
+    private var selectedChoice: AutomaticSuggestionBackendPolicy.Choice? = null
+
     private val engine = OnDeviceSuggestionEngine(
         context = context,
-        backend = if (useGpu) {
-            OnDeviceSuggestionEngine.BackendSelection.Gpu
-        } else {
-            OnDeviceSuggestionEngine.BackendSelection.Cpu(threadCount = 2)
-        }
+        backendProvider = ::selectBackend
     )
     private val preparationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val preparationLock = Any()
@@ -51,6 +56,57 @@ class OnDeviceAutomaticSuggestionRuntime(
 
     val terminalFailureCode: String?
         get() = engine.terminalFailureCode
+
+    /** 마지막으로 공유 엔진을 얻을 때 GPU를 골랐는지. GPU 초기화 실패 판단에만 쓴다. */
+    val attemptedGpu: Boolean
+        get() = selectedChoice == AutomaticSuggestionBackendPolicy.Choice.Gpu
+
+    /** 지금 쓰는(또는 마지막으로 고른) 백엔드 이름. 상태 기록용이다. */
+    val backendLabel: String
+        get() = when (engine.heldFlavor) {
+            is OnDeviceSharedEngine.Flavor.Cpu -> "cpu"
+            OnDeviceSharedEngine.Flavor.Gpu -> "gpu"
+            null -> if (selectedChoice?.let { attemptedGpu } ?: useGpu) "gpu" else "cpu"
+        }
+
+    private fun selectBackend(): OnDeviceSuggestionEngine.BackendSelection {
+        val decision = AutomaticSuggestionBackendPolicy.choose(
+            gpuEnabled = useGpu,
+            engineWarm = OnDeviceSharedEngine.isWarm,
+            keyboardVisible = OnDeviceGenerationControl.isInputViewVisible
+        )
+        selectedChoice = decision.choice
+        Timber.i("Automatic suggestion backend: %s", decision.reason.logText)
+        return when (decision.choice) {
+            AutomaticSuggestionBackendPolicy.Choice.Gpu -> OnDeviceSuggestionEngine.BackendSelection.Gpu
+            AutomaticSuggestionBackendPolicy.Choice.Cpu ->
+                OnDeviceSuggestionEngine.BackendSelection.Cpu(AutomaticSuggestionBackendPolicy.CPU_THREAD_COUNT)
+        }
+    }
+
+    /**
+     * 키보드가 숨겨졌고 이 런타임이 CPU 엔진 사용을 쥐고 있으며 GPU 설정이 켜져 있으면 그 사용을 놓는다.
+     * 생성·예열이 진행 중이면 끝난 뒤에 다시 확인한다. 놓았으면 true. 다음 획득이 숨김 상태에서 GPU로
+     * 교체한다(다른 목적이 엔진을 쓰고 있으면 교체되지 않고 CPU로 계속 쓴다).
+     */
+    suspend fun releaseCpuForGpu(): Boolean = invocationMutex.withLock {
+        if (!AutomaticSuggestionBackendPolicy.shouldReleaseCpuForGpu(
+                gpuEnabled = useGpu,
+                heldFlavor = engine.heldFlavor,
+                keyboardVisible = OnDeviceGenerationControl.isInputViewVisible
+            )
+        ) {
+            return@withLock false
+        }
+        Timber.i("Automatic suggestion backend: keyboard hidden -> release CPU for GPU")
+        try {
+            engine.close()
+        } catch (error: OnDeviceSuggestionEngine.OnDeviceSuggestionException) {
+            Timber.w(error, "OnDeviceAutomaticSuggestionRuntime release failed code=%s", error.code)
+            throw OnDeviceSuggestionCoordinator.BackendException(error.code)
+        }
+        true
+    }
 
     suspend fun warmUp() = invocationMutex.withLock {
         try {
@@ -98,14 +154,6 @@ class OnDeviceAutomaticSuggestionRuntime(
     override fun cancel() {
         engine.cancel()
     }
-
-    /**
-     * 키보드가 떠 있는 동안에는 차가운 엔진을 GPU로 초기화하지 않는다. GPU 가중치 변환이 화면 그리기와 GPU를
-     * 다퉈 키보드가 1초 넘게 멈추기 때문이다. 초기화는 키보드가 숨겨진 뒤 워밍업이 맡는다. CPU 백엔드는 화면
-     * 그리기와 GPU를 다투지 않으므로 키보드가 떠 있어도 바로 초기화한다.
-     */
-    override fun isReadyToGenerate(): Boolean =
-        !useGpu || engine.isWarm || OnDeviceSharedEngine.isWarm || !OnDeviceGenerationControl.isInputViewVisible
 
     override suspend fun close() {
         val pending = synchronized(preparationLock) { preparation }

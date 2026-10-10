@@ -46,10 +46,17 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class OnDeviceSuggestionEngine(
     context: Context,
-    private val backend: BackendSelection = BackendSelection.Cpu(),
+    /** 공유 엔진을 새로 획득할 때마다 불러 그 시점의 백엔드를 고른다. */
+    private val backendProvider: () -> BackendSelection,
     /** 운영 경로는 기본값을 쓴다. 기기 비교 측정만 다른 값을 넣는다. */
     val samplerConfig: SamplerConfig = DEFAULT_SAMPLER_CONFIG
 ) {
+
+    constructor(
+        context: Context,
+        backend: BackendSelection = BackendSelection.Cpu(),
+        samplerConfig: SamplerConfig = DEFAULT_SAMPLER_CONFIG
+    ) : this(context, { backend }, samplerConfig)
 
     sealed interface BackendSelection {
         data class Cpu(val threadCount: Int? = null) : BackendSelection
@@ -114,6 +121,10 @@ class OnDeviceSuggestionEngine(
 
     val isWarm: Boolean
         get() = synchronized(stateLock) { warm != null }
+
+    /** 이 엔진이 지금 쥐고 있는 공유 엔진 사용의 백엔드. 쥐고 있지 않으면 null이다. */
+    val heldFlavor: OnDeviceSharedEngine.Flavor?
+        get() = synchronized(stateLock) { warm?.use?.flavor }
 
     val terminalFailureCode: String?
         get() = synchronized(stateLock) { terminalFailure }
@@ -402,7 +413,7 @@ class OnDeviceSuggestionEngine(
             synchronized(stateLock) { lease = newLease }
             checkNotClosing(request)
             val use = try {
-                OnDeviceSharedEngine.acquire(verified, backend.toFlavor())
+                OnDeviceSharedEngine.acquire(verified, backendProvider().toFlavor())
             } catch (_: OnDeviceSharedEngine.InitializationFailedException) {
                 throw OnDeviceSuggestionException("ENGINE_INITIALIZATION_FAILED")
             }
