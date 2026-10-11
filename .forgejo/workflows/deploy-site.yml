@@ -29,6 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 러너(호스트 실행)의 기본 Node는 18이라 Node 22 이상을 요구하는 wrangler 4가 돌지 않는다.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: 배포 자격증명 확인
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
