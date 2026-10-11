@@ -394,15 +394,6 @@ class AutomaticSuggestionController(
         return coordinator.candidates
     }
 
-    /**
-     * 지금 쓰는 어절(끝이 공백이면 방금 끝낸 어절)이 오타라는 증거가 있는지. 자동 추천 단어 칩보다 ✏️ 교정 후보를
-     * 앞에 둘지 정하는 데 쓴다. 자동 추천 스냅샷이 없으면 거짓이다.
-     */
-    fun typingWordHasTypoEvidence(): Boolean {
-        val text = latestAutomaticSuggestionSnapshot?.session?.textBeforeCursor ?: return false
-        return typoEvidence.correctionForTypingWord(text) != null
-    }
-
     fun commitAutomaticSuggestionCandidate(
         candidate: OnDeviceSuggestionCoordinator.Candidate
     ): AiSuggestionApplyResult {

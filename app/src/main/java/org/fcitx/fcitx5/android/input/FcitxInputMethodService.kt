@@ -1455,8 +1455,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun getAutomaticSuggestionCandidates(): List<OnDeviceSuggestionCoordinator.Candidate> =
         automaticSuggestion.getAutomaticSuggestionCandidates()
 
-    fun typingWordHasTypoEvidence(): Boolean = automaticSuggestion.typingWordHasTypoEvidence()
-
     fun commitAutomaticSuggestionCandidate(
         candidate: OnDeviceSuggestionCoordinator.Candidate
     ): AiSuggestionApplyResult = automaticSuggestion.commitAutomaticSuggestionCandidate(candidate)

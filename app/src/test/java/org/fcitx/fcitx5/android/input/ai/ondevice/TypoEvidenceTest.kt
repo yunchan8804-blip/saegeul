@@ -28,24 +28,4 @@ class TypoEvidenceTest {
         assertNull(evidence.correctionFor("안녕하세", stillTyping = true))
         assertEquals("안녕하세요", evidence.correctionFor("안녕하세", stillTyping = false))
     }
-
-    @Test
-    fun `the word being typed is the last word before the cursor`() {
-        assertEquals("좋네요", evidence.correctionForTypingWord("오늘 날씨 좋네여"))
-        assertNull(evidence.correctionForTypingWord("오늘 날씨 좋네여 안녕하세"))
-        assertNull(evidence.correctionForTypingWord("오늘 날씨 안녕하세"))
-    }
-
-    @Test
-    fun `the word just finished with a space is judged as a finished word`() {
-        assertEquals("좋네요", evidence.correctionForTypingWord("오늘 날씨 좋네여 "))
-        assertEquals("안녕하세요", evidence.correctionForTypingWord("오늘 안녕하세 "))
-    }
-
-    @Test
-    fun `a sentence that already ended has no word being typed`() {
-        assertNull(evidence.correctionForTypingWord("오늘 날씨 좋네여."))
-        assertNull(evidence.correctionForTypingWord("오늘 날씨 좋네여.\n"))
-        assertNull(evidence.correctionForTypingWord("   "))
-    }
 }

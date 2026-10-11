@@ -73,8 +73,9 @@ import java.util.IdentityHashMap
 
 /**
  * Two-tiered horizontal candidate component for Saegeul Keyboard:
- * - Top Row (윗줄): Compact word-level candidates (단어단위 후보, 28dp, compact font)
- * - Bottom Row (아래줄): Full sentence AI recommendations (문장 후보, 30dp, chip style)
+ * - Top Row (윗줄): native and contextual candidates, the fast row of [StableCandidateRows]
+ *   (28dp, compact font)
+ * - Bottom Row (아래줄): on-device automatic suggestions, the AI row (30dp, chip style)
  * - Dynamically expands KawaiiBarComponent to 60dp when both rows are present,
  *   or stays at standard single row (48dp) when only one row is active.
  */
@@ -174,6 +175,8 @@ class HorizontalCandidateComponent :
     private var collectionFeedbackHideRunnable: Runnable? = null
     private var lastObservedCoordinatorState: OnDeviceSuggestionCoordinator.State? = null
     private val contextualCommitSnapshots = IdentityHashMap<CandidateWord, ContextualCandidate>()
+    private val stableRows = StableCandidateRows()
+    private var currentRows: StableCandidateRows.Rows? = null
     private val automaticSuggestionCandidates =
         IdentityHashMap<CandidateWord, OnDeviceSuggestionCoordinator.Candidate>()
     private var metricsVisibilityPosted = false
@@ -208,9 +211,7 @@ class HorizontalCandidateComponent :
 
     private fun getAutomaticCandidates(): AutomaticCandidates {
         automaticSuggestionCandidates.clear()
-        val words = mutableListOf<CandidateWord>()
-        val sentences = mutableListOf<CandidateWord>()
-        service.getAutomaticSuggestionCandidates().forEach { candidate ->
+        val chips = service.getAutomaticSuggestionCandidates().map { candidate ->
             val word = CandidateWord(
                 label = "",
                 text = candidate.insertion,
@@ -221,23 +222,22 @@ class HorizontalCandidateComponent :
                 }
             )
             automaticSuggestionCandidates[word] = candidate
-            when (candidate.mode) {
-                OnDeviceSuggestionPolicy.Mode.WORD -> words += word
-                OnDeviceSuggestionPolicy.Mode.SENTENCE -> sentences += word
+            val kind = when {
+                candidate.replaces != null -> StableCandidateRows.AutomaticKind.REPLACEMENT
+                candidate.mode == OnDeviceSuggestionPolicy.Mode.WORD -> StableCandidateRows.AutomaticKind.WORD
+                else -> StableCandidateRows.AutomaticKind.SENTENCE
             }
+            StableCandidateRows.AutomaticChip(word, kind)
         }
-        return AutomaticCandidates(words, sentences)
+        return AutomaticCandidates(chips)
     }
 
-    private data class AutomaticCandidates(
-        val words: List<CandidateWord>,
-        val sentences: List<CandidateWord>
-    ) {
+    private class AutomaticCandidates(val chips: List<StableCandidateRows.AutomaticChip>) {
         val isNotEmpty: Boolean
-            get() = words.isNotEmpty() || sentences.isNotEmpty()
+            get() = chips.isNotEmpty()
 
-        val texts: Set<String>
-            get() = (words + sentences).mapTo(mutableSetOf()) { it.text }
+        val hasSentences: Boolean
+            get() = chips.any { it.kind != StableCandidateRows.AutomaticKind.WORD }
     }
 
     // Primary adapter reference for external components (e.g. ExpandedCandidateWindow)
@@ -264,12 +264,12 @@ class HorizontalCandidateComponent :
                         return@setOnClickListener
                     }
                     if (holder.candidate !== boundCandidateWord) return@setOnClickListener
-                    val offeredLegacySentences = sentenceAdapter.candidates
-                        .filter { candidate ->
-                            contextualCommitSnapshots.containsKey(candidate) &&
-                                !automaticSuggestionCandidates.containsKey(candidate)
+                    val offeredContextualSentences = currentRows?.oneRow.orEmpty()
+                        .filter { chip ->
+                            chip.sentence && chip.word !== boundCandidateWord &&
+                                contextualCommitSnapshots.containsKey(chip.word)
                         }
-                        .map { it.text }
+                        .map { it.word.text }
                     val nativeIdx = nativeCandidates.indexOfFirst { it.text == boundCandidateWord.text }
                     if (nativeIdx >= 0) {
                         service.selectCandidate(nativeIdx)
@@ -283,9 +283,9 @@ class HorizontalCandidateComponent :
                             contextual.replacementSnapshot
                         )
                     }
-                    // Feedback loop: If sentence candidates were offered on bottom row, record ignore decay
-                    if (offeredLegacySentences.isNotEmpty()) {
-                        service.recordContextualCandidatesIgnored(offeredLegacySentences)
+                    // Feedback loop: the other contextual sentences offered beside the tapped chip decay as ignored
+                    if (offeredContextualSentences.isNotEmpty()) {
+                        service.recordContextualCandidatesIgnored(offeredContextualSentences)
                     }
                     view.post {
                         refreshContextualCandidatesIfNeeded()
@@ -298,6 +298,10 @@ class HorizontalCandidateComponent :
                     val nativeIdx = nativeCandidates.indexOfFirst { it.text == boundCandidateWord.text }
                     if (nativeIdx >= 0) {
                         inputView.showCandidateActionMenu(nativeIdx, boundCandidateWord.text, holder.ui.root)
+                    } else if (isContextualSentence(boundCandidateWord)) {
+                        // Rejection / penalty on contextual sentence long click
+                        service.recordContextualCandidateRejected(boundCandidateWord.text, heavyPenalty = true)
+                        view.post { refreshContextualCandidatesIfNeeded() }
                     }
                     true
                 }
@@ -311,7 +315,7 @@ class HorizontalCandidateComponent :
         }
     }
 
-    // Bottom Row: Sentence Candidates (문장 단위)
+    // Bottom Row: on-device automatic suggestions (AI 줄)
     val sentenceAdapter: HorizontalCandidateViewAdapter by lazy {
         object : HorizontalCandidateViewAdapter(theme, rowHeightDp = 30, isSentenceRow = true) {
             override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
@@ -324,37 +328,12 @@ class HorizontalCandidateComponent :
                     flexShrink = 0f
                 }
                 holder.itemView.setOnClickListener {
-                    if (automaticCandidate != null) {
-                        if (holder.candidate === boundCandidateWord) {
-                            service.commitAutomaticSuggestionCandidate(automaticCandidate)
-                            view.post { refreshContextualCandidatesIfNeeded() }
-                        }
-                        return@setOnClickListener
-                    }
-                    if (holder.candidate !== boundCandidateWord) return@setOnClickListener
-                    val contextual = contextualCommitSnapshots[boundCandidateWord]
-                        ?: return@setOnClickListener
-                    service.commitContextualSentence(
-                        boundCandidateWord.text,
-                        contextual.metricsCandidate,
-                        contextual.appendSnapshot,
-                        contextual.replacementSnapshot
-                    )
-                    view.post {
-                        refreshContextualCandidatesIfNeeded()
+                    if (automaticCandidate != null && holder.candidate === boundCandidateWord) {
+                        service.commitAutomaticSuggestionCandidate(automaticCandidate)
+                        view.post { refreshContextualCandidatesIfNeeded() }
                     }
                 }
-                holder.itemView.setOnLongClickListener {
-                    if (automaticCandidate != null || holder.candidate !== boundCandidateWord) {
-                        return@setOnLongClickListener true
-                    }
-                    // Rejection / penalty on candidate long click
-                    service.recordContextualCandidateRejected(boundCandidateWord.text, heavyPenalty = true)
-                    view.post {
-                        refreshContextualCandidatesIfNeeded()
-                    }
-                    true
-                }
+                holder.itemView.setOnLongClickListener { true }
             }
 
             override fun onViewRecycled(holder: CandidateViewHolder) {
@@ -881,43 +860,15 @@ class HorizontalCandidateComponent :
     }
 
     /**
-     * Candidates gathered for one [renderCandidates] pass: the on-device automatic suggestions,
-     * the native candidates they do not already show, and the contextual words/sentences left after
-     * dropping what an automatic (or, for sentences, a native) candidate already shows.
+     * Candidates gathered for one [renderCandidates] pass: the on-device automatic suggestions and
+     * the fast and AI [rows] [StableCandidateRows] made of them, the native and the contextual ones.
      */
     private class CandidateSources(
         val automatic: AutomaticCandidates,
-        val displayNative: List<CandidateWord>,
-        val contextualWords: List<CandidateWord>,
-        val contextualSentences: List<CandidateWord>,
-        /** The word being typed has typo evidence, so ✏️ corrections go ahead of the automatic word chips. */
-        val typoCorrectionFirst: Boolean
-    ) {
+        val rows: StableCandidateRows.Rows,
+        /** Some source offers a sentence, which keeps the automatic status row from covering its row. */
         val hasSentences: Boolean
-            get() = automatic.sentences.isNotEmpty() || contextualSentences.isNotEmpty()
-
-        /** Word row of the two-row bar and of the landscape single row. */
-        fun wordRow(addressField: Boolean): Array<CandidateWord> = HorizontalCandidateMerger.prependAutomatic(
-            automatic.words,
-            HorizontalCandidateMerger.merge(displayNative, contextualWords, emptyList(), addressField),
-            typoCorrectionFirst
-        )
-
-        /** Sentence row of the two-row bar; its first item is the landscape single row's sentence chip. */
-        fun sentenceRow(): Array<CandidateWord> =
-            HorizontalCandidateMerger.prependAutomatic(
-                automatic.sentences,
-                contextualSentences.toTypedArray(),
-                typoCorrectionFirst = false
-            )
-
-        /** The one-row bar shows words and sentences together. */
-        fun oneRow(addressField: Boolean): Array<CandidateWord> = HorizontalCandidateMerger.prependAutomatic(
-            automatic.words + automatic.sentences,
-            HorizontalCandidateMerger.merge(displayNative, contextualWords, contextualSentences, addressField),
-            typoCorrectionFirst
-        )
-    }
+    )
 
     /** Which candidate bar layout a [renderCandidates] pass draws. */
     private enum class CandidateRowLayout { SINGLE_ROW_LANDSCAPE, TWO_ROWS, ONE_ROW }
@@ -936,8 +887,8 @@ class HorizontalCandidateComponent :
             nativeCandidateCount = nativeCandidates.size
             nativeTotal = data.total
         }
-        val sources = collectCandidateSources()
         val addressField = isAddressField()
+        val sources = collectCandidateSources(addressField)
         val layout = resolveRowLayout(addressField)
         val statusRow = resolveStatusRow(sources, showTwoRows = layout == CandidateRowLayout.TWO_ROWS)
 
@@ -946,54 +897,65 @@ class HorizontalCandidateComponent :
         wordRow.visibility = View.VISIBLE
 
         when (layout) {
-            CandidateRowLayout.SINGLE_ROW_LANDSCAPE -> renderSingleRowLandscape(sources, addressField)
-            CandidateRowLayout.TWO_ROWS -> renderTwoRows(sources, statusRow, addressField)
-            CandidateRowLayout.ONE_ROW -> renderOneRow(sources, statusRow, addressField)
+            CandidateRowLayout.SINGLE_ROW_LANDSCAPE -> renderSingleRowLandscape(sources)
+            CandidateRowLayout.TWO_ROWS -> renderTwoRows(sources, statusRow)
+            CandidateRowLayout.ONE_ROW -> renderOneRow(sources, statusRow)
         }
         scheduleCandidateVisibilityMeasurement()
     }
 
-    private fun collectCandidateSources(): CandidateSources {
+    private fun collectCandidateSources(addressField: Boolean): CandidateSources {
         val automaticCandidates = getAutomaticCandidates()
         bar.hasAutomaticCandidates = automaticCandidates.isNotEmpty
-        val automaticTexts = automaticCandidates.texts
-        val displayNativeCandidates = nativeCandidates.filterNot { it.text in automaticTexts }
         val contextualSnapshot = service.getContextualCandidateSnapshot(wordLimit = 4, sentenceLimit = 2)
-        val contextualWords = contextualSnapshot.words
-            .map { it.word }
-            .filterNot { it.text in automaticTexts }
-        val contextualSentences = contextualSnapshot.sentences
-            .filterNot { contextual ->
-                contextual.word.text in automaticTexts ||
-                    nativeCandidates.any { it.text == contextual.word.text }
-            }
-            .map { it.word }
-        rememberContextualCommitSnapshots(contextualSnapshot.words + contextualSnapshot.sentences, automaticTexts)
-        val typoCorrectionFirst = automaticCandidates.words.isNotEmpty() && service.typingWordHasTypoEvidence()
+        val rows = stableRows.update(
+            editor = StableCandidateRows.EditorInput(
+                sessionEpoch = service.currentInputSessionEpoch,
+                stateRevision = service.editorStateRevision,
+                textInspectionAllowed = service.allowsTextInspectionFeatures(),
+                addressField = addressField
+            ),
+            nativeCandidates = nativeCandidates,
+            contextualWords = contextualSnapshot.words.map { it.word },
+            contextualSentences = contextualSnapshot.sentences.map { it.word },
+            automatic = automaticCandidates.chips
+        )
+        currentRows = rows
+        rememberContextualCommitSnapshots(contextualSnapshot.words + contextualSnapshot.sentences, rows)
         return CandidateSources(
             automaticCandidates,
-            displayNativeCandidates,
-            contextualWords,
-            contextualSentences,
-            typoCorrectionFirst
+            rows,
+            hasSentences = automaticCandidates.hasSentences || contextualSnapshot.sentences.isNotEmpty()
         )
     }
 
     /**
-     * Keeps the metrics/append/replacement snapshots that a tap on each offered contextual
-     * candidate commits with. Candidates an automatic or native candidate already shows are never
-     * offered, so they get none.
+     * Keeps the metrics/append/replacement snapshots that a tap on each contextual chip of [rows]
+     * commits with. A chip frozen in the fast row outlives the snapshot it came from, so it takes
+     * the current candidate with its text when there is one (its metrics generation is the active
+     * one) and otherwise keeps the one it had. Native and automatic chips get none.
      */
-    private fun rememberContextualCommitSnapshots(candidates: List<ContextualCandidate>, automaticTexts: Set<String>) {
-        contextualCommitSnapshots.clear()
-        candidates.forEach { candidate ->
-            if (candidate.word.text !in automaticTexts &&
-                nativeCandidates.none { it.text == candidate.word.text }
-            ) {
-                contextualCommitSnapshots[candidate.word] = candidate
-            }
+    private fun rememberContextualCommitSnapshots(
+        offered: List<ContextualCandidate>,
+        rows: StableCandidateRows.Rows
+    ) {
+        val offeredByWord = IdentityHashMap<CandidateWord, ContextualCandidate>()
+        offered.forEach { offeredByWord[it.word] = it }
+        val offeredByText = offered.associateBy { it.word.text }
+        val kept = IdentityHashMap<CandidateWord, ContextualCandidate>()
+        rows.oneRow.forEach { chip ->
+            val word = chip.word
+            if (automaticSuggestionCandidates.containsKey(word) || nativeCandidates.any { it === word }) return@forEach
+            val contextual = offeredByWord[word] ?: offeredByText[word.text] ?: contextualCommitSnapshots[word]
+            if (contextual != null) kept[word] = contextual
         }
+        contextualCommitSnapshots.clear()
+        contextualCommitSnapshots.putAll(kept)
     }
+
+    private fun isContextualSentence(word: CandidateWord): Boolean =
+        contextualCommitSnapshots.containsKey(word) &&
+            currentRows?.oneRow.orEmpty().any { it.sentence && it.word === word }
 
     private fun isAddressField(): Boolean {
         val flags = if (currentCapFlags != CapabilityFlags.DefaultFlags) currentCapFlags else service.capabilityFlags
@@ -1021,8 +983,10 @@ class HorizontalCandidateComponent :
     }
 
     private fun resolveStatusRow(sources: CandidateSources, showTwoRows: Boolean): StatusRowDecision {
-        // 다른 소스(문장팩·네트워크·개인화)의 문장 후보가 있으면 상태 행이 그 행을 가리지 않는다.
-        val content = computeStatusRowContent(sources.hasSentences)
+        // 상태 행이 자리를 차지하는 행(두 줄이면 AI 줄, 아니면 문장 후보가 있는 행)에 후보가 있으면 상태 행이 그 행을 가리지 않는다.
+        val content = computeStatusRowContent(
+            if (showTwoRows) sources.rows.ai.isNotEmpty() else sources.hasSentences
+        )
         // A spinner-less status (NO_CANDIDATE/ERROR) may only occupy the row when the bar is
         // already non-empty for some other reason; it must never be the sole thing keeping the
         // bar from collapsing. A spinner status (WARMUP/GENERATING) is allowed to force the bar
@@ -1041,13 +1005,14 @@ class HorizontalCandidateComponent :
         !(preeditEmpty && nativeCandidates.isEmpty()) || automatic.isNotEmpty
 
     /**
-     * Portrait (or thumb-split) always-two-row bar. The word and sentence rows always occupy
-     * exactly HEIGHT each (see KawaiiBarComponent.candidateRowFixedHeight): an empty row shows a
-     * placeholder chip in the same spot instead of shrinking, so the bar never resizes.
+     * Portrait (or thumb-split) always-two-row bar: the fast row on top, the AI row below. The two
+     * rows always occupy exactly HEIGHT each (see KawaiiBarComponent.candidateRowFixedHeight): an
+     * empty row shows a placeholder chip in the same spot instead of shrinking, so the bar never
+     * resizes.
      */
-    private fun renderTwoRows(sources: CandidateSources, statusRow: StatusRowDecision, addressField: Boolean) {
-        val topCandidates = sources.wordRow(addressField)
-        val bottomCandidates = sources.sentenceRow()
+    private fun renderTwoRows(sources: CandidateSources, statusRow: StatusRowDecision) {
+        val topCandidates = sources.rows.fast.toWordArray()
+        val bottomCandidates = sources.rows.ai.toWordArray()
 
         singleRowSentenceContainer.visibility = View.GONE
         singleRowGeneratingSpinner.visibility = View.GONE
@@ -1117,12 +1082,12 @@ class HorizontalCandidateComponent :
     }
 
     /**
-     * One-row bar (two-row preference off, or an email/URL field): automatic, native and contextual
-     * candidates share the word row. With none of them, a spinner status row may still hold the
-     * bar up; otherwise the bar collapses.
+     * One-row bar (two-row preference off, or an email/URL field): the fast row and the AI row share
+     * the word row. With none of them, a spinner status row may still hold the bar up; otherwise
+     * the bar collapses.
      */
-    private fun renderOneRow(sources: CandidateSources, statusRow: StatusRowDecision, addressField: Boolean) {
-        val candidates = sources.oneRow(addressField)
+    private fun renderOneRow(sources: CandidateSources, statusRow: StatusRowDecision) {
+        val candidates = sources.rows.oneRow.toWordArray()
         wordAdapter.updateCandidates(candidates, candidates.size)
         sentenceAdapter.updateCandidates(emptyArray(), 0)
 
@@ -1188,15 +1153,15 @@ class HorizontalCandidateComponent :
      * (48dp) regardless of which of these three states is active — see
      * CandidateBarModePolicy.candidateRowHeightDp.
      */
-    private fun renderSingleRowLandscape(sources: CandidateSources, addressField: Boolean) {
+    private fun renderSingleRowLandscape(sources: CandidateSources) {
         setConnectionHint(null)
         setStatusRow(false, null)
         hairlineDivider.visibility = View.GONE
         sentenceRow.hideRow()
         sentenceAdapter.updateCandidates(emptyArray(), 0)
 
-        val topCandidates = sources.wordRow(addressField)
-        val sentenceCandidate = sources.sentenceRow().firstOrNull()
+        val topCandidates = sources.rows.landscapeWords.toWordArray()
+        val sentenceCandidate = sources.rows.landscapeSentence?.word
 
         wordAdapter.updateCandidates(topCandidates, topCandidates.size)
         wordAdapter.rowHeightDp = KawaiiBarComponent.HEIGHT
@@ -1239,6 +1204,9 @@ class HorizontalCandidateComponent :
             }
         }
     }
+
+    private fun List<StableCandidateRows.Chip>.toWordArray(): Array<CandidateWord> =
+        Array(size) { this[it].word }
 
     private fun showHairlineDivider() {
         hairlineDivider.visibility = View.VISIBLE
@@ -1381,6 +1349,8 @@ class HorizontalCandidateComponent :
         nativeExpandedStart = 0
         contextualCommitSnapshots.clear()
         automaticSuggestionCandidates.clear()
+        stableRows.reset()
+        currentRows = null
         bar.hasAutomaticCandidates = false
         cancelStatusRowNoCandidateHide()
         statusRowLogicalState = null
@@ -1412,10 +1382,9 @@ class HorizontalCandidateComponent :
         /**
          * The offset the expanded candidate window starts at: one past the last fcitx list index
          * among the native [visibleChips]. Automatic, contextual and typo-correction chips occupy
-         * no index in fcitx's own candidate list, and a native candidate an automatic chip hides
-         * is not a visible chip, so it shows up in the expanded window when it lies beyond the
-         * last visible native chip. [nativeIndexOf] gives a chip's fcitx list index, -1 for
-         * non-native chips.
+         * no index in fcitx's own candidate list, and a native candidate that is not a visible chip
+         * shows up in the expanded window when it lies beyond the last visible native chip.
+         * [nativeIndexOf] gives a chip's fcitx list index, -1 for non-native chips.
          */
         internal fun nativeExpandedOffset(
             visibleChips: List<CandidateWord>,

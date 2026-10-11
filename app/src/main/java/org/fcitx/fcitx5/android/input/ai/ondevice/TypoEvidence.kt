@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.ai.ondevice
 
-import org.fcitx.fcitx5.android.input.text.SentenceBoundary
 
 /**
  * 쓰는 중인 문장의 어절이 오타라는 증거. 모델이 문장을 다시 썼다는 사실만으로는 오타가 있었다는 뜻이 아니므로,
@@ -28,15 +27,5 @@ class TypoEvidence(
         val correction = typoCorrectionFor(token) ?: return null
         if (stillTyping && isWordPrefix(token)) return null
         return correction
-    }
-
-    /**
-     * 커서 앞 글 [textBeforeCursor]에서 지금 쓰는 어절(마지막 어절. 끝이 공백이면 방금 끝낸 어절)의 교정어.
-     * 문장이 이미 끝났거나 어절이 없거나 오타 증거가 없으면 null.
-     */
-    fun correctionForTypingWord(textBeforeCursor: String): String? {
-        if (textBeforeCursor.isBlank() || SentenceBoundary.endsSentence(textBeforeCursor)) return null
-        val token = textBeforeCursor.trimEnd().takeLastWhile { !it.isWhitespace() }
-        return correctionFor(token, stillTyping = !textBeforeCursor.last().isWhitespace())
     }
 }

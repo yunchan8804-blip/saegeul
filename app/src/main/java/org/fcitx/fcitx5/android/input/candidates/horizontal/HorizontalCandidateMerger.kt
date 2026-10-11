@@ -8,10 +8,10 @@ package org.fcitx.fcitx5.android.input.candidates.horizontal
 import org.fcitx.fcitx5.android.core.CandidateWord
 
 /**
- * Ordering and de-duplication rules for the horizontal candidate bar's rows, kept free of
- * Android/service state so they can be unit tested on the JVM. [HorizontalCandidateComponent]
- * gathers the native, contextual and automatic candidates and decides whether the editor is an
- * address (email/URL) field; this object only decides the order in which they are shown.
+ * Ordering and de-duplication rules for the horizontal candidate bar's fast row, kept free of
+ * Android/service state so they can be unit tested on the JVM. [StableCandidateRows] gathers the
+ * native and contextual candidates and whether the editor is an address (email/URL) field; this
+ * object only decides the order in which a batch of them is shown.
  */
 internal object HorizontalCandidateMerger {
 
@@ -59,27 +59,6 @@ internal object HorizontalCandidateMerger {
         merged.addNewTexts(otherWords)
         merged.addNewTexts(otherSentences)
         return merged.toTypedArray()
-    }
-
-    /**
-     * Puts the on-device automatic suggestions in front of [legacy], dropping every legacy
-     * candidate whose text an automatic suggestion already shows.
-     *
-     * With [typoCorrectionFirst] (the word being typed has evidence of being a typo), the typo
-     * corrections (comment starting with the ✏️ badge) lead instead, then the automatic suggestions,
-     * then the rest of [legacy] in its own order.
-     */
-    fun prependAutomatic(
-        automatic: List<CandidateWord>,
-        legacy: Array<CandidateWord>,
-        typoCorrectionFirst: Boolean
-    ): Array<CandidateWord> {
-        val remaining = legacy.filterNot { legacyCandidate ->
-            automatic.any { automaticCandidate -> automaticCandidate.text == legacyCandidate.text }
-        }
-        if (!typoCorrectionFirst) return (automatic + remaining).toTypedArray()
-        val (typoCorrections, others) = remaining.partition { it.isTypoCorrection() }
-        return (typoCorrections + automatic + others).toTypedArray()
     }
 
     private fun CandidateWord.isTypoCorrection(): Boolean = comment.startsWith(TYPO_CORRECTION_BADGE)
